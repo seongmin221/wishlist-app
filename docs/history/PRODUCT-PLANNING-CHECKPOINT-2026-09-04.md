@@ -1,6 +1,8 @@
 # 제품 기획 재개 체크포인트 (2026-09-04)
 
-> 상태: **진행 중** · 날짜: 2026-09-04 · 영역: **제품 공통**
+> 상태: **대체됨** · 날짜: 2026-09-04 · 영역: **제품 공통**
+
+이 체크포인트 이후 제품 정책과 `Product`·`WishlistItem` 경계가 구체화됐다. 현재 재개 지점은 [2026-09-05 기획 체크포인트](PRODUCT-PLANNING-CHECKPOINT-2026-09-05.md)를 따른다.
 
 2026-08-29 체크포인트 이후 확정한 제품 기획을 기록한다. 제품 규칙의 기준 문서는 [제품 기능 및 스펙](../product-spec.md)이며, taxonomy의 전체 목록은 [제품 taxonomy](../product-taxonomy-draft.md)에서 확인한다.
 
@@ -21,15 +23,38 @@
 
 ## 다음 재개 지점
 
-1. **비어 있지 않은 목적 삭제 규칙 결정 (최우선)**
-   - 권장안: 목적만 삭제하고 활성 항목은 `목적 미지정`으로 남기며, 아카이브 기록은 보존한다.
-2. 사용자 전용 카테고리의 이름 변경·삭제와 연결된 항목 처리 결정
-3. AI 목적 자동 연결의 최소 근거 및 재확인 조건 결정
-4. 중복 URL 저장 정책, 아카이브·삭제 안전장치, 웹뷰 동작 정의
+비어 있지 않은 목적의 삭제 규칙은 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PURPOSE-DELETION.md)으로 확정했다.
+
+사용자 전용 카테고리의 이름 변경·삭제 규칙은 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-LIFECYCLE.md)으로 확정했다.
+
+AI 목적 자동 연결의 최소 근거와 재판단 조건은 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-AI-PURPOSE-LINKING.md)으로 확정했다.
+
+중복 URL과 상품 후보 처리 규칙은 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-DUPLICATE-ITEMS.md)으로 확정했다.
+
+아카이브와 삭제 안전장치는 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-ARCHIVE-DELETE-SAFEGUARDS.md)으로 확정했다.
+
+웹뷰 동작은 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-WEBVIEW-BEHAVIOR.md)으로 확정했다.
+
+사용자 전용 카테고리의 안전성 제한과 AI 후보 제외 기준은 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-SAFETY.md)으로 확정했다.
+
+`Product`를 공용 추출 캐시로만 사용하고 `WishlistItem`을 독립 snapshot으로 두는 경계는 2026-09-05에 [별도 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PRODUCT-CACHE-SNAPSHOT.md)으로 확정했다.
+
+1. **Product 캐시 상태별 재사용 기준 결정 (최우선)**
+2. 전체 데이터 모델과 API 계약 설계
+3. PostgreSQL, Auth, Queue, Hosting 공급자와 처리 완료 전달 방식 결정
+4. Playwright 적용 범위 결정
 
 ## 관련 문서
 
 - [제품 기능 및 스펙](../product-spec.md)
 - [제품 taxonomy](../product-taxonomy-draft.md)
 - [taxonomy 방향 정리](PRODUCT-TAXONOMY-DIRECTION-2026-09-02.md)
+- [목적 삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PURPOSE-DELETION.md)
+- [사용자 전용 카테고리 변경·삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-LIFECYCLE.md)
+- [AI 목적 자동 연결 결정](PRODUCT-PLANNING-DECISION-2026-09-05-AI-PURPOSE-LINKING.md)
+- [중복 URL과 상품 후보 처리 결정](PRODUCT-PLANNING-DECISION-2026-09-05-DUPLICATE-ITEMS.md)
+- [아카이브와 삭제 안전장치 결정](PRODUCT-PLANNING-DECISION-2026-09-05-ARCHIVE-DELETE-SAFEGUARDS.md)
+- [상품 링크 웹뷰 동작 결정](PRODUCT-PLANNING-DECISION-2026-09-05-WEBVIEW-BEHAVIOR.md)
+- [사용자 전용 카테고리 입력·AI 안전성 결정](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-SAFETY.md)
+- [Product 캐시와 WishlistItem 스냅샷 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PRODUCT-CACHE-SNAPSHOT.md)
 - [AI 구조](../architecture/ai/overview.md)
