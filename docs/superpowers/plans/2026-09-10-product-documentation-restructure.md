@@ -8,7 +8,7 @@
 
 **Tech Stack:** Markdown, Git, rg, Ruby 표준 라이브러리를 이용한 상대 링크 검사
 
-**Spec:** docs/history/PRODUCT-DOCUMENTATION-STRUCTURE.md — Task 1에서 docs/history/architecture/repository/product-documentation-structure.md로 이동한다.
+**Spec:** docs/history/architecture/repository/product-documentation-structure.md
 
 ## Global Constraints
 

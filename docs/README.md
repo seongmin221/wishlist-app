@@ -19,7 +19,7 @@
 - [기술 학습 노트](learning/README.md)
 - [의사결정 이력](history/README.md)
 
-구현 사유와 trade-off를 남기는 프로젝트 공통 기록 방식은 [ADR-001](history/ADR-001-documentation-recording.md)을 따른다.
+구현 사유와 trade-off를 남기는 프로젝트 공통 기록 방식은 [ADR-001](history/architecture/repository/ADR-001-documentation-recording.md)을 따른다.
 
 ## 작성 규칙
 

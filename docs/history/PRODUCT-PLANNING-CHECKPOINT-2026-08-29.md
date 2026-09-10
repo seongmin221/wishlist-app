@@ -61,5 +61,5 @@
 ## 구현 상태
 
 - 현재 저장소에는 제품·구조·학습 문서와 기술 선택 기록이 있으며, 이번 체크포인트 시점에는 앱 기능 구현을 시작하지 않았다.
-- 서버 MVP 프레임워크는 Kotlin/JVM + Ktor로 확정되어 있다. 자세한 근거는 [ADR-003](server/ADR-003-select-ktor.md)를 따른다.
+- 서버 MVP 프레임워크는 Kotlin/JVM + Ktor로 확정되어 있다. 자세한 근거는 [ADR-003](architecture/server/ADR-003-select-ktor.md)를 따른다.
 - 다음 세션은 이 문서와 [제품 기능·스펙](../product-spec.md)을 먼저 읽고 taxonomy 논의부터 시작한다.

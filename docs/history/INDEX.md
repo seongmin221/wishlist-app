@@ -1,12 +1,22 @@
 # History Index
 
-결정의 맥락, 선택지, trade-off, 재검토 조건을 보존하는 ADR과 영역별 이력의 진입점이다.
+결정의 맥락, 선택지, trade-off, 재검토 조건을 보존하는 이력의 진입점이다.
 
-- [제품 기획 문서 구조 설계](PRODUCT-DOCUMENTATION-STRUCTURE.md)
+## 기술 결정 이력
+
+- [Architecture History Index](architecture/INDEX.md)
 
 | 영역 | Index / 문서 |
 | --- | --- |
-| 프로젝트 공통 ADR | [ADR-001](ADR-001-documentation-recording.md), [ADR-004](ADR-004-repository-structure.md) |
+| Repository | [repository/INDEX.md](architecture/repository/INDEX.md) |
+| Client | [client/INDEX.md](architecture/client/INDEX.md) |
+| Server | [server/INDEX.md](architecture/server/INDEX.md) |
+| AI | [ai/INDEX.md](architecture/ai/INDEX.md) |
+
+## 제품 기획 이력
+
+| 영역 | Index / 문서 |
+| --- | --- |
 | 제품 기획 재개 (대체됨) | [2026-08-29 기획·학습 체크포인트](PRODUCT-PLANNING-CHECKPOINT-2026-08-29.md), [2026-09-04 기획 체크포인트](PRODUCT-PLANNING-CHECKPOINT-2026-09-04.md) |
 | 제품 기획 이력 (대체됨) | [2026-08-29 목적별 비교 그룹과 AI 목적 제안](PRODUCT-PLANNING-DECISION-2026-08-29-PURPOSE-GROUPS.md), [2026-08-29 목적 점검 흐름 체크포인트](PRODUCT-PLANNING-CHECKPOINT-2026-08-29-PURPOSE-REVIEW.md) |
 | 제품 기획 재개 | [2026-09-05 기획 체크포인트](PRODUCT-PLANNING-CHECKPOINT-2026-09-05.md) |
@@ -22,6 +32,3 @@
 | 로컬 저장·분석 재시도 정책 | [2026-09-10 로컬 대기 저장과 분석 재시도](PRODUCT-PLANNING-DECISION-2026-09-10-LOCAL-PENDING-ANALYSIS.md) |
 | 상품 정보 보완 완료 기준 | [2026-09-10 상품 정보 직접 보완의 완료 기준](PRODUCT-PLANNING-DECISION-2026-09-10-MANUAL-COMPLETION.md) |
 | 홈 조치 영역 우선순위 | [2026-09-10 홈 조치 필요 영역의 우선순위](PRODUCT-PLANNING-DECISION-2026-09-10-HOME-ACTION-PRIORITY.md) |
-| Client | [client/README.md](client/README.md) |
-| Server | [server/INDEX.md](server/INDEX.md) |
-| AI | [ai/README.md](ai/README.md) |
