@@ -29,5 +29,6 @@
 
 ## 관련 문서
 
+- [현재 상품 저장 흐름](../../../../product/save-a-product.md)
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [2026-09-05 기획 체크포인트](../checkpoints/policy-completion.md)

@@ -40,6 +40,7 @@
 
 ## 관련 문서
 
+- [현재 상품 저장 흐름](../../../../product/save-a-product.md) — 저장 수신과 중복 후보 탐지의 경계
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [Server 구조](../../../../architecture/server/overview.md)
 - [상품 정보 추출 pipeline](../../../../architecture/server/extraction-pipeline.md)

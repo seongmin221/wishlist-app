@@ -13,7 +13,7 @@
 - `FAILED` — 상품 정보 추출을 완료하지 못한 결과를 가리킨다.
 - `재시도 가능` — 서버 분석 실패 후 사용자가 직접 보완하기 전 다시 분석을 요청할 수 있는 상태를 가리킨다.
 
-저장·분석·재시도와 삭제 결과의 소유 근거는 [로컬 대기 저장과 분석 재시도 결정](../../history/product-planning/mvp/decisions/local-pending-analysis.md)에 둔다. 캐시의 `READY`·`PARTIAL`·`FAILED` 구분은 [Product 캐시와 WishlistItem 스냅샷 결정](../../history/product-planning/mvp/decisions/product-cache-snapshot.md)을 따른다.
+저장·분석·재시도와 삭제 결과는 [상품 저장](../save-a-product.md)이 소유한다. 캐시의 `READY`·`PARTIAL`·`FAILED` 구분도 이 흐름에서 적용하며, 결정 근거는 [로컬 대기 저장과 분석 재시도 결정](../../history/product-planning/mvp/decisions/local-pending-analysis.md) 및 [Product 캐시와 WishlistItem 스냅샷 결정](../../history/product-planning/mvp/decisions/product-cache-snapshot.md)에 보존한다.
 
 ## 사용자 조치 영역
 
@@ -30,5 +30,5 @@
 ## 상태 문서의 범위
 
 - 이 문서는 용어의 구분과 공통 완료 조건만 기록한다.
-- 각 용어의 생성, 화면 노출, 전환, 재시도와 삭제 예외는 사용자 흐름 문서가 작성된 뒤 그 문서에서 소유한다.
+- 각 용어의 생성, 화면 노출, 전환, 재시도와 삭제 예외는 해당 사용자 흐름 문서가 소유한다. 저장·분석·재시도·처리 중 삭제는 [상품 저장](../save-a-product.md)을 따른다.
 - 아직 제안 상태인 원본 규칙이 있으므로 문서 상태를 승격하지 않는다.
