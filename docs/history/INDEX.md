@@ -17,6 +17,9 @@
 | 웹뷰 정책 | [2026-09-05 상품 링크 웹뷰 동작](PRODUCT-PLANNING-DECISION-2026-09-05-WEBVIEW-BEHAVIOR.md) |
 | 사용자 전용 카테고리 안전성 | [2026-09-05 사용자 전용 카테고리 입력과 AI 안전성](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-SAFETY.md) |
 | 상품 캐시 경계 | [2026-09-05 Product 캐시와 WishlistItem 스냅샷](PRODUCT-PLANNING-DECISION-2026-09-05-PRODUCT-CACHE-SNAPSHOT.md) |
+| 로컬 저장·분석 재시도 정책 | [2026-09-10 로컬 대기 저장과 분석 재시도](PRODUCT-PLANNING-DECISION-2026-09-10-LOCAL-PENDING-ANALYSIS.md) |
+| 상품 정보 보완 완료 기준 | [2026-09-10 상품 정보 직접 보완의 완료 기준](PRODUCT-PLANNING-DECISION-2026-09-10-MANUAL-COMPLETION.md) |
+| 홈 조치 영역 우선순위 | [2026-09-10 홈 조치 필요 영역의 우선순위](PRODUCT-PLANNING-DECISION-2026-09-10-HOME-ACTION-PRIORITY.md) |
 | Client | [client/README.md](client/README.md) |
 | Server | [server/INDEX.md](server/INDEX.md) |
 | AI | [ai/README.md](ai/README.md) |
