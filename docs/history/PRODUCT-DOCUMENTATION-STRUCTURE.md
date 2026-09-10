@@ -186,6 +186,8 @@ docs/
 
 - 동일한 현재 규칙은 product 문서 하나만 소유한다.
 - 다른 product 문서는 소유 문서의 해당 항목을 링크한다.
+- 문서 이동 자체를 근거로 상태를 승격하지 않는다. 모든 규범적 규칙에 확정 근거가 있을 때만 문서 상태를 `확정`으로 두고, 하나라도 제안 상태의 규칙이 있으면 문서 전체를 `제안`으로 둔다.
+- 확정된 규칙과 미결정 사항은 분리한다. 미결정 사항이 있더라도 구현자가 임의로 선택하지 않도록 별도 섹션에 명시한다.
 - 사용자 목표가 새로 구체화되면 기존 대형 문서에 계속 추가하지 않고 형제 product 문서가 필요한지 먼저 판단한다.
 - 둘 이상의 흐름에서 같은 안정적 정의가 반복될 때만 reference로 승격한다.
 - 미결정 사항은 구현자가 임의로 채우지 않도록 명시한다.
@@ -195,17 +197,18 @@ docs/
 ## 마이그레이션 원칙
 
 1. 현재 작업 트리의 내용을 기준으로 기존 product와 history 문서를 목록화한다.
-2. 확정된 규칙마다 목표 product 소유 문서를 지정한다.
+2. 기존 `product-spec.md`의 모든 bullet에 임시 식별자를 부여하고 원본 행, 원본 상태, 정확히 하나의 product 또는 architecture 소유 문서, 관련 history, 이전 여부를 기록한다.
 3. 새 product 문서를 먼저 작성하고 규칙 누락과 중복을 검토한다.
 4. `product-spec.md`를 `product/overview.md`로 축소·이동하고 `product-taxonomy-draft.md`를 reference로 이동한다.
 5. 기존 제품 기획 history를 `product-planning/mvp/` 아래로 이동한다. 본문은 보존하고 상태·대체 관계·현재 문서 링크만 필요한 만큼 갱신한다.
-6. 기술 ADR을 `history/architecture/`로 이동하고 기존 번호를 유지한다.
+6. 기술 ADR을 `history/architecture/`로 이동하고 기존 번호를 유지한다. client, server, AI history README를 통합할 때는 모든 결정 bullet의 상태와 문구를 그대로 새 INDEX에 보존한다.
 7. 루트 및 하위 `INDEX.md`, `README.md`, 모든 내부 링크를 갱신한다.
 8. 검증이 끝난 뒤에만 이전 경로의 파일을 제거한다. Git이 이동으로 인식할 수 있도록 내용 변경과 경로 변경을 구분해 검토한다.
 
 ## 검증
 
 - 기존 `product-spec.md`의 확정 규칙이 하나 이상의 `product/*.md`에 배치됐는지 대조한다.
+- bullet 단위 traceability 표의 모든 항목이 정확히 하나의 소유 문서를 가지며 이전 완료로 표시됐는지 확인한다.
 - 동일한 규칙이 여러 product 문서에서 독립적으로 정의되지 않았는지 확인한다.
 - 모든 상대 Markdown 링크가 실제 파일을 가리키는지 검사한다.
 - 이전 `product-spec.md`, `product-taxonomy-draft.md`, `history/PRODUCT-*` 경로 참조가 남지 않았는지 검색한다.

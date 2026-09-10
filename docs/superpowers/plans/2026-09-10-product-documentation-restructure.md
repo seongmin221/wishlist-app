@@ -20,6 +20,8 @@
 - 제품 기획 history 버전은 세션이나 문서 개정이 아니라 mvp, v1, v2 같은 제품 출시 범위를 뜻한다.
 - 기존 ADR 번호를 유지한다.
 - 날짜, draft, 출시 버전은 현재 product 파일명에 넣지 않는다.
+- 마이그레이션만을 근거로 문서 상태를 승격하지 않는다. 모든 규범적 규칙에 확정 근거가 있을 때만 문서 상태를 확정으로 두고, 하나라도 제안 상태이면 문서 전체를 제안으로 둔다. 미결정 사항은 별도 섹션에 격리한다.
+- product-spec.md의 모든 bullet은 임시 traceability 표에서 식별자, 원본 행, 원본 상태, 단일 소유 문서, 관련 history, 이전 여부를 가져야 한다.
 - 여러 문서나 하위 주제를 가진 폴더에는 간결한 INDEX.md를 둔다.
 - 작업 전부터 존재하는 AGENTS.md, .codex/, .superpowers/ 변경은 수정하거나 커밋하지 않는다.
 - git add .를 사용하지 않고 각 Task에서 바꾼 파일만 명시적으로 stage한다.
@@ -66,14 +68,14 @@ Expected: record user-owned changes; do not stage or edit them.
 Run:
 
 ~~~bash
-rg -n 'history/(ADR-|server/ADR-|client/README|server/(README|INDEX)|ai/README)|\((ADR-|server/ADR-)' docs --glob '*.md'
+rg -n '\]\((history/ADR-00[14][^)]*|ADR-00[14][^)]*|server/ADR-00[23][^)]*|history/client/README\.md|history/server/(README|INDEX)\.md|history/ai/README\.md)\)' docs --glob '*.md' --glob '!superpowers/plans/**' --glob '!history/architecture/**'
 ~~~
 
 Expected: a finite list of link consumers to update in Step 5.
 
 - [ ] **Step 3: Create target indexes and move files**
 
-Write concise scope indexes. Preserve useful text from old platform README files. Move the ADRs and design spec, keeping ADR contents and numbers intact. Update relative links changed by depth.
+Write concise scope indexes. 기존 client, server, AI history README의 모든 결정 bullet을 상태와 문구를 약화하지 않고 그대로 해당 INDEX로 옮긴다. Move the ADRs and design spec, keeping ADR contents and numbers intact. Update relative links changed by depth.
 
 - [ ] **Step 4: Update every link consumer and the plan Spec path**
 
@@ -158,11 +160,11 @@ Expected: four checkpoints and thirteen decisions/direction records plus their i
 
 - [ ] **Step 2: Create release and record-type indexes**
 
-product-planning/INDEX.md defines release-scope versioning. mvp/INDEX.md summarizes the MVP planning sequence and links the current product index. The checkpoint index is chronological; the decision index groups records by the four user flows.
+product-planning/INDEX.md defines release-scope versioning. mvp/INDEX.md summarizes the MVP planning sequence and links the still-current docs/product-spec.md until Task 8 completes. The checkpoint index is chronological; the decision index groups records by the four user flows. Do not link docs/product/INDEX.md in this task because Task 3 has not created it yet.
 
 - [ ] **Step 3: Move checkpoints without merging bodies**
 
-Apply the table exactly. Change a stale 진행 중 status to 대체됨 only because current product docs replace it as the resume point. Preserve dates, session context, and decisions.
+Apply the table exactly. Preserve every checkpoint status in this task, including the 진행 중 states of initial-direction.md and policy-completion.md. Preserve dates, session context, and decisions. Task 8 changes those two statuses only after the new product baseline exists.
 
 - [ ] **Step 4: Move decisions and repair links**
 
@@ -201,6 +203,7 @@ docs: MVP 제품 기획 이력 구조 정리
 - Create: docs/product/references/item-states.md
 - Move: docs/product-taxonomy-draft.md → docs/product/references/product-taxonomy.md
 - Modify: docs/product-spec.md and moved history files that link taxonomy
+- Temporary work artifact: /private/tmp/wishlist-product-spec-traceability.md
 
 **Interfaces:**
 - Consumes: existing 11 top-level categories, 87 leaf types, and state terms in current product/history docs.
@@ -211,30 +214,57 @@ docs: MVP 제품 기획 이력 구조 정리
 Run:
 
 ~~~bash
-rg -c '^## ' docs/product-taxonomy-draft.md
-rg -c '^- ' docs/product-taxonomy-draft.md
+awk '/^## 출시 후 확장 기준/{exit} /^## /{headings++} /^- /{bullets++} END{print headings, bullets}' docs/product-taxonomy-draft.md
 rg -n 'PROCESSING|READY|PARTIAL|FAILED|NEW|CONFIRMED|UNCONFIRMED|분석 대기|분류 중|정보 보완 필요|카테고리 미지정|분류·목적 확인|재시도 가능' docs/product-spec.md docs/history/product-planning/mvp
 ~~~
 
-Expected: taxonomy counts are 11 and 87; state inventory is available for comparison.
+Expected: taxonomy output is 11 87; state inventory is available for comparison.
 
-- [ ] **Step 2: Create README and indexes**
+- [ ] **Step 2: Create the bullet-level traceability table**
+
+Create /private/tmp/wishlist-product-spec-traceability.md before writing any product flow document. Assign PS-001 through PS-148 to every bullet line in docs/product-spec.md, including nested bullets. Use these columns:
+
+~~~text
+ID | source line | concise rule | source status | exactly one owner | related history | migration status
+~~~
+
+Fill source status conservatively from the product spec and linked history. A later explicit 확정 decision may override the product spec's document-level 제안 status for that exact rule; otherwise keep the rule 제안. Do not infer 확정 from repetition. Every owner must be one concrete docs/product/ or docs/architecture/ path. Related history must be an exact path or 없음. Initial migration status is 대기.
+
+Run:
+
+~~~bash
+rg -c '^\| PS-[0-9]{3} \|' /private/tmp/wishlist-product-spec-traceability.md
+rg -n '^\| PS-[0-9]{3} \|[^|]*\|[^|]*\|[[:space:]]*\|' /private/tmp/wishlist-product-spec-traceability.md
+awk -F '|' '/^\| PS-[0-9]{3} \|/ {if ($6 !~ /docs\/(product|architecture)\// || ($7 !~ /docs\/history\// && $7 !~ /없음/) || $8 !~ /대기/) {print NR ": invalid traceability row"; bad=1}} END {exit bad}' /private/tmp/wishlist-product-spec-traceability.md
+~~~
+
+Expected: first command prints 148; the other commands print nothing and exit zero. The field validator requires exactly one concrete owner, a related history path or 없음, and initial 대기 status on every row.
+
+- [ ] **Step 3: Create README and indexes**
 
 README defines current-product authority, the common document template, the single-owner rule, and reference promotion criteria. INDEX names overview, four flows, and references, but does not create broken Markdown links to flow documents before they exist.
 
-- [ ] **Step 3: Move taxonomy without changing entries**
+- [ ] **Step 4: Move taxonomy without changing entries**
 
-Change draft wording to launch-baseline wording. Preserve all category headings and leaf bullets; update introduction and links only.
+Change draft wording to launch-baseline wording. Preserve its existing 출시 기준 확정 status, all category headings, and all leaf bullets; update introduction and links only.
 
-- [ ] **Step 4: Create item-states.md from proven terms**
+- [ ] **Step 5: Create item-states.md from proven terms**
 
-Separate internal processing states, user-visible action areas, review state, and completion conditions. Do not invent a unified state machine if current documents do not define one. Link behavioral ownership to history until the feature docs exist.
+Separate internal processing states, user-visible action areas, review state, and completion conditions. Derive the document status from the traceability rows and never promote it merely because it was reorganized. Do not invent a unified state machine if current documents do not define one. Link behavioral ownership to history until the feature docs exist.
 
-- [ ] **Step 5: Update inbound taxonomy links and verify**
+- [ ] **Step 6: Update inbound taxonomy links and verify**
 
-Expected after checks: new taxonomy still has 11 second-level headings and 87 bullet entries; docs/product-taxonomy-draft.md is absent; rg for product-taxonomy-draft.md finds no Markdown link. Run the full link checker.
+Run:
 
-- [ ] **Step 6: Commit the reference structure**
+~~~bash
+awk '/^## 출시 후 확장 기준/{exit} /^## /{headings++} /^- /{bullets++} END{print headings, bullets}' docs/product/references/product-taxonomy.md
+test ! -e docs/product-taxonomy-draft.md
+rg -n '\]\([^)]*product-taxonomy-draft\.md' docs --glob '*.md' --glob '!superpowers/plans/**'
+~~~
+
+Expected: taxonomy output is 11 87, the old file is absent, and the legacy Markdown-link search prints nothing. Run the full link checker.
+
+- [ ] **Step 7: Commit the reference structure**
 
 Commit:
 
@@ -252,7 +282,10 @@ docs: 제품 공통 참조 문서 구성
 - Create: docs/product/save-a-product.md
 - Modify: docs/product/INDEX.md
 - Modify: docs/product/references/item-states.md
-- Modify: related history decision links
+- Modify: docs/history/product-planning/mvp/decisions/local-pending-analysis.md
+- Modify: docs/history/product-planning/mvp/decisions/product-cache-snapshot.md
+- Modify: docs/history/product-planning/mvp/decisions/duplicate-items.md
+- Update work artifact: /private/tmp/wishlist-product-spec-traceability.md
 
 **Interfaces:**
 - Consumes: local-pending-analysis.md, product-cache-snapshot.md, duplicate-items.md, current product-spec.md, and server extraction architecture.
@@ -264,7 +297,7 @@ Read all sources completely. Classify every saving rule as precondition, happy p
 
 - [ ] **Step 2: Write goal, principles, scope, and normal flow**
 
-State that reliable capture precedes analysis and saving does not wait for extraction. Cover unauthenticated storage, logged-in offline ownership, login, network recovery, server creation, and cross-device visibility.
+Set the document status from its traceability rows: 확정 only if every normative row has confirmed provenance, otherwise 제안. State that reliable capture precedes analysis and saving does not wait for extraction. Cover unauthenticated storage, logged-in offline ownership, login, network recovery, server creation, and cross-device visibility.
 
 - [ ] **Step 3: Write cache, retry, and deletion behavior**
 
@@ -277,6 +310,8 @@ Duplicate detection may originate here, but user resolution belongs to organize-
 - [ ] **Step 5: Verify coverage and links**
 
 Search both sources and target for 로그인, 오프라인, 로컬, 7일, READY, PARTIAL, FAILED, 재시도, 삭제, 늦게. Check each source rule has one owning paragraph and no new rule was invented. Run the full link checker.
+
+Mark every traceability row owned by docs/product/save-a-product.md as 완료 and confirm none remain 대기. The 원본 URL 개인정보 경계 and 주기적 상품 정보 갱신 제외 rules must both be owned by docs/product/save-a-product.md.
 
 - [ ] **Step 6: Commit**
 
@@ -294,7 +329,14 @@ docs: 상품 저장 흐름 기획 분리
 - Create: docs/product/organize-candidates.md
 - Modify: docs/product/INDEX.md
 - Modify: docs/product/references/item-states.md
-- Modify: related history decision links
+- Modify: docs/history/product-planning/mvp/decisions/purpose-groups.md
+- Modify: docs/history/product-planning/mvp/decisions/ai-purpose-linking.md
+- Modify: docs/history/product-planning/mvp/decisions/purpose-deletion.md
+- Modify: docs/history/product-planning/mvp/decisions/custom-category-lifecycle.md
+- Modify: docs/history/product-planning/mvp/decisions/custom-category-safety.md
+- Modify: docs/history/product-planning/mvp/decisions/duplicate-items.md
+- Modify: docs/history/product-planning/mvp/decisions/taxonomy-direction.md
+- Update work artifact: /private/tmp/wishlist-product-spec-traceability.md
 
 **Interfaces:**
 - Consumes: taxonomy reference and purpose-groups, purpose-deletion, custom-category-lifecycle, custom-category-safety, ai-purpose-linking, duplicate-items, taxonomy-direction.
@@ -306,7 +348,7 @@ Read all source records and matching product-spec sections. Sort rules into taxo
 
 - [ ] **Step 2: Write goal, principles, and category flows**
 
-Preserve the distinction between what a product is and why it is compared. Cover public taxonomy immutability; custom creation limits, normalization, edit/delete/reassignment, archive snapshots, request rejection, and internal AI-candidate exclusion.
+Set the document status from its traceability rows using the conservative Global Constraint. Preserve the distinction between what a product is and why it is compared. Cover public taxonomy immutability; custom creation limits, normalization, edit/delete/reassignment, archive snapshots, request rejection, and internal AI-candidate exclusion.
 
 - [ ] **Step 3: Write purpose and AI flows**
 
@@ -319,6 +361,8 @@ Cover confirm/defer behavior and accessible buttons; normal-list visibility; PRO
 - [ ] **Step 5: Verify exact limits and links**
 
 Search for 20개, 40자, 200자, 5개, 60자, 확정된 목적 미지정, 오른쪽, 왼쪽, PROCESSING, READY, PARTIAL, FAILED, 모두 유지. Confirm no conflicting ownership in the new product tree. Run the full link checker.
+
+Mark every traceability row owned by docs/product/organize-candidates.md as 완료 and confirm none remain 대기.
 
 - [ ] **Step 6: Commit**
 
@@ -336,7 +380,13 @@ docs: 구매 후보 정리 흐름 기획 분리
 - Create: docs/product/inspect-and-edit-a-product.md
 - Modify: docs/product/INDEX.md
 - Modify: docs/product/references/item-states.md
-- Modify: related history decision links
+- Modify: docs/history/product-planning/mvp/decisions/manual-completion.md
+- Modify: docs/history/product-planning/mvp/decisions/home-action-priority.md
+- Modify: docs/history/product-planning/mvp/decisions/webview-behavior.md
+- Modify: docs/history/product-planning/mvp/decisions/local-pending-analysis.md
+- Modify: docs/history/product-planning/mvp/decisions/custom-category-lifecycle.md
+- Modify: docs/history/product-planning/mvp/decisions/archive-delete-safeguards.md
+- Update work artifact: /private/tmp/wishlist-product-spec-traceability.md
 
 **Interfaces:**
 - Consumes: manual-completion, home-action-priority, webview-behavior, custom-category-lifecycle, archive-delete-safeguards, and current list/edit/webview sections.
@@ -348,7 +398,7 @@ Separate visibility priority, normal-list inclusion, missing information, manual
 
 - [ ] **Step 2: Write visibility and completion behavior**
 
-Document the single-action-area invariant and exact priority: 분석 대기 → 분류 중 → 정보 보완 필요 → 카테고리 미지정 → 분류·목적 확인. Keep normal-list inclusion separate. Require product name and category; keep image, price, currency, merchant, brand, and purpose optional.
+Set the document status from its traceability rows using the conservative Global Constraint. Document the single-action-area invariant and exact priority: 분석 대기 → 분류 중 → 정보 보완 필요 → 카테고리 미지정 → 분류·목적 확인. Keep normal-list inclusion separate. Require product name and category; keep image, price, currency, merchant, brand, and purpose optional.
 
 - [ ] **Step 3: Write edit and webview behavior**
 
@@ -361,6 +411,8 @@ Cover confirmation, purpose impact, no undo, no archive effect, and purpose-unas
 - [ ] **Step 5: Verify coverage and links**
 
 Search for all five action-area labels plus 제품명, 카테고리, 기본 이미지, 쿠키, 새 창, 외부 앱, 프로세스, 결제, 실행 취소. Confirm every existing rule appears once under the correct section. Run the full link checker.
+
+Mark every traceability row owned by docs/product/inspect-and-edit-a-product.md as 완료 and confirm none remain 대기. The 최근 저장순 및 정렬 제한 and 가격·통화·마지막 확인 시점 rules must be owned by docs/product/inspect-and-edit-a-product.md.
 
 - [ ] **Step 6: Commit**
 
@@ -377,7 +429,10 @@ docs: 상품 확인과 편집 흐름 기획 분리
 **Files:**
 - Create: docs/product/finish-a-purchase-decision.md
 - Modify: docs/product/INDEX.md
-- Modify: related history decision links
+- Modify: docs/history/product-planning/mvp/decisions/archive-delete-safeguards.md
+- Modify: docs/history/product-planning/mvp/decisions/purpose-deletion.md
+- Modify: docs/history/product-planning/mvp/decisions/custom-category-lifecycle.md
+- Update work artifact: /private/tmp/wishlist-product-spec-traceability.md
 
 **Interfaces:**
 - Consumes: archive-delete-safeguards, purpose-deletion, custom-category-lifecycle, and current purchase/archive rules.
@@ -389,7 +444,7 @@ List archive eligibility, purchased-item selection, confirmation, snapshot field
 
 - [ ] **Step 2: Write archive and snapshot flows**
 
-State that ending comparison and recording a purchase are related but distinct: purchase selection is optional, while a non-empty purpose and all candidates are archived together. Cover snapshots, default title, title editing, and independence from active data.
+Set the document status from its traceability rows using the conservative Global Constraint. State that ending comparison and recording a purchase are related but distinct: purchase selection is optional, while a non-empty purpose and all candidates are archived together. Cover snapshots, default title, title editing, and independence from active data.
 
 - [ ] **Step 3: Write restoration and deletion flows**
 
@@ -398,6 +453,8 @@ Cover detail-only cancellation, atomic restoration of the purpose and all items,
 - [ ] **Step 4: Verify archive invariants and links**
 
 Search for 빈 목적, 선택, 스냅샷, 기본 제목, 상세 화면, 전체, 개별, 실행 취소. Confirm there is no partial-restore interpretation. Run the full link checker.
+
+Mark every traceability row owned by docs/product/finish-a-purchase-decision.md as 완료 and confirm none remain 대기.
 
 - [ ] **Step 5: Commit**
 
@@ -418,6 +475,13 @@ docs: 구매 결정 종료 흐름 기획 분리
 - Modify: docs/INDEX.md, docs/README.md
 - Modify: docs/history/INDEX.md, docs/history/README.md
 - Modify: all architecture, learning, and history files linking product-spec.md
+- Modify: docs/history/product-planning/mvp/checkpoints/initial-direction.md
+- Modify: docs/history/product-planning/mvp/checkpoints/policy-completion.md
+- Modify: docs/history/product-planning/mvp/decisions/taxonomy-direction.md
+- Modify: docs/architecture/client/README.md
+- Modify: docs/architecture/server/overview.md
+- Modify: docs/architecture/ai/overview.md
+- Complete and remove after verification: /private/tmp/wishlist-product-spec-traceability.md
 
 **Interfaces:**
 - Consumes: completed four flow documents and references.
@@ -435,10 +499,15 @@ Required source mapping:
 | list, completion, editing, webview, active deletion | product/inspect-and-edit-a-product.md |
 | purchase, archive, restore, archive deletion | product/finish-a-purchase-decision.md |
 | SSRF, worker idempotency, provider/auth/queue/hosting/notification choices | server architecture |
+| 원본 URL의 개인정보 경계 | product/save-a-product.md |
+| 최근 저장순 및 다른 정렬 기준 제외 | product/inspect-and-edit-a-product.md |
+| 가격, ISO 4217 통화, 마지막 확인 시점 | product/inspect-and-edit-a-product.md |
+| 최초 추출 후 주기적 갱신 제외 | product/save-a-product.md |
+| deterministic parser와 AI의 역할 경계 | architecture/ai/overview.md |
 
 - [ ] **Step 1: Check every product-spec section against the mapping**
 
-Create a temporary review checklist outside the repository or in the working notes. Do not delete the old spec until every section has a destination.
+Use /private/tmp/wishlist-product-spec-traceability.md as the required checklist. Every PS-001 through PS-148 row must have exactly one concrete product or architecture owner, conservative source status, exact related-history path or 없음, and migration status 완료. Do not delete the old spec while any row is missing or 대기.
 
 - [ ] **Step 2: Write the concise overview**
 
@@ -448,13 +517,28 @@ Include purpose, principles, MVP included/excluded scope, one linked end-to-end 
 
 Ensure SSRF points to extraction-pipeline.md, worker idempotency is explicit in server architecture, and provider/auth/queue/hosting/notification choices remain architecture open decisions.
 
+Reconcile the existing completion-delivery conflict explicitly. docs/architecture/client/README.md currently names polling while product-spec.md says polling, realtime, and push are undecided. Do not create a new product decision: label polling as an initial 제안 and preserve the final delivery mechanism as a technical 미결정 until a separate decision is made.
+
 - [ ] **Step 4: Update repository entry points and inbound links**
 
 docs/INDEX.md and docs/README.md lead to product/INDEX.md and overview.md. History says it is not the current product source. Architecture and learning link to the most specific product owner.
 
+After all current product documents and links exist, change both checkpoints/initial-direction.md and checkpoints/policy-completion.md from 진행 중 to 대체됨 and link docs/product/INDEX.md as the current resume point. Only now mark decisions/taxonomy-direction.md as 대체됨 by the canonical taxonomy and organizing documents.
+
 - [ ] **Step 5: Remove legacy entry files and verify**
 
 Delete product-spec.md only after mapping and links are complete. Confirm product-spec.md, product-taxonomy-draft.md, and root history/PRODUCT-* Markdown links no longer exist. Historical prose may mention an old name, but it must not link to an old path. Run the full link checker.
+
+Before deletion, verify that all 148 traceability rows are 완료 and that each product document status follows the Global Constraints.
+
+Run:
+
+~~~bash
+rg -c '^\| PS-[0-9]{3} \|' /private/tmp/wishlist-product-spec-traceability.md
+awk -F '|' '/^\| PS-[0-9]{3} \|/ {if ($6 !~ /docs\/(product|architecture)\// || ($7 !~ /docs\/history\// && $7 !~ /없음/) || $8 !~ /완료/) {print NR ": incomplete traceability row"; bad=1}} END {exit bad}' /private/tmp/wishlist-product-spec-traceability.md
+~~~
+
+Expected: the count is 148 and the field validator prints nothing. Remove the temporary traceability file only after this check passes.
 
 - [ ] **Step 6: Commit**
 
@@ -496,14 +580,22 @@ Confirm docs/history/product-planning/v1 and v2 do not yet exist.
 
 - [ ] **Step 2: Run count regressions**
 
-Expected: taxonomy has 11 second-level headings and 87 bullets; MVP history has 4 checkpoint files and 13 decision files excluding indexes.
+Run:
+
+~~~bash
+awk '/^## 출시 후 확장 기준/{exit} /^## /{headings++} /^- /{bullets++} END{print headings, bullets}' docs/product/references/product-taxonomy.md
+find docs/history/product-planning/mvp/checkpoints -maxdepth 1 -type f ! -name INDEX.md
+find docs/history/product-planning/mvp/decisions -maxdepth 1 -type f ! -name INDEX.md
+~~~
+
+Expected: taxonomy output is 11 87; the file lists contain 4 checkpoints and 13 decisions. The 출시 후 확장 기준 heading and its four policy bullets are deliberately excluded from taxonomy entity counts.
 
 - [ ] **Step 3: Run repository-wide link and legacy-path checks**
 
 Run the full Ruby link checker. Then run:
 
 ~~~bash
-rg -n '\]\([^)]*(product-spec\.md|product-taxonomy-draft\.md|history/PRODUCT-|history/ADR-|history/server/ADR-)' docs --glob '*.md'
+rg -n '\]\([^)]*(product-spec\.md|product-taxonomy-draft\.md|history/PRODUCT-|history/ADR-|history/server/ADR-)' docs --glob '*.md' --glob '!superpowers/plans/**'
 ~~~
 
 Expected: no output.
