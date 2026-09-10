@@ -32,6 +32,7 @@
 
 ## 관련 문서
 
+- [현재 구매 후보 정리 흐름](../../../../product/organize-candidates.md)
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [AI 구조](../../../../architecture/ai/overview.md)
 - [목적 삭제 결정](purpose-deletion.md)

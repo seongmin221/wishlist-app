@@ -21,7 +21,7 @@
 
 ## 검토 상태
 
-`분류·목적 확인`은 자동 카테고리·목적 연결 또는 중복 후보를 사용자가 검토하는 영역이다. 사용자는 결과를 `확정`하거나 `보류`할 수 있으며, `보류`는 미확정 표시와 함께 해당 영역에 자동 재노출하지 않는다는 의미로 사용한다. 이 동작의 근거는 [taxonomy와 목적 체크포인트](../../history/product-planning/mvp/checkpoints/taxonomy-and-purpose.md) 및 [중복 URL과 상품 후보 처리 결정](../../history/product-planning/mvp/decisions/duplicate-items.md)에 둔다.
+`분류·목적 확인`은 자동 카테고리·목적 연결 또는 중복 후보를 사용자가 검토하는 영역이다. `확정`·`보류`, 접근 가능한 조작, 미확정 표시와 자동 재노출의 상세는 [구매 후보 정리](../organize-candidates.md)가 소유한다. 이 동작의 결정 근거는 [taxonomy와 목적 체크포인트](../../history/product-planning/mvp/checkpoints/taxonomy-and-purpose.md) 및 [중복 URL과 상품 후보 처리 결정](../../history/product-planning/mvp/decisions/duplicate-items.md)에 보존한다.
 
 ## 완료 조건
 
@@ -30,5 +30,5 @@
 ## 상태 문서의 범위
 
 - 이 문서는 용어의 구분과 공통 완료 조건만 기록한다.
-- 각 용어의 생성, 화면 노출, 전환, 재시도와 삭제 예외는 해당 사용자 흐름 문서가 소유한다. 저장·분석·재시도·처리 중 삭제는 [상품 저장](../save-a-product.md)을 따른다.
+- 각 용어의 생성, 화면 노출, 전환, 재시도와 삭제 예외는 해당 사용자 흐름 문서가 소유한다. 저장·분석·재시도·처리 중 삭제는 [상품 저장](../save-a-product.md), 분류·목적 검토와 중복 정리는 [구매 후보 정리](../organize-candidates.md)를 따른다.
 - 아직 제안 상태인 원본 규칙이 있으므로 문서 상태를 승격하지 않는다.

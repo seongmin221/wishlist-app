@@ -9,7 +9,7 @@
 ## 사용자 흐름
 
 - [상품 저장](save-a-product.md) — URL 공유부터 분석·복구까지
-- `organize-candidates.md` — 분류, 목적, 중복 후보의 검토
+- [구매 후보 정리](organize-candidates.md) — 분류, 목적, 중복 후보의 검토
 - `inspect-and-edit-a-product.md` — 목록 확인, 정보 보완·편집, 원본 링크 탐색
 - `finish-a-purchase-decision.md` — 구매 결정, 아카이브, 삭제
 
