@@ -27,6 +27,7 @@
 
 ## 관련 문서
 
+- [현재 상품 확인과 편집 흐름](../../../../product/inspect-and-edit-a-product.md)
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [상품 정보 직접 보완의 완료 기준](manual-completion.md)
 - [로컬 대기 저장과 분석 재시도](local-pending-analysis.md)

@@ -56,6 +56,7 @@
 
 ## 관련 문서
 
+- [현재 상품 확인과 편집 흐름](../../../../product/inspect-and-edit-a-product.md) — 활성 상품 삭제의 확인과 목적 영향
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [목적 삭제 결정](purpose-deletion.md)
 - [중복 URL과 상품 후보 처리 결정](duplicate-items.md)

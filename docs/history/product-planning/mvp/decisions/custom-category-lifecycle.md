@@ -32,6 +32,7 @@
 ## 관련 문서
 
 - [현재 구매 후보 정리 흐름](../../../../product/organize-candidates.md)
+- [현재 상품 확인과 편집 흐름](../../../../product/inspect-and-edit-a-product.md) — `카테고리 미지정`의 홈 노출과 일반 목록 경계
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [제품 taxonomy](../../../../product/references/product-taxonomy.md)
 - [2026-09-04 기획 체크포인트](../checkpoints/taxonomy-and-purpose.md)

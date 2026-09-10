@@ -25,6 +25,7 @@
 
 ## 관련 문서
 
+- [현재 상품 확인과 편집 흐름](../../../../product/inspect-and-edit-a-product.md)
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [로컬 대기 저장과 분석 재시도](local-pending-analysis.md)
 - [사용자 전용 카테고리 변경과 삭제](custom-category-lifecycle.md)
