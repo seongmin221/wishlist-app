@@ -2,6 +2,8 @@
 
 이 프로젝트의 AI는 외부 LLM API를 통한 structured classification과 metadata normalization에 한정한다.
 
+- [AI Q&A](q-and-a/INDEX.md)
+
 추가할 학습 주제:
 
 - structured output과 schema validation

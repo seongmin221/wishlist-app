@@ -2,6 +2,8 @@
 
 결정의 맥락, 선택지, trade-off, 재검토 조건을 보존하는 ADR과 영역별 이력의 진입점이다.
 
+- [제품 기획 문서 구조 설계](PRODUCT-DOCUMENTATION-STRUCTURE.md)
+
 | 영역 | Index / 문서 |
 | --- | --- |
 | 프로젝트 공통 ADR | [ADR-001](ADR-001-documentation-recording.md), [ADR-004](ADR-004-repository-structure.md) |
