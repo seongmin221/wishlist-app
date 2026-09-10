@@ -27,5 +27,6 @@
 ## 관련 문서
 
 - [현재 구매 후보 정리 흐름](../../../../product/organize-candidates.md)
+- [현재 구매 결정 종료 흐름](../../../../product/finish-a-purchase-decision.md) — 아카이브 기록의 스냅샷과 활성 목적 삭제의 비영향
 - [제품 기능 및 스펙](../../../../product-spec.md)
 - [2026-09-04 기획 체크포인트](../checkpoints/taxonomy-and-purpose.md)
