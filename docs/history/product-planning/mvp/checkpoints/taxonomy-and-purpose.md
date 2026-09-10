@@ -4,7 +4,7 @@
 
 이 체크포인트 이후 제품 정책과 `Product`·`WishlistItem` 경계가 구체화됐다. 현재 재개 지점은 [2026-09-05 기획 체크포인트](policy-completion.md)를 따른다.
 
-2026-08-29 체크포인트 이후 확정한 제품 기획을 기록한다. 제품 규칙의 기준 문서는 [제품 기능 및 스펙](../../../../product-spec.md)이며, taxonomy의 전체 목록은 [제품 taxonomy](../../../../product-taxonomy-draft.md)에서 확인한다.
+2026-08-29 체크포인트 이후 확정한 제품 기획을 기록한다. 제품 규칙의 기준 문서는 [제품 기능 및 스펙](../../../../product-spec.md)이며, taxonomy의 전체 목록은 [제품 taxonomy](../../../../product/references/product-taxonomy.md)에서 확인한다.
 
 ## 이번까지 확정한 방향
 
@@ -19,7 +19,7 @@
 ## 문서·구현 상태
 
 - 제품·taxonomy·AI 구조 문서를 갱신했다. 이 체크포인트 시점에도 앱과 서버 기능 구현은 시작하지 않았다.
-- 공용 taxonomy의 구체적인 목록은 [제품 taxonomy](../../../../product-taxonomy-draft.md)에 있다. `헤드폰`에는 게이밍 헤드셋을 포함하고, `의자`는 사무용·게이밍·식탁 의자를 함께 둔다. 스킨케어와 메이크업은 분리하며, 키보드는 하나의 세부 유형이다.
+- 공용 taxonomy의 구체적인 목록은 [제품 taxonomy](../../../../product/references/product-taxonomy.md)에 있다. `헤드폰`에는 게이밍 헤드셋을 포함하고, `의자`는 사무용·게이밍·식탁 의자를 함께 둔다. 스킨케어와 메이크업은 분리하며, 키보드는 하나의 세부 유형이다.
 
 ## 다음 재개 지점
 
@@ -47,7 +47,7 @@ AI 목적 자동 연결의 최소 근거와 재판단 조건은 2026-09-05에 [�
 ## 관련 문서
 
 - [제품 기능 및 스펙](../../../../product-spec.md)
-- [제품 taxonomy](../../../../product-taxonomy-draft.md)
+- [제품 taxonomy](../../../../product/references/product-taxonomy.md)
 - [taxonomy 방향 정리](../decisions/taxonomy-direction.md)
 - [목적 삭제 결정](../decisions/purpose-deletion.md)
 - [사용자 전용 카테고리 변경·삭제 결정](../decisions/custom-category-lifecycle.md)
