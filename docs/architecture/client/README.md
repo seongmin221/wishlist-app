@@ -28,7 +28,7 @@
 - 공유 URL을 수신하면 우선 local pending item을 만든다.
 - 서버가 항목을 생성하면 서버 ID와 처리 상태를 반영한다.
 - 목록 갱신으로 `PROCESSING`, `READY`, `PARTIAL`, `FAILED` 상태를 동기화한다.
-- 초기에는 앱 진입/목록 refresh 기반 polling을 사용하고, push/realtime은 후속 검토한다.
+- 초기 제안으로는 앱 진입·목록 refresh 기반 polling을 사용한다. 이는 확정된 전달 방식이 아니며, polling·realtime·push 중 최종 선택은 [Server 구조의 기술 미결정 사항](../server/overview.md#기술-미결정-사항)에서 별도로 결정한다.
 
 - [iOS 구조](ios.md)
 - [Android 구조](android.md)

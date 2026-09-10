@@ -11,7 +11,8 @@
 ## 시작점
 
 - [문서 INDEX](INDEX.md)
-- [제품 기능·스펙](product-spec.md)
+- [제품 문서 INDEX](product/INDEX.md)
+- [제품 개요](product/overview.md)
 - [전체 서비스 구조](architecture/README.md)
 - [클라이언트 구조](architecture/client/README.md)
 - [서버 구조](architecture/server/overview.md)
@@ -23,7 +24,7 @@
 
 ## 작성 규칙
 
-1. 기능 또는 동작이 바뀌면 먼저 `product-spec.md`를 갱신한다.
+1. 기능 또는 동작이 바뀌면 소유하는 `docs/product/` 문서를 갱신하고, 범위·전체 여정·향후 범위 변화는 `product/overview.md`도 함께 갱신한다.
 2. 구조적 선택은 근거와 대안을 포함해 `history/`에 기록한다.
 3. 새 기술을 채택하면 해당 `learning/` 문서에 이 프로젝트의 사용 맥락과 함께 설명한다.
 4. 비밀값, 사용자 URL, 접근 토큰, 민감한 운영 정보는 문서에 커밋하지 않는다.

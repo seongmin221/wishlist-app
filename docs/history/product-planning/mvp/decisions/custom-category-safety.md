@@ -43,7 +43,6 @@
 ## 관련 문서
 
 - [현재 구매 후보 정리 흐름](../../../../product/organize-candidates.md)
-- [제품 기능 및 스펙](../../../../product-spec.md)
 - [제품 taxonomy](../../../../product/references/product-taxonomy.md)
 - [AI 구조](../../../../architecture/ai/overview.md)
 - [사용자 전용 카테고리 변경·삭제 결정](custom-category-lifecycle.md)

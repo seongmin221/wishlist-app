@@ -31,5 +31,4 @@
 
 - [현재 상품 저장 흐름](../../../../product/save-a-product.md)
 - [현재 상품 확인과 편집 흐름](../../../../product/inspect-and-edit-a-product.md) — 직접 보완과 처리 중 삭제 이후의 표시 경계
-- [제품 기능 및 스펙](../../../../product-spec.md)
 - [2026-09-05 기획 체크포인트](../checkpoints/policy-completion.md)

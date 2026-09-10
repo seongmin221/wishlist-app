@@ -7,6 +7,7 @@
 - MVP에서는 자체 모델 학습, GPU 운영, embedding/vector DB/RAG를 하지 않는다.
 - 외부 LLM API를 사용한다.
 - 코드로 확실히 처리할 수 있는 URL 정규화·HTML 구조 parsing은 AI에 맡기지 않는다.
+- [추출 pipeline](../server/extraction-pipeline.md)의 deterministic parser 결과가 충분하면 AI는 추출 대체 수단이 아니라 taxonomy 분류·정규화 보조 수단으로만 사용한다.
 - 모델은 공용 taxonomy를 새로 만들지 않는다. 분류 결과는 공용 taxonomy ID 또는 검증을 통과한 해당 사용자의 세부 카테고리 ID 중에서만 선택한다.
 - 사용자가 수정한 category가 최종값이다.
 - 모델은 사용자가 이미 만든 목적에만 새 항목을 연결할 수 있다. 새 목적을 생성하지 않으며, 연결 확신이 낮으면 목적 미지정으로 남긴다.

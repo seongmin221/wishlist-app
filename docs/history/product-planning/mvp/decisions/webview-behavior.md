@@ -33,6 +33,5 @@
 ## 관련 문서
 
 - [현재 상품 확인과 편집 흐름](../../../../product/inspect-and-edit-a-product.md)
-- [제품 기능 및 스펙](../../../../product-spec.md)
 - [Client 구조](../../../../architecture/client/README.md)
 - [웹뷰 탐색 Q&A](../../../../learning/client/q-and-a/QA-CLI-001-WEBVIEW-NAVIGATION.md)

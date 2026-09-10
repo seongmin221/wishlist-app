@@ -4,7 +4,7 @@
 
 이 체크포인트 이후 제품 정책과 `Product`·`WishlistItem` 경계가 구체화됐다. 현재 재개 지점은 [2026-09-05 기획 체크포인트](policy-completion.md)를 따른다.
 
-2026-08-29 체크포인트 이후 확정한 제품 기획을 기록한다. 제품 규칙의 기준 문서는 [제품 기능 및 스펙](../../../../product-spec.md)이며, taxonomy의 전체 목록은 [제품 taxonomy](../../../../product/references/product-taxonomy.md)에서 확인한다.
+2026-08-29 체크포인트 이후 확정한 제품 기획을 기록한다. 현재 제품 규칙의 기준은 [제품 문서 INDEX](../../../../product/INDEX.md)이며, taxonomy의 전체 목록은 [제품 taxonomy](../../../../product/references/product-taxonomy.md)에서 확인한다.
 
 ## 이번까지 확정한 방향
 
@@ -46,7 +46,7 @@ AI 목적 자동 연결의 최소 근거와 재판단 조건은 2026-09-05에 [�
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../../../../product-spec.md)
+- [제품 문서 INDEX](../../../../product/INDEX.md)
 - [제품 taxonomy](../../../../product/references/product-taxonomy.md)
 - [taxonomy 방향 정리](../decisions/taxonomy-direction.md)
 - [목적 삭제 결정](../decisions/purpose-deletion.md)

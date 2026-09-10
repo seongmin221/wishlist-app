@@ -8,7 +8,7 @@
 - **Application**: wishlist/product/category use case와 transaction 경계
 - **Extraction**: URL 검증, fetch, HTML parser, canonicalization
 - **Classification**: taxonomy 입력 구성, 외부 LLM 호출, 결과 검증
-- **Worker**: queue 소비, retry, idempotent한 상태 갱신
+- **Worker**: queue 소비, retry, 중복 전달에도 안전한 idempotent 상태 갱신
 - **Persistence**: PostgreSQL repository와 migration
 - **Integration**: Auth, queue, LLM, browser rendering adapter
 
@@ -42,6 +42,14 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 ## 신뢰성 원칙
 
 - DB 기록과 queue 등록의 불일치를 막기 위해 transactional outbox 또는 동등한 전달 보장 방식을 검토한다.
-- Worker 작업은 중복 실행되어도 같은 최종 결과가 나와야 한다.
+- Worker는 같은 작업이 중복 전달·실행되어도 상태 전이와 `WishlistItem` 결과가 한 번 처리한 경우와 같은 최종 결과가 되도록 idempotent해야 한다.
 - retry 횟수, backoff, dead-letter 처리, 추출 성공률을 관측 가능하게 만든다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.
+
+## 기술 미결정 사항
+
+- PostgreSQL 제공자, Auth, Queue, Hosting의 구체적 공급자
+- JS-rendered 사이트에 Playwright를 언제·어디까지 적용할지
+- 처리 완료를 client에 전달할 최종 방식: polling, realtime, push 중 선택
+
+Client의 polling은 초기 제안일 뿐 제품 결정이 아니다. 최종 전달 방식은 위 선택을 별도 기술 설계로 결정할 때까지 미결정으로 둔다.
