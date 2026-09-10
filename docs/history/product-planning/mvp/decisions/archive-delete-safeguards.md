@@ -56,6 +56,6 @@
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [목적 삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PURPOSE-DELETION.md)
-- [중복 URL과 상품 후보 처리 결정](PRODUCT-PLANNING-DECISION-2026-09-05-DUPLICATE-ITEMS.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [목적 삭제 결정](purpose-deletion.md)
+- [중복 URL과 상품 후보 처리 결정](duplicate-items.md)

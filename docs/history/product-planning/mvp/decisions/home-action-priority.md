@@ -27,6 +27,6 @@
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [상품 정보 직접 보완의 완료 기준](PRODUCT-PLANNING-DECISION-2026-09-10-MANUAL-COMPLETION.md)
-- [로컬 대기 저장과 분석 재시도](PRODUCT-PLANNING-DECISION-2026-09-10-LOCAL-PENDING-ANALYSIS.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [상품 정보 직접 보완의 완료 기준](manual-completion.md)
+- [로컬 대기 저장과 분석 재시도](local-pending-analysis.md)

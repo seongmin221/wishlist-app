@@ -25,6 +25,6 @@
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [로컬 대기 저장과 분석 재시도](PRODUCT-PLANNING-DECISION-2026-09-10-LOCAL-PENDING-ANALYSIS.md)
-- [사용자 전용 카테고리 변경과 삭제](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-LIFECYCLE.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [로컬 대기 저장과 분석 재시도](local-pending-analysis.md)
+- [사용자 전용 카테고리 변경과 삭제](custom-category-lifecycle.md)

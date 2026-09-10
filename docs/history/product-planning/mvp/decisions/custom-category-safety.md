@@ -42,7 +42,7 @@
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [제품 taxonomy](../product-taxonomy-draft.md)
-- [AI 구조](../architecture/ai/overview.md)
-- [사용자 전용 카테고리 변경·삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-LIFECYCLE.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [제품 taxonomy](../../../../product-taxonomy-draft.md)
+- [AI 구조](../../../../architecture/ai/overview.md)
+- [사용자 전용 카테고리 변경·삭제 결정](custom-category-lifecycle.md)

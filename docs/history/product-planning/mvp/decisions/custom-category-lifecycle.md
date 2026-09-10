@@ -31,6 +31,6 @@
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [제품 taxonomy](../product-taxonomy-draft.md)
-- [2026-09-04 기획 체크포인트](PRODUCT-PLANNING-CHECKPOINT-2026-09-04.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [제품 taxonomy](../../../../product-taxonomy-draft.md)
+- [2026-09-04 기획 체크포인트](../checkpoints/taxonomy-and-purpose.md)

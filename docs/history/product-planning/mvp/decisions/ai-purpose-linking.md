@@ -32,6 +32,6 @@
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [AI 구조](../architecture/ai/overview.md)
-- [목적 삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PURPOSE-DELETION.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [AI 구조](../../../../architecture/ai/overview.md)
+- [목적 삭제 결정](purpose-deletion.md)

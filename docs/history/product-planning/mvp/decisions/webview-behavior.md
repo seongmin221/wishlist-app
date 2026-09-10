@@ -32,6 +32,6 @@
 
 ## 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [Client 구조](../architecture/client/README.md)
-- [웹뷰 탐색 Q&A](../learning/client/q-and-a/QA-CLI-001-WEBVIEW-NAVIGATION.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [Client 구조](../../../../architecture/client/README.md)
+- [웹뷰 탐색 Q&A](../../../../learning/client/q-and-a/QA-CLI-001-WEBVIEW-NAVIGATION.md)

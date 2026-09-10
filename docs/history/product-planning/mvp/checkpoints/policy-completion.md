@@ -2,7 +2,7 @@
 
 > 상태: **진행 중** · 날짜: 2026-09-05 · 영역: **제품·서버·클라이언트·AI**
 
-제품 정책 논의를 마친 지점과 다음 재개 위치를 기록한다. 제품 규칙의 기준 문서는 [제품 기능 및 스펙](../product-spec.md)이며, 아래 결정의 세부 근거는 연결된 결정 문서를 따른다.
+제품 정책 논의를 마친 지점과 다음 재개 위치를 기록한다. 제품 규칙의 기준 문서는 [제품 기능 및 스펙](../../../../product-spec.md)이며, 아래 결정의 세부 근거는 연결된 결정 문서를 따른다.
 
 ## 이번까지 확정한 내용
 
@@ -104,19 +104,19 @@
 
 ## 주요 관련 문서
 
-- [제품 기능 및 스펙](../product-spec.md)
-- [제품 taxonomy](../product-taxonomy-draft.md)
-- [AI 구조](../architecture/ai/overview.md)
-- [Server 구조](../architecture/server/overview.md)
-- [Client 구조](../architecture/client/README.md)
-- [목적 삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PURPOSE-DELETION.md)
-- [사용자 전용 카테고리 변경·삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-LIFECYCLE.md)
-- [사용자 전용 카테고리 입력·AI 안전성 결정](PRODUCT-PLANNING-DECISION-2026-09-05-CUSTOM-CATEGORY-SAFETY.md)
-- [AI 목적 자동 연결 결정](PRODUCT-PLANNING-DECISION-2026-09-05-AI-PURPOSE-LINKING.md)
-- [중복 상품 결정](PRODUCT-PLANNING-DECISION-2026-09-05-DUPLICATE-ITEMS.md)
-- [아카이브·삭제 결정](PRODUCT-PLANNING-DECISION-2026-09-05-ARCHIVE-DELETE-SAFEGUARDS.md)
-- [웹뷰 동작 결정](PRODUCT-PLANNING-DECISION-2026-09-05-WEBVIEW-BEHAVIOR.md)
-- [Product 캐시와 WishlistItem 스냅샷 결정](PRODUCT-PLANNING-DECISION-2026-09-05-PRODUCT-CACHE-SNAPSHOT.md)
-- [로컬 대기 저장과 분석 재시도 결정](PRODUCT-PLANNING-DECISION-2026-09-10-LOCAL-PENDING-ANALYSIS.md)
-- [상품 정보 직접 보완의 완료 기준](PRODUCT-PLANNING-DECISION-2026-09-10-MANUAL-COMPLETION.md)
-- [홈 조치 필요 영역의 우선순위](PRODUCT-PLANNING-DECISION-2026-09-10-HOME-ACTION-PRIORITY.md)
+- [제품 기능 및 스펙](../../../../product-spec.md)
+- [제품 taxonomy](../../../../product-taxonomy-draft.md)
+- [AI 구조](../../../../architecture/ai/overview.md)
+- [Server 구조](../../../../architecture/server/overview.md)
+- [Client 구조](../../../../architecture/client/README.md)
+- [목적 삭제 결정](../decisions/purpose-deletion.md)
+- [사용자 전용 카테고리 변경·삭제 결정](../decisions/custom-category-lifecycle.md)
+- [사용자 전용 카테고리 입력·AI 안전성 결정](../decisions/custom-category-safety.md)
+- [AI 목적 자동 연결 결정](../decisions/ai-purpose-linking.md)
+- [중복 상품 결정](../decisions/duplicate-items.md)
+- [아카이브·삭제 결정](../decisions/archive-delete-safeguards.md)
+- [웹뷰 동작 결정](../decisions/webview-behavior.md)
+- [Product 캐시와 WishlistItem 스냅샷 결정](../decisions/product-cache-snapshot.md)
+- [로컬 대기 저장과 분석 재시도 결정](../decisions/local-pending-analysis.md)
+- [상품 정보 직접 보완의 완료 기준](../decisions/manual-completion.md)
+- [홈 조치 필요 영역의 우선순위](../decisions/home-action-priority.md)
