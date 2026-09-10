@@ -11,7 +11,7 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 ## 후보 정리
 
 - [목적별 비교 그룹과 AI 목적 제안](purpose-groups.md) — 대체됨 · 2026-08-29
-- [taxonomy 방향 정리](taxonomy-direction.md) — 확정된 방향 + 남은 세부 설계 · 2026-09-02
+- [taxonomy 방향 정리](taxonomy-direction.md) — 대체됨 · 2026-09-02
 - [사용자 전용 카테고리 변경과 삭제](custom-category-lifecycle.md) — 확정 · 2026-09-05
 - [사용자 전용 카테고리 입력과 AI 안전성](custom-category-safety.md) — 확정 · 2026-09-05
 - [AI 목적 자동 연결과 재판단](ai-purpose-linking.md) — 확정 · 2026-09-05
