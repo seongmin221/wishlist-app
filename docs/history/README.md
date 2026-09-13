@@ -7,6 +7,7 @@
 - [AI 결정](ai/README.md)
 - [ADR-001: 프로젝트 문서와 구현 이력 기록](ADR-001-documentation-recording.md)
 - [ADR-004: client, server, AI 자산을 분리한 monorepo](ADR-004-repository-structure.md)
+- [ADR-005: WishlistItem 상태와 API 경계](ADR-005-wishlist-item-state-api.md)
 
 ## 기록 양식
 

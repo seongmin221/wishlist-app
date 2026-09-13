@@ -6,3 +6,5 @@
 | --- | --- | --- |
 | QA-SRV-001 | 서버의 중요한 경계와 프레임워크의 관계 | [QA-SRV-001](QA-SRV-001-framework-boundaries.md) |
 | QA-SRV-002 | AI 탐색을 위한 문서 INDEX 전략 | [QA-SRV-002](QA-SRV-002-ai-first-document-navigation.md) |
+| QA-SRV-003 | LocalSubmission과 WishlistItem 상태·API 경계 | [QA-SRV-003](QA-SRV-003-wishlist-item-state-and-api-boundaries.md) |
+| QA-SRV-004 | 전체 목록 조회와 anchor window pagination | [QA-SRV-004](QA-SRV-004-anchor-window-pagination.md) |

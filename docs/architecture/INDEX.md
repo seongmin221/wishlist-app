@@ -5,6 +5,7 @@
 | 주제 | 문서 |
 | --- | --- |
 | 전체 서비스 구조 | [README.md](README.md) |
+| WishlistItem 상태 모델과 API 계약 | [wishlist-item-state-api.md](wishlist-item-state-api.md) |
 | Repository 구조 | [repository-structure.md](repository-structure.md) |
 | Client 구조 | [client/INDEX.md](client/INDEX.md) |
 | Server 구조 | [server/INDEX.md](server/INDEX.md) |

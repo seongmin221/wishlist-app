@@ -23,7 +23,7 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 5. API는 처리 완료를 기다리지 않고 item ID와 상태를 응답한다.
 6. Worker는 새 저장 요청의 대상 상품만 추출·분류하고 해당 `WishlistItem`의 독립된 snapshot을 완성한다.
 7. 추출 결과는 이후 새 항목 생성에 재사용할 수 있도록 `Product` 캐시에 저장할 수 있지만 기존 `WishlistItem`에는 전파하지 않는다.
-8. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾸고, 재시도 불가능한 실패는 `FAILED`와 안전한 오류 사유로 남긴다.
+8. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾼다. 실패는 `FAILED_RETRYABLE`과 `FAILED_TERMINAL`로 구분하고 안전한 공개 오류 코드와 내부 진단 정보를 분리한다.
 
 ## Product 경계
 
@@ -45,3 +45,4 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 - Worker 작업은 중복 실행되어도 같은 최종 결과가 나와야 한다.
 - retry 횟수, backoff, dead-letter 처리, 추출 성공률을 관측 가능하게 만든다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.
+- WishlistItem의 독립 상태 축, idempotency, anchor window와 경쟁 상황은 [WishlistItem 상태 모델과 API 계약](../wishlist-item-state-api.md)을 따른다.

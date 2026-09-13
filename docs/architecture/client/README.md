@@ -25,10 +25,12 @@
 
 ## 공통 저장 상태
 
-- 공유 URL을 수신하면 우선 local pending item을 만든다.
-- 서버가 항목을 생성하면 서버 ID와 처리 상태를 반영한다.
-- 목록 갱신으로 `PROCESSING`, `READY`, `PARTIAL`, `FAILED` 상태를 동기화한다.
-- 초기에는 앱 진입/목록 refresh 기반 polling을 사용하고, push/realtime은 후속 검토한다.
+- 공유 URL을 수신하면 서버 상품과 구분되는 `LocalSubmission`을 우선 만든다.
+- 한 번의 공유에 생성한 `clientSubmissionId`를 재전송에도 유지한다. 서버가 항목을 생성하면 응답을 로컬 캐시에 반영한 뒤 LocalSubmission을 제거한다.
+- MVP에서는 push, realtime과 주기적 polling을 사용하지 않는다. 앱 신규 실행, foreground 복귀와 사용자의 새로고침 시 서버 상태를 한 번 조회한다.
+- 앱 신규 실행은 최신 첫 window를 조회한다. foreground 복귀와 새로고침은 현재 anchor 상품 주변 앞뒤 20개를 갱신하고 stable item ID와 카드 내부 offset으로 위치를 유지한다.
+- 서버가 홈 조치 상태를 계산하고 KMP는 기기의 LocalSubmission을 `분석 대기` 항목으로 합성한다.
+- 상세 상태와 API 계약은 [WishlistItem 상태 모델과 API 계약](../wishlist-item-state-api.md)을 따른다.
 
 - [iOS 구조](ios.md)
 - [Android 구조](android.md)
