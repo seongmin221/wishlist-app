@@ -91,6 +91,8 @@
 
 ## 다음 재개 지점
 
+> 최신 재개 위치는 [2026-09-13 기술 설계 체크포인트](TECHNICAL-DESIGN-CHECKPOINT-2026-09-13.md)를 따른다.
+
 ### 1. 구현 전 데이터 모델과 API 계약 결정 (완료)
 
 - `READY` Product 캐시는 canonical URL 기준으로 7일 동안 새 `WishlistItem`에 복사하고, 상품 metadata 추출은 생략한다. 카테고리와 목적은 새 사용자 항목 기준으로 별도 판단한다.
