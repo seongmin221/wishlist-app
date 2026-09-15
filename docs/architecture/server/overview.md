@@ -1,6 +1,6 @@
 # Server 구조
 
-> 상태: **부분 확정** — MVP 서버는 Kotlin/JVM + Ktor를 사용한다. 클라우드 공급자와 DB/Auth/Queue의 구체적 선택은 후속 설계에서 결정한다.
+> 상태: **부분 확정** — MVP 서버는 Kotlin/JVM + Ktor, Neon PostgreSQL과 Firebase Authentication을 사용한다. Hosting과 Queue의 구체적 선택은 후속 설계에서 결정한다.
 
 ## 논리 모듈
 
@@ -13,6 +13,16 @@
 - **Integration**: Auth, queue, LLM, browser rendering adapter
 
 Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application 로직이 Ktor, AWS, DB driver에 직접 의존하지 않게 해 향후 테스트와 기술 교체의 비용을 낮춘다.
+
+## 관리형 PostgreSQL과 Auth
+
+- PostgreSQL 제공자는 Neon을 사용한다.
+- Auth는 Firebase Authentication을 사용하고 첫 출시에는 Apple·Google 로그인을 제공한다.
+- 모바일 앱은 Firebase ID token을 Ktor API에 전달한다. Ktor는 Firebase Admin Java SDK로 token을 검증하고 Firebase UID를 내부 사용자와 연결한다.
+- 모바일 앱은 Neon에 직접 접근하지 않는다. 사용자 데이터 접근 권한과 transaction 경계는 Ktor application layer가 소유한다.
+- 초기 주요 사용자는 한국으로 가정하되, Neon과 Ktor를 Singapore에 함께 배치하는 방향을 Hosting 공급자 선택과 함께 검토한다.
+
+선택 배경, 비용 가정과 정확한 후속 논의 지점은 [2026-09-15 기술 설계 체크포인트](../../history/TECHNICAL-DESIGN-CHECKPOINT-2026-09-15.md)를 따른다.
 
 ## 비동기 등록 흐름
 

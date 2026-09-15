@@ -8,3 +8,4 @@
 | QA-SRV-002 | AI 탐색을 위한 문서 INDEX 전략 | [QA-SRV-002](QA-SRV-002-ai-first-document-navigation.md) |
 | QA-SRV-003 | LocalSubmission과 WishlistItem 상태·API 경계 | [QA-SRV-003](QA-SRV-003-wishlist-item-state-and-api-boundaries.md) |
 | QA-SRV-004 | 전체 목록 조회와 anchor window pagination | [QA-SRV-004](QA-SRV-004-anchor-window-pagination.md) |
+| QA-SRV-005 | 관리형 PostgreSQL과 Auth 조합 | [QA-SRV-005](QA-SRV-005-managed-postgres-auth-combinations.md) |
