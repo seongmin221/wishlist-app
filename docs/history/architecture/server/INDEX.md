@@ -12,4 +12,9 @@
 - [ADR-002: MVP 서버 구현 언어는 Kotlin을 우선한다](ADR-002-kotlin-server-language.md)
 - [ADR-003: MVP 서버 프레임워크로 Ktor를 채택한다](ADR-003-select-ktor.md)
 
+## 기술 설계 체크포인트
+
+- [2026-09-15 인프라 설계 체크포인트](technical-design-checkpoint-2026-09-15.md) — 진행 중
+- [2026-09-13 기술 설계 체크포인트](technical-design-checkpoint-2026-09-13.md) — 대체됨
+
 추가 결정은 `ADR-번호-제목.md` 형식으로 이 폴더에 기록한다.

@@ -12,6 +12,8 @@
 | Client | [client/INDEX.md](architecture/client/INDEX.md) |
 | Server | [server/INDEX.md](architecture/server/INDEX.md) |
 | AI | [ai/INDEX.md](architecture/ai/INDEX.md) |
+| 공통 상태·API 경계 | [ADR-005](architecture/ADR-005-wishlist-item-state-api.md) |
+| 최신 기술 설계 재개 | [2026-09-15 인프라 설계 체크포인트](architecture/server/technical-design-checkpoint-2026-09-15.md) |
 
 ## 제품 기획 이력
 

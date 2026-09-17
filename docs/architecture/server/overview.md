@@ -1,6 +1,6 @@
 # Server 구조
 
-> 상태: **부분 확정** — MVP 서버는 Kotlin/JVM + Ktor를 사용한다. 클라우드 공급자와 DB/Auth/Queue의 구체적 선택은 후속 설계에서 결정한다.
+> 상태: **부분 확정** — MVP 서버는 Kotlin/JVM + Ktor, Neon PostgreSQL과 Firebase Authentication을 사용한다. Hosting과 Queue의 구체적 선택은 후속 설계에서 결정한다.
 
 ## 논리 모듈
 
@@ -14,6 +14,16 @@
 
 Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application 로직이 Ktor, AWS, DB driver에 직접 의존하지 않게 해 향후 테스트와 기술 교체의 비용을 낮춘다.
 
+## 관리형 PostgreSQL과 Auth
+
+- PostgreSQL 제공자는 Neon을 사용한다.
+- Auth는 Firebase Authentication을 사용하고 첫 출시에는 Apple·Google 로그인을 제공한다.
+- 모바일 앱은 Firebase ID token을 Ktor API에 전달한다. Ktor는 Firebase Admin Java SDK로 token을 검증하고 Firebase UID를 내부 사용자와 연결한다.
+- 모바일 앱은 Neon에 직접 접근하지 않는다. 사용자 데이터 접근 권한과 transaction 경계는 Ktor application layer가 소유한다.
+- 초기 주요 사용자는 한국으로 가정하되, Neon과 Ktor를 Singapore에 함께 배치하는 방향을 Hosting 공급자 선택과 함께 검토한다.
+
+선택 배경, 비용 가정과 정확한 후속 논의 지점은 [2026-09-15 기술 설계 체크포인트](../../history/architecture/server/technical-design-checkpoint-2026-09-15.md)를 따른다.
+
 ## 비동기 등록 흐름
 
 1. API가 URL, 사용자 ID를 검증한다.
@@ -23,7 +33,7 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 5. API는 처리 완료를 기다리지 않고 item ID와 상태를 응답한다.
 6. Worker는 새 저장 요청의 대상 상품만 추출·분류하고 해당 `WishlistItem`의 독립된 snapshot을 완성한다.
 7. 추출 결과는 이후 새 항목 생성에 재사용할 수 있도록 `Product` 캐시에 저장할 수 있지만 기존 `WishlistItem`에는 전파하지 않는다.
-8. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾸고, 재시도 불가능한 실패는 `FAILED`와 안전한 오류 사유로 남긴다.
+8. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾼다. 실패는 `FAILED_RETRYABLE`과 `FAILED_TERMINAL`로 구분하고 안전한 공개 오류 코드와 내부 진단 정보를 분리한다.
 
 ## Product 경계
 
@@ -45,11 +55,9 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 - Worker는 같은 작업이 중복 전달·실행되어도 상태 전이와 `WishlistItem` 결과가 한 번 처리한 경우와 같은 최종 결과가 되도록 idempotent해야 한다.
 - retry 횟수, backoff, dead-letter 처리, 추출 성공률을 관측 가능하게 만든다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.
+- WishlistItem의 독립 상태 축, idempotency, anchor window와 경쟁 상황은 [WishlistItem 상태 모델과 API 계약](../wishlist-item-state-api.md)을 따른다.
 
 ## 기술 미결정 사항
 
-- PostgreSQL 제공자, Auth, Queue, Hosting의 구체적 공급자
+- Queue와 Hosting의 구체적 공급자 및 작업 전달 보장 방식
 - JS-rendered 사이트에 Playwright를 언제·어디까지 적용할지
-- 처리 완료를 client에 전달할 최종 방식: polling, realtime, push 중 선택
-
-Client의 polling은 초기 제안일 뿐 제품 결정이 아니다. 최종 전달 방식은 위 선택을 별도 기술 설계로 결정할 때까지 미결정으로 둔다.

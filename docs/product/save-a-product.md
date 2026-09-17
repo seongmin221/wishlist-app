@@ -1,6 +1,6 @@
 # 상품 저장
 
-> 상태: **제안** · 최종 갱신: 2026-09-10 · 관련 흐름: URL 공유부터 분석·복구까지
+> 상태: **제안** · 최종 갱신: 2026-09-13 · 관련 흐름: URL 공유부터 분석·복구까지
 
 ## 사용자 목표
 
@@ -40,13 +40,17 @@
 
 ## 상태와 전환
 
-`로컬 대기`와 `PROCESSING`, `READY`, `PARTIAL`, `FAILED`, `재시도 가능`의 공통 의미는 [상품 상태 용어](references/item-states.md)에 둔다. 이 흐름에서는 로컬 대기가 전송 성공 후 서버 항목의 `PROCESSING` 또는 캐시로 생성된 항목으로 이어지고, 분석 결과는 `READY`, `PARTIAL`, `FAILED` 또는 `재시도 가능`으로 나타난다.
+`로컬 대기`와 `PROCESSING`, `READY`, `PARTIAL`, `FAILED_RETRYABLE`, `FAILED_TERMINAL`의 공통 의미는 [상품 상태 용어](references/item-states.md)에 둔다. 이 흐름에서는 로컬 대기가 전송 성공 후 서버 항목의 `PROCESSING` 또는 캐시로 생성된 항목으로 이어지고, 분석 결과는 `READY`, `PARTIAL`, `FAILED_RETRYABLE` 또는 `FAILED_TERMINAL`로 나타난다.
 
 분석 중인 항목은 수정하거나 재추출할 수 없고 삭제만 할 수 있다. `PARTIAL` 또는 추출할 수 없는 결과는 누락·실패 사실을 별도로 알리며, 원본 링크 열기와 제품명·대표 이미지·카테고리 직접 입력을 제공한다. 직접 보완의 완료 조건과 편집의 상세 동선은 [상품 확인과 편집의 정보 보완 필요와 직접 보완 완료](inspect-and-edit-a-product.md#정보-보완-필요와-직접-보완-완료)에서 정한다.
 
+## 분석 결과 갱신
+
+분석 완료 전달에는 MVP에서 push, realtime 또는 주기적 polling을 사용하지 않는다. 앱 신규 실행, foreground 복귀와 사용자의 새로고침 때 필요한 목록과 홈 영역을 한 번 갱신한다. 네트워크 복구 시 로컬 대기 항목의 전송을 자동 재개하는 것은 서버 상태 polling과 구분한다.
+
 ## 캐시와 사용자 항목 경계
 
-`Product`는 canonical URL과 서버가 추출한 재사용 가능한 metadata를 위한 공용 캐시다. MVP에서는 canonical URL이 같은 `READY` 캐시만 추출 완료 시점부터 7일 동안 새 저장에 재사용한다. `PARTIAL`과 `FAILED` 캐시는 재사용하지 않고, 새 저장 요청의 대상만 분석한다.
+`Product`는 canonical URL과 서버가 추출한 재사용 가능한 metadata를 위한 공용 캐시다. MVP에서는 canonical URL이 같은 `READY` 캐시만 추출 완료 시점부터 7일 동안 새 저장에 재사용한다. `PARTIAL`과 모든 실패 캐시는 재사용하지 않고, 새 저장 요청의 대상만 분석한다.
 
 재사용 가능한 `Product`가 있으면 그 시점의 정보를 새 `WishlistItem`에 복사해 빠르게 생성한다. `WishlistItem`은 사용자별 표시용 정보와 수동 수정값을 보관하는 독립 snapshot이며, 복사 뒤 `Product`와 어느 방향으로도 동기화하지 않는다. 사용자가 제품명·대표 이미지 등을 수정해도 자신의 `WishlistItem`에만 반영되고 `Product`나 다른 사용자의 항목에는 반영하지 않는다.
 
@@ -56,9 +60,9 @@
 
 ## 예외와 복구
 
-서버가 URL 분석을 시도한 뒤 실패하면 항목을 서버에 보존하고 `재시도 가능`으로 표시한다. 실패 원인을 기록하며, 사용자는 직접 보완하기 전까지 항목별로 분석을 다시 요청할 수 있다. 앱과 API는 네트워크 단절 중 저장 요청이 실패한 상태를 사용자에게 명확히 보인다.
+서버 분석 실패는 재시도 가능 여부에 따라 구분한다. 일시적 실패는 Worker 내부 재시도를 제한된 횟수만 수행한 뒤 `FAILED_RETRYABLE`로 보존하고, 사용자가 직접 보완하기 전까지 다시 분석할 수 있게 한다. 차단 주소나 지원하지 않는 콘텐츠처럼 반복해도 성공하기 어려운 실패는 `FAILED_TERMINAL`로 보존하고, 안전한 범주의 이유와 직접 보완·삭제를 제공한다. 앱과 API는 네트워크 단절 중 저장 요청이 실패한 상태를 사용자에게 명확히 보인다.
 
-분석 결과의 `PARTIAL`·`FAILED` 처리와 재시도는 새 요청의 대상 항목에만 적용한다. 중복 후보가 발견되어도 저장을 차단하거나 자동 병합하지 않는다. 추출 뒤 후보를 안내하는 시점과 사용자의 최종 정리 선택은 [구매 후보 정리의 중복 후보 비교와 정리](organize-candidates.md#중복-후보-비교와-정리)의 범위다.
+분석 결과의 `PARTIAL`·실패 처리와 재시도는 새 요청의 대상 항목에만 적용한다. 중복 후보가 발견되어도 저장을 차단하거나 자동 병합하지 않는다. 추출 뒤 후보를 안내하는 시점과 사용자의 최종 정리 선택은 [구매 후보 정리의 중복 후보 비교와 정리](organize-candidates.md#중복-후보-비교와-정리)의 범위다.
 
 ## 삭제와 늦게 도착한 결과
 
@@ -73,7 +77,6 @@ URL 정규화, SSRF 검증, fetch, parser와 렌더링 사용 기준은 [상품 
 ## 미결정 사항
 
 - URL 저장 요청이 분석 완료를 기다리지 않는 규칙, 원본 URL의 공용 캐시 공유 제한, 네트워크 단절 중 실패 상태의 사용자 표시에는 아직 제안 근거가 남아 있다.
-- 처리 완료 알림을 polling, realtime, push 중 무엇으로 제공할지는 서버 설계에서 아직 결정하지 않았다.
 
 ## 관련 문서
 
@@ -81,3 +84,4 @@ URL 정규화, SSRF 검증, fetch, parser와 렌더링 사용 기준은 [상품 
 - [Product 캐시와 WishlistItem 스냅샷 결정](../history/product-planning/mvp/decisions/product-cache-snapshot.md)
 - [중복 URL과 상품 후보 처리 결정](../history/product-planning/mvp/decisions/duplicate-items.md)
 - [상품 상태 용어](references/item-states.md)
+- [WishlistItem 상태 모델과 API 계약](../architecture/wishlist-item-state-api.md)

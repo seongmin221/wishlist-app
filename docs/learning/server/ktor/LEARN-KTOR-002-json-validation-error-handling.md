@@ -102,7 +102,7 @@ stack trace, DB host, access token, 외부 provider 응답 같은 내부 정보�
 | 중복 저장을 막는 정책과 충돌 | `409 Conflict` | 현재 상태 충돌 |
 | 예상하지 못한 예외 | `500 Internal Server Error` | 내부 log와 alert로 조사할 오류 |
 
-상품 metadata extraction이 나중에 실패하는 것은 `POST /wishlist`의 `500` 사유가 아니다. 저장과 queue 등록이 성공했다면 API는 `201 Created`와 `PROCESSING`을 반환하고, Worker가 item 상태를 이후 `FAILED`로 갱신한다.
+상품 metadata extraction이 나중에 실패하는 것은 `POST /wishlist`의 `500` 사유가 아니다. 저장과 queue 등록이 성공했다면 API는 `201 Created`와 `PROCESSING`을 반환하고, Worker가 item 상태를 이후 `FAILED_RETRYABLE` 또는 `FAILED_TERMINAL`로 갱신한다.
 
 ## 테스트에서 확인할 것
 
