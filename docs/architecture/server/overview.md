@@ -1,13 +1,13 @@
 # Server 구조
 
-> 상태: **부분 확정** — MVP 서버는 Kotlin/JVM + Ktor, Neon PostgreSQL과 Firebase Authentication을 사용한다. Hosting과 Queue의 구체적 선택은 후속 설계에서 결정한다.
+> 상태: **부분 확정** — MVP 서버는 Kotlin/JVM + Ktor, Neon PostgreSQL, Firebase Authentication과 Google Cloud Run을 사용한다. 분석 작업은 transactional outbox와 Cloud Tasks로 전달한다.
 
 ## 논리 모듈
 
 - **API**: 인증된 요청의 생성·조회·수정, 짧은 응답
 - **Application**: wishlist/product/category use case와 transaction 경계
 - **Extraction**: URL 검증, fetch, HTML parser, canonicalization
-- **Classification**: taxonomy 입력 구성, 외부 LLM 호출, 결과 검증
+- **Classification**: taxonomy 입력 구성, 실행 방식과 공급자에 독립적인 LLM inference adapter 호출, 결과 검증
 - **Worker**: queue 소비, retry, 중복 전달에도 안전한 idempotent 상태 갱신
 - **Persistence**: PostgreSQL repository와 migration
 - **Integration**: Auth, queue, LLM, browser rendering adapter
@@ -20,20 +20,33 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 - Auth는 Firebase Authentication을 사용하고 첫 출시에는 Apple·Google 로그인을 제공한다.
 - 모바일 앱은 Firebase ID token을 Ktor API에 전달한다. Ktor는 Firebase Admin Java SDK로 token을 검증하고 Firebase UID를 내부 사용자와 연결한다.
 - 모바일 앱은 Neon에 직접 접근하지 않는다. 사용자 데이터 접근 권한과 transaction 경계는 Ktor application layer가 소유한다.
-- 초기 주요 사용자는 한국으로 가정하되, Neon과 Ktor를 Singapore에 함께 배치하는 방향을 Hosting 공급자 선택과 함께 검토한다.
+- 초기 주요 사용자는 한국으로 가정하고 Neon과 Ktor를 Singapore에 함께 배치한다.
 
-선택 배경, 비용 가정과 정확한 후속 논의 지점은 [2026-09-15 기술 설계 체크포인트](../../history/architecture/server/technical-design-checkpoint-2026-09-15.md)를 따른다.
+선택 배경, 비용 가정과 정확한 후속 논의 지점은 [2026-09-19 기술 설계 체크포인트](../../history/architecture/server/technical-design-checkpoint-2026-09-19.md)를 따른다.
+
+## Cloud Run 호스팅
+
+- Ktor API와 상품 분석 Worker는 Cloud Run의 Singapore 리전에 배포한다.
+- API는 Cloud Run service와 minimum instance 1을 초기 기준으로 사용한다.
+- Worker는 API와 별도 배포하고 유휴 시 scale-to-zero를 허용한다.
+- Worker는 Cloud Tasks의 인증된 HTTP 요청을 받는 Cloud Run service로 구성한다.
+- CPU, memory, concurrency와 최대 instance는 부하·비용 검증 후 결정한다.
+
+선택 근거와 재검토 조건은 [ADR-007](../../history/architecture/server/ADR-007-cloud-run-hosting.md)을 따른다.
+Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architecture/server/ADR-008-cloud-tasks-outbox-worker.md)을 따른다.
 
 ## 비동기 등록 흐름
 
 1. API가 URL, 사용자 ID를 검증한다.
 2. canonical candidate로 재사용 가능한 `Product` 캐시를 찾는다.
 3. `WishlistItem`을 만들고, 재사용 가능한 캐시가 있으면 그 시점의 metadata를 항목에 복사한다.
-4. 추가 추출이 필요하면 대상 항목을 `PROCESSING`으로 만들고 작업을 원자적으로 등록한다.
+4. 추가 추출이 필요하면 같은 Neon transaction에서 대상 항목을 `PROCESSING`으로 만들고 `AnalysisJob`과 `OutboxEvent`를 등록한다.
 5. API는 처리 완료를 기다리지 않고 item ID와 상태를 응답한다.
-6. Worker는 새 저장 요청의 대상 상품만 추출하고, category·purpose를 OpenAI API 한 번의 구조화 호출로 판단해 해당 `WishlistItem`의 독립된 snapshot을 완성한다.
-7. 추출 결과는 이후 새 항목 생성에 재사용할 수 있도록 `Product` 캐시에 저장할 수 있지만 기존 `WishlistItem`에는 전파하지 않는다.
-8. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾼다. 실패는 `FAILED_RETRYABLE`과 `FAILED_TERMINAL`로 구분하고 안전한 공개 오류 코드와 내부 진단 정보를 분리한다.
+6. Outbox dispatcher는 미발행 event를 Cloud Tasks task로 만들고 발행 완료를 기록한다.
+7. Cloud Tasks는 OIDC로 인증된 HTTP 요청을 scale-to-zero Worker service에 전달한다.
+8. Worker는 새 저장 요청의 대상 상품만 추출하고, category·purpose를 OpenAI API 한 번의 구조화 호출로 판단해 해당 `WishlistItem`의 독립된 snapshot을 완성한다.
+9. 추출 결과는 이후 새 항목 생성에 재사용할 수 있도록 `Product` 캐시에 저장할 수 있지만 기존 `WishlistItem`에는 전파하지 않는다.
+10. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾼다. 실패는 `FAILED_RETRYABLE`과 `FAILED_TERMINAL`로 구분하고 안전한 공개 오류 코드와 내부 진단 정보를 분리한다.
 
 ## Product 경계
 
@@ -51,14 +64,17 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 
 ## 신뢰성 원칙
 
-- DB 기록과 queue 등록의 불일치를 막기 위해 transactional outbox 또는 동등한 전달 보장 방식을 검토한다.
+- DB 기록과 Cloud Tasks 등록의 불일치를 막기 위해 [transactional outbox](../../learning/server/q-and-a/QA-SRV-007-transactional-outbox.md)를 사용한다.
+- API가 commit 직후 task 발행을 시도하고 Cloud Scheduler가 1분마다 미발행 outbox를 복구한다.
+- 하나의 generation은 최대 3회, 10초부터 최대 10분의 exponential backoff로 전체 30분 동안 재시도한다. 3회 또는 30분 중 하나라도 먼저 도달하면 추가 분석을 막는다.
 - Worker는 같은 작업이 중복 전달·실행되어도 상태 전이와 `WishlistItem` 결과가 한 번 처리한 경우와 같은 최종 결과가 되도록 idempotent해야 한다.
+- retry 횟수, backoff, 장기 실패와 추출 성공률을 관측 가능하게 만든다. Cloud Tasks retry 소진 후 task가 삭제돼도 `AnalysisJob`의 실패 기록은 보존한다.
 - Worker는 AI 요청 후보 snapshot을 기록하고 결과 반영 때 generation·lifecycle·후보 유효성을 재검증한다. stale 결과는 반영하지 않는다.
-- retry 횟수, backoff, dead-letter 처리, 추출 성공률을 관측 가능하게 만든다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.
 - WishlistItem의 독립 상태 축, idempotency, anchor window와 경쟁 상황은 [WishlistItem 상태 모델과 API 계약](../wishlist-item-state-api.md)을 따른다.
 
 ## 기술 미결정 사항
 
-- Queue와 Hosting의 구체적 공급자 및 작업 전달 보장 방식
+- Cloud Tasks dispatch rate, Worker concurrency·최대 instance와 resource별 비용
 - JS-rendered 사이트에 Playwright를 언제·어디까지 적용할지
+- OpenAI API의 실제 token 사용량·품질·latency가 정한 cap과 평가 기준을 충족하는지
