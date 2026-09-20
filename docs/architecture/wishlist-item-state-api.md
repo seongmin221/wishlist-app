@@ -69,7 +69,7 @@ LocalSubmission --POST/idempotency--> WishlistItem
 | `reviewStatus` | `NOT_REQUIRED`, `PENDING`, `CONFIRMED`, `DEFERRED` | 자동 카테고리·목적 결과에 대한 사용자 검토 |
 | `lifecycleStatus` | `ACTIVE`, `ARCHIVED`, `DELETED` | 상품의 생명주기 |
 | `manualCompletionAt` | nullable timestamp | 실패·누락 항목을 사용자가 직접 완료했는지 여부 |
-| `categoryMissingReason` | `EXTRACTION_UNRESOLVED`, `CUSTOM_CATEGORY_DELETED`, null | 카테고리가 없는 원인 |
+| `categoryMissingReason` | `EXTRACTION_UNRESOLVED`, `AI_ABSTAINED`, `AI_RESPONSE_UNUSABLE`, `CUSTOM_CATEGORY_DELETED`, null | 카테고리가 없는 원인 |
 
 `FAILED_RETRYABLE`과 `FAILED_TERMINAL`에는 앱에 노출할 안정적인 `failureCode`를 저장한다. HTTP 응답, 대상 IP, parser stack trace 같은 내부 진단 정보는 `WishlistItem` 공개 모델과 분리한다.
 
@@ -77,12 +77,13 @@ LocalSubmission --POST/idempotency--> WishlistItem
 
 `AnalysisJob`은 사용자 상품이 아니라 Worker 실행을 관리하는 서버 내부 자원이다.
 
-- `jobId`, `wishlistItemId`, `generation`
+- `jobId`, `wishlistItemId`, `generation`, 요청 당시의 metadata fingerprint
+- 허용 category·purpose ID snapshot과 model/prompt/taxonomy version
 - `status`: queue 대기, 실행 중, 성공, 실패, 취소
 - 내부 자동 재시도 횟수, 최대 횟수와 다음 실행 시각
 - 내부 실패 분류와 진단 정보
 
-하나의 사용자 분석 요청 안에서는 일시적 오류를 제한된 횟수만 자동 재시도한다. 이를 소진하면 항목을 `FAILED_RETRYABLE`로 전환하며, 사용자의 재분석 요청은 `generation`을 올린 새 작업을 만든다. Worker는 항목의 현재 generation과 자신의 generation이 같고 생명주기가 `ACTIVE`일 때만 결과를 반영한다.
+하나의 사용자 분석 요청 안에서는 일시적 오류를 제한된 횟수만 자동 재시도한다. 이를 소진하면 항목을 `FAILED_RETRYABLE`로 전환하며, 사용자의 재분석 요청은 `generation`을 올린 새 작업을 만든다. Worker는 항목의 현재 generation과 자신의 generation이 같고 생명주기가 `ACTIVE`이며, 요청 당시 후보가 현재도 소유자에게 허용될 때만 결과를 반영한다. stale 결과는 반영하지 않고 job을 취소한다.
 
 ### Product cache
 
@@ -97,6 +98,8 @@ canonical URL이 같은 `READY` Product cache 결과는 7일 동안 새 `Wishlis
 - 삭제는 현재 `version`과 무관하게 허용한다. 삭제된 항목에는 Worker 결과를 반영하지 않는다.
 - 일반 편집, 직접 보완과 검토 결정은 `expectedVersion`을 요구한다. 값이 다르면 `409 Conflict`로 거절한다.
 - `categoryId`가 있으면 `categoryMissingReason`은 null이어야 한다.
+- 유효한 Structured Output의 `ABSTAINED`는 `categoryId=null`, `categoryMissingReason=AI_ABSTAINED`, `analysisStatus=PARTIAL`로 기록한다.
+- refusal, content filter 또는 schema-invalid ID로 category 결과를 쓸 수 없으면 `categoryId=null`, `categoryMissingReason=AI_RESPONSE_UNUSABLE`, `analysisStatus=PARTIAL`과 안전한 `failureCode`를 기록한다.
 - 사용자 전용 카테고리 삭제로 카테고리가 없어진 경우에는 `CUSTOM_CATEGORY_DELETED`를 사용한다. 추출이 카테고리를 결정하지 못한 경우와 섞지 않는다.
 
 ## 홈 조치 상태
@@ -105,9 +108,10 @@ canonical URL이 같은 `READY` Product cache 결과는 7일 동안 새 `Wishlis
 
 1. `PROCESSING`이면 `ANALYSIS_IN_PROGRESS`
 2. 제품명이 없거나 `categoryMissingReason == EXTRACTION_UNRESOLVED`이면 `INFORMATION_COMPLETION`
-3. `categoryMissingReason == CUSTOM_CATEGORY_DELETED`이면 `CATEGORY_REASSIGNMENT`
-4. `reviewStatus == PENDING`이면 `CLASSIFICATION_REVIEW`
-5. 그 외에는 `NONE`
+3. `categoryMissingReason`이 `AI_ABSTAINED` 또는 `AI_RESPONSE_UNUSABLE`이면 `CATEGORY_ASSIGNMENT`
+4. `categoryMissingReason == CUSTOM_CATEGORY_DELETED`이면 `CATEGORY_REASSIGNMENT`
+5. `reviewStatus == PENDING`이면 `CLASSIFICATION_REVIEW`
+6. 그 외에는 `NONE`
 
 서버 전송 전의 `ANALYSIS_PENDING`은 기기에만 존재하므로 KMP가 `LocalSubmission`에서 계산해 서버의 홈 응답과 합성한다. 하나의 서버 항목에는 하나의 `requiredAction`만 적용한다.
 
@@ -293,6 +297,7 @@ API 오류는 안정된 `code`, 추적 가능한 `requestId`와 필요한 최소
 | Worker 완료와 사용자 삭제 | 사용자 삭제 | `ACTIVE`일 때만 Worker 결과 반영 |
 | 다른 기기 수정과 오래된 편집 | 먼저 반영된 최신 version | `expectedVersion`, `409 Conflict` |
 | 카테고리 삭제와 해당 카테고리 선택 | 카테고리 삭제 | `CATEGORY_NOT_AVAILABLE`, 클라이언트 입력 초안 유지 |
+| Worker 호출 중 후보 category·purpose 변경 또는 삭제 | 현재 후보 | 후보 snapshot 재검증 후 stale 결과 폐기 |
 | anchor 이동·삭제와 window 조회 | 현재 서버 정렬 | 가까운 위치와 `anchorResolved=false` 반환 |
 
 ## 새로고침 정책
