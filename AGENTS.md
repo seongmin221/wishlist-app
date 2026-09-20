@@ -16,7 +16,7 @@ Use:
 
 Do not create history records for trivial mechanical changes.
 
-When a non-trivial question about a server, client, or AI concept taught in this project is answered, preserve the question and concise answer under the relevant `docs/learning/**/q-and-a/` directory.
+When a non-trivial question about a server, client, or AI concept taught in this project is answered, preserve the question and concise answer under the relevant `docs/learning/**/q-and-a/` directory. Product planning questions are not Q&A records; capture resulting decisions or specifications in the appropriate product or history document instead.
 
 Keep concise `INDEX.md` files current for document category folders, and create one when a folder gains multiple documents or subtopics.
 
