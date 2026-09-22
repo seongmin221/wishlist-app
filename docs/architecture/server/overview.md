@@ -92,7 +92,7 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 - 하나의 generation은 최대 3회, 10초부터 최대 10분의 exponential backoff로 전체 30분 동안 재시도한다. 3회 또는 30분 중 하나라도 먼저 도달하면 추가 분석을 막는다.
 - Cloud Tasks queue도 `maxAttempts=3`, `minBackoff=10s`, `maxBackoff=600s`, `maxRetryDuration=1800s`로 고정한다. Worker가 DB attempt count와 최초 시도 기준 deadline을 사전 검증하며 소진 시 `FAILED_RETRYABLE`을 기록하고 2xx로 끝낸다.
 - Worker는 같은 작업이 중복 전달·실행되어도 상태 전이와 `WishlistItem` 결과가 한 번 처리한 경우와 같은 최종 결과가 되도록 idempotent해야 한다.
-- browser Worker도 generation·owner·lifecycle과 `BROWSER_PENDING` 단계 claim을 원자적으로 검증한다. 중복·stale browser task는 결과를 쓰지 않고 2xx로 끝낸다.
+- browser Worker도 generation·owner·lifecycle과 `BROWSER_PENDING` 단계 claim을 원자적으로 검증한다. 중복·stale browser task는 결과를 쓰지 않고 2xx로 끝낸다. 대상 사이트 차단·navigation timeout·대상 DNS/연결 오류·추출 부족은 `PARTIAL`을 저장하고 2xx로 끝내며, DB commit 실패·Worker runtime 장애처럼 terminal 상태를 쓰지 못한 인프라 오류만 재시도한다.
 - retry 횟수, backoff, 장기 실패와 추출 성공률을 관측 가능하게 만든다. Cloud Tasks retry 소진 후 task가 삭제돼도 `AnalysisJob`의 실패 기록은 보존한다.
 - Worker는 AI 요청 후보 snapshot을 기록하고 결과 반영 때 generation·lifecycle·후보 유효성을 재검증한다. stale 결과는 반영하지 않는다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.

@@ -25,7 +25,9 @@ ADR-010은 OpenAI API와 저비용 모델을 MVP 기본값으로 정했지만, c
 ### 비용·개인정보·평가
 
 - 시스템 절대 상한은 입력 4,096 token·출력 256 token이지만, 월 20,000건 release 기본 요청은 입력 1,000 token·출력 80 token으로 더 낮게 제한한다. 이 기본 제한을 넘기는 release는 별도 비용 평가 없이는 허용하지 않는다. 목적 후보는 최근 활성 목적 10개 이하로 제한한다.
-- 일별 1,000원·월별 10,000원의 hard cap과 각 80%의 알림 threshold를 둔다. 호출 전 DB의 일·월 budget window에서 요청 최대 비용을 reservation하는 조건부 원자 update를 수행하며, 동시 Worker도 ceiling을 넘겨 reservation을 얻을 수 없다. 응답 뒤 실제 token 비용을 기록하고 남은 reservation을 해제한다. reservation 실패 시 새 AI 호출·재시도 없이 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 남긴다.
+- 일별 1,000원·월별 10,000원의 hard cap과 각 80%의 알림 threshold를 둔다. 호출 전 DB의 일·월 budget window에서 요청 최대 비용을 reservation하는 조건부 원자 update를 수행하며, 동시 Worker도 ceiling을 넘겨 reservation을 얻을 수 없다.
+- 각 reservation에는 request UUID·job generation·가격표 version·최대/실제 비용·`RESERVED | IN_FLIGHT | SETTLED | RELEASED` 상태·120초 lease를 기록한다. 전송 직전에 `IN_FLIGHT`로 바꾸고 lease를 갱신하며, 응답을 얻으면 실제 비용으로 `SETTLED`하고 차액을 해제한다. 1분 reconciler는 만료 `RESERVED`만 `RELEASED`로 풀고, 만료 `IN_FLIGHT`는 호출 성공 가능성을 보수적으로 인정해 최대 비용으로 `SETTLED`한다. reservation 실패 시 새 AI 호출·재시도 없이 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 남긴다.
+- 모델 가격표 version 변경은 새 release 비용 평가와 일·월 ceiling 갱신 없이는 production에 적용하지 않는다.
 - 요청은 `store: false`를 사용하고 URL query를 제거한다. raw prompt/response는 애플리케이션 DB·로그에 저장하지 않으며, 개인정보 처리 고지에 외부 API 전송을 명시한다.
 - 최초 출시와 model·prompt·taxonomy 변경 전에는 category 정확도, purpose 오연결, abstain 품질, 저품질 metadata와 prompt injection 사례를 포함한 평가를 수행한다.
 

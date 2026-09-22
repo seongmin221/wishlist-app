@@ -14,7 +14,7 @@
 - purpose 오연결률의 분모는 AI가 `ASSIGNED`를 낸 사례이고, 분자는 사람이 허용한 purpose ID 집합 밖의 ID를 낸 사례다. 정답 `UNASSIGNED` 사례의 `ASSIGNED`도 오연결이다. 복수 purpose가 허용되면 그 집합의 어느 ID나 정답으로 한다. purpose `ASSIGNED` 정답 사례의 허용 ID 연결률도 별도로 계산한다.
 - holdout 출시 기준은 category exact accuracy **85% 이상**, `ASSIGNED` purpose 오연결 **5% 이하**, purpose 허용 ID 연결률 **70% 이상**, 의도적으로 애매하거나 근거가 부족한 사례 category `ABSTAINED` **80% 이상**, 허용되지 않은 ID·schema 검증 실패 **0건**, OpenAI 호출 latency p95 **15초 이하**, 월 20,000건 분석 가정에서 외부 LLM 월 **10,000원 hard cap** 충족이다.
 - 사람이 정한 final 값, LLM predicted 값, abstain·unassigned, alias와 실제 model snapshot ID, prompt/taxonomy version, input·output token과 latency를 결과별로 기록한다. raw prompt·response는 보관하지 않는다.
-- 최종 후보는 120개 개발 사례만으로 선택한다. 독립 evaluator는 holdout 사례별 결과·점수·집계값을 공개하지 않고 출시 통과/실패만 한 번 반환한다. 실패하면 같은 60개 holdout을 다시 실행하지 않고, 개발 사례로 수정한 뒤 새로 라벨·고정한 60개 holdout으로 다음 최종 검증을 한다.
+- 최종 후보는 120개 개발 사례만으로 선택한다. 독립 evaluator는 holdout 사례별 결과·점수·집계값을 공개하지 않고 출시 통과/실패만 한 번 반환한다. 실패한 holdout은 읽기 전용 retired holdout으로 봉인하고 개발 사례·학습 데이터·다음 평가에 쓰지 않는다. 개발 후보 선택이 끝난 뒤, 라벨에 접근하지 않는 개발팀과 분리된 evaluator가 strata를 유지해 새 60개를 선정·라벨·봉인한다. 그 새 holdout으로만 다음 최종 검증을 한다.
 
 ## 이유와 trade-off
 

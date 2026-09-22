@@ -45,9 +45,9 @@ timeout·네트워크 오류·429·5xx만 기존 재시도 정책을 적용한�
 ## 비용·개인정보·평가 경계
 
 - 시스템 절대 상한은 입력 4,096·출력 256 토큰이나, 월 20,000건 release 기본 요청은 입력 1,000·출력 80 토큰으로 제한한다. 더 높은 release 제한은 별도 비용 평가를 통과해야 한다. title은 300자, brand·merchant는 각각 160자, description은 2,000자로 정규화·절단하며 목적 후보는 최근 활성 목적 최대 10개로 제한한다.
-- 일별 1,000원·월별 10,000원을 외부 LLM hard cap으로 두고, 각 한도의 80%에서 운영 알림을 낸다. 호출 전에 DB 일·월 budget window에 최대 요청 비용을 조건부 원자 reservation하며 응답 뒤 실제 token 비용을 기록하고 잔여 reservation을 해제한다. reservation을 얻지 못하면 OpenAI 호출·재시도 대신 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 끝낸다.
+- 일별 1,000원·월별 10,000원을 외부 LLM hard cap으로 두고, 각 한도의 80%에서 운영 알림을 낸다. 호출 전에 DB 일·월 budget window에 최대 요청 비용을 조건부 원자 reservation한다. request UUID·job generation·가격표 version·상태를 가진 reservation은 전송 직전에 `IN_FLIGHT`가 되며 120초 lease를 갖는다. 응답 시 실제 비용으로 정산하고 차액을 해제한다. 1분 reconciler는 만료 `RESERVED`만 해제하고 만료 `IN_FLIGHT`는 최대 비용으로 정산한다. reservation을 얻지 못하면 OpenAI 호출·재시도 대신 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 끝낸다. 가격표 version 변경은 비용 평가와 ceiling 갱신을 거친 release에서만 허용한다.
 - OpenAI 요청은 `store: false`를 사용하고 query를 제거한 canonical URL 또는 필요한 metadata만 보낸다. raw prompt/response는 애플리케이션 로그·DB에 보관하지 않으며, 개인정보 처리 고지에 외부 API 전송을 명시한다. abuse monitoring 로그의 보존 정책은 `store: false`와 별개다.
-- 평가는 최초 출시와 model snapshot·prompt·taxonomy 변경 전에 수행한다. 120개 개발 사례와 독립 evaluator가 출시 통과/실패만 한 번 반환하는 60개 blind holdout을 포함한 180개 대표 corpus로 category 정확도, purpose 오연결·연결률, abstain 품질, 저품질 metadata와 prompt injection 사례를 평가한다. holdout 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하·연결률 70% 이상, 의도적 애매 사례 abstain 80% 이상, 허용되지 않은 ID·schema 검증 실패 0건, OpenAI latency p95 15초 이하와 월 10,000원 LLM hard cap 충족이다.
+- 평가는 최초 출시와 model snapshot·prompt·taxonomy 변경 전에 수행한다. 120개 개발 사례와 독립 evaluator가 출시 통과/실패만 한 번 반환하는 60개 blind holdout을 포함한 180개 대표 corpus로 category 정확도, purpose 오연결·연결률, abstain 품질, 저품질 metadata와 prompt injection 사례를 평가한다. holdout 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하·연결률 70% 이상, 의도적 애매 사례 abstain 80% 이상, 허용되지 않은 ID·schema 검증 실패 0건, OpenAI latency p95 15초 이하와 월 10,000원 LLM hard cap 충족이다. 실패한 holdout은 retired로 봉인해 개발·다음 평가에 쓰지 않으며, 새 평가용 holdout은 독립 evaluator가 새로 선정·라벨·봉인한다.
 
 ## 기록할 데이터
 

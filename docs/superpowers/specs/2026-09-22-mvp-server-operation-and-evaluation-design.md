@@ -29,13 +29,15 @@
 
 ## 추출과 AI 분류
 
-일반 Worker는 URL 정규화·SSRF 검증·HTTP fetch·JSON-LD·OpenGraph·HTML metadata·heuristic parser를 순서대로 사용한다. 결과가 없거나 품질이 낮고 `browserAttempted=false`일 때만 위 transaction으로 browser Queue 작업을 요청한다. browser 단계도 실패하면 추가 browser fallback 없이 `PARTIAL`과 사용자 직접 보완으로 끝낸다.
+일반 Worker는 URL 정규화·SSRF 검증·HTTP fetch·JSON-LD·OpenGraph·HTML metadata·heuristic parser를 순서대로 사용한다. 결과가 없거나 품질이 낮고 `browserAttempted=false`일 때만 위 transaction으로 browser Queue 작업을 요청한다. browser 단계에서 대상 사이트 차단·navigation timeout·대상 DNS/연결 오류·추출 품질 부족이 나면 즉시 `PARTIAL`을 저장하고 2xx로 끝낸다. DB commit 실패, Worker runtime 장애처럼 terminal 상태를 저장하지 못한 Worker 인프라 오류만 전역 3회·30분 정책으로 재시도한다. 어느 경우도 두 번째 browser fallback은 만들지 않는다.
 
 추출 metadata와 허용 taxonomy, 최근 활성 목적 10개 이하를 넣어 release에서 고정한 `gpt-5.6-luna` snapshot에 Responses API Structured Output 호출을 한 번 수행한다. `reasoning.effort`는 `none`이다. 응답은 category `ASSIGNED | ABSTAINED`, purpose `ASSIGNED | UNASSIGNED`로 검증한다. 허용되지 않은 ID·refusal·content filter는 `PARTIAL`, 일시적 네트워크·429·5xx는 기존 3회·30분 retry 정책을 따른다. alias는 후보 선택에만 쓰며 snapshot 변경은 새 model 변경으로 간주해 재평가한다.
 
 월 20,000건과 월 10,000원 cap을 함께 만족시키기 위해 release 기본 요청은 입력 최대 1,000 token·출력 최대 80 token으로 제한한다. 4,096/256은 시스템 절대 상한이며, 이 값을 사용하는 release는 별도 비용 평가 없이는 허용하지 않는다. raw prompt·response는 저장하지 않는다. `store: false`, canonical URL query 제거, Secret Manager의 OpenAI key 사용을 적용한다.
 
-OpenAI 가격과 보수 환율 1 USD=1,600원을 기준으로 월 USD 6.00·일 USD 0.60을 내부 budget ceiling으로 둔다. 호출 전 `LlmBudgetWindow`의 일·월 reservation을 조건부 원자 update로 확보한다. reservation은 해당 요청의 최대 1,000 입력·80 출력 token 비용이며, 동시 Worker 중 어느 하나라도 ceiling을 넘기면 reservation을 얻지 못한다. 응답 뒤 실제 token 비용을 기록하고 남은 reservation을 해제한다. 80%에서 알림을 보내며 reservation 실패 시 OpenAI를 호출·재시도하지 않고 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 끝낸다.
+OpenAI 가격과 보수 환율 1 USD=1,600원을 기준으로 월 USD 6.00·일 USD 0.60을 내부 budget ceiling으로 둔다. 호출 전 `LlmBudgetWindow`의 일·월 reservation을 조건부 원자 update로 확보한다. reservation은 해당 요청의 최대 1,000 입력·80 출력 token 비용이며, 동시 Worker 중 어느 하나라도 ceiling을 넘기면 reservation을 얻지 못한다.
+
+각 `LlmBudgetReservation`은 request UUID·`AnalysisJob` generation·가격표 version·최대 비용·실제 비용·`RESERVED | IN_FLIGHT | SETTLED | RELEASED` 상태와 120초 lease를 기록한다. 120초는 Worker timeout 90초와 Task deadline 105초보다 길다. OpenAI 전송 직전에 reservation을 `IN_FLIGHT`로 바꾸고 lease를 갱신한다. 응답을 받으면 실제 token 비용으로 `SETTLED`하고 남은 reservation을 해제한다. 1분 reconciler는 만료 `RESERVED`를 `RELEASED`로 해제하고, 만료 `IN_FLIGHT`는 OpenAI가 이미 처리했을 가능성을 보수적으로 인정해 최대 비용으로 `SETTLED`한다. 따라서 Worker가 호출 뒤 죽거나 응답을 잃어도 cap을 초과하지 않으며, 호출 전 중단만 예산을 되돌린다. 80%에서 알림을 보내며 reservation 실패 시 OpenAI를 호출·재시도하지 않고 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 끝낸다. 모델 가격표 version 변경은 새 release의 비용 평가와 ceiling 갱신 없이는 production에 적용하지 않는다.
 
 Cloud Tasks는 `maxAttempts=3`, `minBackoff=10s`, `maxBackoff=600s`, `maxRetryDuration=1800s`로 설정한다. Worker는 실행 전에 `AnalysisJob`의 attempt count와 최초 시도 기준 30분 deadline을 검사한다. 한도 소진 전 retryable 오류만 non-2xx로 반환하며, 3회 또는 30분 한도를 넘으면 `FAILED_RETRYABLE`을 저장하고 2xx로 task 재시도를 끝낸다.
 
@@ -66,7 +68,7 @@ category 정확도는 정답이 category ID인 holdout 사례 전체를 분모�
 
 holdout에는 `ABSTAINED` 정답 사례 10개 이상, purpose `ASSIGNED` 정답 사례 20개 이상을 strata로 보장한다. 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하, purpose 허용 ID 연결률 70% 이상, 의도적 애매 사례 abstain 80% 이상, schema 검증 실패 0건, OpenAI latency p95 15초 이하, 월 20,000건 가정에서 LLM 월 10,000원 hard cap 충족이다.
 
-최종 후보는 120개 개발 사례만으로 선택한다. 독립 evaluator는 holdout의 사례별 결과·점수·집계값을 공개하지 않고 출시 통과/실패만 한 번 반환한다. holdout 실패 뒤에는 같은 60개를 다시 실행하지 않고, 120개로 원인을 수정한 뒤 새로 라벨·고정한 60개 holdout으로 다음 최종 검증을 한다.
+최종 후보는 120개 개발 사례만으로 선택한다. 독립 evaluator는 holdout의 사례별 결과·점수·집계값을 공개하지 않고 출시 통과/실패만 한 번 반환한다. holdout 실패 뒤 기존 60개는 읽기 전용 retired holdout으로 봉인해 개발 사례·학습 데이터·다음 평가에 쓰지 않는다. 새 holdout은 개발 후보 선택이 끝난 뒤, 라벨에 접근하지 않는 개발팀과 분리된 evaluator가 같은 strata를 충족하도록 선정·라벨하고 봉인한다. 그 새 60개로만 다음 최종 검증을 한다.
 
 ## 출시 전 검증
 
