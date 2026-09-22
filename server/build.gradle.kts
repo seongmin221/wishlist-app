@@ -16,6 +16,7 @@ dependencies {
     implementation("org.flywaydb:flyway-core:11.20.0")
     implementation("org.flywaydb:flyway-database-postgresql:11.20.0")
     implementation("org.postgresql:postgresql:42.7.8")
+    implementation("com.google.firebase:firebase-admin:9.10.0")
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
     testImplementation("org.testcontainers:postgresql:1.21.3")

@@ -20,6 +20,7 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 - Auth는 Firebase Authentication을 사용하고 첫 출시에는 Apple·Google 로그인을 제공한다.
 - 모바일 앱은 Firebase ID token을 Ktor API에 전달한다. Ktor는 Firebase Admin Java SDK로 token을 검증하고 Firebase UID를 내부 사용자와 연결한다.
 - 모바일 앱은 Neon에 직접 접근하지 않는다. 사용자 데이터 접근 권한과 transaction 경계는 Ktor application layer가 소유한다.
+- 상품 생성 API는 Firebase Admin SDK로 Bearer ID token을 검증한 UID만 소유자 식별에 사용한다. 내부 `owner_id` UUID는 `firebase:<projectId>:<uid>`의 name-based UUID로 결정적으로 계산해 같은 Firebase 계정의 재전송이 같은 소유자 범위에 속하도록 한다. 요청의 사용자 ID 헤더는 신뢰하지 않는다.
 - 초기 주요 사용자는 한국으로 가정하고 Neon과 Ktor를 Singapore에 함께 배치한다.
 
 선택 배경, 비용 가정과 정확한 후속 논의 지점은 [2026-09-19 기술 설계 체크포인트](../../history/architecture/server/technical-design-checkpoint-2026-09-19.md)를 따른다.
@@ -64,6 +65,7 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 2. canonical candidate로 재사용 가능한 `Product` 캐시를 찾는다.
 3. `WishlistItem`을 만들고, 재사용 가능한 캐시가 있으면 그 시점의 metadata를 항목에 복사한다.
 4. 추가 추출이 필요하면 같은 Neon transaction에서 대상 항목을 `PROCESSING`으로 만들고 `AnalysisJob`과 `OutboxEvent`를 등록한다.
+   같은 사용자와 `clientSubmissionId`의 동시 저장은 DB unique constraint와 `ON CONFLICT DO NOTHING`으로 한 요청만 생성하고, 다른 요청은 기존 항목을 조회해 재전송 응답을 만든다.
 5. API는 처리 완료를 기다리지 않고 item ID와 상태를 응답한다.
 6. Outbox dispatcher는 미발행 event를 Cloud Tasks task로 만들고 발행 완료를 기록한다.
 7. Cloud Tasks는 OIDC로 인증된 HTTP 요청을 scale-to-zero Worker service에 전달한다.
