@@ -8,5 +8,6 @@ AI 탐색의 최상위 진입점이다. 원문 검색을 대체하지 않고, �
 | Architecture | client, server, AI, repository 구조 | [architecture/INDEX.md](architecture/INDEX.md) |
 | Learning | 프로젝트 맥락의 기술 학습 | [learning/INDEX.md](learning/INDEX.md) |
 | History | 결정과 구현 사유 | [history/INDEX.md](history/INDEX.md) |
+| Design & plans | 확정 설계와 구현 순서 | [superpowers/INDEX.md](superpowers/INDEX.md) |
 
 작성 규칙과 문서 상태 표기는 [README.md](README.md)를 참고한다.
