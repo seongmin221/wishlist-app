@@ -53,21 +53,20 @@ Dispatcher, retry와 장기 실패 복구 정책은 [ADR-009](ADR-009-outbox-ret
 
 ## 정확한 재개 지점
 
-Queue와 작업 전달·재시도, 일반·browser Worker의 초기 resource·queue 용량, 환경·local 의존성, production 계정·secret·service identity, migration 안전·비용 관측·timeout까지 정해졌다. 다음 논의는 OpenAI 평가 설계부터 시작한다.
+Queue와 작업 전달·재시도, 일반·browser Worker의 초기 resource·queue 용량, 환경·local 의존성, production 계정·secret·service identity, migration 안전·비용 관측·timeout과 OpenAI 출시 평가 기준까지 정해졌다. 다음 논의는 evaluation corpus 작성 방식과 부하 시험 계획부터 시작한다.
 
-> OpenAI 분류의 실제 token 사용량·비용·latency와 category·purpose 품질을 출시 전에 어떤 대표 URL·지표·통과 기준으로 평가할지 정한다.
+> OpenAI corpus는 11개 상위 taxonomy, 목적 연결·미지정, 애매·저품질, JS-rendered와 비정상 입력을 포함한 180개 metadata snapshot으로 구성하고, 첫 실험 전 60개 holdout을 고정한다. 일반 20개 burst, JS 4개 동시, 30분 혼합 안정성 시험을 fake·실제 외부 서비스로 나눠 수행한다. 다음으로 전체 설계 문서를 검토한다.
 
 Worker는 `eventId` 또는 `jobId`와 `analysisVersion`으로 중복·늦은 결과를 차단한다. 실제 분석 시간, p95 완료 시간, queue depth, retry, CPU·memory와 평균 월 비용을 부하 시험·출시 후에 관측하고, 필요하면 Worker 최대 instance와 Cloud Tasks 동시 dispatch를 함께 조정한다. Worker request timeout과 Cloud Tasks task deadline은 extraction·LLM latency 측정 후에 정한다.
 
 ## 이후 기술 설계 순서
 
-1. OpenAI API의 실제 token 사용량·품질·latency와 평가 기준을 확정한다.
-2. 대표 URL 부하 시험으로 일반·browser Worker resource, p95 5분, 비용·timeout·retry 기준을 검증한다.
-3. 인프라 설계 문서를 최종 검토한 뒤 구현 계획을 작성한다.
+1. corpus·부하 시험을 구현해 실제 OpenAI token·품질·latency와 worker resource 기준을 검증한다.
+2. 인프라 설계 문서를 최종 검토한 뒤 구현 계획을 작성한다.
 
 ## 다음 세션 시작 문구
 
-> `docs/history/architecture/server/technical-design-checkpoint-2026-09-19.md`를 기준으로 인프라 설계를 재개하자. 일반·browser Worker의 초기 resource와 Queue limit까지 정했다. 다음으로 OpenAI 분류의 출시 전 평가 데이터·지표·통과 기준을 제안해줘.
+> `docs/history/architecture/server/technical-design-checkpoint-2026-09-19.md`를 기준으로 인프라 설계를 재개하자. OpenAI 분류의 180개 평가 corpus와 출시 기준을 정했다. 다음으로 corpus 구성과 일반·browser Worker 부하 시험 시나리오를 제안해줘.
 
 ## 관련 프로젝트 문서
 

@@ -24,6 +24,7 @@
 - **확정**: JS-rendered 사이트는 일반 extraction 실패·저품질일 때만 Playwright를 한 번 보조 실행하며, 실패는 직접 보완으로 넘긴다.
 - **확정**: Playwright는 scale-to-zero browser Worker와 별도 Queue에서 실행해 일반 Worker와 격리한다.
 - **확정**: browser Worker는 2 vCPU·2 GiB·concurrency 1·maximum instance 2, browser Queue는 초당 1 dispatch·동시 2개로 시작한다.
+- **확정**: 출시 전에는 일반 20개 burst, JS 4개 동시, 30분 혼합 안정성 시험을 fake·실제 외부 서비스로 나눠 수행한다.
 - **검토 예정**: 실제 부하·비용 측정에 따른 용량 조정, Worker·Cloud Tasks timeout과 비용 alert 기준.
 
 - [ADR-002: MVP 서버 구현 언어는 Kotlin을 우선한다](ADR-002-kotlin-server-language.md)
@@ -44,6 +45,7 @@
 - [ADR-022: JS-rendered 상품 페이지는 Playwright를 제한적 보조 경로로 지원한다](ADR-022-playwright-best-effort-fallback.md)
 - [ADR-023: Playwright는 별도 browser Worker에서 실행한다](ADR-023-browser-worker-isolation.md)
 - [ADR-024: browser Worker는 2 vCPU·2 GiB와 동시 2개로 시작한다](ADR-024-browser-worker-capacity.md)
+- [ADR-026: 출시 전 서버 체력 시험은 세 가지 대표 시나리오로 수행한다](ADR-026-release-load-test-scenarios.md)
 
 ## 기술 설계 체크포인트
 

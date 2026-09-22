@@ -47,7 +47,7 @@ timeout·네트워크 오류·429·5xx만 기존 재시도 정책을 적용한�
 - 입력은 모델 토큰 기준 최대 4,096, 출력은 최대 256 토큰이다. title은 300자, brand·merchant는 각각 160자, description은 2,000자로 정규화·절단하며 목적 후보는 최근 활성 목적 최대 10개로 제한한다.
 - 일별 1,000원·월별 10,000원을 외부 LLM hard cap으로 두고, 각 한도의 80%에서 운영 알림을 낸다. cap을 넘으면 새 AI 호출 대신 `PARTIAL`로 끝낸다.
 - OpenAI 요청은 `store: false`를 사용하고 query를 제거한 canonical URL 또는 필요한 metadata만 보낸다. raw prompt/response는 애플리케이션 로그·DB에 보관하지 않으며, 개인정보 처리 고지에 외부 API 전송을 명시한다. abuse monitoring 로그의 보존 정책은 `store: false`와 별개다.
-- 평가는 최초 출시와 model·prompt·taxonomy 변경 전에 수행한다. category 정확도, purpose 오연결, abstain 품질, 저품질 metadata와 prompt injection 사례를 포함한다.
+- 평가는 최초 출시와 model·prompt·taxonomy 변경 전에 수행한다. 120개 개발 사례와 60개 고정 holdout을 포함한 180개 대표 corpus로 category 정확도, purpose 오연결, abstain 품질, 저품질 metadata와 prompt injection 사례를 평가한다. holdout 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하, 의도적 애매 사례 abstain 80% 이상, 허용되지 않은 ID·schema 검증 실패 0건, OpenAI latency p95 15초 이하와 월 10,000원 LLM hard cap 충족이다.
 
 ## 기록할 데이터
 
@@ -63,4 +63,4 @@ timeout·네트워크 오류·429·5xx만 기존 재시도 정책을 적용한�
 
 이 데이터는 이후 정확도 측정과 taxonomy 개선의 근거가 된다. semantic search, similar product, recommendation이 실제 제품 요구가 되었을 때 embedding 도입을 별도 결정한다.
 
-LLM 비용 범위와 provider/model 변경 재검토 조건은 [ADR-006](../../history/architecture/ai/ADR-006-llm-cost-and-execution-strategy.md), OpenAI API 기본 전략은 [ADR-010](../../history/architecture/ai/ADR-010-openai-low-cost-model-strategy.md), 호출·상태·보호 정책은 [ADR-011](../../history/architecture/ai/ADR-011-ai-classification-control-policy.md)을 따른다.
+LLM 비용 범위와 provider/model 변경 재검토 조건은 [ADR-006](../../history/architecture/ai/ADR-006-llm-cost-and-execution-strategy.md), OpenAI API 기본 전략은 [ADR-010](../../history/architecture/ai/ADR-010-openai-low-cost-model-strategy.md), 호출·상태·보호 정책은 [ADR-011](../../history/architecture/ai/ADR-011-ai-classification-control-policy.md), 출시 평가는 [ADR-025](../../history/architecture/ai/ADR-025-openai-classification-release-evaluation.md)를 따른다.
