@@ -67,7 +67,7 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 5. API는 처리 완료를 기다리지 않고 item ID와 상태를 응답한다.
 6. Outbox dispatcher는 미발행 event를 Cloud Tasks task로 만들고 발행 완료를 기록한다.
 7. Cloud Tasks는 OIDC로 인증된 HTTP 요청을 scale-to-zero Worker service에 전달한다.
-8. Worker는 새 저장 요청의 대상 상품만 추출하고, category·purpose를 OpenAI API 한 번의 구조화 호출로 판단해 해당 `WishlistItem`의 독립된 snapshot을 완성한다.
+8. Worker는 새 저장 요청의 대상 상품만 추출한다. 일반 추출이 부족하면 같은 DB transaction으로 `BROWSER_PENDING` 단계·browser `OutboxEvent`를 기록해 browser Worker에 한 번만 넘긴다. 최종 단계는 category·purpose를 OpenAI API 한 번의 구조화 호출로 판단해 해당 `WishlistItem`의 독립된 snapshot을 완성한다.
 9. 추출 결과는 이후 새 항목 생성에 재사용할 수 있도록 `Product` 캐시에 저장할 수 있지만 기존 `WishlistItem`에는 전파하지 않는다.
 10. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾼다. 실패는 `FAILED_RETRYABLE`과 `FAILED_TERMINAL`로 구분하고 안전한 공개 오류 코드와 내부 진단 정보를 분리한다.
 
@@ -90,7 +90,9 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 - DB 기록과 Cloud Tasks 등록의 불일치를 막기 위해 [transactional outbox](../../learning/server/q-and-a/QA-SRV-007-transactional-outbox.md)를 사용한다.
 - API가 commit 직후 task 발행을 시도하고 Cloud Scheduler가 1분마다 미발행 outbox를 복구한다.
 - 하나의 generation은 최대 3회, 10초부터 최대 10분의 exponential backoff로 전체 30분 동안 재시도한다. 3회 또는 30분 중 하나라도 먼저 도달하면 추가 분석을 막는다.
+- Cloud Tasks queue도 `maxAttempts=3`, `minBackoff=10s`, `maxBackoff=600s`, `maxRetryDuration=1800s`로 고정한다. Worker가 DB attempt count와 최초 시도 기준 deadline을 사전 검증하며 소진 시 `FAILED_RETRYABLE`을 기록하고 2xx로 끝낸다.
 - Worker는 같은 작업이 중복 전달·실행되어도 상태 전이와 `WishlistItem` 결과가 한 번 처리한 경우와 같은 최종 결과가 되도록 idempotent해야 한다.
+- browser Worker도 generation·owner·lifecycle과 `BROWSER_PENDING` 단계 claim을 원자적으로 검증한다. 중복·stale browser task는 결과를 쓰지 않고 2xx로 끝낸다.
 - retry 횟수, backoff, 장기 실패와 추출 성공률을 관측 가능하게 만든다. Cloud Tasks retry 소진 후 task가 삭제돼도 `AnalysisJob`의 실패 기록은 보존한다.
 - Worker는 AI 요청 후보 snapshot을 기록하고 결과 반영 때 generation·lifecycle·후보 유효성을 재검증한다. stale 결과는 반영하지 않는다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.

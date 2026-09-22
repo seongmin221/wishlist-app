@@ -5,7 +5,7 @@
 ## 확정된 원칙
 
 - MVP에서는 자체 모델 학습, GPU 운영, embedding/vector DB/RAG를 하지 않는다.
-- MVP의 분류·목적 연결은 OpenAI API를 사용하며, 기본 모델은 `gpt-5.6-luna`다.
+- MVP의 분류·목적 연결은 OpenAI API를 사용하며, 기본 모델 후보는 `gpt-5.6-luna`다. release에는 실제 model snapshot ID를 고정한다.
 - OpenAI API 호출은 최소화하고, 기본 요청은 `reasoning.effort`를 `none`으로 설정하며 Structured Outputs를 사용한다.
 - 모바일 on-device와 서버 자체 호스팅 LLM은 MVP에서 제외한다.
 - 코드로 확실히 처리할 수 있는 URL 정규화·HTML 구조 parsing은 AI에 맡기지 않는다.
@@ -44,10 +44,10 @@ timeout·네트워크 오류·429·5xx만 기존 재시도 정책을 적용한�
 
 ## 비용·개인정보·평가 경계
 
-- 입력은 모델 토큰 기준 최대 4,096, 출력은 최대 256 토큰이다. title은 300자, brand·merchant는 각각 160자, description은 2,000자로 정규화·절단하며 목적 후보는 최근 활성 목적 최대 10개로 제한한다.
-- 일별 1,000원·월별 10,000원을 외부 LLM hard cap으로 두고, 각 한도의 80%에서 운영 알림을 낸다. cap을 넘으면 새 AI 호출 대신 `PARTIAL`로 끝낸다.
+- 시스템 절대 상한은 입력 4,096·출력 256 토큰이나, 월 20,000건 release 기본 요청은 입력 1,000·출력 80 토큰으로 제한한다. 더 높은 release 제한은 별도 비용 평가를 통과해야 한다. title은 300자, brand·merchant는 각각 160자, description은 2,000자로 정규화·절단하며 목적 후보는 최근 활성 목적 최대 10개로 제한한다.
+- 일별 1,000원·월별 10,000원을 외부 LLM hard cap으로 두고, 각 한도의 80%에서 운영 알림을 낸다. 호출 전에 DB 일·월 budget window에 최대 요청 비용을 조건부 원자 reservation하며 응답 뒤 실제 token 비용을 기록하고 잔여 reservation을 해제한다. reservation을 얻지 못하면 OpenAI 호출·재시도 대신 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 끝낸다.
 - OpenAI 요청은 `store: false`를 사용하고 query를 제거한 canonical URL 또는 필요한 metadata만 보낸다. raw prompt/response는 애플리케이션 로그·DB에 보관하지 않으며, 개인정보 처리 고지에 외부 API 전송을 명시한다. abuse monitoring 로그의 보존 정책은 `store: false`와 별개다.
-- 평가는 최초 출시와 model·prompt·taxonomy 변경 전에 수행한다. 120개 개발 사례와 60개 고정 holdout을 포함한 180개 대표 corpus로 category 정확도, purpose 오연결, abstain 품질, 저품질 metadata와 prompt injection 사례를 평가한다. holdout 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하, 의도적 애매 사례 abstain 80% 이상, 허용되지 않은 ID·schema 검증 실패 0건, OpenAI latency p95 15초 이하와 월 10,000원 LLM hard cap 충족이다.
+- 평가는 최초 출시와 model snapshot·prompt·taxonomy 변경 전에 수행한다. 120개 개발 사례와 독립 evaluator가 출시 통과/실패만 한 번 반환하는 60개 blind holdout을 포함한 180개 대표 corpus로 category 정확도, purpose 오연결·연결률, abstain 품질, 저품질 metadata와 prompt injection 사례를 평가한다. holdout 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하·연결률 70% 이상, 의도적 애매 사례 abstain 80% 이상, 허용되지 않은 ID·schema 검증 실패 0건, OpenAI latency p95 15초 이하와 월 10,000원 LLM hard cap 충족이다.
 
 ## 기록할 데이터
 
@@ -55,7 +55,7 @@ timeout·네트워크 오류·429·5xx만 기존 재시도 정책을 적용한�
 - `final_category_id` 또는 사용자 override
 - `predicted_purpose_id` 또는 목적 미지정
 - `final_purpose_id` 또는 사용자 override
-- model provider/model identifier
+- model provider/model alias와 실제 snapshot identifier
 - prompt/taxonomy version
 - confidence 또는 후보 목록(지원될 경우)
 - 분류 시각 및 실패 사유

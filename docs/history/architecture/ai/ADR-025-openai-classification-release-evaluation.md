@@ -9,10 +9,12 @@
 - 각 사례에는 입력 metadata, 정답 category 또는 `ABSTAINED`, 허용 purpose 또는 `UNASSIGNED`, 연결하면 안 되는 purpose, metadata 품질, JS-rendered 여부와 prompt injection·비정상 입력 여부를 기록한다.
 - 180개 문제집은 11개 상위 taxonomy마다 최소 12개를 포함하고, purpose 연결·미지정 사례는 각각 최소 60개, 여러 purpose 후보가 있는 사례와 정보 부족·abstain 사례는 각각 최소 30개, JS-rendered와 비정상 입력 사례는 각각 최소 20개를 포함한다. 사례는 여러 기준에 함께 포함될 수 있다.
 - 실제 페이지가 바뀌어 평가가 흔들리지 않게, AI 평가는 당시 추출한 정규화 metadata snapshot을 고정 입력으로 사용한다. 실제 URL fetch·Playwright 성능은 별도 부하 시험에서 평가한다.
-- 60개 holdout은 첫 model·prompt 실험 전에 strata를 유지해 분리·고정한다.
-- holdout 출시 기준은 category exact accuracy **85% 이상**, `ASSIGNED` purpose 오연결 **5% 이하**, 의도적으로 애매하거나 근거가 부족한 사례 category `ABSTAINED` **80% 이상**, 허용되지 않은 ID·schema 검증 실패 **0건**, OpenAI 호출 latency p95 **15초 이하**, 월 20,000건 분석 가정에서 외부 LLM 월 **10,000원 hard cap** 충족이다.
-- 사람이 정한 final 값, LLM predicted 값, abstain·unassigned, model·prompt·taxonomy version, input·output token과 latency를 결과별로 기록한다. raw prompt·response는 보관하지 않는다.
-- 통과하지 못하면 model·prompt·taxonomy·입력 절단 규칙을 조정하고 같은 holdout에서 다시 평가한다. holdout 라벨·구성을 바꾸지 않는다.
+- 60개 holdout은 첫 model·prompt 실험 전에 strata를 유지해 분리·고정하며, `ABSTAINED` 정답 사례 10개 이상과 purpose `ASSIGNED` 정답 사례 20개 이상을 포함한다.
+- category exact accuracy의 분모는 정답이 category ID인 사례 전체이며, 예상 ID와 정확히 같을 때만 정답이다. `ABSTAINED` 정답은 이 분모에서 빼고 abstain 지표로 따로 채점한다.
+- purpose 오연결률의 분모는 AI가 `ASSIGNED`를 낸 사례이고, 분자는 사람이 허용한 purpose ID 집합 밖의 ID를 낸 사례다. 정답 `UNASSIGNED` 사례의 `ASSIGNED`도 오연결이다. 복수 purpose가 허용되면 그 집합의 어느 ID나 정답으로 한다. purpose `ASSIGNED` 정답 사례의 허용 ID 연결률도 별도로 계산한다.
+- holdout 출시 기준은 category exact accuracy **85% 이상**, `ASSIGNED` purpose 오연결 **5% 이하**, purpose 허용 ID 연결률 **70% 이상**, 의도적으로 애매하거나 근거가 부족한 사례 category `ABSTAINED` **80% 이상**, 허용되지 않은 ID·schema 검증 실패 **0건**, OpenAI 호출 latency p95 **15초 이하**, 월 20,000건 분석 가정에서 외부 LLM 월 **10,000원 hard cap** 충족이다.
+- 사람이 정한 final 값, LLM predicted 값, abstain·unassigned, alias와 실제 model snapshot ID, prompt/taxonomy version, input·output token과 latency를 결과별로 기록한다. raw prompt·response는 보관하지 않는다.
+- 최종 후보는 120개 개발 사례만으로 선택한다. 독립 evaluator는 holdout 사례별 결과·점수·집계값을 공개하지 않고 출시 통과/실패만 한 번 반환한다. 실패하면 같은 60개 holdout을 다시 실행하지 않고, 개발 사례로 수정한 뒤 새로 라벨·고정한 60개 holdout으로 다음 최종 검증을 한다.
 
 ## 이유와 trade-off
 

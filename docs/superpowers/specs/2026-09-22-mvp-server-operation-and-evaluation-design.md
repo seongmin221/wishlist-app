@@ -24,15 +24,20 @@
 - 일반 Worker는 1 vCPU·1 GiB·concurrency 1·minimum instance 0·maximum instance 5이며 일반 Queue는 초당 1 dispatch·동시 5개다.
 - browser Worker는 2 vCPU·2 GiB·concurrency 1·minimum instance 0·maximum instance 2이며 browser Queue는 초당 1 dispatch·동시 2개다.
 - Worker timeout은 90초, Cloud Tasks deadline은 105초다.
-- 모든 Worker는 같은 `AnalysisJob` generation·lifecycle·owner를 다시 확인해 늦거나 중복된 결과를 반영하지 않는다.
+- 일반 Worker가 browser fallback을 결정하면 같은 Neon transaction에서 `AnalysisJob` 단계를 `BROWSER_PENDING`으로 바꾸고 `browserAttempted=true` 및 browser용 `OutboxEvent`를 함께 기록한다. 따라서 task 생성 전후 프로세스가 중단돼도 dispatcher가 browser task를 복구한다.
+- browser Worker는 task를 받으면 generation·owner·lifecycle뿐 아니라 `BROWSER_PENDING` 단계 claim을 원자적으로 `BROWSER_RUNNING`으로 바꾼다. 이미 claim·취소·삭제·새 generation인 task는 2xx로 종료하며 결과를 반영하지 않는다.
 
 ## 추출과 AI 분류
 
-일반 Worker는 URL 정규화·SSRF 검증·HTTP fetch·JSON-LD·OpenGraph·HTML metadata·heuristic parser를 순서대로 사용한다. 결과가 없거나 품질이 낮을 때만 browser Queue에 한 번 작업을 넣어 Playwright를 실행한다. browser 단계도 실패하면 무한 재시도하지 않고 `PARTIAL`과 사용자 직접 보완으로 끝낸다.
+일반 Worker는 URL 정규화·SSRF 검증·HTTP fetch·JSON-LD·OpenGraph·HTML metadata·heuristic parser를 순서대로 사용한다. 결과가 없거나 품질이 낮고 `browserAttempted=false`일 때만 위 transaction으로 browser Queue 작업을 요청한다. browser 단계도 실패하면 추가 browser fallback 없이 `PARTIAL`과 사용자 직접 보완으로 끝낸다.
 
-추출 metadata와 허용 taxonomy, 최근 활성 목적 10개 이하를 넣어 `gpt-5.6-luna`에 Responses API Structured Output 호출을 한 번 수행한다. `reasoning.effort`는 `none`이다. 응답은 category `ASSIGNED | ABSTAINED`, purpose `ASSIGNED | UNASSIGNED`로 검증한다. 허용되지 않은 ID·refusal·content filter는 `PARTIAL`, 일시적 네트워크·429·5xx는 기존 3회·30분 retry 정책을 따른다.
+추출 metadata와 허용 taxonomy, 최근 활성 목적 10개 이하를 넣어 release에서 고정한 `gpt-5.6-luna` snapshot에 Responses API Structured Output 호출을 한 번 수행한다. `reasoning.effort`는 `none`이다. 응답은 category `ASSIGNED | ABSTAINED`, purpose `ASSIGNED | UNASSIGNED`로 검증한다. 허용되지 않은 ID·refusal·content filter는 `PARTIAL`, 일시적 네트워크·429·5xx는 기존 3회·30분 retry 정책을 따른다. alias는 후보 선택에만 쓰며 snapshot 변경은 새 model 변경으로 간주해 재평가한다.
 
-입력은 4,096 token, 출력은 256 token으로 제한하며 raw prompt·response는 저장하지 않는다. `store: false`, canonical URL query 제거, Secret Manager의 OpenAI key 사용을 적용한다.
+월 20,000건과 월 10,000원 cap을 함께 만족시키기 위해 release 기본 요청은 입력 최대 1,000 token·출력 최대 80 token으로 제한한다. 4,096/256은 시스템 절대 상한이며, 이 값을 사용하는 release는 별도 비용 평가 없이는 허용하지 않는다. raw prompt·response는 저장하지 않는다. `store: false`, canonical URL query 제거, Secret Manager의 OpenAI key 사용을 적용한다.
+
+OpenAI 가격과 보수 환율 1 USD=1,600원을 기준으로 월 USD 6.00·일 USD 0.60을 내부 budget ceiling으로 둔다. 호출 전 `LlmBudgetWindow`의 일·월 reservation을 조건부 원자 update로 확보한다. reservation은 해당 요청의 최대 1,000 입력·80 출력 token 비용이며, 동시 Worker 중 어느 하나라도 ceiling을 넘기면 reservation을 얻지 못한다. 응답 뒤 실제 token 비용을 기록하고 남은 reservation을 해제한다. 80%에서 알림을 보내며 reservation 실패 시 OpenAI를 호출·재시도하지 않고 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 끝낸다.
+
+Cloud Tasks는 `maxAttempts=3`, `minBackoff=10s`, `maxBackoff=600s`, `maxRetryDuration=1800s`로 설정한다. Worker는 실행 전에 `AnalysisJob`의 attempt count와 최초 시도 기준 30분 deadline을 검사한다. 한도 소진 전 retryable 오류만 non-2xx로 반환하며, 3회 또는 30분 한도를 넘으면 `FAILED_RETRYABLE`을 저장하고 2xx로 task 재시도를 끝낸다.
 
 ## 환경·권한·DB
 
@@ -57,17 +62,23 @@ Flyway versioned SQL migration은 Git에 보관한다. local과 CI의 빈 Postgr
 
 사람이 정답을 라벨한 180개 metadata snapshot을 사용한다. 120개는 개선용이며, 첫 model·prompt 실험 전에 고정한 60개 holdout은 최종 출시 판정에만 쓴다. corpus에는 모든 상위 taxonomy, 목적 연결·미지정, 다중 후보, 저품질·abstain, JS-rendered와 비정상 입력 사례가 포함된다.
 
-holdout 통과 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하, 의도적 애매 사례 abstain 80% 이상, schema 검증 실패 0건, OpenAI latency p95 15초 이하, 월 20,000건 가정에서 LLM 월 10,000원 hard cap 충족이다.
+category 정확도는 정답이 category ID인 holdout 사례 전체를 분모로 하며, 예상 ID와 정확히 같을 때만 정답이다. `ABSTAINED` 정답 사례는 이 분모에서 빼고 abstain 지표로 따로 채점한다. purpose 오연결률은 AI가 `ASSIGNED`를 낸 사례를 분모로 하며, 사람이 허용한 purpose ID 집합에 없는 ID를 낸 사례를 분자로 한다. 복수 purpose가 허용되면 그 집합의 어느 ID나 정답이며, 정답이 `UNASSIGNED`인 사례에서의 `ASSIGNED`는 오연결이다. purpose `ASSIGNED` 정답 사례에 대한 허용 ID 연결률도 70% 이상이어야 한다.
+
+holdout에는 `ABSTAINED` 정답 사례 10개 이상, purpose `ASSIGNED` 정답 사례 20개 이상을 strata로 보장한다. 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하, purpose 허용 ID 연결률 70% 이상, 의도적 애매 사례 abstain 80% 이상, schema 검증 실패 0건, OpenAI latency p95 15초 이하, 월 20,000건 가정에서 LLM 월 10,000원 hard cap 충족이다.
+
+최종 후보는 120개 개발 사례만으로 선택한다. 독립 evaluator는 holdout의 사례별 결과·점수·집계값을 공개하지 않고 출시 통과/실패만 한 번 반환한다. holdout 실패 뒤에는 같은 60개를 다시 실행하지 않고, 120개로 원인을 수정한 뒤 새로 라벨·고정한 60개 holdout으로 다음 최종 검증을 한다.
 
 ## 출시 전 검증
 
 다음 부하 시험을 fake 외부 서비스와 실제 외부 서비스로 각각 수행한다.
 
-1. 일반 상품 20개 burst: 완료 p95 5분, duplicate·retry·backlog 확인
-2. JS-rendered 상품 4개 동시: browser Worker 2개와 Queue 격리 확인
-3. 일반·JS 상품 30분 혼합: backlog가 지속 증가하지 않고 failure·retry가 비정상 증가하지 않는지 확인
+완료 시간은 API가 저장을 수락한 시각부터 `READY` 또는 `PARTIAL`이 된 시각까지로 정의한다. `FAILED_RETRYABLE`·`FAILED_TERMINAL`은 완료 p95에서 제외하되 성공률 지표에는 실패로 포함한다.
 
-이 결과와 AI holdout 평가가 모두 기준을 통과하면 initial resource·timeout·AI 모델 설정을 그대로 출시한다. 어느 하나라도 실패하면 해당 원인만 조정하고 같은 고정 평가·부하 시험으로 다시 검증한다.
+1. 일반 상품 20개 burst를 Queue가 회복될 때까지 10회 반복한다. 총 200개 중 `READY|PARTIAL` 성공률 98% 이상, 성공 항목 완료 p95 5분 이하, 중복 반영 0건, 마지막 입력 뒤 Queue backlog 회복 2분 이하다.
+2. JS-rendered 상품 4개 동시 burst를 Queue 회복 뒤 5회 반복한다. 총 20개에서 browser Worker 최대 2개·동시 dispatch 2개를 넘지 않고, 중복 반영 0건, 성공 항목 완료 p95 5분 이하를 확인한다.
+3. 30분 혼합 시험은 30초마다 1개(총 60개)를 넣되 일반 80%·JS 20%로 구성한다. `READY|PARTIAL` 성공률 95% 이상, 자동 retry가 전체 시도의 5% 이하, 마지막 입력 뒤 Queue backlog 회복 2분 이하를 기준으로 한다.
+
+이 결과와 AI holdout 평가가 모두 기준을 통과하면 initial resource·timeout·AI snapshot 설정을 그대로 출시한다. 부하 시험이 실패하면 해당 원인만 조정하고 같은 시나리오로 다시 검증한다. AI holdout이 실패하면 새 holdout을 고정해 최종 검증한다.
 
 ## 구현 순서
 

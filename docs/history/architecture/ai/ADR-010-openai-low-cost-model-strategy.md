@@ -9,9 +9,9 @@ ADR-006에서는 외부 LLM 비용을 기본 인프라 예산과 분리하고, �
 ## 결정
 
 - MVP의 category 분류와 purpose 연결은 서버의 OpenAI API 호출을 기본 전략으로 사용한다.
-- 기본 모델은 `gpt-5.6-luna`이며, Responses API의 Structured Outputs로 허용된 ID만 받는다.
+- 기본 모델 후보는 `gpt-5.6-luna`이며, 실제 release는 이 alias가 가리키는 **snapshot ID**를 설정에 고정한다. Responses API의 Structured Outputs로 허용된 ID만 받는다.
 - 기본 요청은 `reasoning.effort`를 `none`으로 설정하고, 입력은 deterministic parsing·캐시를 통과한 최소 상품 메타데이터와 검증된 taxonomy로 제한한다.
-- 모델명은 설정으로 관리하고, provider/model identifier·prompt/taxonomy version·토큰 사용량·실패 사유를 분석 결과와 함께 기록한다.
+- alias와 실제 snapshot ID를 함께 기록하고, provider/model identifier·prompt/taxonomy version·토큰 사용량·실패 사유를 분석 결과와 함께 기록한다. alias 또는 snapshot 변경은 새 model 변경으로 보고 출시 평가를 다시 수행한다.
 - API 키는 모바일 클라이언트가 아닌 서버의 비밀 관리 영역에만 둔다.
 - 로컬 on-device, Cloud Run CPU/GPU 자체 호스팅과 자체 모델 학습은 MVP 범위에서 제외한다.
 
