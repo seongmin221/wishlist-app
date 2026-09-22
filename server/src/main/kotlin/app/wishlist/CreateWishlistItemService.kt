@@ -15,7 +15,10 @@ sealed interface CreateResult {
     data object InvalidUrl : CreateResult { override val item: WishlistItem? = null }
 }
 
-class CreateWishlistItemService(private val dataSource: DataSource) {
+class CreateWishlistItemService(
+    private val dataSource: DataSource,
+    private val dispatchAfterCommit: () -> Unit = {},
+) {
     fun create(ownerId: UUID, key: UUID, sourceUrl: String): CreateResult {
         if (!isPublicHttpUrl(sourceUrl)) return CreateResult.InvalidUrl
 
@@ -56,6 +59,7 @@ class CreateWishlistItemService(private val dataSource: DataSource) {
                     statement.executeUpdate()
                 }
                 connection.commit()
+                runCatching { dispatchAfterCommit() }
                 return CreateResult.Created(connection.loadItem(itemId))
             } catch (error: Exception) {
                 connection.rollback()

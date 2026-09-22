@@ -91,9 +91,11 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 
 - DB 기록과 Cloud Tasks 등록의 불일치를 막기 위해 [transactional outbox](../../learning/server/q-and-a/QA-SRV-007-transactional-outbox.md)를 사용한다.
 - API가 commit 직후 task 발행을 시도하고 Cloud Scheduler가 1분마다 미발행 outbox를 복구한다.
+- dispatcher는 outbox 행을 `FOR UPDATE SKIP LOCKED`로 claim하고 120초 발행 lease를 기록한다. Cloud Tasks 생성에 실패하면 lease를 풀어 다시 시도할 수 있게 하며, task 이름을 고정해 생성 성공 직후 dispatcher가 죽어도 중복 발행을 동일 task로 수렴시킨다.
 - 하나의 generation은 최대 3회, 10초부터 최대 10분의 exponential backoff로 전체 30분 동안 재시도한다. 3회 또는 30분 중 하나라도 먼저 도달하면 추가 분석을 막는다.
 - Cloud Tasks queue도 `maxAttempts=3`, `minBackoff=10s`, `maxBackoff=600s`, `maxRetryDuration=1800s`로 고정한다. Worker가 DB attempt count와 최초 시도 기준 deadline을 사전 검증하며 소진 시 `FAILED_RETRYABLE`을 기록하고 2xx로 끝낸다.
 - Worker는 같은 작업이 중복 전달·실행되어도 상태 전이와 `WishlistItem` 결과가 한 번 처리한 경우와 같은 최종 결과가 되도록 idempotent해야 한다.
+- 일반 Worker는 `GENERAL_PENDING → GENERAL_RUNNING`을 DB에서 claim하며 첫 시도부터 30분과 최대 3회를 사전에 검증한다. 실행 중 종료되어 120초 넘게 `GENERAL_RUNNING`에 남은 job은 reconciler가 다시 대기 상태와 새 outbox event로 복구한다. 한도를 소진한 작업은 `FAILED_RETRYABLE`로 기록한다.
 - browser Worker도 generation·owner·lifecycle과 `BROWSER_PENDING` 단계 claim을 원자적으로 검증한다. 중복·stale browser task는 결과를 쓰지 않고 2xx로 끝낸다. 대상 사이트 차단·navigation timeout·대상 DNS/연결 오류·추출 부족은 `PARTIAL`을 저장하고 2xx로 끝내며, DB commit 실패·Worker runtime 장애처럼 terminal 상태를 쓰지 못한 인프라 오류만 재시도한다.
 - retry 횟수, backoff, 장기 실패와 추출 성공률을 관측 가능하게 만든다. Cloud Tasks retry 소진 후 task가 삭제돼도 `AnalysisJob`의 실패 기록은 보존한다.
 - Worker는 AI 요청 후보 snapshot을 기록하고 결과 반영 때 generation·lifecycle·후보 유효성을 재검증한다. stale 결과는 반영하지 않는다.

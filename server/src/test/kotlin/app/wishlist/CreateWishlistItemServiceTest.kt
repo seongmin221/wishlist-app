@@ -69,6 +69,23 @@ class CreateWishlistItemServiceTest {
         assertEquals(0, databaseCount(database, "wishlist_items"))
     }
 
+    @Test
+    fun `queue publication failure after commit does not lose accepted item`() {
+        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+            database.start()
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            var attempted = 0
+            val service = CreateWishlistItemService(
+                DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password),
+            ) { attempted++; error("queue unavailable") }
+
+            assertIs<CreateResult.Created>(service.create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item"))
+            assertEquals(1, attempted)
+            assertEquals(1, databaseCount(database, "wishlist_items"))
+            assertEquals(1, databaseCount(database, "outbox_events"))
+        }
+    }
+
     private fun withDatabase(block: (PostgreSQLContainer<*>, CreateWishlistItemService) -> Unit) {
         PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
             database.start()
