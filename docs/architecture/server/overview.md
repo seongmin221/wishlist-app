@@ -24,13 +24,36 @@ Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application �
 
 선택 배경, 비용 가정과 정확한 후속 논의 지점은 [2026-09-19 기술 설계 체크포인트](../../history/architecture/server/technical-design-checkpoint-2026-09-19.md)를 따른다.
 
+## 환경 경계
+
+MVP 초기에는 local과 production만 운용한다. local은 개발·단위·통합 테스트를 위한 환경이며, production만 Cloud Run, Firebase Authentication, Neon PostgreSQL과 Cloud Tasks의 실제 계정을 사용한다. 별도 cloud development·staging은 production 통합 검증 위험이 반복될 때 추가한다.
+
+local은 Docker PostgreSQL로 migration·repository를 통합 테스트하고 Firebase Auth Emulator로 인증 경계를 검증한다. Cloud Tasks·OpenAI adapter는 in-memory fake, extraction은 fixture HTTP server로 대체한다. 실제 Cloud Tasks IAM은 production smoke test, OpenAI 품질·latency는 대표 URL 평가로 검증한다.
+
+production의 Neon credential과 OpenAI API key는 Secret Manager에 두고, API·Worker에 필요한 secret version만 환경변수로 주입한다. Firebase Admin SDK는 Cloud Run service identity의 Application Default Credentials를 사용하며 private key 파일을 배포하지 않는다. Cloud Tasks와 Cloud Scheduler는 전용 service account의 OIDC token으로 private Worker·API endpoint를 호출하고, CI/CD는 GitHub Actions OIDC federation으로 배포한다.
+
+DB schema는 Flyway의 versioned SQL migration 파일로 Git에서 관리한다. local Docker PostgreSQL의 빈 DB에서 Gradle task로 전체 migration과 통합 테스트를 실행하고, CI/CD의 전용 단계가 production Neon에 `validate`·`migrate`를 한 번 적용한 뒤 API·Worker를 배포한다. runtime 서비스는 migration을 실행하지 않으며 destructive change는 expand → migrate → contract로 나눈다.
+
+production migration은 API·Worker와 별도의 Neon DB role·credential을 사용한다. 일반 변경 전에는 Neon restore history를 확인하고, destructive·대량 data 변경 전에는 Neon branch 또는 snapshot을 생성한다. migration 실패 시 deployment를 중단하고, 자동 rollback 대신 forward migration 또는 복구 branch 검증을 거쳐 수동으로 대응한다.
+
+## 비용과 관측
+
+기본 인프라는 평균 월 30,000원 상한으로 관리한다. GCP production project에는 월 20,000원 budget alert를 두고 50%·80%·100%에서 알림을 받으며, Neon은 월 10,000원 목표 비용으로 별도 확인한다. 자동 billing·서비스 중단은 하지 않는다. API·Worker latency·오류·instance, Worker 실행 시간·retry, Queue backlog와 저장부터 분석 완료까지의 p95 시간을 비용과 함께 관측한다.
+
+Worker request timeout은 90초, Cloud Tasks task deadline은 105초로 시작한다. 대표 URL 부하 시험에서 전체 완료 p95 5분, timeout·retry 비율과 queue backlog를 확인해 timeout과 capacity를 함께 조정한다.
+
+production은 전용 Google Cloud project 하나에 Firebase Authentication, Cloud Run, Cloud Tasks, Cloud Scheduler와 Secret Manager를 함께 둔다. Neon은 별도의 production 전용 project·database를 사용한다. staging을 추가할 때는 production 자원을 공유하지 않는다.
+
 ## Cloud Run 호스팅
 
 - Ktor API와 상품 분석 Worker는 Cloud Run의 Singapore 리전에 배포한다.
 - API는 Cloud Run service와 minimum instance 1을 초기 기준으로 사용한다.
 - Worker는 API와 별도 배포하고 유휴 시 scale-to-zero를 허용한다.
-- Worker는 Cloud Tasks의 인증된 HTTP 요청을 받는 Cloud Run service로 구성한다.
-- CPU, memory, concurrency와 최대 instance는 부하·비용 검증 후 결정한다.
+- 일반 Worker는 Cloud Tasks의 인증된 HTTP 요청을 받는 Cloud Run service로 구성한다. Playwright는 별도의 scale-to-zero browser Worker service와 browser 전용 Queue에서만 실행한다.
+- 초기 API는 request-based billing, 1 vCPU·1 GiB memory·concurrency 20·minimum instances 1·maximum instances 3으로 둔다.
+- 초기 Worker는 request-based billing, 1 vCPU·1 GiB memory·concurrency 1·minimum instances 0·maximum instances 5로 둔다.
+- Cloud Tasks는 초당 최대 1 dispatch, 최대 5개 동시 dispatch로 시작한다. 실제 부하·비용 측정으로 조정한다.
+- browser Worker는 request-based billing, 2 vCPU·2 GiB memory·concurrency 1·minimum instances 0·maximum instances 2로 둔다. browser Queue는 초당 최대 1 dispatch, 최대 2개 동시 dispatch로 시작한다.
 
 선택 근거와 재검토 조건은 [ADR-007](../../history/architecture/server/ADR-007-cloud-run-hosting.md)을 따른다.
 Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architecture/server/ADR-008-cloud-tasks-outbox-worker.md)을 따른다.
@@ -75,6 +98,7 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 
 ## 기술 미결정 사항
 
-- Cloud Tasks dispatch rate, Worker concurrency·최대 instance와 resource별 비용
-- JS-rendered 사이트에 Playwright를 언제·어디까지 적용할지
+- Worker request timeout, Cloud Tasks task deadline, 비용 alert의 정확한 기준
+- 실제 부하·비용 측정에 따른 초기 resource와 queue 용량 조정
+- browser Worker의 CPU·memory·concurrency·maximum instance, browser Queue dispatch rate와 비용
 - OpenAI API의 실제 token 사용량·품질·latency가 정한 cap과 평가 기준을 충족하는지

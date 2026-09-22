@@ -35,4 +35,4 @@
 
 ## Playwright 사용 기준
 
-일반 fetch에서 추출 결과가 없거나 품질이 낮은 JS-rendered 사이트에만 제한적으로 사용한다. Playwright는 비용·지연·bot detection 위험이 있어 모든 URL에 적용하지 않는다.
+일반 fetch에서 추출 결과가 없거나 품질이 낮은 JS-rendered 사이트에만 **한 번** 제한적으로 사용한다. Playwright는 비용·지연·bot detection 위험이 있어 모든 URL·모든 retry에 적용하지 않는다. browser rendering도 충분한 metadata를 얻지 못하면 `PARTIAL`과 직접 보완 흐름으로 넘긴다. Playwright는 일반 Worker가 아닌 scale-to-zero browser Worker에서 실행하며 browser resource는 후속 설계에서 정한다.
