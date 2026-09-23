@@ -31,3 +31,10 @@ kotlin { jvmToolchain(17) }
 tasks.test { useJUnitPlatform() }
 
 application { mainClass.set("app.MainKt") }
+
+tasks.register<JavaExec>("runBudgetMaintenance") {
+    group = "application"
+    description = "Reconcile LLM reservations and emit pending budget alerts once"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("app.budget.BudgetMaintenanceServiceKt")
+}

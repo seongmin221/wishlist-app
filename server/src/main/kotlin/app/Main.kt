@@ -31,6 +31,7 @@ fun main() {
 }
 
 fun Application.module() {
+    RuntimeConfig.fromEnvironment(System.getenv())
     install(ContentNegotiation) { json() }
     routing {
         get("/health") { call.respondText("ok") }

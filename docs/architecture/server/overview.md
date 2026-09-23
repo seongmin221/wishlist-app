@@ -99,6 +99,7 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 - browser Worker도 generation·owner·lifecycle과 `BROWSER_PENDING` 단계 claim을 원자적으로 검증한다. 중복·stale browser task는 결과를 쓰지 않고 2xx로 끝낸다. 대상 사이트 차단·navigation timeout·대상 DNS/연결 오류·추출 부족은 `PARTIAL`을 저장하고 2xx로 끝내며, DB commit 실패·Worker runtime 장애처럼 terminal 상태를 쓰지 못한 인프라 오류만 재시도한다.
 - retry 횟수, backoff, 장기 실패와 추출 성공률을 관측 가능하게 만든다. Cloud Tasks retry 소진 후 task가 삭제돼도 `AnalysisJob`의 실패 기록은 보존한다.
 - Worker는 AI 요청 후보 snapshot을 기록하고 결과 반영 때 generation·lifecycle·후보 유효성을 재검증한다. stale 결과는 반영하지 않는다.
+- runtime은 명시적으로 지원하지 않는 Worker 역할을 설정하면 기동을 거부한다. production API는 DB·Firebase·Cloud Tasks 필수 설정이 없으면 health-only로 조용히 기동하지 않는다. Worker 역할 조립과 private endpoint 배포가 끝나기 전에는 Worker 서비스를 출시하지 않는다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.
 - WishlistItem의 독립 상태 축, idempotency, anchor window와 경쟁 상황은 [WishlistItem 상태 모델과 API 계약](../wishlist-item-state-api.md)을 따른다.
 
