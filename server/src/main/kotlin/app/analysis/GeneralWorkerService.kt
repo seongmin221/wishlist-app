@@ -52,8 +52,8 @@ class GeneralWorkerService(
             try {
                 val disposition = when (outcome) {
                     ProcessingOutcome.Complete -> {
-                        connection.prepareStatement("update analysis_jobs set stage='COMPLETE', updated_at=now() where id=? and stage='GENERAL_RUNNING'").use { it.setObject(1, jobId); it.executeUpdate() }
-                        connection.prepareStatement("update wishlist_items set analysis_status='READY', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
+                        val updated = connection.prepareStatement("update analysis_jobs set stage='COMPLETE', updated_at=now() where id=? and generation=? and stage='GENERAL_RUNNING'").use { it.setObject(1, jobId); it.setInt(2,generation); it.executeUpdate() }
+                        if (updated == 1) connection.prepareStatement("update wishlist_items set analysis_status='READY', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
                         WorkerDisposition.ACKNOWLEDGE
                     }
                     ProcessingOutcome.NeedsBrowser -> {

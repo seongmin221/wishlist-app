@@ -37,7 +37,7 @@ class BrowserWorkerServiceTest {
     fun `navigation timeout becomes partial without queue retry`() = withJob { database, jobId ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
-        val browser = BrowserWorkerService(source) { throw BrowserNavigationTimeout() }
+        val browser = BrowserWorkerService(source, { throw BrowserNavigationTimeout() }, { _, _ -> error("classification must not run") })
         assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
         database.createConnection("").use { connection ->
             connection.createStatement().executeQuery("select analysis_status from wishlist_items").use { rows ->
@@ -51,7 +51,7 @@ class BrowserWorkerServiceTest {
     fun `blocked browser destination becomes partial without retry`() = withJob { database, jobId ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
-        val browser = BrowserWorkerService(source) { throw UnsafeUrlException("blocked") }
+        val browser = BrowserWorkerService(source, { throw UnsafeUrlException("blocked") }, { _, _ -> error("classification must not run") })
         assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
     }
 
@@ -59,7 +59,9 @@ class BrowserWorkerServiceTest {
     fun `browser result writes metadata to the same item`() = withJob { database, jobId ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
-        val browser = BrowserWorkerService(source) { Metadata("Rendered product", null, null, "https://example.com/item") }
+        val browser = BrowserWorkerService(source,
+            { Metadata("Rendered product", null, null, "https://example.com/item") },
+            { _, _ -> ProcessingOutcome.Complete })
         assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
         database.createConnection("").use { connection ->
             connection.createStatement().executeQuery("select product_name, analysis_status from wishlist_items").use { rows ->
@@ -71,10 +73,41 @@ class BrowserWorkerServiceTest {
     }
 
     @Test
+    fun `browser metadata without usable classification stays partial`() = withJob { database, jobId ->
+        val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+        GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
+        val browser = BrowserWorkerService(source,
+            { Metadata("Rendered product", null, null, "https://example.com/item") },
+            { _, _ -> ProcessingOutcome.Partial })
+        assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
+        database.createConnection("").use { connection ->
+            connection.createStatement().executeQuery("select product_name,analysis_status from wishlist_items").use { rows ->
+                rows.next(); assertEquals("Rendered product", rows.getString(1)); assertEquals("PARTIAL", rows.getString(2))
+            }
+        }
+    }
+
+    @Test
+    fun `revoked browser claim cannot write metadata or ready status`() = withJob { database, jobId ->
+        val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+        GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
+        val browser = BrowserWorkerService(source,
+            { id ->
+                source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='CANCELLED' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+                Metadata("Stale product", null, null, "https://example.com/item")
+            },
+            { _, _ -> ProcessingOutcome.Complete })
+        assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
+        source.connection.use { c -> c.createStatement().executeQuery("select product_name,analysis_status from wishlist_items").use { r ->
+            r.next(); assertEquals(null, r.getString(1)); assertEquals("PROCESSING", r.getString(2))
+        } }
+    }
+
+    @Test
     fun `infrastructure failure leaves browser claim for reconciler retry`() = withJob { database, jobId ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
-        val browser = BrowserWorkerService(source) { error("browser runtime exited") }
+        val browser = BrowserWorkerService(source, { error("browser runtime exited") }, { _, _ -> error("classification must not run") })
         assertFailsWith<IllegalStateException> { browser.runBrowser(jobId, 1) }
         database.createConnection("").use { connection ->
             connection.prepareStatement("update analysis_jobs set updated_at=now()-interval '121 seconds' where id=?").use {

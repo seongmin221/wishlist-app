@@ -79,6 +79,17 @@ class GeneralWorkerServiceTest {
         }
     }
 
+    @Test
+    fun `claim revoked during processing cannot mark item ready`() = withJob { database, jobId, _ ->
+        val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+        val worker = GeneralWorkerService(source) { id ->
+            source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='CANCELLED' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+            ProcessingOutcome.Complete
+        }
+        assertEquals(WorkerDisposition.ACKNOWLEDGE, worker.runGeneral(jobId, 1))
+        source.connection.use { c -> c.createStatement().executeQuery("select analysis_status from wishlist_items").use { r -> r.next(); assertEquals("PROCESSING", r.getString(1)) } }
+    }
+
     private fun withJob(block: (PostgreSQLContainer<*>, UUID, UUID) -> Unit) {
         PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
             database.start()

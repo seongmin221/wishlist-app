@@ -20,9 +20,9 @@ class GeneralExtractionProcessorTest {
             val jobId = database.createConnection("").use { connection ->
                 connection.createStatement().executeQuery("select id from analysis_jobs").use { rows -> rows.next(); rows.getObject(1, UUID::class.java) }
             }
-            val processor = GeneralExtractionProcessor(source) { url ->
-                ExtractionResult.Complete(Metadata("A product", "Description", null, url))
-            }
+            val processor = GeneralExtractionProcessor(source,
+                { url -> ExtractionResult.Complete(Metadata("A product", "Description", null, url)) },
+                { _, _ -> app.analysis.ProcessingOutcome.Complete })
 
             assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
             database.createConnection("").use { connection ->
@@ -45,7 +45,7 @@ class GeneralExtractionProcessorTest {
             val jobId = database.createConnection("").use { connection ->
                 connection.createStatement().executeQuery("select id from analysis_jobs").use { rows -> rows.next(); rows.getObject(1, UUID::class.java) }
             }
-            val processor = GeneralExtractionProcessor(source) { ExtractionResult.Partial }
+            val processor = GeneralExtractionProcessor(source, { ExtractionResult.Partial }, { _, _ -> error("classification must not run") })
             assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
             database.createConnection("").use { connection ->
                 connection.createStatement().executeQuery("select analysis_status from wishlist_items").use { rows ->
@@ -66,7 +66,7 @@ class GeneralExtractionProcessorTest {
             val jobId = database.createConnection("").use { connection ->
                 connection.createStatement().executeQuery("select id from analysis_jobs").use { rows -> rows.next(); rows.getObject(1, UUID::class.java) }
             }
-            val processor = GeneralExtractionProcessor(source) { throw UnsafeUrlException("private redirect") }
+            val processor = GeneralExtractionProcessor(source, { throw UnsafeUrlException("private redirect") }, { _, _ -> error("classification must not run") })
             assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
             database.createConnection("").use { connection ->
                 connection.createStatement().executeQuery("select analysis_status from wishlist_items").use { rows ->

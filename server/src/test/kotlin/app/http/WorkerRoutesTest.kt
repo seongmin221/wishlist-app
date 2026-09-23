@@ -40,7 +40,7 @@ class WorkerRoutesTest {
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
             val worker = GeneralWorkerService(source) { ProcessingOutcome.Retryable }
-            val browser = BrowserWorkerService(source) { error("must not render") }
+            val browser = BrowserWorkerService(source, { error("must not render") }, { _, _ -> error("must not classify") })
             testApplication {
                 application { routing { workerRoutes(worker, browser) } }
                 val response = client.post("/internal/worker/browser") {

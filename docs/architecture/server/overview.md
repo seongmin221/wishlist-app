@@ -69,7 +69,7 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 5. API는 처리 완료를 기다리지 않고 item ID와 상태를 응답한다.
 6. Outbox dispatcher는 미발행 event를 Cloud Tasks task로 만들고 발행 완료를 기록한다.
 7. Cloud Tasks는 OIDC로 인증된 HTTP 요청을 scale-to-zero Worker service에 전달한다.
-8. Worker는 새 저장 요청의 대상 상품만 추출한다. 일반 추출이 부족하면 같은 DB transaction으로 `BROWSER_PENDING` 단계·browser `OutboxEvent`를 기록해 browser Worker에 한 번만 넘긴다. 최종 단계는 category·purpose를 OpenAI API 한 번의 구조화 호출로 판단해 해당 `WishlistItem`의 독립된 snapshot을 완성한다.
+8. Worker는 새 저장 요청의 대상 상품만 추출한다. 일반 추출이 부족하면 같은 DB transaction으로 `BROWSER_PENDING` 단계·browser `OutboxEvent`를 기록해 browser Worker에 한 번만 넘긴다. 최종 단계는 category·purpose를 OpenAI API 한 번의 구조화 호출로 판단해 해당 `WishlistItem`의 독립된 snapshot을 완성한다. 추출 metadata만으로 `READY`를 기록하지 않으며, 분류 결과가 안전하게 반영된 경우에만 완료한다.
 9. 추출 결과는 이후 새 항목 생성에 재사용할 수 있도록 `Product` 캐시에 저장할 수 있지만 기존 `WishlistItem`에는 전파하지 않는다.
 10. 성공 시 새 항목 상태를 `READY` 또는 `PARTIAL`로 바꾼다. 실패는 `FAILED_RETRYABLE`과 `FAILED_TERMINAL`로 구분하고 안전한 공개 오류 코드와 내부 진단 정보를 분리한다.
 

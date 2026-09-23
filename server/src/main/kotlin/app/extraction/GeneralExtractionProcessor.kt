@@ -7,6 +7,7 @@ import javax.sql.DataSource
 class GeneralExtractionProcessor(
     private val dataSource: DataSource,
     private val extract: (String) -> ExtractionResult,
+    private val classify: (UUID, Metadata) -> ProcessingOutcome,
 ) {
     fun process(jobId: UUID): ProcessingOutcome {
         val sourceUrl = dataSource.connection.use { connection ->
@@ -31,7 +32,7 @@ class GeneralExtractionProcessor(
                         it.executeUpdate()
                     }
                 }
-                ProcessingOutcome.Complete
+                classify(jobId, result.metadata)
             }
             ExtractionResult.NeedsBrowser -> ProcessingOutcome.NeedsBrowser
             ExtractionResult.Partial -> ProcessingOutcome.Partial

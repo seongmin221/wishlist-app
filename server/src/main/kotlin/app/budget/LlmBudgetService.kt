@@ -65,6 +65,8 @@ class LlmBudgetService(
 
     fun settle(id: UUID, inputTokens: Int, outputTokens: Int) = finalize(id, price.costMicrousd(inputTokens, outputTokens), false)
 
+    fun settleMaximum(id: UUID) = finalize(id, price.maximumMicrousd(), false)
+
     fun reconcileExpired(now: Instant = Instant.now()): Int = transaction { c ->
         val expired = c.prepareStatement("select id,state,maximum_microusd from llm_budget_reservations where state in ('RESERVED','IN_FLIGHT') and lease_until<? for update skip locked").use { s ->
             s.setTimestamp(1, Timestamp.from(now)); s.executeQuery().use { r -> buildList { while (r.next()) add(Triple(r.getObject(1, UUID::class.java), ReservationState.valueOf(r.getString(2)), r.getLong(3))) } }
