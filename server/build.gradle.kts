@@ -28,6 +28,8 @@ dependencies {
 
 kotlin { jvmToolchain(17) }
 
+sourceSets.main { resources.srcDir("../ai") }
+
 tasks.test { useJUnitPlatform() }
 
 application { mainClass.set("app.MainKt") }

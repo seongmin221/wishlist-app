@@ -12,6 +12,7 @@
 - [추출 pipeline](../server/extraction-pipeline.md)의 deterministic parser는 AI의 입력 metadata를 만들며, AI는 taxonomy 분류·목적 연결 보조 수단으로만 사용한다.
 - 카테고리·목적의 사용자 정책, AI 제안·확정·재판단 조건은 [구매 후보 정리의 AI 분류와 목적 연결](../../product/organize-candidates.md#5-ai-분류와-목적-연결)을 따른다.
 - AI 구현은 요청마다 허용된 category·purpose ID를 구조화해 전달하고, 응답 ID를 서버 schema로 검증한 뒤 predicted 값과 model/prompt version을 기록한다.
+- 출시 공용 taxonomy의 11개 상위 그룹·87개 세부 유형은 [버전 데이터](../../../ai/taxonomy/v1.json)로 고정하며 [제품 문서](../../product/references/product-taxonomy.md)와 일치하는지 테스트한다. AI 후보 snapshot에는 ID뿐 아니라 사람에게 읽히는 그룹·세부 유형 이름도 보존한다.
 
 ## 처리 흐름
 
@@ -48,6 +49,7 @@ timeout·네트워크 오류·429·5xx만 기존 재시도 정책을 적용한�
 - 일별 1,000원·월별 10,000원을 외부 LLM hard cap으로 두고, 각 한도의 80%에서 운영 알림을 낸다. 호출 전에 DB 일·월 budget window에 최대 요청 비용을 조건부 원자 reservation한다. request UUID·job generation·가격표 version·상태를 가진 reservation은 전송 직전에 `IN_FLIGHT`가 되며 120초 lease를 갖는다. 응답 시 실제 비용으로 정산하고 차액을 해제한다. 1분 reconciler는 만료 `RESERVED`만 해제하고 만료 `IN_FLIGHT`는 최대 비용으로 정산한다. reservation을 얻지 못하면 OpenAI 호출·재시도 대신 `PARTIAL`과 `AI_BUDGET_EXCEEDED`로 끝낸다. 가격표 version 변경은 비용 평가와 ceiling 갱신을 거친 release에서만 허용한다.
 - 현재 구현된 DB 예산 서비스는 일·월 window를 고정 순서로 잠그고 같은 transaction에서 예약하며, 미전송 만료 건은 해제하고 전송 가능성이 있는 만료 건은 최대 비용으로 정산한다. 예산 사용량이 80%에 도달하면 같은 transaction에 일·월별 알림 사건을 각각 한 번만 기록하고, 발행기가 실패한 전달을 재시도할 수 있다. Responses adapter는 후보 ID를 서버에서 다시 검사하고 alias 대신 snapshot 설정을 요구한다. 일반·browser Worker의 처리 콜백은 추출 뒤 분류 결과를 받아야 `READY`로 끝나며, 예산 소진·무효 응답은 `PARTIAL`로 끝난다. 추출·분류 결과는 우선 `analysis_jobs`의 임시 필드에 보관하고, Worker가 claim과 generation을 확인한 뒤 상품의 결과와 최종 상태를 같은 DB transaction에서 반영한다. 첫 분류 시 후보 ID 목록도 작업에 봉인하여 재시도가 같은 후보를 사용한다. 단, 현재는 테스트용 구성 주입만 검증했다. 실제 taxonomy·사용자 목적 후보 공급, Worker runtime 조립, 예약 reconciler 주기 실행, 알림 채널 연결, 승인된 model snapshot 검증이 남아 있어 아직 출시 가능한 보호로 간주하지 않는다.
 - 예산 복구는 `server/`의 `./gradlew runBudgetMaintenance`로 1회 실행할 수 있다. `DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`를 요구하며, 예약 만료 정산 뒤 미전달 알림을 발행한다. 현 notifier는 구조화된 경고를 stderr에 남기는 경계까지만 구현되어 있다. Cloud Scheduler의 1분 주기 실행과 Cloud Logging 경고 채널은 배포 설정에서 별도로 연결해야 한다.
+- 전체 taxonomy 파일은 3,179바이트다. 현재 Responses adapter는 요청 전체가 900 UTF-8바이트를 넘으면 전송하지 않는 보수적 guard를 사용하므로, 87개 유형의 ID·이름 전체를 그대로 넘겨서는 분류 요청이 성립하지 않는다. 후보 사전 선택이나 토큰 상한의 재설계 중 하나를 개발 corpus와 비용 평가로 결정해야 하며, 그 전에는 Worker runtime을 활성화하지 않는다. 사용자 목적 저장·조회 테이블도 아직 없어 목적 후보 공급은 별도 구현이 필요하다.
 - OpenAI 요청은 `store: false`를 사용하고 query를 제거한 canonical URL 또는 필요한 metadata만 보낸다. raw prompt/response는 애플리케이션 로그·DB에 보관하지 않으며, 개인정보 처리 고지에 외부 API 전송을 명시한다. abuse monitoring 로그의 보존 정책은 `store: false`와 별개다.
 - 평가는 최초 출시와 model snapshot·prompt·taxonomy 변경 전에 수행한다. 120개 개발 사례와 독립 evaluator가 출시 통과/실패만 한 번 반환하는 60개 blind holdout을 포함한 180개 대표 corpus로 category 정확도, purpose 오연결·연결률, abstain 품질, 저품질 metadata와 prompt injection 사례를 평가한다. holdout 출시 기준은 category 정확도 85% 이상, purpose 오연결 5% 이하·연결률 70% 이상, 의도적 애매 사례 abstain 80% 이상, 허용되지 않은 ID·schema 검증 실패 0건, OpenAI latency p95 15초 이하와 월 10,000원 LLM hard cap 충족이다. 실패한 holdout은 retired로 봉인해 개발·다음 평가에 쓰지 않으며, 새 평가용 holdout은 독립 evaluator가 새로 선정·라벨·봉인한다.
 

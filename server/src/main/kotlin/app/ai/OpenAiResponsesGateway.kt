@@ -28,7 +28,7 @@ class OpenAiResponsesGateway(
         "store" to JsonPrimitive(false),
         "max_output_tokens" to JsonPrimitive(80),
         "reasoning" to JsonObject(mapOf("effort" to JsonPrimitive("none"))),
-        "input" to JsonPrimitive("Classify the product. Use only supplied IDs. Product: ${metadata.take(2400)}; categories: ${candidates.categoryIds.sorted()}; purposes: ${candidates.purposeIds.sorted()}"),
+        "input" to JsonPrimitive("Classify the product. Use only supplied IDs. Product: ${metadata.take(2400)}; categories: ${candidates.categoryIds.sorted().map { it to (candidates.categoryLabels[it] ?: it) }}; purposes: ${candidates.purposeIds.sorted().map { it to (candidates.purposeLabels[it] ?: it) }}"),
         "text" to JsonObject(mapOf("format" to JsonObject(mapOf(
             "type" to JsonPrimitive("json_schema"), "name" to JsonPrimitive("wishlist_classification"),
             "strict" to JsonPrimitive(true), "schema" to ClassificationSchema.outputSchema,

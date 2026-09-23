@@ -77,6 +77,20 @@ class AiClassificationServiceTest {
         assertEquals(ProcessingOutcome.Complete, classifier.classify(jobId, Metadata("Lamp", null, null, "https://example.com/item")))
     }
 
+    @Test fun `retry preserves human readable candidate labels`() = withJob { source, jobId ->
+        source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING' where id=?").use { s -> s.setObject(1,jobId); s.executeUpdate() } }
+        var first = true
+        val classifier = AiClassificationService(source,LlmBudgetService(source),
+            { CandidateSnapshot(setOf("C026"),emptySet(),mapOf("C026" to "디지털·IT > 헤드폰")) },
+            { _, snapshot ->
+                if (first) { first=false; GatewayResponse(ClassificationResult.Retryable,null,null) }
+                else if (snapshot.categoryLabels["C026"] == "디지털·IT > 헤드폰") GatewayResponse(ClassificationResult.Assigned("C026",null),500,20)
+                else GatewayResponse(ClassificationResult.Unusable("missing_label"),500,20)
+            })
+        assertEquals(ProcessingOutcome.Retryable,classifier.classify(jobId,Metadata("Headphones",null,null,"https://example.com/item")))
+        assertEquals(ProcessingOutcome.Complete,classifier.classify(jobId,Metadata("Headphones",null,null,"https://example.com/item")))
+    }
+
     private fun withJob(block: (javax.sql.DataSource, UUID) -> Unit) {
         PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
             db.start(); DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)

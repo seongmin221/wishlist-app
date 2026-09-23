@@ -79,13 +79,19 @@ class AiClassificationService(
                 CandidateSnapshot(
                     json.getValue("categories").jsonArray.map { it.jsonPrimitive.content }.toSet(),
                     json.getValue("purposes").jsonArray.map { it.jsonPrimitive.content }.toSet(),
+                    json["category_labels"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content }.orEmpty(),
+                    json["purpose_labels"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content }.orEmpty(),
                 )
             } else {
                 val fresh = candidatesForJob(jobId)
                 require(fresh.categoryIds.isNotEmpty() && fresh.purposeIds.size <= 10)
+                require(fresh.categoryLabels.keys.all { it in fresh.categoryIds })
+                require(fresh.purposeLabels.keys.all { it in fresh.purposeIds })
                 val json = JsonObject(mapOf(
                     "categories" to JsonArray(fresh.categoryIds.sorted().map(::JsonPrimitive)),
                     "purposes" to JsonArray(fresh.purposeIds.sorted().map(::JsonPrimitive)),
+                    "category_labels" to JsonObject(fresh.categoryLabels.mapValues { JsonPrimitive(it.value) }),
+                    "purpose_labels" to JsonObject(fresh.purposeLabels.mapValues { JsonPrimitive(it.value) }),
                 )).toString()
                 c.prepareStatement("update analysis_jobs set candidate_snapshot_json=? where id=?").use { s ->
                     s.setString(1,json); s.setObject(2,jobId); s.executeUpdate()

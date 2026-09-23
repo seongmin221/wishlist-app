@@ -7,7 +7,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-data class CandidateSnapshot(val categoryIds: Set<String>, val purposeIds: Set<String>)
+data class CandidateSnapshot(
+    val categoryIds: Set<String>,
+    val purposeIds: Set<String>,
+    val categoryLabels: Map<String,String> = emptyMap(),
+    val purposeLabels: Map<String,String> = emptyMap(),
+)
 
 sealed interface ClassificationResult {
     data class Assigned(val categoryId: String, val purposeId: String?) : ClassificationResult
