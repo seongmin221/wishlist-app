@@ -20,7 +20,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select count(*) from flyway_schema_history where success").use { rows ->
                         rows.next()
-                        assertEquals(5, rows.getInt(1))
+                        assertEquals(6, rows.getInt(1))
                     }
                 }
             }

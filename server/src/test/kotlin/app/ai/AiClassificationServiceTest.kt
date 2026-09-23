@@ -66,6 +66,17 @@ class AiClassificationServiceTest {
         } }
     }
 
+    @Test fun `retry uses sealed candidate snapshot even when provider changes`() = withJob { source, jobId ->
+        source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING' where id=?").use { s -> s.setObject(1,jobId); s.executeUpdate() } }
+        var current = CandidateSnapshot(setOf("CAT_FIRST"), emptySet())
+        var response = GatewayResponse(ClassificationResult.Retryable, null, null)
+        val classifier = AiClassificationService(source, LlmBudgetService(source), { current }, { _, _ -> response })
+        assertEquals(ProcessingOutcome.Retryable, classifier.classify(jobId, Metadata("Lamp", null, null, "https://example.com/item")))
+        current = CandidateSnapshot(setOf("CAT_SECOND"), emptySet())
+        response = GatewayResponse(ClassificationResult.Assigned("CAT_FIRST", null), 500, 20)
+        assertEquals(ProcessingOutcome.Complete, classifier.classify(jobId, Metadata("Lamp", null, null, "https://example.com/item")))
+    }
+
     private fun withJob(block: (javax.sql.DataSource, UUID) -> Unit) {
         PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
             db.start(); DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)

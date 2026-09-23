@@ -6,6 +6,13 @@ import app.budget.ReserveResult
 import app.extraction.Metadata
 import java.util.UUID
 import javax.sql.DataSource
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class AiClassificationService(
     private val dataSource: DataSource,
@@ -19,7 +26,7 @@ class AiClassificationService(
                where j.id=? and j.stage in ('GENERAL_RUNNING','BROWSER_RUNNING') and i.lifecycle_status='ACTIVE'""",
         ).use { s -> s.setObject(1,jobId); s.executeQuery().use { r -> if (r.next()) r.getInt(1) else null } } }
             ?: return ProcessingOutcome.Terminal
-        val candidates = candidatesForJob(jobId)
+        val candidates = candidateSnapshot(jobId)
         val reservation = when (val result = budget.reserveBeforeCall(jobId, claim, UUID.randomUUID())) {
             is ReserveResult.Reserved -> result.reservation
             ReserveResult.Exceeded -> {
@@ -59,6 +66,35 @@ class AiClassificationService(
                 ProcessingOutcome.Terminal
             }
         }
+    }
+
+    private fun candidateSnapshot(jobId: UUID): CandidateSnapshot = dataSource.connection.use { c ->
+        c.autoCommit = false
+        try {
+            val existing = c.prepareStatement("select candidate_snapshot_json from analysis_jobs where id=? for update").use { s ->
+                s.setObject(1,jobId); s.executeQuery().use { r -> check(r.next()); r.getString(1) }
+            }
+            val result = if (existing != null) {
+                val json = Json.parseToJsonElement(existing).jsonObject
+                CandidateSnapshot(
+                    json.getValue("categories").jsonArray.map { it.jsonPrimitive.content }.toSet(),
+                    json.getValue("purposes").jsonArray.map { it.jsonPrimitive.content }.toSet(),
+                )
+            } else {
+                val fresh = candidatesForJob(jobId)
+                require(fresh.categoryIds.isNotEmpty() && fresh.purposeIds.size <= 10)
+                val json = JsonObject(mapOf(
+                    "categories" to JsonArray(fresh.categoryIds.sorted().map(::JsonPrimitive)),
+                    "purposes" to JsonArray(fresh.purposeIds.sorted().map(::JsonPrimitive)),
+                )).toString()
+                c.prepareStatement("update analysis_jobs set candidate_snapshot_json=? where id=?").use { s ->
+                    s.setString(1,json); s.setObject(2,jobId); s.executeUpdate()
+                }
+                fresh
+            }
+            c.commit()
+            result
+        } catch (error: Exception) { c.rollback(); throw error }
     }
 
     private fun saveAssignment(jobId: UUID, result: ClassificationResult.Assigned) {
