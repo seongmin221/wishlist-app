@@ -52,8 +52,16 @@ class GeneralWorkerService(
             try {
                 val disposition = when (outcome) {
                     ProcessingOutcome.Complete -> {
-                        val updated = connection.prepareStatement("update analysis_jobs set stage='COMPLETE', updated_at=now() where id=? and generation=? and stage='GENERAL_RUNNING'").use { it.setObject(1, jobId); it.setInt(2,generation); it.executeUpdate() }
-                        if (updated == 1) connection.prepareStatement("update wishlist_items set analysis_status='READY', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
+                        val updated = connection.prepareStatement("update analysis_jobs set stage='COMPLETE', updated_at=now() where id=? and generation=? and stage='GENERAL_RUNNING' and pending_category_id is not null").use { it.setObject(1, jobId); it.setInt(2,generation); it.executeUpdate() }
+                        if (updated == 1) connection.prepareStatement(
+                            """update wishlist_items i set analysis_status='READY',product_name=j.pending_product_name,
+                               product_description=j.pending_product_description,product_image_url=j.pending_product_image_url,
+                               canonical_url=j.pending_canonical_url,predicted_category_id=j.pending_category_id,
+                               predicted_purpose_id=j.pending_purpose_id,analysis_failure_code=null,classified_at=now(),
+                               version=i.version+1,updated_at=now()
+                               from analysis_jobs j where j.wishlist_item_id=i.id and j.id=? and j.generation=?
+                                 and j.stage='COMPLETE' and i.lifecycle_status='ACTIVE'""",
+                        ).use { it.setObject(1,jobId); it.setInt(2,generation); it.executeUpdate() }
                         WorkerDisposition.ACKNOWLEDGE
                     }
                     ProcessingOutcome.NeedsBrowser -> {
@@ -70,13 +78,20 @@ class GeneralWorkerService(
                         WorkerDisposition.ACKNOWLEDGE
                     }
                     ProcessingOutcome.Terminal -> {
-                        connection.prepareStatement("update analysis_jobs set stage='FAILED', updated_at=now() where id=?").use { it.setObject(1, jobId); it.executeUpdate() }
-                        connection.prepareStatement("update wishlist_items set analysis_status='FAILED_TERMINAL', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
+                        val updated = connection.prepareStatement("update analysis_jobs set stage='FAILED', updated_at=now() where id=? and generation=? and stage='GENERAL_RUNNING'").use { it.setObject(1,jobId); it.setInt(2,generation); it.executeUpdate() }
+                        if (updated == 1) connection.prepareStatement("update wishlist_items i set analysis_status='FAILED_TERMINAL',analysis_failure_code=j.pending_failure_code,version=i.version+1,updated_at=now() from analysis_jobs j where j.wishlist_item_id=i.id and j.id=? and i.lifecycle_status='ACTIVE'").use { it.setObject(1,jobId); it.executeUpdate() }
                         WorkerDisposition.ACKNOWLEDGE
                     }
                     ProcessingOutcome.Partial -> {
-                        connection.prepareStatement("update analysis_jobs set stage='PARTIAL', updated_at=now() where id=?").use { it.setObject(1, jobId); it.executeUpdate() }
-                        connection.prepareStatement("update wishlist_items set analysis_status='PARTIAL', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
+                        val updated = connection.prepareStatement("update analysis_jobs set stage='PARTIAL', updated_at=now() where id=? and generation=? and stage='GENERAL_RUNNING'").use { it.setObject(1,jobId); it.setInt(2,generation); it.executeUpdate() }
+                        if (updated == 1) connection.prepareStatement(
+                            """update wishlist_items i set analysis_status='PARTIAL',product_name=coalesce(j.pending_product_name,i.product_name),
+                               product_description=coalesce(j.pending_product_description,i.product_description),
+                               product_image_url=coalesce(j.pending_product_image_url,i.product_image_url),
+                               canonical_url=coalesce(j.pending_canonical_url,i.canonical_url),analysis_failure_code=j.pending_failure_code,
+                               version=i.version+1,updated_at=now() from analysis_jobs j
+                               where j.wishlist_item_id=i.id and j.id=? and i.lifecycle_status='ACTIVE'""",
+                        ).use { it.setObject(1,jobId); it.executeUpdate() }
                         WorkerDisposition.ACKNOWLEDGE
                     }
                     ProcessingOutcome.Retryable -> if (claim.attempts + 1 >= 3 || claim.firstAttempt?.plusSeconds(1800)?.isBefore(Instant.now()) == true) {

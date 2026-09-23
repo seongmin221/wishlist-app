@@ -21,8 +21,8 @@ class GeneralExtractionProcessor(
             is ExtractionResult.Complete -> {
                 dataSource.connection.use { connection ->
                     connection.prepareStatement(
-                        """update wishlist_items i set product_name=?, product_description=?, product_image_url=?, canonical_url=?
-                           from analysis_jobs j where j.wishlist_item_id=i.id and j.id=? and j.stage='GENERAL_RUNNING' and i.lifecycle_status='ACTIVE'""",
+                        """update analysis_jobs j set pending_product_name=?, pending_product_description=?, pending_product_image_url=?, pending_canonical_url=?
+                           from wishlist_items i where j.wishlist_item_id=i.id and j.id=? and j.stage='GENERAL_RUNNING' and i.lifecycle_status='ACTIVE'""",
                     ).use {
                         it.setString(1, result.metadata.title)
                         it.setString(2, result.metadata.description)

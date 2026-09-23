@@ -61,7 +61,10 @@ class BrowserWorkerServiceTest {
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
         val browser = BrowserWorkerService(source,
             { Metadata("Rendered product", null, null, "https://example.com/item") },
-            { _, _ -> ProcessingOutcome.Complete })
+            { id, _ ->
+                source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+                ProcessingOutcome.Complete
+            })
         assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
         database.createConnection("").use { connection ->
             connection.createStatement().executeQuery("select product_name, analysis_status from wishlist_items").use { rows ->

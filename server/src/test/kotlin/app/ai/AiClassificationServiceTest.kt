@@ -55,6 +55,17 @@ class AiClassificationServiceTest {
         } }
     }
 
+    @Test fun `classification result remains provisional until worker commits terminal state`() = withJob { source, jobId ->
+        source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING' where id=?").use { s -> s.setObject(1,jobId); s.executeUpdate() } }
+        val classifier = AiClassificationService(source, LlmBudgetService(source),
+            { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+            { _, _ -> GatewayResponse(ClassificationResult.Assigned("CAT_HOME", null), 500, 20) })
+        assertEquals(ProcessingOutcome.Complete, classifier.classify(jobId, Metadata("Lamp", null, null, "https://example.com/item")))
+        source.connection.use { c -> c.createStatement().executeQuery("select predicted_category_id,analysis_status from wishlist_items").use { r ->
+            r.next(); assertEquals(null,r.getString(1)); assertEquals("PROCESSING",r.getString(2))
+        } }
+    }
+
     private fun withJob(block: (javax.sql.DataSource, UUID) -> Unit) {
         PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
             db.start(); DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)

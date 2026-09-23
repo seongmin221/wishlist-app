@@ -63,15 +63,15 @@ class AiClassificationService(
 
     private fun saveAssignment(jobId: UUID, result: ClassificationResult.Assigned) {
         dataSource.connection.use { c -> c.prepareStatement(
-            """update wishlist_items i set predicted_category_id=?,predicted_purpose_id=?,classified_at=now(),analysis_failure_code=null
-               from analysis_jobs j where j.wishlist_item_id=i.id and j.id=? and j.stage in ('GENERAL_RUNNING','BROWSER_RUNNING')
+            """update analysis_jobs j set pending_category_id=?,pending_purpose_id=?,pending_failure_code=null
+               from wishlist_items i where j.wishlist_item_id=i.id and j.id=? and j.stage in ('GENERAL_RUNNING','BROWSER_RUNNING')
                  and i.lifecycle_status='ACTIVE'""",
         ).use { s -> s.setString(1,result.categoryId); s.setString(2,result.purposeId); s.setObject(3,jobId); check(s.executeUpdate()==1) } }
     }
 
     private fun setFailure(jobId: UUID, code: String) {
         dataSource.connection.use { c -> c.prepareStatement(
-            """update wishlist_items i set analysis_failure_code=? from analysis_jobs j
+            """update analysis_jobs j set pending_failure_code=? from wishlist_items i
                where j.wishlist_item_id=i.id and j.id=? and j.stage in ('GENERAL_RUNNING','BROWSER_RUNNING') and i.lifecycle_status='ACTIVE'""",
         ).use { s -> s.setString(1,code); s.setObject(2,jobId); s.executeUpdate() } }
     }

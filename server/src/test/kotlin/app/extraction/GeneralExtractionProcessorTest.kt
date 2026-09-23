@@ -22,7 +22,10 @@ class GeneralExtractionProcessorTest {
             }
             val processor = GeneralExtractionProcessor(source,
                 { url -> ExtractionResult.Complete(Metadata("A product", "Description", null, url)) },
-                { _, _ -> app.analysis.ProcessingOutcome.Complete })
+                { id, _ ->
+                    source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+                    app.analysis.ProcessingOutcome.Complete
+                })
 
             assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
             database.createConnection("").use { connection ->
