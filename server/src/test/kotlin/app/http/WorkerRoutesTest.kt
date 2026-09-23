@@ -3,6 +3,7 @@ package app.http
 import app.DatabaseFactory
 import app.analysis.GeneralWorkerService
 import app.analysis.ProcessingOutcome
+import app.browser.BrowserWorkerService
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
@@ -24,6 +25,25 @@ class WorkerRoutesTest {
             testApplication {
                 application { routing { workerRoutes(worker) } }
                 val response = client.post("/internal/worker/general") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"jobId":"00000000-0000-0000-0000-000000000001","generation":1}""")
+                }
+                assertEquals(HttpStatusCode.NoContent, response.status)
+            }
+        }
+    }
+
+    @Test
+    fun `stale browser task is acknowledged with no content`() {
+        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+            database.start()
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+            val worker = GeneralWorkerService(source) { ProcessingOutcome.Retryable }
+            val browser = BrowserWorkerService(source) { error("must not render") }
+            testApplication {
+                application { routing { workerRoutes(worker, browser) } }
+                val response = client.post("/internal/worker/browser") {
                     contentType(ContentType.Application.Json)
                     setBody("""{"jobId":"00000000-0000-0000-0000-000000000001","generation":1}""")
                 }

@@ -10,6 +10,7 @@
 - browser Worker 결과는 같은 `AnalysisJob` generation에 안전하게 반영한다. 늦은 browser 결과는 삭제·취소·새 generation 항목을 복원하거나 덮어쓰지 않는다.
 - 일반 Worker가 browser fallback을 결정할 때는 같은 DB transaction에서 job 단계를 `BROWSER_PENDING`으로 바꾸고 `browserAttempted=true` 및 browser용 `OutboxEvent`를 함께 기록한다. 따라서 task 생성 전후의 process 중단도 outbox dispatcher가 복구한다.
 - browser Worker는 generation·owner·lifecycle 검증 뒤 `BROWSER_PENDING` 단계만 원자적으로 `BROWSER_RUNNING`으로 claim한다. 이미 claim됐거나 취소·삭제·새 generation인 task는 2xx로 끝내고 결과를 쓰지 않는다.
+- browser Worker runtime 중단으로 `BROWSER_RUNNING`이 120초를 넘으면 reconciler가 현재 generation·lifecycle을 확인하고 browser 전용 시도 횟수·30분 한도 안에서 새 outbox event를 만든다.
 - 대상 사이트 차단·Playwright navigation timeout·대상 DNS/연결 오류·추출 품질 부족은 `PARTIAL`과 직접 보완 흐름으로 저장하고 2xx로 끝낸다.
 - DB commit 실패·Worker runtime 장애처럼 terminal 상태를 기록하지 못한 Worker 인프라 오류만 전역 Cloud Tasks 최대 3회·30분 정책으로 재시도한다. 두 번째 browser fallback은 만들지 않는다.
 

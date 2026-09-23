@@ -6,7 +6,7 @@ import java.util.UUID
 import javax.sql.DataSource
 
 enum class WorkerDisposition { ACKNOWLEDGE, RETRY }
-enum class ProcessingOutcome { Complete, Retryable, Terminal }
+enum class ProcessingOutcome { Complete, NeedsBrowser, Partial, Retryable, Terminal }
 
 class GeneralWorkerService(
     private val dataSource: DataSource,
@@ -56,9 +56,27 @@ class GeneralWorkerService(
                         connection.prepareStatement("update wishlist_items set analysis_status='READY', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
                         WorkerDisposition.ACKNOWLEDGE
                     }
+                    ProcessingOutcome.NeedsBrowser -> {
+                        connection.prepareStatement("update analysis_jobs set stage='BROWSER_PENDING', browser_attempted=true, updated_at=now() where id=? and stage='GENERAL_RUNNING' and browser_attempted=false").use {
+                            it.setObject(1, jobId)
+                            check(it.executeUpdate() == 1) { "browser fallback already attempted" }
+                        }
+                        connection.prepareStatement("insert into outbox_events (id, analysis_job_id, event_type, task_name) values (?, ?, 'BROWSER_ANALYSIS', ?)").use {
+                            it.setObject(1, UUID.randomUUID())
+                            it.setObject(2, jobId)
+                            it.setString(3, "browser-$jobId-$generation")
+                            it.executeUpdate()
+                        }
+                        WorkerDisposition.ACKNOWLEDGE
+                    }
                     ProcessingOutcome.Terminal -> {
                         connection.prepareStatement("update analysis_jobs set stage='FAILED', updated_at=now() where id=?").use { it.setObject(1, jobId); it.executeUpdate() }
                         connection.prepareStatement("update wishlist_items set analysis_status='FAILED_TERMINAL', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
+                        WorkerDisposition.ACKNOWLEDGE
+                    }
+                    ProcessingOutcome.Partial -> {
+                        connection.prepareStatement("update analysis_jobs set stage='PARTIAL', updated_at=now() where id=?").use { it.setObject(1, jobId); it.executeUpdate() }
+                        connection.prepareStatement("update wishlist_items set analysis_status='PARTIAL', version=version+1, updated_at=now() where id=? and lifecycle_status='ACTIVE'").use { it.setObject(1, claim.itemId); it.executeUpdate() }
                         WorkerDisposition.ACKNOWLEDGE
                     }
                     ProcessingOutcome.Retryable -> if (claim.attempts + 1 >= 3 || claim.firstAttempt?.plusSeconds(1800)?.isBefore(Instant.now()) == true) {
