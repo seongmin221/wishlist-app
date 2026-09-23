@@ -14,6 +14,7 @@ sealed interface ReserveResult {
     data object Exceeded : ReserveResult
 }
 data class WindowTotals(val reserved: Long, val settled: Long)
+data class BudgetAlert(val id: UUID, val windowType: String, val windowStart: Instant, val thresholdPercent: Int)
 
 class LlmBudgetService(
     private val dataSource: DataSource,
@@ -47,7 +48,15 @@ class LlmBudgetService(
             }
             if (!allowed) return@transaction ReserveResult.Exceeded
         }
-        windows.forEach { (type, start, _) -> c.adjustWindow(type, start, maximum, 0) }
+        windows.forEach { (type, start, ceiling) ->
+            c.adjustWindow(type, start, maximum, 0)
+            val total = c.prepareStatement("select reserved_microusd+settled_microusd from llm_budget_windows where window_type=? and window_start=?").use { s ->
+                s.setString(1,type); s.setTimestamp(2,Timestamp.from(start)); s.executeQuery().use { r -> r.next(); r.getLong(1) }
+            }
+            if (total >= ceiling - ceiling / 5) c.prepareStatement("insert into llm_budget_alerts(id,window_type,window_start,threshold_percent) values(?,?,?,80) on conflict do nothing").use { s ->
+                s.setObject(1,UUID.randomUUID()); s.setString(2,type); s.setTimestamp(3,Timestamp.from(start)); s.executeUpdate()
+            }
+        }
         val id = UUID.randomUUID()
         c.prepareStatement("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,model_snapshot,state,maximum_microusd,lease_until) values(?,?,?,?,?,?,'RESERVED',?,?)").use { s ->
             s.setObject(1, id); s.setObject(2, requestId); s.setObject(3, jobId); s.setInt(4, generation)
@@ -77,6 +86,7 @@ class LlmBudgetService(
 
     fun state(id: UUID): ReservationState = dataSource.connection.use { c -> c.prepareStatement("select state from llm_budget_reservations where id=?").use { s -> s.setObject(1,id); s.executeQuery().use { r -> check(r.next()); ReservationState.valueOf(r.getString(1)) } } }
     fun windowTotals(type: String): WindowTotals = dataSource.connection.use { c -> c.prepareStatement("select reserved_microusd,settled_microusd from llm_budget_windows where window_type=? order by window_start desc limit 1").use { s -> s.setString(1,type); s.executeQuery().use { r -> check(r.next()); WindowTotals(r.getLong(1), r.getLong(2)) } } }
+    fun pendingAlerts(): List<BudgetAlert> = dataSource.connection.use { c -> c.prepareStatement("select id,window_type,window_start,threshold_percent from llm_budget_alerts where delivered_at is null order by created_at").use { s -> s.executeQuery().use { r -> buildList { while (r.next()) add(BudgetAlert(r.getObject(1,UUID::class.java),r.getString(2),r.getTimestamp(3).toInstant(),r.getInt(4))) } } } }
 
     private fun finalize(id: UUID, actual: Long, release: Boolean) = transaction { c ->
         val state = c.prepareStatement("select state from llm_budget_reservations where id=? for update").use { s -> s.setObject(1,id); s.executeQuery().use { r -> check(r.next()); ReservationState.valueOf(r.getString(1)) } }

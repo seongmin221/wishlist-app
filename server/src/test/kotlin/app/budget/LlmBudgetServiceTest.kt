@@ -49,6 +49,14 @@ class LlmBudgetServiceTest {
         assertFailsWith<IllegalArgumentException> { PriceTable("new-price", 0.20, 1.20) }
     }
 
+    @Test fun `crossing eighty percent creates one durable alert per window`() = withBudget { service, jobId ->
+        assertIs<ReserveResult.Reserved>(service.reserveBeforeCall(jobId, 1, UUID.randomUUID()))
+        assertEquals(0, service.pendingAlerts().size)
+        assertIs<ReserveResult.Reserved>(service.reserveBeforeCall(jobId, 1, UUID.randomUUID()))
+        assertEquals(setOf("DAILY", "MONTHLY"), service.pendingAlerts().map { it.windowType }.toSet())
+        assertEquals(2, service.pendingAlerts().size)
+    }
+
     private fun withBudget(block: (LlmBudgetService, UUID) -> Unit) {
         PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
             db.start()
