@@ -13,3 +13,6 @@
 | QA-SRV-007 | Transactional outbox의 목적과 동작 | [QA-SRV-007](QA-SRV-007-transactional-outbox.md) |
 | QA-SRV-008 | Cloud Run 분석 작업 Queue 선택지 | [QA-SRV-008](QA-SRV-008-queue-options.md) |
 | QA-SRV-009 | Outbox 발행·재시도·장기 실패 운영 | [QA-SRV-009](QA-SRV-009-outbox-dispatch-retry-recovery.md) |
+| QA-SRV-010 | production secret과 service account의 역할 분리 | [QA-SRV-010](QA-SRV-010-production-secrets-and-service-accounts.md) |
+| QA-SRV-011 | DB migration의 목적·위험·운용 방식 | [QA-SRV-011](QA-SRV-011-database-migrations.md) |
+| QA-SRV-012 | 큰 HTML 제한과 브라우저 fallback 판단 | [QA-SRV-012](QA-SRV-012-large-html-and-browser-fallback.md) |

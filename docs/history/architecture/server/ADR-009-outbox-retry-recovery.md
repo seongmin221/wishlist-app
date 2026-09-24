@@ -14,6 +14,7 @@ Transactional outbox와 Cloud Tasks를 선택한 뒤에도 누가 outbox를 발�
 - API는 Neon transaction commit 직후 Cloud Tasks 생성을 한 번 시도한다. 실패해도 사용자 저장 요청을 실패로 되돌리지 않고 outbox를 미발행 상태로 남긴다.
 - Cloud Scheduler는 1분마다 OIDC로 인증된 dispatcher endpoint를 호출해 남은 outbox를 발행한다.
 - dispatcher는 중복 호출에 안전해야 한다. outbox claim/lease와 고유 task 이름을 사용하고, Cloud Tasks 생성 성공 후 발행 완료를 기록한다.
+- 구현에서는 outbox를 `FOR UPDATE SKIP LOCKED`로 claim하고 120초 lease를 둔다. 실패 시 lease를 풀고, 발행 성공 뒤 기록 전에 중단돼도 고정 task 이름으로 중복 생성을 판별한다.
 
 ### 분석 재시도
 
@@ -31,6 +32,7 @@ Cloud Tasks의 `maxAttempts`와 `maxRetryDuration`은 두 조건이 모두 충�
 
 - Cloud Tasks가 task를 삭제해도 Neon의 `AnalysisJob` 시도·오류 기록은 보존한다.
 - reconciler가 오래 queue 대기 또는 실행 중인 job을 찾아 현재 generation과 lifecycle을 검증한다.
+- 일반 Worker 실행 중 중단으로 `GENERAL_RUNNING`이 120초 넘게 남으면 새 outbox event로 다시 발행한다. 재발행 task 이름에는 job·generation·복구 시도 횟수를 넣어 이전 task와 충돌하지 않게 한다.
 - 제한 안에서 안전하게 재실행할 수 있으면 새 dispatch attempt로 다시 Queue에 넣는다.
 - 3회 또는 30분 한도를 넘은 retryable 오류는 `FAILED_RETRYABLE`, 반복해도 성공할 수 없는 오류는 `FAILED_TERMINAL`로 전환한다.
 - Cloud Tasks queue depth와 응답 코드별 task attempt에 alert를 둔다.
