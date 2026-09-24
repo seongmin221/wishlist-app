@@ -9,7 +9,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-data class HttpFetchResponse(val status: Int, val headers: Map<String, String>, val body: String)
+data class HttpFetchResponse(val status: Int, val headers: Map<String, String>, val body: String, val truncated: Boolean = false)
 
 sealed interface ExtractionResult {
     data class Complete(val metadata: Metadata) : ExtractionResult
@@ -38,9 +38,9 @@ class HttpMetadataExtractor(
                 val document = Jsoup.parse(response.body, current)
                 val product = document.select("script[type=application/ld+json]")
                     .firstNotNullOfOrNull { script -> runCatching { findProduct(Json.parseToJsonElement(script.data())) }.getOrNull() }
-                val title = product?.get("name")?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotEmpty() }
+                val structuredTitle = product?.get("name")?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotEmpty() }
                     ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
-                    ?: document.title().trim().takeIf { it.isNotEmpty() }
+                val title = structuredTitle ?: if (response.truncated) null else document.title().trim().takeIf { it.isNotEmpty() }
                 val description = document.selectFirst("meta[property=og:description]")?.attr("content")?.takeIf { it.isNotBlank() }
                     ?: document.selectFirst("meta[name=description]")?.attr("content")?.takeIf { it.isNotBlank() }
                 val image = document.selectFirst("meta[property=og:image]")?.attr("abs:content")?.takeIf { it.isNotBlank() }

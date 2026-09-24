@@ -21,8 +21,8 @@ class LlmBudgetServiceTest {
                 .map { it.get() }
             assertEquals(2, results.count { it is ReserveResult.Reserved })
             assertEquals(6, results.count { it is ReserveResult.Exceeded })
-            assertEquals(592L, service.windowTotals("DAILY").reserved)
-            assertEquals(592L, service.windowTotals("MONTHLY").reserved)
+        assertEquals(992L, service.windowTotals("DAILY").reserved)
+        assertEquals(992L, service.windowTotals("MONTHLY").reserved)
         } finally { executor.shutdownNow() }
     }
 
@@ -31,7 +31,7 @@ class LlmBudgetServiceTest {
         val sent = assertIs<ReserveResult.Reserved>(service.reserveBeforeCall(jobId, 1, UUID.randomUUID()))
         service.markInFlight(sent.reservation.id)
         service.reconcileExpired(Instant.now().plusSeconds(121))
-        assertEquals(296L, service.windowTotals("DAILY").settled)
+        assertEquals(496L, service.windowTotals("DAILY").settled)
         assertEquals(0L, service.windowTotals("DAILY").reserved)
         assertEquals(ReservationState.RELEASED, service.state(before.reservation.id))
         assertEquals(ReservationState.SETTLED, service.state(sent.reservation.id))
@@ -65,7 +65,7 @@ class LlmBudgetServiceTest {
             CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item") as CreateResult.Created
             val jobId = source.connection.use { c -> c.createStatement().executeQuery("select id from analysis_jobs").use { it.next(); it.getObject(1, UUID::class.java) } }
             source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING' where id=?").use { it.setObject(1, jobId); it.executeUpdate() } }
-            block(LlmBudgetService(source, dailyCeilingMicrousd = 600, monthlyCeilingMicrousd = 600), jobId)
+            block(LlmBudgetService(source, dailyCeilingMicrousd = 1000, monthlyCeilingMicrousd = 1000), jobId)
         }
     }
 }

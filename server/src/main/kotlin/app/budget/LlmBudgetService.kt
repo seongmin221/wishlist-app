@@ -22,8 +22,9 @@ class LlmBudgetService(
     private val modelSnapshot: String = "test-snapshot",
     private val dailyCeilingMicrousd: Long = 600_000,
     private val monthlyCeilingMicrousd: Long = 6_000_000,
+    private val allowLocalAlias: Boolean = false,
 ) {
-    init { require(modelSnapshot.isNotBlank() && modelSnapshot != "gpt-5.6-luna") }
+    init { require(modelSnapshot.isNotBlank() && (allowLocalAlias || modelSnapshot != "gpt-5.6-luna")) }
 
     fun reserveBeforeCall(jobId: UUID, generation: Int, requestId: UUID): ReserveResult = transaction { c ->
         c.prepareStatement("select id, maximum_microusd, state from llm_budget_reservations where request_id=?").use { s ->

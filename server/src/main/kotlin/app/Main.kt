@@ -14,6 +14,17 @@ import javax.sql.DataSource
 import org.postgresql.ds.PGSimpleDataSource
 import app.http.FirebaseOwnerResolver
 import app.http.wishlistRoutes
+import app.http.workerRoutes
+import app.analysis.GeneralWorkerService
+import app.extraction.GeneralExtractionProcessor
+import app.extraction.HttpMetadataExtractor
+import app.extraction.SafeHttpTransport
+import app.extraction.UrlSafetyPolicy
+import app.ai.AiClassificationService
+import app.ai.OpenAiConfig
+import app.ai.OpenAiResponsesGateway
+import app.ai.TaxonomyCatalog
+import app.budget.LlmBudgetService
 import app.wishlist.CreateWishlistItemService
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
@@ -31,10 +42,24 @@ fun main() {
 }
 
 fun Application.module() {
-    RuntimeConfig.fromEnvironment(System.getenv())
+    val env = System.getenv()
+    val runtime = RuntimeConfig.fromEnvironment(env)
     install(ContentNegotiation) { json() }
     routing {
         get("/health") { call.respondText("ok") }
+        if (runtime.role == RuntimeRole.GENERAL_WORKER) {
+            val source = DatabaseFactory.dataSource(env.getValue("DATABASE_URL"), env.getValue("DATABASE_USER"), env.getValue("DATABASE_PASSWORD"))
+            val catalog = TaxonomyCatalog.loadV1()
+            val model = env.getValue("OPENAI_MODEL_SNAPSHOT")
+            val gateway = OpenAiResponsesGateway(OpenAiConfig(model, env.getValue("OPENAI_API_KEY"), allowLocalAlias = env["APP_ENV"] != "production"))
+            val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = model, allowLocalAlias = env["APP_ENV"] != "production"),
+                { catalog.snapshot(catalog.categories.map { it.id }.toSet()) }, gateway::classify)
+            val transport = SafeHttpTransport()
+            val extractor = HttpMetadataExtractor(UrlSafetyPolicy(), transport::fetch)
+            val processor = GeneralExtractionProcessor(source, extractor::extract, classifier::classify)
+            workerRoutes(GeneralWorkerService(source, processor::process))
+            return@routing
+        }
         val databaseUrl = System.getenv("DATABASE_URL")
         val databaseUser = System.getenv("DATABASE_USER")
         val databasePassword = System.getenv("DATABASE_PASSWORD")

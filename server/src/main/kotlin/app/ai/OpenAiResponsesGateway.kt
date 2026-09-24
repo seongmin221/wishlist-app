@@ -13,8 +13,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-data class OpenAiConfig(val modelSnapshot: String, val apiKey: String) {
-    init { require(modelSnapshot.isNotBlank() && modelSnapshot != "gpt-5.6-luna" && apiKey.isNotBlank()) }
+data class OpenAiConfig(val modelSnapshot: String, val apiKey: String, val allowLocalAlias: Boolean = false) {
+    init { require(modelSnapshot.isNotBlank() && (allowLocalAlias || modelSnapshot != "gpt-5.6-luna") && apiKey.isNotBlank()) }
 }
 
 data class GatewayResponse(val classification: ClassificationResult, val inputTokens: Int?, val outputTokens: Int?)
@@ -22,26 +22,46 @@ data class GatewayResponse(val classification: ClassificationResult, val inputTo
 class OpenAiResponsesGateway(
     private val config: OpenAiConfig,
     private val client: HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build(),
+    private val baseUri: URI = URI("https://api.openai.com/v1"),
 ) {
     fun requestBody(metadata: String, candidates: CandidateSnapshot): JsonObject = JsonObject(mapOf(
         "model" to JsonPrimitive(config.modelSnapshot),
         "store" to JsonPrimitive(false),
         "max_output_tokens" to JsonPrimitive(80),
         "reasoning" to JsonObject(mapOf("effort" to JsonPrimitive("none"))),
-        "input" to JsonPrimitive("Classify the product. Use only supplied IDs. Product: ${metadata.take(2400)}; categories: ${candidates.categoryIds.sorted().map { it to (candidates.categoryLabels[it] ?: it) }}; purposes: ${candidates.purposeIds.sorted().map { it to (candidates.purposeLabels[it] ?: it) }}"),
+        "input" to JsonPrimitive("Classify the product. Use only supplied IDs. Product: ${metadata.take(2400)}; categories: ${compactCandidates(candidates.categoryIds, candidates.categoryLabels)}; purposes: ${compactCandidates(candidates.purposeIds, candidates.purposeLabels)}"),
         "text" to JsonObject(mapOf("format" to JsonObject(mapOf(
             "type" to JsonPrimitive("json_schema"), "name" to JsonPrimitive("wishlist_classification"),
             "strict" to JsonPrimitive(true), "schema" to ClassificationSchema.outputSchema,
         )))),
     ))
 
+    private fun compactCandidates(ids: Set<String>, labels: Map<String, String>): String = ids.sorted()
+        .groupBy { labels[it]?.substringBefore(" > ") ?: "" }
+        .entries.joinToString(";") { (group, members) ->
+            val values = members.joinToString(",") { id -> "$id:${labels[id]?.substringAfter(" > ") ?: id}" }
+            if (group.isEmpty()) values else "$group[$values]"
+        }
+
     fun classify(metadata: String, candidates: CandidateSnapshot): GatewayResponse {
         val body = requestBody(metadata, candidates).toString()
-        // UTF-8 byte length conservatively bounds token count for this text-only request.
-        if (body.toByteArray(Charsets.UTF_8).size > 900) {
-            return GatewayResponse(ClassificationResult.Unusable("input_too_large"), null, null)
-        }
-        val request = HttpRequest.newBuilder(URI("https://api.openai.com/v1/responses"))
+        val responseBody = Json.parseToJsonElement(body).jsonObject
+        val countBody = JsonObject(responseBody.filterKeys { it in setOf("model", "input", "text") }).toString()
+        val countRequest = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses/input_tokens"))
+            .timeout(Duration.ofSeconds(20))
+            .header("Authorization", "Bearer ${config.apiKey}")
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(countBody))
+            .build()
+        val countResponse = try { client.send(countRequest, HttpResponse.BodyHandlers.ofString()) }
+            catch (_: Exception) { return GatewayResponse(ClassificationResult.Retryable, null, null) }
+        if (countResponse.statusCode() == 429 || countResponse.statusCode() >= 500) return GatewayResponse(ClassificationResult.Retryable, null, null)
+        if (countResponse.statusCode() !in 200..299) return GatewayResponse(ClassificationResult.Terminal("openai_count_http_${countResponse.statusCode()}"), null, null)
+        val count = runCatching { Json.parseToJsonElement(countResponse.body()).jsonObject["input_tokens"]?.jsonPrimitive?.intOrNull }.getOrNull()
+            ?: return GatewayResponse(ClassificationResult.Unusable("invalid_token_count"), null, null)
+        if (count < 0) return GatewayResponse(ClassificationResult.Unusable("invalid_token_count"), null, null)
+        if (count > 2000) return GatewayResponse(ClassificationResult.Unusable("input_too_large"), null, null)
+        val request = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses"))
             .timeout(Duration.ofSeconds(70))
             .header("Authorization", "Bearer ${config.apiKey}")
             .header("Content-Type", "application/json")

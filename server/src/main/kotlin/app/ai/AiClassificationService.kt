@@ -36,10 +36,15 @@ class AiClassificationService(
         }
         budget.markInFlight(reservation.id)
         val result = gateway(listOfNotNull(metadata.title, metadata.description).joinToString(" "), candidates)
-        if (result.inputTokens != null && result.outputTokens != null && result.inputTokens in 0..1000 && result.outputTokens in 0..80) {
+        val usageWithinLimit = result.inputTokens != null && result.outputTokens != null && result.inputTokens in 0..2000 && result.outputTokens in 0..80
+        if (usageWithinLimit) {
             budget.settle(reservation.id, result.inputTokens, result.outputTokens)
         } else if (result.classification !is ClassificationResult.Retryable) {
             budget.settleMaximum(reservation.id)
+        }
+        if (result.classification is ClassificationResult.Assigned && !usageWithinLimit) {
+            setFailure(jobId, "AI_USAGE_OUT_OF_RANGE")
+            return ProcessingOutcome.Partial
         }
         return when (val classification = result.classification) {
             is ClassificationResult.Assigned -> {

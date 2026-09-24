@@ -15,7 +15,7 @@ class BudgetAlertDispatcherTest {
             CreateWishlistItemService(source).create(UUID.randomUUID(),UUID.randomUUID(),"https://example.com/item")
             val jobId = source.connection.use { c -> c.createStatement().executeQuery("select id from analysis_jobs").use { r -> r.next(); r.getObject(1,UUID::class.java) } }
             source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING' where id=?").use { s -> s.setObject(1,jobId); s.executeUpdate() } }
-            val service = LlmBudgetService(source,dailyCeilingMicrousd=600,monthlyCeilingMicrousd=600)
+            val service = LlmBudgetService(source,dailyCeilingMicrousd=1000,monthlyCeilingMicrousd=1000)
             repeat(2) { service.reserveBeforeCall(jobId,1,UUID.randomUUID()) }
             val dispatcher = BudgetAlertDispatcher(source)
             assertEquals(0,dispatcher.dispatch(2) { error("notifier unavailable") })

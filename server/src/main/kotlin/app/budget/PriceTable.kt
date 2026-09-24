@@ -12,10 +12,10 @@ class PriceTable(
         }
     }
 
-    fun maximumMicrousd(): Long = costMicrousd(1000, 80)
+    fun maximumMicrousd(): Long = costMicrousd(2000, 80)
 
     fun costMicrousd(inputTokens: Int, outputTokens: Int): Long {
-        require(inputTokens in 0..1000 && outputTokens in 0..80)
+        require(inputTokens in 0..2000 && outputTokens in 0..80)
         return kotlin.math.ceil(inputTokens * inputUsdPerMillion + outputTokens * outputUsdPerMillion).toLong()
     }
 

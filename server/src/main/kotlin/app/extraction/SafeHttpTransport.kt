@@ -28,8 +28,8 @@ class SafeHttpTransport {
             val type = response.header("Content-Type")?.substringBefore(';')?.trim()?.lowercase()
             if (response.code == 200 && type !in setOf("text/html", "application/xhtml+xml")) return HttpFetchResponse(415, emptyMap(), "")
             val bytes = response.body.byteStream().use { it.readNBytes(512 * 1024 + 1) }
-            if (bytes.size > 512 * 1024) return HttpFetchResponse(413, emptyMap(), "")
-            return HttpFetchResponse(response.code, response.headers.names().associate { it.lowercase() to response.header(it).orEmpty() }, bytes.toString(Charsets.UTF_8))
+            val bounded = if (bytes.size > 512 * 1024) bytes.copyOf(512 * 1024) else bytes
+            return HttpFetchResponse(response.code, response.headers.names().associate { it.lowercase() to response.header(it).orEmpty() }, bounded.toString(Charsets.UTF_8), bytes.size > 512 * 1024)
         }
     }
 }

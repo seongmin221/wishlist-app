@@ -31,6 +31,10 @@ MVP 초기에는 local과 production만 운용한다. local은 개발·단위·�
 
 local은 Docker PostgreSQL로 migration·repository를 통합 테스트하고 Firebase Auth Emulator로 인증 경계를 검증한다. Cloud Tasks·OpenAI adapter는 in-memory fake, extraction은 fixture HTTP server로 대체한다. 실제 Cloud Tasks IAM은 production smoke test, OpenAI 품질·latency는 대표 URL 평가로 검증한다.
 
+`APP_ROLE=general-worker`는 DB와 `OPENAI_API_KEY`, `OPENAI_MODEL_SNAPSHOT`을 요구하며 `/internal/worker/general`을 연결한다. 로컬은 모델 별칭을 명시적으로 허용하지만 production은 snapshot ID를 요구한다. API 역할은 기존 Firebase 인증과 상품 생성 경로를 유지한다. 로컬 통합 테스트는 상품 생성 HTTP → 일반 Worker HTTP → 토큰 계산·Responses adapter(fake HTTP) → DB `READY` 및 카테고리 저장까지 확인한다. 별도 opt-in smoke test는 실제 OpenAI에 같은 경로를 호출해 `C011` 저장까지 확인했다. 이 두 테스트의 상품 metadata 추출은 재현 가능한 fixture로 대체했다. Worker HTTP 경로의 접근 제어는 Cloud Run private service와 인증된 Cloud Tasks 호출에 의존하므로, 해당 서비스의 공개 접근을 허용해서는 안 된다.
+
+실제 URL 추출까지 포함한 8건 로컬 경로 실측 결과와 외부 사이트의 간헐적 실패는 [추출 파이프라인 파일럿](extraction-pipeline.md#실제-url-8건-로컬-파일럿-2026-09-24)에 기록한다. 해당 검증도 Firebase·Cloud Tasks·배포 앱의 인증 및 호출 경로는 포함하지 않는다.
+
 production의 Neon credential과 OpenAI API key는 Secret Manager에 두고, API·Worker에 필요한 secret version만 환경변수로 주입한다. Firebase Admin SDK는 Cloud Run service identity의 Application Default Credentials를 사용하며 private key 파일을 배포하지 않는다. Cloud Tasks와 Cloud Scheduler는 전용 service account의 OIDC token으로 private Worker·API endpoint를 호출하고, CI/CD는 GitHub Actions OIDC federation으로 배포한다.
 
 DB schema는 Flyway의 versioned SQL migration 파일로 Git에서 관리한다. local Docker PostgreSQL의 빈 DB에서 Gradle task로 전체 migration과 통합 테스트를 실행하고, CI/CD의 전용 단계가 production Neon에 `validate`·`migrate`를 한 번 적용한 뒤 API·Worker를 배포한다. runtime 서비스는 migration을 실행하지 않으며 destructive change는 expand → migrate → contract로 나눈다.
