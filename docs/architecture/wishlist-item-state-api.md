@@ -113,6 +113,8 @@ canonical URL이 같은 `READY` Product cache 결과는 7일 동안 새 `Wishlis
 5. `reviewStatus == PENDING`이면 `CLASSIFICATION_REVIEW`
 6. 그 외에는 `NONE`
 
+`CATEGORY_REASSIGNMENT`는 홈 조치 영역에 표시하지 않고 카테고리 탭의 `미지정` 묶음을 구성하는 데 쓴다. 홈 조회는 이 값을 영역으로 노출하지 않는다.
+
 서버 전송 전의 `ANALYSIS_PENDING`은 기기에만 존재하므로 KMP가 `LocalSubmission`에서 계산해 서버의 홈 응답과 합성한다. 하나의 서버 항목에는 하나의 `requiredAction`만 적용한다.
 
 제품명과 카테고리가 있다면 `reviewStatus == PENDING`이어도 일반 카테고리 목록에 함께 표시할 수 있다. 홈 조치 상태와 일반 목록 포함 여부는 별도 조건이다.
