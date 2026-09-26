@@ -141,3 +141,4 @@ R-1 에디토리얼 블록, R-2 스위스 그래픽, R-3 데이터 시트·질�
 - [현재 상품 확인과 편집 흐름](../../../../product/inspect-and-edit-a-product.md)
 - [Client 구조](../../../../architecture/client/README.md)
 - 디자인 캔버스: https://claude.ai/artifact/UFARxWnKuzLvjoY7eh7LTg (비공개)
+- [디자인 캔버스 보드 생성기](../../../../../design/canvas/README.md): `확정 디자인` 페이지의 기능 흐름 뷰·흐름도·목적 상세 부품을 만드는 스크립트
