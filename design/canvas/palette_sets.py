@@ -1,4 +1,4 @@
-# 컬러풀 팔레트 후보: 중간(M)·강하게(S) 세트 + 짙은 색. 글자색은 면 밝기로 자동 결정.
+# 컬러풀 팔레트 후보: 중간(M)·강하게(S) 세트 + 짙은 색, 확정 톤(P)·확정 톤 +(PS). 글자색은 면 밝기로 자동 결정.
 from oklch import hex2oklch, oklch2hex, contrast
 INK, WHITE = '#111111', '#FFFFFF'
 M = [('노랑',.905,.140,95),('주황',.830,.120,58),('코랄',.800,.110,28),('분홍',.845,.095,352),('라일락',.820,.085,315),('보라',.790,.100,288),
@@ -25,8 +25,33 @@ def build(spec):
         h = oklch2hex(L, C, H); L2, C2, H2 = hex2oklch(h)
         out.append(dict(n=n, h=h, fg=text_on(h), sec=secondary_on(h), L=L2, C=C2, H=H2, want=C, deep=L < .6))
     return out
-SETS = {'M': build(M), 'MD': build(M + DEEP_M), 'S': build(S), 'SD': build(S + DEEP_S)}
+# 확정 톤: `확정 디자인` 블록 6색과 PAL-15(같은 톤으로 더한 9색)에서 고른 14색. 주황은 확정 목적 색 살구, 코랄은 로즈
+P_HEX = [('노랑','#F4E4A6'),('주황','#F3D9C9'),('코랄','#F7CDCD'),('분홍','#F8DAE3'),('라일락','#EACFE8'),('보라','#DCD6F0'),('파랑','#C4D5F3'),
+         ('하늘','#CFE3F0'),('민트','#C3E9E1'),('초록','#C4F0BA'),('연두','#D9EC9A'),('토프','#E4CCC4'),('베이지','#E6D5BB'),('회색','#D6D5CA')]
+REST = {'토프', '베이지', '회색'}
+def _in_gamut(L, C, H):
+    return abs(hex2oklch(oklch2hex(L, C, H))[1] - C) < .003
+def plus(spec):
+    # 확정 톤 +: 색상은 그대로, 밝기를 조금 낮추고 채도를 한 단계 올린다(쉬어 가는 색은 조금만)
+    out = []
+    for n, h in spec:
+        L, C, H = hex2oklch(h)
+        L2, C2 = (L - .01, C + (0 if n == '회색' else .012)) if n in REST else (L - .02, min(C * 1.3 + .03, .13))
+        while not _in_gamut(L2, C2, H): C2 -= .003
+        out.append((n, oklch2hex(L2, C2, H)))
+    return out
+def build_hex(spec):
+    out = []
+    for n, h in spec:
+        L, C, H = hex2oklch(h)
+        out.append(dict(n=n, h=h, fg=text_on(h), sec=secondary_on(h), L=L, C=C, H=H, want=C, deep=False))
+    return out
+SETS = {'M': build(M), 'MD': build(M + DEEP_M), 'S': build(S), 'SD': build(S + DEEP_S), 'P': build_hex(P_HEX), 'PS': build_hex(plus(P_HEX))}
 if __name__ == '__main__':
+    for k in ['P', 'PS']:
+        print('==', k)
+        for c in SETS[k]:
+            print(f"  {c['n']:5s} {c['h']} L{c['L']:.2f} C{c['C']:.3f} H{c['H']:3.0f} 둘째 {c['sec']} {contrast(c['sec'], c['h']):.1f}")
     for k in ['M', 'S']:
         print('==', k)
         for c in SETS[k + 'D']:

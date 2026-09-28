@@ -7,7 +7,7 @@ helmet = _helmet('PT-A8')
 pt_nav = tab_nav('PT-A8')
 MONO = "font-family: 'JetBrains Mono', Pretendard, monospace; font-size: 10px; letter-spacing: .1em"
 GS = "font-family: 'Space Grotesk', Pretendard, sans-serif"
-LABEL = {'M': '중간', 'MD': '중간 + 짙은 색', 'S': '강하게', 'SD': '강하게 + 짙은 색'}
+LABEL = {'M': '중간', 'MD': '중간 + 짙은 색', 'S': '강하게', 'SD': '강하게 + 짙은 색', 'P': '확정 톤', 'PS': '확정 톤 +'}
 BY = {k: {c['n']: c for c in v} for k, v in SETS.items()}
 
 def page(title, w, h, body, script='renderVals() { return {}; }', bg='#F7F7F3'):
@@ -70,8 +70,8 @@ def header(title, line2, right):
 TOGGLE = ('<div role="tablist" aria-label="목적 보기" style="display: flex; padding: 3px; border-radius: 999px; background: #E9E9E3">'
           '<button role="tab" aria-selected="true" style="height: 38px; padding: 0 12px; border-radius: 999px; border: 0; background: #111111; color: #FFFFFF; font-size: 12px; font-weight: 700">진행 중</button>'
           '<button role="tab" aria-selected="false" style="height: 38px; padding: 0 12px; border-radius: 999px; border: 0; background: transparent; color: #111111; font-size: 12px; font-weight: 700">아카이브 2</button></div>')
-def purpose_tab(key):
-    cs = [BY[key][n] for n in ORDER if n in BY[key]]
+def purpose_tab(key, order=ORDER):
+    cs = [BY[key][n] for n in order if n in BY[key]]
     blocks = []
     for k, c in enumerate(cs):
         name, desc = PURP[k]; cnt = [3, 2, 0, 2, 1, 0, 3, 2, 1, 3, 0, 2, 1, 1, 2, 1, 0, 2][k]
@@ -135,4 +135,29 @@ for code, bg, label in BGS:
     s = re.sub(r'#F7F7F3', bg, home, flags=re.I)
     s = re.sub(r'<title>[^<]*</title>', '<title>바탕 후보 · %s</title>' % label, s, count=1)
     open(os.path.join(OUT, 'CP-BG-%s.dc.html' % code), 'w').write(s)
-print('ok', SWW, SWH)
+
+# 5. 확정 톤 후보: `확정 디자인` 블록 색 느낌(P)과 한 단계 선명하게(PS)를 강하게 세트(S)와 비교
+# 확정 톤은 셋째 목적 색이 살구(주황)였으므로 코랄·주황 순서를 바꾼다
+ORDER_P = [{'코랄': '주황', '주황': '코랄'}.get(n, n) for n in ORDER]
+def section_flat(key, desc):
+    grid = f'<div style="display: grid; grid-template-columns: repeat(7, {SW}px); gap: {G}px">' + ''.join(swatch(c) for c in SETS[key]) + '</div>'
+    return (f'<div style="display: flex; flex-direction: column; gap: 14px"><div style="display: flex; align-items: baseline; gap: 12px">'
+            f'<span style="font-size: 22px; font-weight: 700; letter-spacing: -0.03em">{LABEL[key]}</span><span style="font-size: 13px; color: rgba(17,17,17,.62)">{desc}</span></div>' + grid + '</div>')
+SWH_P = 1000
+sheet = (f'<div style="width: {SWW}px; height: {SWH_P}px; box-sizing: border-box; padding: 40px; background: #F7F7F3; color: #111111; display: flex; flex-direction: column; gap: 36px">'
+         '<div style="display: flex; flex-direction: column; gap: 8px"><h1 style="margin: 0; font-size: 34px; line-height: 40px; font-weight: 700; letter-spacing: -0.035em">블록 색 · 확정 톤 후보</h1>'
+         '<span style="font-size: 14px; line-height: 20px; color: rgba(17,17,17,.62)">확정 디자인의 블록 6색과 같은 톤으로 14색을 맞췄어요. 이름·역할은 강하게 세트와 같고, 모든 면 위 글자는 먹색이에요.</span></div>'
+         + section_flat('P', '채도 .02~.11 · 밝기 .86~.92 · 확정 6색 + PAL-15')
+         + section_flat('PS', '확정 톤에서 밝기를 조금 낮추고 채도를 한 단계 · 채도 .06~.13')
+         + section_flat('S', '지금 기록된 세트 · 채도 .10~.18 · 비교용') + '</div>')
+open(os.path.join(OUT, 'CP-SWATCH-P.dc.html'), 'w').write(page('블록 색 · 확정 톤 후보', SWW, SWH_P, sheet))
+for key in ['P', 'PS']:
+    open(os.path.join(OUT, 'CP-PT-%s.dc.html' % key), 'w').write(purpose_tab(key, ORDER_P))
+    open(os.path.join(OUT, 'CP-PD-%s.dc.html' % key), 'w').write(purpose_detail(key))
+home0 = board('P-D')
+for key in ['P', 'PS', 'S']:
+    c = BY[key]
+    h = home0.replace('#D9EC9A', c['연두']['h']).replace('#F4E4A6', c['노랑']['h']).replace('#CFDFD4', c['하늘']['h'])
+    h = re.sub(r'<title>[^<]*</title>', '<title>홈 · %s</title>' % LABEL[key], h, count=1)
+    open(os.path.join(OUT, 'CP-HOME-%s.dc.html' % key), 'w').write(h)
+print('ok', SWW, SWH, SWH_P)
