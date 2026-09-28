@@ -3,20 +3,11 @@
 # 사용: python3 gen_colorsys.py <src dir> <out dir>
 import os, re, sys
 from collections import Counter
-from palette_sets import SETS, NEUTRAL
+from palette_sets import SETS, NEUTRAL, mix, tone
 from oklch import contrast
 SRC, OUT = sys.argv[1], sys.argv[2]; os.makedirs(OUT, exist_ok=True)
 S = {c['n']: c for c in SETS['PS']}
 INK = '#111111'
-
-def mix(a, b, w):  # a*w + b*(1-w)
-    x = [int(a[i:i + 2], 16) for i in (1, 3, 5)]; y = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
-    return '#' + ''.join('%02X' % round(x[j] * w + y[j] * (1 - w)) for j in range(3))
-def tone(surface, target, w=0.45):  # 같은 색의 어두운 톤, 대비 target 이상
-    while True:
-        t = mix(surface, INK, w)
-        if contrast(t, surface) >= target or w <= 0: return t
-        w -= 0.02
 
 # 확정 색 -> 강하게 세트
 MAP = {'#D9EC9A': S['연두']['h'], '#F4E4A6': S['노랑']['h'], '#CFDFD4': S['하늘']['h'],   # 홈 챙길 일 블록

@@ -9,6 +9,7 @@
 - `확정 디자인` 페이지: `Flow-Confirmed`(기능 흐름 뷰), `Flow-Map`(흐름도), `PurposeDetail`(목적 상세 부품)
 - `확정 화면` 페이지: 흐름도가 불러 쓰는 `P-D`, `EH-A`~`EH-C`, `CT-D`, `PT-A8`, `A8-AR2`, `AD-F2`, `ARCH-ACT2`와 예전 통합 흐름 `FLOW`, 시트 원본 `PD-FINAL`
 - `UI 피드백 적용` 페이지: 확정 전 비교에 쓴 `UI-*` 복제본
+- `디자인 시스템` 페이지: 값과 공통 요소(`DS-*`)
 - `디자인 시스템 · 색` 페이지: 색 세트 비교(`CP-*`)
 
 ## 확정 보드를 만든 과정 (2026-09-28)
@@ -26,6 +27,7 @@ python3 gen_promote.py build/ui source/project build/confirmed   # UI-* → 확�
 | `gen_ui_review.py` | 확정 보드를 `UI-*`로 복제해 UI 피드백(라벨 글꼴, keep-all, 작은 사진 바탕, 이름 두 줄, 개수 표기, 문구, 목록 위쪽 흐림 등)을 반영한다. |
 | `gen_colorsys.py` | `UI-*`에 디자인 시스템 색(확정 톤 +, 바탕 `#F7F7F3`)과 무채색 단계 A안을 입힌다. |
 | `gen_promote.py` | `UI-*`를 확정 보드 이름으로 바꾸고 `dc-import` 이름과 제목을 확정 보드 것으로 되돌린다. |
+| `gen_design_system.py` | `디자인 시스템` 페이지의 `DS-*` 보드. 확정 보드(`build/confirmed` 또는 캔버스에서 내려받은 확정 보드)에서 헬멧·하단 탭·사진을 읽는다. `python3 gen_design_system.py <확정 보드 폴더> build/ds` |
 | `gen_colorful.py` | `디자인 시스템 · 색` 페이지의 `CP-*` 보드. 원본은 `PT-A8`, `PurposeDetail`, `P-D`(UI 피드백 이전 것). |
 | `gen_neutral.py` | 지운 `탐색 · 무채색 단계` 페이지의 A안·B안 보드 기록. |
 | `palette_sets.py`, `oklch.py` | 색 세트 정의, 무채색 단계(`NEUTRAL`), OKLCH·대비 계산 |

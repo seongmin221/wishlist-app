@@ -19,6 +19,15 @@ def secondary_on(h):
         if contrast(s, h) >= 3.0: return s
         w -= 0.05
     return s
+def mix(a, b, w):  # a*w + b*(1-w)
+    x = [int(a[i:i + 2], 16) for i in (1, 3, 5)]; y = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
+    return '#' + ''.join('%02X' % round(x[j] * w + y[j] * (1 - w)) for j in range(3))
+def tone(surface, target, w=0.45):
+    # 같은 색의 어두운 톤: 먹색과 섞어 대비 target 이상이 되는 첫 값 (헤드라인 둘째 줄 3.0, 작은 글자 4.5)
+    while True:
+        t = mix(surface, INK, w)
+        if contrast(t, surface) >= target or w <= 0: return t
+        w -= 0.02
 def build(spec):
     out = []
     for n, L, C, H in spec:

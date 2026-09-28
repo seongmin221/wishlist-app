@@ -8,3 +8,4 @@
 | Kotlin Multiplatform | [kmp.md](kmp.md) |
 | 헤드라인 둘째 줄 색 계산 | [headline-secondary-color.md](headline-secondary-color.md) |
 | 색 팔레트와 글자색 규칙 | [color-palette.md](color-palette.md) |
+| 디자인 시스템 (값·공통 요소) | [design-system.md](design-system.md) |
