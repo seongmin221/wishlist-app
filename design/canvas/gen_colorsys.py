@@ -1,11 +1,12 @@
-# 디자인 시스템 색(강하게 세트, 바탕 #F7F7F3)을 UI 피드백 적용 보드에 반영한다.
+# 디자인 시스템 색(확정 톤 +, 바탕 #F7F7F3)과 무채색 단계 A안을 UI 피드백 적용 보드에 반영한다.
+# 2026-09-27에는 강하게 세트(SETS['S'])로 만들었고, 2026-09-28 확정 톤 +(SETS['PS'])로 바꿨다.
 # 사용: python3 gen_colorsys.py <src dir> <out dir>
 import os, re, sys
 from collections import Counter
-from palette_sets import SETS
+from palette_sets import SETS, NEUTRAL
 from oklch import contrast
 SRC, OUT = sys.argv[1], sys.argv[2]; os.makedirs(OUT, exist_ok=True)
-S = {c['n']: c for c in SETS['S']}
+S = {c['n']: c for c in SETS['PS']}
 INK = '#111111'
 
 def mix(a, b, w):  # a*w + b*(1-w)
@@ -19,7 +20,7 @@ def tone(surface, target, w=0.45):  # 같은 색의 어두운 톤, 대비 target
 
 # 확정 색 -> 강하게 세트
 MAP = {'#D9EC9A': S['연두']['h'], '#F4E4A6': S['노랑']['h'], '#CFDFD4': S['하늘']['h'],   # 홈 챙길 일 블록
-       '#DCD6F0': S['보라']['h'], '#CFE3F0': S['하늘']['h'], '#F3D9C9': S['코랄']['h']}   # 목적 색
+       '#DCD6F0': S['보라']['h'], '#CFE3F0': S['하늘']['h'], '#F3D9C9': S['주황']['h']}   # 목적 색 (셋째는 확정 디자인처럼 살구)
 # 옅은 목적 색(PT-A8 아카이브 보기): 원래와 같은 비율(흰색 쪽 37.5%)로 다시 만든다
 PALE = {'#E1ECF1': mix(S['하늘']['h'], '#FFFFFF', 0.625), '#E8E5F1': mix(S['보라']['h'], '#FFFFFF', 0.625)}
 SURF = {}  # 새 면 색 -> (헤드라인 둘째 줄 3:1, 작은 글자 4.5:1)
@@ -53,11 +54,13 @@ def apply(s):
         s = s.replace('color: %s' % old, 'color: %s' % SURF[MAP[surf]][0])
     for a, b in list(MAP.items()) + list(PALE.items()):
         LOG['surface'] += len(re.findall(re.escape(a), s, re.I)); s = re.sub(re.escape(a), b, s, flags=re.I)
-    n = len(re.findall(r'(width: 8px; height: 8px; border-radius: 999px; background: #[0-9A-F]{6}); box-shadow: 0 0 0 1px rgba\(17,17,17,\.2\)', s))
-    s = re.sub(r'(width: 8px; height: 8px; border-radius: 999px; background: #[0-9A-F]{6}); box-shadow: 0 0 0 1px rgba\(17,17,17,\.2\)', r'\1', s); LOG['dot-ring-off'] += n
-    return recolor_inside(s)
+    # 목적 점 테두리(먹색 20%)는 옅은 면에서도 흰 바탕 위 점이 보이도록 남긴다
+    s = recolor_inside(s)
+    for a, b in NEUTRAL.items():
+        LOG['neutral'] += len(re.findall(re.escape(a), s, re.I)); s = re.sub(re.escape(a), b, s, flags=re.I)
+    return s
 
-PKEY = {'closet': '보라', 'run': '하늘', 'lamp': '코랄'}
+PKEY = {'closet': '보라', 'run': '하늘', 'lamp': '주황'}
 def purpose_detail(s):
     # 목적 상세 머리 면을 목적 색으로 (아카이브 상세와 같은 형태)
     a = '<div style="padding: 58px 20px 0; display: flex; flex-direction: column; gap: 18px; flex-shrink: 0">'

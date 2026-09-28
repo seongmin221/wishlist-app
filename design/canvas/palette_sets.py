@@ -46,6 +46,9 @@ def build_hex(spec):
         L, C, H = hex2oklch(h)
         out.append(dict(n=n, h=h, fg=text_on(h), sec=secondary_on(h), L=L, C=C, H=H, want=C, deep=False))
     return out
+# 무채색 단계 A안(확정): 흩어진 회색 -> 바탕 #F7F7F3 색조의 단계
+NEUTRAL = {'#F0F0EB': '#F2F2EE', '#EFEFEA': '#F2F2EE', '#ECECE6': '#EAEAE4', '#E9E9E3': '#EAEAE4',
+           '#E5E5E0': '#E4E4DE', '#A5A59E': '#A0A099', '#9C9C95': '#A0A099'}
 SETS = {'M': build(M), 'MD': build(M + DEEP_M), 'S': build(S), 'SD': build(S + DEEP_S), 'P': build_hex(P_HEX), 'PS': build_hex(plus(P_HEX))}
 if __name__ == '__main__':
     for k in ['P', 'PS']:

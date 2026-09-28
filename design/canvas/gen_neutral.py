@@ -4,8 +4,7 @@ import os, re, sys
 from oklch import hex2oklch, contrast
 UI, OUT = sys.argv[1], sys.argv[2]; os.makedirs(OUT, exist_ok=True)  # UI: gen_ui_review·gen_colorsys 결과 폴더
 
-GRAY = {'#F0F0EB': '#F2F2EE', '#EFEFEA': '#F2F2EE', '#ECECE6': '#EAEAE4', '#E9E9E3': '#EAEAE4',
-        '#E5E5E0': '#E4E4DE', '#A5A59E': '#A0A099', '#9C9C95': '#A0A099'}
+from palette_sets import NEUTRAL as GRAY
 INK_B, CARD_B = '#181811', '#FDFDFB'
 
 def sec(surface, ink, w=0.45):

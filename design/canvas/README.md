@@ -11,7 +11,7 @@
 | `gen_flow_map.py` | `Flow-Map.dc.html` | 흐름도. 확정 보드를 `dc-import`로 절반 크기로 불러와 화살표로 잇는다. |
 | `gen_longpress.py` | `LM-A.dc.html` | 길게 누르기 메뉴 시안 보드. 다른 생성기가 이 파일의 조각을 불러 쓴다. |
 | `gen_ui_review.py` | `UI-*.dc.html` | `UI 피드백 적용` 페이지. 확정 보드(기능 흐름 뷰·흐름도·목적 상세와 흐름도가 불러 쓰는 6개)를 복제해 UI 피드백을 반영한다. |
-| `gen_colorsys.py` | `UI-*.dc.html` | 위 결과에 디자인 시스템 색(강하게 세트, 바탕 `#F7F7F3`)을 입힌다. 목적 상세 머리 면을 목적 색으로 깐다. |
+| `gen_colorsys.py` | `UI-*.dc.html` | 위 결과에 디자인 시스템 색(확정 톤 +, 바탕 `#F7F7F3`)과 무채색 단계 A안을 입힌다. 목적 상세 머리 면을 목적 색으로 깐다. |
 | `gen_colorful.py` | `CP-*.dc.html` | `디자인 시스템 · 색` 페이지. 세트 견본, 세트별 목적 탭·목적 상세, 바탕 후보별 홈. 확정 톤 후보(`CP-SWATCH-P`, `CP-PT-P/PS`, `CP-PD-P/PS`, `CP-HOME-P/PS/S`)도 만든다. 원본은 `PT-A8`, `PurposeDetail`, `P-D`. |
 | `gen_neutral.py` | `NEU-RAMP`, `NA-*`, `NB-*` | `탐색 · 무채색 단계` 페이지. 회색 단계 A안·B안(색 적용 전 `UI-*` 기준). |
 
