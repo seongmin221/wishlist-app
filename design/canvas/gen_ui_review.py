@@ -33,12 +33,16 @@ HELMET_CSS = (
 LABEL = "font-family: 'Label Mono', Pretendard, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: .02em"
 
 
-# 스크롤 목록 위아래 흐림: 위는 고정 줄 아래로 들어가는 내용, 아래는 떠 있는 버튼·탭 뒤
+# 스크롤 목록 흐림: 위는 고정 줄 아래로 들어가는 내용, 아래는 떠 있는 선택 칩·넣기 버튼 뒤(후보 추가 창)
 def mask(full, clear):
     g = 'linear-gradient(to bottom, transparent 0, #000 14px, #000 calc(100%% - %dpx), transparent calc(100%% - %dpx))' % (full, clear)
     return '-webkit-mask-image: %s; mask-image: %s' % (g, g)
-MASK_LIST = mask(116, 72)   # 하단 탭만 떠 있는 목록
-MASK_FAB = mask(176, 96)    # 비교 끝내기 버튼과 하단 탭이 떠 있는 목록
+def mask_top():
+    g = 'linear-gradient(to bottom, transparent 0, #000 14px)'
+    return '-webkit-mask-image: %s; mask-image: %s' % (g, g)
+# 하단 탭 뒤는 흐리지 않는다: 탭 뒤로 지나가는 내용이 그대로 보이게 위쪽만 흐린다 (2026-09-28)
+MASK_LIST = mask_top()      # 하단 탭만 떠 있는 목록
+MASK_FAB = mask_top()       # 비교 끝내기 버튼과 하단 탭이 떠 있는 목록
 MASK_PICK = mask(196, 112)  # 선택 칩과 넣기 버튼이 떠 있는 후보 추가 창
 SCROLL = '<div class="scroll" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain">'
 
