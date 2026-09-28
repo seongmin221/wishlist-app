@@ -6,10 +6,11 @@ from collections import Counter
 SRC, OUT = sys.argv[1], sys.argv[2]
 os.makedirs(OUT, exist_ok=True)
 P = 'UI-'
-APP = ['Flow-Confirmed', 'PurposeDetail', 'P-D', 'CT-D', 'PT-A8', 'A8-AR2', 'AD-F2', 'ARCH-ACT2']
+APP = ['Flow-Confirmed', 'PurposeDetail', 'P-D', 'CT-D', 'PT-A8', 'A8-AR2', 'AD-F2', 'ARCH-ACT2', 'EH-A', 'EH-B', 'EH-C']
 TITLES = {'Flow-Confirmed': 'UI 적용 · 기능 흐름 뷰', 'PurposeDetail': 'UI 적용 · 목적 상세 부품', 'P-D': 'UI 적용 · 홈',
           'CT-D': 'UI 적용 · 카테고리', 'PT-A8': 'UI 적용 · 목적 탭', 'A8-AR2': 'UI 적용 · 아카이브 목록',
-          'AD-F2': 'UI 적용 · 기록 상세', 'ARCH-ACT2': 'UI 적용 · 기록 동작', 'Flow-Map': 'UI 적용 · 흐름도'}
+          'AD-F2': 'UI 적용 · 기록 상세', 'ARCH-ACT2': 'UI 적용 · 기록 동작', 'Flow-Map': 'UI 적용 · 흐름도',
+          'EH-A': 'UI 적용 · 빈 홈 목적 있음', 'EH-B': 'UI 적용 · 빈 홈 목적 없음', 'EH-C': 'UI 적용 · 빈 홈 처음 사용'}
 LOG = {}
 
 def sub(s, name, pat, rep, flags=0, count=0, need=True):
@@ -153,6 +154,8 @@ for name in APP:
     if name == 'Flow-Confirmed': s = flow_confirmed(s)
     if name == 'CT-D': s = category_index(s)
     if name == 'PurposeDetail': s = purpose_detail(s)
+    if name.startswith('EH-'):  # 빈 홈 목적 목록의 개수 앞 0 빼기
+        s = sub(s, 'count-pad', r"(font-family: 'Space Grotesk', Pretendard, sans-serif; font-size: 18px; color: rgba\(17,17,17,\.62\)\">)0(\d)<", r'\1\2<')
     open(os.path.join(OUT, P + name + '.dc.html'), 'w').write(s)
 
 # 흐름도: 복제 보드를 불러오도록

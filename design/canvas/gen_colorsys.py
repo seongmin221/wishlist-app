@@ -62,21 +62,14 @@ def apply(s):
 
 PKEY = {'closet': '보라', 'run': '하늘', 'lamp': '주황'}
 def purpose_detail(s):
-    # 목적 상세 머리 면을 목적 색으로 (아카이브 상세와 같은 형태)
-    a = '<div style="padding: 58px 20px 0; display: flex; flex-direction: column; gap: 18px; flex-shrink: 0">'
-    assert s.count(a) >= 1
-    s = s.replace(a, '<div style="background: {{ pcolor }}; border-radius: 0 0 32px 32px; padding: 58px 20px 26px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0">', 1)
-    b = 'color: rgba(17,17,17,.5)">{{ line2 }}</span></h1>'
-    assert s.count(b) == 1; s = s.replace(b, 'color: {{ psec }}">{{ line2 }}</span></h1>')
-    c = '<p style="margin: -10px 0 0; font-size: 13px; line-height: 19px; color: rgba(17,17,17,.62)">{{ desc }}</p>'
-    assert s.count(c) == 1; s = s.replace(c, c.replace('margin: -10px 0 0', 'margin: -6px 0 0').replace('rgba(17,17,17,.62)', '{{ plab }}'))
+    # 목적 상세 머리는 색 면 없이 기본 바탕으로 둔다(2026-09-28). 라벨 줄의 목적 점만 목적 색을 따른다
     d = 'width: 8px; height: 8px; border-radius: 999px; background: %s' % S['보라']['h']
     LOG['pd-dot'] += s.count(d); s = s.replace(d, 'width: 8px; height: 8px; border-radius: 999px; background: {{ pcolor }}')
     js = 'v.pname = s.pname;'
     assert s.count(js) == 1
     table = ', '.join("%s: ['%s', '%s', '%s']" % (k, S[n]['h'], SURF[S[n]['h']][0], SURF[S[n]['h']][1]) for k, n in PKEY.items())
     s = s.replace(js, "const PC = { %s }; const pc = PC[s.key] || PC.closet; v.pcolor = pc[0]; v.psec = pc[1]; v.plab = pc[2]; " % table + js)
-    LOG['pd-header'] += 1
+    LOG['pd-dot-table'] += 1
     return s
 
 for f in sorted(os.listdir(SRC)):
