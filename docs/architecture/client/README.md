@@ -28,3 +28,7 @@
 - [iOS 구조](ios.md)
 - [Android 구조](android.md)
 - [KMP 구조](kmp.md)
+
+## 미결정 사항
+
+- 로그인 상태에서 iOS Share Extension·Android 공유 수신 Activity가 공유된 로그인 토큰으로 직접 서버 저장 요청을 보낼지, 로컬에만 `LocalSubmission`을 만들고 전송을 앱에 맡길지 정하지 않았다. 공유 직후 확인 카드의 문구가 이 결정에 따라 달라진다. 배경은 [QA-CLI-002](../../learning/client/q-and-a/QA-CLI-002-share-receipt-feedback.md)를 참고한다.
