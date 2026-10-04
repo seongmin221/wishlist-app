@@ -107,7 +107,7 @@ def sheet(T, mode_edit, mode_create):
 <div style="display: flex; flex-direction: column; gap: 8px">{field_label("포함 예시 · 선택", "최대 5개", T)}<input type="text" maxLength="60" placeholder="예시를 입력하고 추가" onInput="{{{{markDirty}}}}" style="{fld}"></div>
 <p style="margin: 0; font-size: 13px; line-height: 1.5; word-break: keep-all; color: {T['sub']}">공용 카테고리는 바뀌지 않고, 나만 쓰는 세부 카테고리로 추가돼요.</p></sc-if>"""
     title = ((f'<sc-if value="{{{{isEdit}}}}" hint-placeholder-val="{{{{true}}}}">세부 카테고리 편집</sc-if>' if mode_edit else "")
-             + (f'<sc-if value="{{{{isCreate}}}}" hint-placeholder-val="{{{{false}}}}">새 세부 카테고리</sc-if>' if mode_create else ""))
+             + (f'<sc-if value="{{{{isCreate}}}}" hint-placeholder-val="{{{{false}}}}">신규 카테고리</sc-if>' if mode_create else ""))
     ok = ((f'<sc-if value="{{{{isEdit}}}}" hint-placeholder-val="{{{{true}}}}">저장</sc-if>' if mode_edit else "")
           + (f'<sc-if value="{{{{isCreate}}}}" hint-placeholder-val="{{{{false}}}}">만들기</sc-if>' if mode_create else ""))
     return f"""<sc-if value="{{{{sheetOpen}}}}" hint-placeholder-val="{{{{false}}}}">{scrim(T, 10)}
