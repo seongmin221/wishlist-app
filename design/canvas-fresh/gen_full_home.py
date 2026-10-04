@@ -156,11 +156,11 @@ def btn_secondary(T, label, on, bg=None, extra="", radius=28, h=56):
 # ---------------------------------------------------------------- 분류·목적 확인 연속 처리
 
 REVIEW_ITEMS = [
-    dict(name="마샬 MAJOR V", price="₩229,000", cat="헤드폰", purpose="출퇴근 헤드폰", photo="white", hasDup=False,
+    dict(name="마샬 MAJOR V", price="KRW 229,000", cat="헤드폰", purpose="출퇴근 헤드폰", photo="white", hasDup=False,
          why="AI가 카테고리와 목적을 연결했어요"),
-    dict(name="호카 스피드고트 6", price="₩209,000", cat="신발", purpose="가을 트레일 러닝", photo="beige", hasDup=True,
+    dict(name="호카 스피드고트 6", price="KRW 209,000", cat="신발", purpose="가을 트레일 러닝", photo="beige", hasDup=True,
          why="AI가 카테고리와 목적을 연결했어요"),
-    dict(name="발뮤다 더 토스터", price="₩349,000", cat="주방 가전", purpose=None, photo="brown", hasDup=False,
+    dict(name="발뮤다 더 토스터", price="KRW 349,000", cat="주방 가전", purpose=None, photo="brown", hasDup=False,
          why="AI가 카테고리를 정했어요. 맞는 목적은 찾지 못했어요"),
 ]
 
@@ -220,7 +220,7 @@ def compare_card(T, theme, new):
            if new else
            f'<span style="align-self: flex-start; height: 26px; padding: 0 10px; border-radius: 13px; background: {T["tile"]}; display: flex; align-items: center; font-size: 12px; font-weight: 700">이미 있던 상품</span>')
     border = f"2px solid {T['text']}" if new else f"1.5px solid {T['line']}"
-    price = "₩209,000" if new else "₩199,000"
+    price = "KRW 209,000" if new else "KRW 199,000"
     saved = "오늘" if new else "3주 전"
     seller = "musinsa.com" if new else "hoka.com"
     ai = f'<span style="display: block; margin-top: 2px; {lbl(11, T["sub"])}">AI 연결</span>' if new else ""
@@ -552,8 +552,8 @@ def font_pick_board(key, caption):
 </div>
 <a href="#" style="box-sizing: border-box; padding: 16px; border-radius: 28px; background: #F96857; color: #1D1D1D; display: flex; flex-direction: column; gap: 4px"><span style="font-family: 'Do Hyeon', sans-serif; font-size: 20px; line-height: 1.0">출퇴근 헤드폰</span><span style="{l(12, '#1D1D1D')}">후보 5 · 어제 후보 추가</span></a>
 <div style="display: flex; gap: 12px">
-{prod("white", "소니 WH-1000XM6", "₩549,000", "무신사 · 2일 전 확인")}
-{prod("brown", "보스 QuietComfort Ultra", "₩499,000", "보스 공식몰 · 2일 전 확인")}
+{prod("white", "소니 WH-1000XM6", "KRW 549,000", "무신사 · 2일 전 확인")}
+{prod("brown", "보스 QuietComfort Ultra", "KRW 499,000", "보스 공식몰 · 2일 전 확인")}
 </div>
 </div>
 </div>

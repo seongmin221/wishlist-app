@@ -153,7 +153,7 @@ def product_board(theme, title, init, kind="normal"):
         body = f"""<div style="display: flex; flex-direction: column; gap: 0">
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><div style="{brand_box}">소니</div><div style="{name_box}">WH-1000XM6</div></sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block"><span style="position: absolute; left: -9999px">브랜드</span><input type="text" defaultValue="소니" onInput="{{{{markDirty}}}}" style="{brand_box}; {uline}"></label><label style="display: block"><span style="position: absolute; left: -9999px">제품명</span><input type="text" defaultValue="WH-1000XM6" onInput="{{{{markDirty}}}}" style="{name_box}; {uline}"></label></sc-if>
-<div style="display: flex; align-items: baseline; gap: 6px; margin-top: 6px"><span style="font-size: 24px; [[NUM]]">₩549,000</span></div>
+<div style="display: flex; align-items: baseline; gap: 6px; margin-top: 6px"><span style="font-size: 24px; [[NUM]]">KRW 549,000</span></div>
 <div style="margin-top: 4px; font-size: 13px; line-height: 1.5; word-break: keep-all; color: [[sub]]">2일 전 확인한 가격이에요. 지금 가격은 원본에서 확인해 주세요.</div>
 </div>
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}">{group(row_view("카테고리", cat_val) + row_view("목적", pur_val))}</sc-if>

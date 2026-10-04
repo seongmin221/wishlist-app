@@ -23,20 +23,20 @@ TOPS = ["패션·잡화", "뷰티·퍼스널케어", "디지털·IT", "가구·�
 MINE = {
     "dac": {"name": "오디오 케이블·DAC", "top": "디지털·IT", "count": 2, "desc": "헤드폰에 연결하는 DAC와 교체용 케이블",
             "examples": ["포터블 DAC", "이어폰 케이블"],
-            "items": [("FiiO BTR7", "₩259,000", "1 / 1", "white", "fiio.com · 3일 전 확인"),
-                      ("오디오퀘스트 DragonFly Red", "₩299,000", "4 / 5", "brown", "29CM · 1주 전 확인")]},
+            "items": [("FiiO BTR7", "KRW 259,000", "1 / 1", "white", "fiio.com · 3일 전 확인"),
+                      ("오디오퀘스트 DragonFly Red", "KRW 299,000", "4 / 5", "brown", "29CM · 1주 전 확인")]},
     "lego": {"name": "레고", "top": "취미·문화·컬렉터블", "count": 0, "desc": "테크닉, 아이디어 시리즈", "examples": ["테크닉"], "items": []},
 }
 
 HEADPHONES = [
-    ("소니 WH-1000XM6", "₩549,000", "1 / 1", "white", "출퇴근 헤드폰", "2일 전 확인", False),
-    ("보스 QuietComfort Ultra", "₩499,000", "4 / 5", "brown", "출퇴근 헤드폰", "2일 전 확인", False),
-    ("젠하이저 MOMENTUM 4", "₩389,000", "3 / 4", "beige", None, "5일 전 확인", False),
-    ("애플 AirPods Max", "₩769,000", "1 / 1", "white", "출퇴근 헤드폰", "1주 전 확인", False),
-    ("마샬 MAJOR V", "₩229,000", "4 / 5", "green", None, "1주 전 확인", True),
-    ("뱅앤올룹슨 Beoplay H95", "₩1,190,000", "3 / 4", "beige", None, "2주 전 확인", False),
-    ("소니 ULT WEAR", "₩279,000", "1 / 1", "white", "출퇴근 헤드폰", "2주 전 확인", False),
-    ("오디오테크니카 ATH-M50x", "₩219,000", "4 / 5", "brown", None, "3주 전 확인", False),
+    ("소니 WH-1000XM6", "KRW 549,000", "1 / 1", "white", "출퇴근 헤드폰", "2일 전 확인", False),
+    ("보스 QuietComfort Ultra", "KRW 499,000", "4 / 5", "brown", "출퇴근 헤드폰", "2일 전 확인", False),
+    ("젠하이저 MOMENTUM 4", "KRW 389,000", "3 / 4", "beige", None, "5일 전 확인", False),
+    ("애플 AirPods Max", "KRW 769,000", "1 / 1", "white", "출퇴근 헤드폰", "1주 전 확인", False),
+    ("마샬 MAJOR V", "KRW 229,000", "4 / 5", "green", None, "1주 전 확인", True),
+    ("뱅앤올룹슨 Beoplay H95", "KRW 1,190,000", "3 / 4", "beige", None, "2주 전 확인", False),
+    ("소니 ULT WEAR", "KRW 279,000", "1 / 1", "white", "출퇴근 헤드폰", "2주 전 확인", False),
+    ("오디오테크니카 ATH-M50x", "KRW 219,000", "4 / 5", "brown", None, "3주 전 확인", False),
 ]
 
 
