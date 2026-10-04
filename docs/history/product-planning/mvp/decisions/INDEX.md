@@ -12,7 +12,8 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 
 - [목적별 비교 그룹과 AI 목적 제안](purpose-groups.md) — 대체됨 · 2026-08-29
 - [taxonomy 방향 정리](taxonomy-direction.md) — 대체됨 · 2026-09-02
-- [사용자 전용 카테고리 변경과 삭제](custom-category-lifecycle.md) — 확정 · 2026-09-05
+- [사용자 전용 카테고리 변경과 삭제](custom-category-lifecycle.md) — 일부 대체 · 2026-09-05
+- [사용자 전용 카테고리 삭제 뒤 재지정을 정보 보완으로 합침](custom-category-deletion-reassign.md) — 확정 · 2026-10-02
 - [사용자 전용 카테고리 입력과 AI 안전성](custom-category-safety.md) — 확정 · 2026-09-05
 - [AI 목적 자동 연결과 재판단](ai-purpose-linking.md) — 확정 · 2026-09-05
 - [연결된 상품이 있는 목적 삭제](purpose-deletion.md) — 확정 · 2026-09-05
