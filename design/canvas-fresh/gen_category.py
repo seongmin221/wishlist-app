@@ -211,7 +211,7 @@ def product_js(T, rows):
 
 
 def product_col(T, key):
-    return f"""<div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><sc-for list="{{{{{key}}}}}" as="p" hint-placeholder-count="3"><a href="#" style="display: flex; flex-direction: column; gap: 8px">
+    return f"""<div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><sc-for list="{{{{{key}}}}}" as="p" hint-placeholder-count="3"><a href="FProductDetail{T['s']}.dc.html" style="display: flex; flex-direction: column; gap: 8px">
 <div style="{{{{p.ratio}}}}; position: relative; box-sizing: border-box; border-radius: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="56%" height="56%" viewBox="0 0 48 48" fill="none" stroke="{{{{p.s}}}}" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="{{{{p.f}}}}"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="{{{{p.f}}}}"></rect></svg>
 <sc-if value="{{{{p.pending}}}}" hint-placeholder-val="{{{{false}}}}"><span aria-label="분류·목적 미확정" style="position: absolute; left: 8px; top: 8px; width: 32px; height: 32px; border-radius: 10px; background: #FFFFFF; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7"></path></svg></span></sc-if></div>
 <span style="display: flex; flex-direction: column; gap: 4px; padding: 0 2px">

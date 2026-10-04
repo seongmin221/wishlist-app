@@ -9,13 +9,13 @@ import sys
 
 THEMES = {
     "L": dict(
-        name="라이트", bg="#F8F8F8", card="#FFFFFF", sheet="#FFFFFF", tile="#F0F0F0", icon_tile="#F0F0F0",
+        s="L", name="라이트", bg="#F8F8F8", card="#FFFFFF", sheet="#FFFFFF", tile="#F0F0F0", icon_tile="#F0F0F0",
         field="#FFFFFF", line="#E2E2E2", text="#1D1D1D", sub="#5E5E5E", tab="#1D1D1D", tab_text="#FFFFFF",
         inv="#1D1D1D", inv_text="#FFFFFF", handle="#DCDCDC", dash="#BDBDBD", back1="#EEEEEE", back2="#E4E4E4",
         scrim="rgba(0,0,0,0.24)", ring=True,
     ),
     "D": dict(
-        name="다크", bg="#1D1D1D", card="#312F30", sheet="#2A2A2A", tile="#3A3939", icon_tile="#1D1D1D",
+        s="D", name="다크", bg="#1D1D1D", card="#312F30", sheet="#2A2A2A", tile="#3A3939", icon_tile="#1D1D1D",
         field="#312F30", line="#3A3939", text="#F4F3F0", sub="#A9A7A2", tab="#312F30", tab_text="#F4F3F0",
         inv="#F4F3F0", inv_text="#1D1D1D", handle="#4A4948", dash="#5A5958", back1="#2A2A2A", back2="#262626",
         scrim="rgba(0,0,0,0.45)", ring=False,
