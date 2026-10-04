@@ -10,6 +10,7 @@
 | `gen_product.py` | 상품 묶음(`FProduct*`). 카테고리 선택 시트의 분류 데이터는 `taxonomy.json` |
 | `gen_archive.py` | 아카이브(끝난 비교) 묶음(`FArchive*`) |
 | `gen_account.py` | 로그인 안내, 홈 로그인 전, 설정, 공유 수신, 원본 링크 웹뷰(`FLogin*`, `FHomeLoggedOut*`, `FSettings*`, `FShareSaved*`, `FWebView*`) |
+| `gen_infocolor.py` | `검토 · 정보 아이콘 색` 페이지의 후보 보드(`PickInfo*`) |
 | `gen_vis.py` | `시각 방향 · 대표 화면`의 목적 보드(`VisPurpose*`). 전체 화면 목적 보드에서 연결만 바꾼다 |
 
 ## 만들기

@@ -22,6 +22,17 @@ THEMES = {
     ),
 }
 
+# 정보성 아이콘 타일의 상태 색(옅은 면 + 짙은 아이콘). 목적 6색과 겹치지 않는다. 홈 할 일 카드 타일에는 쓰지 않는다.
+STATUS = {
+    "L": {'done': ('#DCF1E4', '#1F7A4D'), 'wait': ('#FBEFCB', '#8A6200'), 'offline': ('#E2E5FA', '#3E48B8'), 'external': ('#E2E5FA', '#3E48B8'), 'fail': ('#FBE1DB', '#B03A21'), 'busy': ('#DDF0F5', '#1C6E82')},
+    "D": {'done': ('#1E3A2B', '#7DD3A5'), 'wait': ('#3D3216', '#F2C95A'), 'offline': ('#262B4D', '#A3ABF5'), 'external': ('#262B4D', '#A3ABF5'), 'fail': ('#432420', '#F59A86'), 'busy': ('#1C3740', '#86D3E6')},
+}
+for _th, _pal in STATUS.items():
+    for _k, (_bg, _fg) in _pal.items():
+        THEMES[_th][f"st_{_k}_bg"] = _bg
+        THEMES[_th][f"st_{_k}_fg"] = _fg
+BRAND = ("#F96857", "#1D1D1D")  # 앱 아이콘·로그인 안내의 앱 색
+
 PURPOSE = {
     "출퇴근 헤드폰": ("#F96857", "#F84D39"),
     "가을 트레일 러닝": ("#F9CD61", "#B38107"),
@@ -136,7 +147,7 @@ def header(T, title, home):
 def done_block(T, heading, home):
     return f"""<sc-if value="{{{{done}}}}" hint-placeholder-val="{{{{false}}}}">
 <div style="flex-grow: 1; padding: 0 24px 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center">
-<span style="width: 64px; height: 64px; border-radius: 28px; background: {T['card']}; display: flex; align-items: center; justify-content: center">{ICON_CHECK}</span>
+<span style="width: 64px; height: 64px; border-radius: 28px; background: {T['st_done_bg']}; color: {T['st_done_fg']}; display: flex; align-items: center; justify-content: center">{ICON_CHECK}</span>
 <h2 style="margin: 0; font-size: 24px; font-weight: 700">{heading}</h2>
 <p style="margin: 0; font-size: 15px; color: {T['sub']}">{{{{summary}}}}</p>
 <a href="{home}" style="margin-top: 12px; height: 52px; padding: 0 28px; border-radius: 26px; background: {T['inv']}; color: {T['inv_text']}; display: flex; align-items: center; font-size: 16px; font-weight: 700">홈으로</a>
@@ -363,7 +374,7 @@ def fill_board(theme, home):
 {header(T, "정보 보완 필요", home)}<sc-if value="{{{{notDone}}}}" hint-placeholder-val="{{{{true}}}}">
 <div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 12px 20px 140px; display: flex; flex-direction: column; gap: 20px">
 <div style="display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 28px; background: {T['card']}">
-<span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; background: {T['icon_tile']}; display: flex; align-items: center; justify-content: center">{ICON_PEN}</span>
+<span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; background: {T['st_fail_bg']}; color: {T['st_fail_fg']}; display: flex; align-items: center; justify-content: center">{ICON_PEN}</span>
 <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0">
 <span style="font-size: 15px; font-weight: 700; word-break: keep-all">{{{{cur.msg}}}}</span>
 <span style="{lbl(12, T['sub'])}">{{{{cur.domain}}}}</span>

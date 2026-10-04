@@ -50,9 +50,9 @@ def dis_attr(d):
 TILE = lambda icon, size=44, r=14, bg="[[icon_tile]]": f'<span style="width: {size}px; height: {size}px; flex-shrink: 0; border-radius: {r}px; background: {bg}; color: [[text]]; display: flex; align-items: center; justify-content: center">{svg(I[icon])}</span>'
 
 
-def dialog(key, label, title, bullets, cancel_on, ok_html, icon=None):
+def dialog(key, label, title, bullets, cancel_on, ok_html, icon=None, status="external"):
     lis = "".join(f"<li>{b}</li>" for b in bullets)
-    head_icon = f'{TILE(icon, 48, 14, "[[tile]]")}' if icon else ""
+    head_icon = (f'<span style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: [[st_{status}_bg]]; color: [[st_{status}_fg]]; display: flex; align-items: center; justify-content: center">{svg(I[icon])}</span>') if icon else ""
     return f"""<sc-if value="{{{{{key}}}}}" hint-placeholder-val="{{{{false}}}}"><div style="position: absolute; inset: 0; z-index: 20; [[scrimDiv]]"></div>
 <div role="dialog" aria-label="{label}" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 36px; background: [[sheet]]; color: [[text]]; display: flex; flex-direction: column; gap: 12px">
 {head_icon}<h2 style="margin: 0; font-size: 20px; font-weight: 700">{title}</h2>
@@ -70,7 +70,7 @@ def ok_btn(label, on, red=False):
 
 def login_board(theme):
     T = THEMES[theme]
-    li = lambda t: f'<li style="display: flex; align-items: center; gap: 12px">{TILE("check", 32, 10, "[[card]]")}<span style="word-break: keep-all">{t}</span></li>'
+    li = lambda t: f'<li style="display: flex; align-items: center; gap: 12px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; background: #F96857; color: #1D1D1D; display: flex; align-items: center; justify-content: center">{svg(I["check"])}</span><span style="word-break: keep-all">{t}</span></li>'
     tpl = f"""<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: [[bg]]; color: [[text]]; font-family: 'IBM Plex Sans KR', sans-serif">
 <div style="position: absolute; inset: 0; padding: 0 24px 40px; display: flex; flex-direction: column">
 <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 24px">
@@ -171,7 +171,7 @@ wvSub: s.wvDone ? '방금 삭제했어요' : '쇼핑몰 로그인과 방문 기�
 
 # ---------------------------------------------------------------- 공유 수신
 
-def share_board(theme, title, icon, msg, sub):
+def share_board(theme, title, icon, msg, sub, status):
     T = THEMES[theme]
     shop = {"L": ("#E9E9E9", "#DADADA", "#D2D2D2", "#C8C8C8"), "D": ("#2A2A2A", "#333333", "#3B3B3B", "#444444")}[theme]
     tpl = f"""<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {shop[0]}; color: [[text]]; font-family: 'IBM Plex Sans KR', sans-serif">
@@ -180,7 +180,7 @@ def share_board(theme, title, icon, msg, sub):
 <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px"><div style="height: 300px; border-radius: 12px; background: {shop[2]}"></div><div style="width: 70%; height: 18px; border-radius: 6px; background: {shop[2]}"></div><div style="width: 40%; height: 22px; border-radius: 6px; background: {shop[3]}"></div></div>
 </div>
 <div role="status" style="position: absolute; left: 16px; right: 16px; bottom: 40px; z-index: 5; box-sizing: border-box; padding: 16px; border-radius: 28px; background: [[card]]; display: flex; align-items: center; gap: 14px">
-<span style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: [[icon_tile]]; display: flex; align-items: center; justify-content: center">{svg(I[icon], 22, "2")}</span>
+<span style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: [[st_{status}_bg]]; color: [[st_{status}_fg]]; display: flex; align-items: center; justify-content: center">{svg(I[icon], 22, "2")}</span>
 <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px"><span style="font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 20px; line-height: 1.0">{msg}</span><span style="font-size: 13px; line-height: 1.45; word-break: keep-all; color: [[sub]]">{sub}</span></span>
 </div>
 </div>
@@ -278,9 +278,9 @@ def main():
         b[f"FSettingsLoggedOut{th}"] = settings_board(th, f"{nm} 설정 로그인 전", "{ logged: false }")
         b[f"FSettingsLogout{th}"] = settings_board(th, f"{nm} 로그아웃 확인", "{ out: true }")
         b[f"FSettingsWebviewClear{th}"] = settings_board(th, f"{nm} 웹뷰 데이터 삭제 확인", "{ wv: true }")
-        b[f"FShareSaved{th}"] = share_board(th, f"{nm} 공유 수신 저장 완료", "check", "위시리스트에 저장했어요", "정보를 가져오는 중이에요")
-        b[f"FShareSavedLocal{th}"] = share_board(th, f"{nm} 공유 수신 로그인 전", "clock", "이 기기에 저장했어요", "로그인하면 정보를 가져와요")
-        b[f"FShareSavedOffline{th}"] = share_board(th, f"{nm} 공유 수신 오프라인", "cloudoff", "이 기기에 저장했어요", "다음에 앱을 열면 보내요")
+        b[f"FShareSaved{th}"] = share_board(th, f"{nm} 공유 수신 저장 완료", "check", "위시리스트에 저장했어요", "정보를 가져오는 중이에요", "done")
+        b[f"FShareSavedLocal{th}"] = share_board(th, f"{nm} 공유 수신 로그인 전", "clock", "이 기기에 저장했어요", "로그인하면 정보를 가져와요", "wait")
+        b[f"FShareSavedOffline{th}"] = share_board(th, f"{nm} 공유 수신 오프라인", "cloudoff", "이 기기에 저장했어요", "다음에 앱을 열면 보내요", "offline")
         b[f"FWebView{th}"] = webview_board(th, f"{nm} 원본 링크 웹뷰", "{}")
         b[f"FWebViewShare{th}"] = webview_board(th, f"{nm} 웹뷰 공유 시트", "{ sheet: true }")
         b[f"FWebViewExternal{th}"] = webview_board(th, f"{nm} 웹뷰 외부 앱 열기 확인", "{ ext: true }")
