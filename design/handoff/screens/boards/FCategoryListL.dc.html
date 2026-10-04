@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>라이트 카테고리 세부 유형 목록</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&amp;family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1D1D1D;text-decoration:none}a:hover{color:#5E5E5E}
+input::placeholder{color:#5E5E5E}
+input.ed:focus{border-bottom-color:currentColor !important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F8F8F8; color: #1D1D1D; font-family: 'IBM Plex Sans KR', sans-serif">
+<div style="position: absolute; inset: 0; overflow-y: auto">
+<div style="height: 44px"></div>
+<header style="position: sticky; top: 0; z-index: 1; background: #F8F8F8; padding: 12px 20px 14px; display: flex; align-items: center; gap: 12px"><a href="FCategoryHomeL.dc.html" aria-label="뒤로" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px"><h1 style="margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: 22px; font-weight: 700; word-break: keep-all">헤드폰<span style="font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: #5E5E5E">8</span></h1><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">디지털·IT</span></div></header>
+<div style="padding: 8px 16px 140px; display: flex; gap: 12px; align-items: flex-start"><div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><sc-for list="{{left}}" as="p" hint-placeholder-count="3"><a href="FProductDetailL.dc.html" style="display: flex; flex-direction: column; gap: 8px">
+<div style="{{p.ratio}}; position: relative; box-sizing: border-box; border-radius: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="56%" height="56%" viewBox="0 0 48 48" fill="none" stroke="{{p.s}}" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="{{p.f}}"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="{{p.f}}"></rect></svg>
+<sc-if value="{{p.pending}}" hint-placeholder-val="{{false}}"><span aria-label="분류·목적 미확정" style="position: absolute; left: 8px; top: 8px; width: 32px; height: 32px; border-radius: 10px; background: #FFFFFF; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7"></path></svg></span></sc-if></div>
+<span style="display: flex; flex-direction: column; gap: 4px; padding: 0 2px">
+<span style="font-size: 14px; line-height: 1.35; word-break: keep-all">{{p.name}}</span>
+<span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;">{{p.price}}</span>
+<span style="display: flex; align-items: center; gap: 6px; min-width: 0"><sc-if value="{{p.hasDot}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="width: 10px; height: 10px; flex-shrink: 0; box-sizing: border-box; border-radius: 5px; {{p.dotStyle}}"></span></sc-if><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E; overflow: hidden; text-overflow: ellipsis;">{{p.meta}}</span></span>
+</span></a></sc-for></div><div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><sc-for list="{{right}}" as="p" hint-placeholder-count="3"><a href="FProductDetailL.dc.html" style="display: flex; flex-direction: column; gap: 8px">
+<div style="{{p.ratio}}; position: relative; box-sizing: border-box; border-radius: 20px; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="56%" height="56%" viewBox="0 0 48 48" fill="none" stroke="{{p.s}}" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="{{p.f}}"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="{{p.f}}"></rect></svg>
+<sc-if value="{{p.pending}}" hint-placeholder-val="{{false}}"><span aria-label="분류·목적 미확정" style="position: absolute; left: 8px; top: 8px; width: 32px; height: 32px; border-radius: 10px; background: #FFFFFF; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7"></path></svg></span></sc-if></div>
+<span style="display: flex; flex-direction: column; gap: 4px; padding: 0 2px">
+<span style="font-size: 14px; line-height: 1.35; word-break: keep-all">{{p.name}}</span>
+<span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;">{{p.price}}</span>
+<span style="display: flex; align-items: center; gap: 6px; min-width: 0"><sc-if value="{{p.hasDot}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="width: 10px; height: 10px; flex-shrink: 0; box-sizing: border-box; border-radius: 5px; {{p.dotStyle}}"></span></sc-if><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E; overflow: hidden; text-overflow: ellipsis;">{{p.meta}}</span></span>
+</span></a></sc-for></div></div>
+</div>
+<nav aria-label="하단 탭" style="position: absolute; left: 16px; right: 16px; bottom: 24px; z-index: 5; height: 64px; box-sizing: border-box; padding: 8px; border-radius: 32px; background: #1D1D1D; display: flex; align-items: center; justify-content: space-between"><a href="FHomeL.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>홈</a><a href="FCategoryHomeL.dc.html" aria-current="page" style="flex-grow: 1; height: 48px; border-radius: 24px; background: #FFFFFF; color: #1D1D1D; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect></svg>카테고리</a><a href="FPurposeHomeL.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="8" width="16" height="12" rx="3"></rect><path d="M7 5h10"></path></svg>목적</a></nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const items = [{"name": "소니 WH-1000XM6", "price": "KRW 549,000", "ratio": "aspect-ratio: 1 / 1; background: #FFFFFF", "s": "#9A9A96", "f": "#D8D8D4", "pending": false, "hasDot": true, "dotStyle": "background: #F96857; border: 1px solid #F84D39;", "meta": "출퇴근 헤드폰 · 2일 전 확인"}, {"name": "보스 QuietComfort Ultra", "price": "KRW 499,000", "ratio": "aspect-ratio: 4 / 5; background: #7A6B5B", "s": "#E9DFD2", "f": "#A99683", "pending": false, "hasDot": true, "dotStyle": "background: #F96857; border: 1px solid #F84D39;", "meta": "출퇴근 헤드폰 · 2일 전 확인"}, {"name": "젠하이저 MOMENTUM 4", "price": "KRW 389,000", "ratio": "aspect-ratio: 3 / 4; background: #E9E8E4", "s": "#7C7B77", "f": "#BDBCB7", "pending": false, "hasDot": false, "dotStyle": "background: ;", "meta": "목적 미지정 · 5일 전 확인"}, {"name": "애플 AirPods Max", "price": "KRW 769,000", "ratio": "aspect-ratio: 1 / 1; background: #FFFFFF", "s": "#9A9A96", "f": "#D8D8D4", "pending": false, "hasDot": true, "dotStyle": "background: #F96857; border: 1px solid #F84D39;", "meta": "출퇴근 헤드폰 · 1주 전 확인"}, {"name": "마샬 MAJOR V", "price": "KRW 229,000", "ratio": "aspect-ratio: 4 / 5; background: #3F4B44", "s": "#C9D3CB", "f": "#7F8E84", "pending": true, "hasDot": false, "dotStyle": "background: ;", "meta": "목적 미지정 · 1주 전 확인"}, {"name": "뱅앤올룹슨 Beoplay H95", "price": "KRW 1,190,000", "ratio": "aspect-ratio: 3 / 4; background: #E9E8E4", "s": "#7C7B77", "f": "#BDBCB7", "pending": false, "hasDot": false, "dotStyle": "background: ;", "meta": "목적 미지정 · 2주 전 확인"}, {"name": "소니 ULT WEAR", "price": "KRW 279,000", "ratio": "aspect-ratio: 1 / 1; background: #FFFFFF", "s": "#9A9A96", "f": "#D8D8D4", "pending": false, "hasDot": true, "dotStyle": "background: #F96857; border: 1px solid #F84D39;", "meta": "출퇴근 헤드폰 · 2주 전 확인"}, {"name": "오디오테크니카 ATH-M50x", "price": "KRW 219,000", "ratio": "aspect-ratio: 4 / 5; background: #7A6B5B", "s": "#E9DFD2", "f": "#A99683", "pending": false, "hasDot": false, "dotStyle": "background: ;", "meta": "목적 미지정 · 3주 전 확인"}];
+return { left: items.filter((_, i) => i % 2 === 0), right: items.filter((_, i) => i % 2 === 1) };
+}
+}
+</script>
+</body>
+</html>

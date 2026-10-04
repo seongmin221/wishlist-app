@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>라이트 원본 링크 웹뷰</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&amp;family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1D1D1D;text-decoration:none}a:hover{color:#5E5E5E}
+input::placeholder{color:#5E5E5E}
+input.ed:focus{border-bottom-color:currentColor !important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F8F8F8; color: #1D1D1D; font-family: 'IBM Plex Sans KR', sans-serif">
+<header style="position: absolute; left: 0; right: 0; top: 0; z-index: 4; padding: 50px 12px 8px; background: #F8F8F8; display: flex; align-items: center; gap: 8px">
+<a href="FProductDetailL.dc.html" aria-label="닫기" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; margin-right: 52px">
+<span style="display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>www.musinsa.com</span>
+<span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">{{pageName}}</span>
+</div>
+</header>
+<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 102px; z-index: 5; height: 2px; background: #E2E2E2"><div style="width: 62%; height: 2px; background: #1D1D1D"></div></div>
+<div style="position: absolute; left: 0; right: 0; top: 104px; bottom: 84px; overflow-y: auto; background: #FAFAFA">
+<div style="padding: 0 0 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="height: 360px; background: #D9D9D9; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #5E5E5E">쇼핑몰 웹페이지 · {{pageName}}</div>
+<div style="padding: 0 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="width: 40%; height: 12px; border-radius: 6px; background: #E4E4E4"></div><div style="width: 85%; height: 18px; border-radius: 6px; background: #E4E4E4"></div><div style="width: 60%; height: 18px; border-radius: 6px; background: #E4E4E4"></div><div style="width: 35%; height: 22px; border-radius: 6px; background: #CFCFCF"></div>
+<div style="height: 8px"></div><div style="width: 100%; height: 48px; border-radius: 10px; background: #CFCFCF"></div>
+<button type="button" onClick="{{go}}" style="all: unset; cursor: pointer; margin-top: 8px; min-height: 44px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: #5E5E5E">페이지 안의 다른 링크<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"></path></svg></button>
+</div>
+</div>
+</div>
+<nav aria-label="웹 탐색" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 8px 12px 32px; background: #F8F8F8; display: flex; align-items: center; justify-content: space-between">
+<div style="display: flex; gap: 4px">
+<sc-if value="{{canBack}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{back}}" aria-label="뒤로" style="all: unset; cursor: pointer; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #1D1D1D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg></button></sc-if><sc-if value="{{noBack}}" hint-placeholder-val="{{true}}"><a href="FProductDetailL.dc.html" aria-label="뒤로 (이전 페이지가 없으면 닫기)" style="width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #1D1D1D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg></a></sc-if>
+<sc-if value="{{canFwd}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{forward}}" aria-label="앞으로" style="all: unset; cursor: pointer; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #1D1D1D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"></path></svg></button></sc-if><sc-if value="{{noFwd}}" hint-placeholder-val="{{true}}"><button type="button" disabled="disabled" aria-label="앞으로" style="all: unset; cursor: pointer; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #BDBDBD"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"></path></svg></button></sc-if>
+</div>
+<div style="display: flex; gap: 4px"><button type="button" aria-label="새로고침" style="all: unset; cursor: pointer; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #1D1D1D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"></path></svg></button><button type="button" onClick="{{openSheet}}" aria-label="공유" style="all: unset; cursor: pointer; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #1D1D1D"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 8l5-5 5 5M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"></path></svg></button></div>
+</nav>
+<sc-if value="{{sheetOpen}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{closeSheet}}" aria-label="닫기" style="all: unset; position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></button>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 11; box-sizing: border-box; padding: 10px 20px 36px; border-radius: 36px 36px 0 0; background: #FFFFFF; color: #1D1D1D; display: flex; flex-direction: column; gap: 4px">
+<div style="align-self: center; width: 40px; height: 5px; margin-bottom: 8px; border-radius: 3px; background: #DCDCDC"></div>
+<button type="button" onClick="{{closeSheet}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 60px; display: flex; align-items: center; gap: 14px; font-size: 16px"><span style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 14px; background: #F0F0F0; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg></span>외부 브라우저로 열기</button><button type="button" onClick="{{closeSheet}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 60px; display: flex; align-items: center; gap: 14px; font-size: 16px"><span style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 14px; background: #F0F0F0; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"></path></svg></span>링크 복사</button><button type="button" onClick="{{closeSheet}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 60px; display: flex; align-items: center; gap: 14px; font-size: 16px"><span style="width: 40px; height: 40px; flex-shrink: 0; border-radius: 14px; background: #F0F0F0; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect></svg></span>다른 앱으로 공유</button>
+</div></sc-if>
+<sc-if value="{{extOpen}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></div>
+<div role="dialog" aria-label="외부 앱 열기 확인" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 36px; background: #FFFFFF; color: #1D1D1D; display: flex; flex-direction: column; gap: 12px">
+<span style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: #E2E5FA; color: #3E48B8; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="3" width="10" height="18" rx="2"></rect><path d="M11 18h2"></path></svg></span><h2 style="margin: 0; font-size: 20px; font-weight: 700">외부 앱을 열까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; word-break: keep-all; display: flex; flex-direction: column; gap: 2px"><li>결제 앱이 열려요</li><li>직접 누르지 않았다면 취소해 주세요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{closeExt}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #F0F0F0; color: #1D1D1D; font-size: 16px; font-weight: 500">취소</button><button type="button" onClick="{{closeExt}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1D1D1D; color: #FFFFFF; font-size: 16px; font-weight: 700">열기</button></div>
+</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = Object.assign({ hist: 0, fwd: 0, sheet: false, ext: false }, {}); }
+renderVals() {
+const s = this.state;
+const pages = ['상품 페이지', '다른 상품 페이지', '리뷰 페이지', '장바구니 페이지'];
+return {
+pageName: pages[Math.min(s.hist, pages.length - 1)],
+canBack: s.hist > 0, noBack: s.hist === 0, canFwd: s.fwd > 0, noFwd: s.fwd === 0,
+go: () => this.setState({ hist: s.hist + 1, fwd: 0 }),
+back: () => this.setState({ hist: s.hist - 1, fwd: s.fwd + 1 }),
+forward: () => this.setState({ hist: s.hist + 1, fwd: s.fwd - 1 }),
+sheetOpen: s.sheet, openSheet: () => this.setState({ sheet: true }), closeSheet: () => this.setState({ sheet: false }),
+extOpen: s.ext, closeExt: () => this.setState({ ext: false })
+};
+}
+}
+</script>
+</body>
+</html>
