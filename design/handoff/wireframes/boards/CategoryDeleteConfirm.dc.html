@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>직접 만든 카테고리 삭제 확인</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1A1A1A;text-decoration:none}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; color: #1A1A1A; font-family: 'IBM Plex Sans KR', sans-serif">
+<div style="position: absolute; inset: 0; overflow-y: auto">
+<div style="height: 44px"></div>
+<header style="position: sticky; top: 0; z-index: 1; background: #FFFFFF; padding: 12px 20px 14px; display: flex; align-items: center; gap: 12px"><a href="CategoryHome.dc.html" aria-label="뒤로" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg></a><div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><h1 style="margin: 0; font-size: 22px; font-weight: 700">오디오 케이블·DAC <span style="font-weight: 400; color: #6B6B6B">2</span></h1><div style="font-size: 13px; color: #6B6B6B">디지털·IT · 직접 만든 카테고리 · 최근 저장순</div></div><button type="button" onClick="{{toggleMenu}}" aria-label="카테고리 편집·삭제" style="border: none; width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg></button></header>
+<sc-if value="{{hasList}}" hint-placeholder-val="{{true}}"><div style="padding: 8px 16px 140px; display: flex; gap: 10px; align-items: flex-start"><div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><sc-for list="{{left}}" as="p" hint-placeholder-count="1"><a href="ProductDetail.dc.html" style="display: flex; flex-direction: column; gap: 8px; color: #1A1A1A"><div style="{{p.imgStyle}}"></div><div style="display: flex; flex-direction: column; gap: 3px; padding: 0 2px"><div style="font-size: 14px; line-height: 1.35">{{p.name}}</div><div style="font-size: 16px; font-weight: 700">{{p.price}}</div><div style="font-size: 12px; color: #6B6B6B">{{p.meta}}</div></div></a></sc-for></div><div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><sc-for list="{{right}}" as="p" hint-placeholder-count="1"><a href="ProductDetail.dc.html" style="display: flex; flex-direction: column; gap: 8px; color: #1A1A1A"><div style="{{p.imgStyle}}"></div><div style="display: flex; flex-direction: column; gap: 3px; padding: 0 2px"><div style="font-size: 14px; line-height: 1.35">{{p.name}}</div><div style="font-size: 16px; font-weight: 700">{{p.price}}</div><div style="font-size: 12px; color: #6B6B6B">{{p.meta}}</div></div></a></sc-for></div></div></sc-if><sc-if value="{{emptyList}}" hint-placeholder-val="{{false}}"><div style="padding: 80px 32px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center"><h2 style="margin: 0; font-size: 18px; font-weight: 700">아직 상품이 없어요</h2><p style="margin: 0; font-size: 14px; line-height: 1.5; color: #6B6B6B">상품 편집에서 이 카테고리를 고르면 여기에 모여요.</p></div></sc-if>
+</div>
+<nav aria-label="하단 탭" style="position: absolute; left: 16px; right: 16px; bottom: 24px; z-index: 2; height: 64px; box-sizing: border-box; padding: 8px; border-radius: 32px; background: #1A1A1A; display: flex; align-items: center; justify-content: space-between">
+<a href="Home.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #FFFFFF; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>홈</a>
+<a href="#" aria-current="page" style="flex-grow: 1; height: 48px; border-radius: 24px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; color: #1A1A1A; font-size: 15px; font-weight: 700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect></svg>카테고리</a>
+<a href="PurposeHome.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #FFFFFF; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="8" width="16" height="12" rx="3"></rect><path d="M7 5h10"></path></svg>목적</a>
+</nav>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{closeMenu}}" aria-label="메뉴 닫기" style="all: unset; position: absolute; inset: 0; z-index: 8"></button><div style="position: absolute; right: 20px; top: 112px; z-index: 9; width: 168px; padding: 6px 0; border-radius: 18px; background: #FFFFFF; border: 1.5px solid #D6D6D6; display: flex; flex-direction: column"><button type="button" onClick="{{openEdit}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 10px; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>편집</button><button type="button" onClick="{{openDelete}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 10px; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"></path></svg>삭제</button></div></sc-if><sc-if value="{{sheetOpen}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 10; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div style="position: absolute; left: 0; right: 0; top: 96px; bottom: 0; z-index: 11; border-radius: 28px 28px 0 0; background: #FFFFFF; display: flex; flex-direction: column">
+<div style="align-self: center; width: 40px; height: 5px; margin-top: 10px; border-radius: 3px; background: #D0D0D0"></div>
+<div style="padding: 8px 12px 0 20px; display: flex; align-items: center; gap: 8px"><h2 style="flex-grow: 1; margin: 0; font-size: 20px; font-weight: 700"><sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}">세부 카테고리 편집</sc-if><sc-if value="{{isCreate}}" hint-placeholder-val="{{false}}">새 세부 카테고리</sc-if></h2><button type="button" onClick="{{closeSheet}}" aria-label="닫기" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 14px 20px 120px; display: flex; flex-direction: column; gap: 18px">
+<sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}"><div style="font-size: 14px; color: #6B6B6B">‘{{cTop}}’ 아래 · 상품 {{cCount}}개</div>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #6B6B6B"><span>이름 · 필수</span><span>최대 40자</span></span><input type="text" maxLength="40" defaultValue="{{cName}}" placeholder="예: 오디오 케이블·DAC" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 14px; border: 1.5px solid #1A1A1A; font: inherit; font-size: 16px; height: 52px"></label>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #6B6B6B"><span>설명 · 선택</span><span>최대 200자</span></span><textarea maxLength="200" rows="2" defaultValue="{{cDesc}}" placeholder="어떤 상품을 넣을지 적어 두면 AI 분류에 참고해요" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 14px; border: 1.5px solid #1A1A1A; font: inherit; font-size: 16px; padding: 12px 14px; resize: none"></textarea></label>
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #6B6B6B"><span>포함 예시 · 선택</span><span>{{exCount}}</span></span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{cExamples}}" as="e" hint-placeholder-count="2"><span style="height: 36px; padding: 0 6px 0 14px; border-radius: 18px; background: #F0F0F0; display: flex; align-items: center; gap: 4px; font-size: 14px">{{e.name}}<button type="button" onClick="{{markDirty}}" aria-label="예시 빼기" style="all: unset; cursor: pointer; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span></sc-for></div>
+<input type="text" maxLength="60" placeholder="예시를 입력하고 추가" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 14px; border: 1.5px solid #1A1A1A; font: inherit; font-size: 16px; height: 52px"></div>
+<sc-if value="{{hasItems}}" hint-placeholder-val="{{false}}"><p style="margin: 0; font-size: 13px; color: #6B6B6B">{{renameNote}}</p></sc-if>
+</sc-if>
+<sc-if value="{{isCreate}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #6B6B6B"><span>상위 카테고리 · 필수</span><span></span></span><div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{tops}}" as="t" hint-placeholder-count="11"><sc-if value="{{t.on}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{t.pick}}" style="all: unset; cursor: pointer; box-sizing: border-box; height: 44px; padding: 0 16px; border-radius: 22px; display: flex; align-items: center; gap: 6px; font-size: 15px; white-space: nowrap; height: 40px; background: #1A1A1A; color: #FFFFFF">{{t.name}}</button></sc-if><sc-if value="{{t.off}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{t.pick}}" style="all: unset; cursor: pointer; box-sizing: border-box; height: 44px; padding: 0 16px; border-radius: 22px; display: flex; align-items: center; gap: 6px; font-size: 15px; white-space: nowrap; height: 40px; background: #F0F0F0">{{t.name}}</button></sc-if></sc-for></div></div>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #6B6B6B"><span>이름 · 필수</span><span>최대 40자</span></span><input type="text" maxLength="40" placeholder="예: 오디오 케이블·DAC" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 14px; border: 1.5px solid #1A1A1A; font: inherit; font-size: 16px; height: 52px"></label>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #6B6B6B"><span>설명 · 선택</span><span>최대 200자</span></span><textarea maxLength="200" rows="2" placeholder="어떤 상품을 넣을지 적어 두면 AI 분류에 참고해요" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 14px; border: 1.5px solid #1A1A1A; font: inherit; font-size: 16px; padding: 12px 14px; resize: none"></textarea></label>
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #6B6B6B"><span>포함 예시 · 선택</span><span>최대 5개</span></span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"></div>
+<input type="text" maxLength="60" placeholder="예시를 입력하고 추가" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 0 14px; border-radius: 14px; border: 1.5px solid #1A1A1A; font: inherit; font-size: 16px; height: 52px"></div>
+<p style="margin: 0; font-size: 13px; color: #6B6B6B">공용 카테고리는 바뀌지 않고, 나만 쓰는 세부 카테고리로 추가돼요.</p></sc-if>
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 20px 34px; background: #FFFFFF; border-top: 1px solid #E2E2E2; display: flex; gap: 10px">
+<button type="button" onClick="{{closeSheet}}" style="flex: 1 1 0; height: 54px; border-radius: 27px; font-size: 16px; border: 1.5px solid #1A1A1A; background: #FFFFFF">취소</button>
+<button type="button" onClick="{{save}}" style="flex: 2 1 0; height: 54px; border-radius: 27px; font-size: 16px; border: none; background: #1A1A1A; color: #FFFFFF"><sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}">저장</sc-if><sc-if value="{{isCreate}}" hint-placeholder-val="{{false}}">만들기</sc-if></button>
+</div>
+</div></sc-if><sc-if value="{{isDelete}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="카테고리 삭제 확인" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">‘오디오 케이블·DAC’을 삭제할까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>상품 2개는 홈의 ‘정보 보완 필요’로 옮겨져요</li><li>거기서 카테고리를 다시 고를 수 있어요</li><li>아카이브 기록은 바뀌지 않아요</li><li>되돌릴 수 없어요</li></ul>
+<sc-if value="{{hasItems}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{toggleDelList}}" style="all: unset; cursor: pointer; min-height: 44px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; border-bottom: 1px solid #E2E2E2">옮겨지는 상품 {{cCount}}개<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6 6-6"></path></svg></button>
+<sc-if value="{{delList}}" hint-placeholder-val="{{false}}"><div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px"><sc-for list="{{delItems}}" as="d" hint-placeholder-count="2"><div style="display: flex; align-items: center; gap: 10px; font-size: 14px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: #C9C9C9"></span>{{d.name}}</div></sc-for></div></sc-if></sc-if>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{closeDelete}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font-size: 16px">취소</button><a href="CategoryHome.dc.html" style="flex: 1 1 0; height: 52px; border-radius: 26px; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px">삭제</a></div>
+</div></sc-if><sc-if value="{{isDiscard}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="변경 사항을 버릴까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">변경 사항을 버릴까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>편집한 내용이 저장되지 않아요</li></ul>
+
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{keepEditing}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font-size: 16px">계속 편집</button><button type="button" onClick="{{discardAll}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1A1A1A; color: #FFFFFF; font-size: 16px">버리기</button></div>
+</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = Object.assign({ menu: false, sheet: null, del: false, delList: false, dirty: false, discard: false, newTop: "디지털·IT" }, {"del": true, "delList": true}); }
+renderVals() {
+const s = this.state;
+const c = {"name": "오디오 케이블·DAC", "top": "디지털·IT", "count": 2, "desc": "헤드폰에 연결하는 DAC와 교체용 케이블", "examples": ["포터블 DAC", "이어폰 케이블"], "items": ["FiiO BTR7", "오디오퀘스트 DragonFly Red"]};
+const items = [{"name": "FiiO BTR7", "price": "₩259,000", "imgStyle": "aspect-ratio: 1 / 1; border-radius: 16px; background: #C9C9C9", "meta": "fiio.com · 3일 전 확인"}, {"name": "오디오퀘스트 DragonFly Red", "price": "₩299,000", "imgStyle": "aspect-ratio: 4 / 5; border-radius: 16px; background: #C9C9C9", "meta": "29CM · 1주 전 확인"}];
+const tax = [{"top": "패션·잡화"}, {"top": "뷰티·퍼스널케어"}, {"top": "디지털·IT"}, {"top": "가구·인테리어"}, {"top": "생활·주방·가전"}, {"top": "스포츠·아웃도어·여행"}, {"top": "취미·문화·컬렉터블"}, {"top": "유아·키즈"}, {"top": "반려동물"}, {"top": "자동차·모빌리티"}, {"top": "건강·웰빙"}];
+return {
+left: items.filter((_, i) => i % 2 === 0), right: items.filter((_, i) => i % 2 === 1), hasList: items.length > 0, emptyList: items.length === 0,
+menuOpen: s.menu, toggleMenu: () => this.setState({ menu: !s.menu }), closeMenu: () => this.setState({ menu: false }),
+openEdit: () => this.setState({ menu: false, sheet: 'edit', dirty: false }),
+isEdit: s.sheet === 'edit', isCreate: false, sheetOpen: !!s.sheet,
+closeSheet: () => s.dirty ? this.setState({ discard: true }) : this.setState({ sheet: null }),
+markDirty: () => { if (!s.dirty) this.setState({ dirty: true }); },
+isDiscard: s.discard, keepEditing: () => this.setState({ discard: false }), discardAll: () => this.setState({ discard: false, sheet: null, dirty: false }),
+save: () => this.setState({ sheet: null, dirty: false }),
+cName: c.name, cTop: c.top, cDesc: c.desc, cCount: c.count, hasItems: c.count > 0, noItems: c.count === 0,
+cExamples: c.examples.map((e) => ({ name: e })), exCount: c.examples.length + ' / 5',
+renameNote: c.count ? '이름을 바꾸면 상품 ' + c.count + '개에 바로 반영돼요' : '',
+tops: tax.map((t) => ({ name: t.top, on: s.newTop === t.top, off: s.newTop !== t.top, pick: () => this.setState({ newTop: t.top }) })),
+openDelete: () => this.setState({ menu: false, sheet: null, del: true, delList: false }),
+isDelete: s.del, closeDelete: () => this.setState({ del: false }),
+delList: s.delList, toggleDelList: () => this.setState({ delList: !s.delList }),
+delItems: c.items.map((n) => ({ name: n }))
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>끝난 비교 상세 구매 없음</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1A1A1A;text-decoration:none}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; color: #1A1A1A; font-family: 'IBM Plex Sans KR', sans-serif">
+<div data-scroll="1" onScroll="{{onScroll}}" style="position: absolute; inset: 0; overflow-y: auto; background: #E4E4E4">
+<section style="padding: 52px 20px 32px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; min-height: 44px">
+<sc-if value="{{view}}" hint-placeholder-val="{{true}}"><a href="ArchiveList.dc.html" aria-label="뒤로" style="width: 44px; height: 44px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg></a><button type="button" onClick="{{toggleMenu}}" aria-label="더보기" style="border: none; width: 44px; height: 44px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg></button></sc-if>
+<sc-if value="{{edit}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{cancel}}" style="height: 44px; padding: 0 16px; border-radius: 22px; border: none; background: #FFFFFF; font-size: 15px">취소</button></sc-if>
+</div>
+<div style="font-size: 13px; color: #444444">끝난 비교 · 8월 30일 종료</div>
+<sc-if value="{{view}}" hint-placeholder-val="{{true}}"><h1 style="margin: 0; font-size: 30px; font-weight: 700; line-height: 1.25">기계식 키보드</h1></sc-if>
+<sc-if value="{{edit}}" hint-placeholder-val="{{false}}"><label style="display: block; margin: 0 -8px"><span style="position: absolute; left: -9999px">기록 제목</span><input type="text" defaultValue="기계식 키보드" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 2px 8px; border: none; border-radius: 8px; background: rgba(255,255,255,0.7); font: inherit; font-size: 30px; font-weight: 700; line-height: 1.25; color: #1A1A1A"></label><p style="margin: 0; font-size: 13px; color: #444444">제목만 바뀌어요. 다른 목적의 이름은 바뀌지 않아요.</p></sc-if>
+<sc-if value="{{edit}}" hint-placeholder-val="{{false}}"><div style="display: flex"><button type="button" onClick="{{save}}" style="height: 44px; padding: 0 22px; border-radius: 22px; border: none; background: #1A1A1A; color: #FFFFFF; font-size: 14px">저장</button></div></sc-if>
+</section>
+<section data-sheet="1" style="min-height: 740px; border-radius: 28px 28px 0 0; background: #FFFFFF; padding: 0 20px 140px; display: flex; flex-direction: column; gap: 24px">
+<sc-if value="{{view}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{toggleCollapse}}" aria-label="{{handleLabel}}" style="all: unset; cursor: grab; align-self: stretch; height: 28px; margin-bottom: -16px; display: flex; align-items: center; justify-content: center"><span style="width: 40px; height: 5px; border-radius: 3px; background: #BDBDBD"></span></button></sc-if>
+
+
+<section style="display: flex; flex-direction: column">
+<h2 style="margin: 0 0 14px; font-size: 13px; font-weight: 500; color: #6B6B6B">비교한 후보 3</h2>
+<div style="display: flex; gap: 10px; align-items: flex-start"><div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><div style="display: flex; flex-direction: column; gap: 8px"><div style="position: relative; aspect-ratio: 1 / 1; border-radius: 16px; background: #C9C9C9"></div><div style="display: flex; flex-direction: column; gap: 3px; padding: 0 2px"><div style="font-size: 14px; line-height: 1.35">키크론 Q1 Pro</div><div style="font-size: 12px; color: #6B6B6B">키보드</div></div></div><div style="display: flex; flex-direction: column; gap: 8px"><div style="position: relative; aspect-ratio: 3 / 4; border-radius: 16px; background: #C9C9C9"></div><div style="display: flex; flex-direction: column; gap: 3px; padding: 0 2px"><div style="font-size: 14px; line-height: 1.35">리얼포스 R3</div><div style="font-size: 12px; color: #6B6B6B">키보드</div></div></div></div><div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 20px"><div style="display: flex; flex-direction: column; gap: 8px"><div style="position: relative; aspect-ratio: 4 / 5; border-radius: 16px; background: #C9C9C9"></div><div style="display: flex; flex-direction: column; gap: 3px; padding: 0 2px"><div style="font-size: 14px; line-height: 1.35">레오폴드 FC900R</div><div style="font-size: 12px; color: #6B6B6B">키보드</div></div></div></div></div>
+</section>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: #6B6B6B">종료 당시의 목적 이름과 카테고리로 보관돼요. 이후 카테고리나 목적을 바꿔도 이 기록은 바뀌지 않아요.</p>
+</section>
+</div>
+<div aria-label="접힌 헤더" style="position: absolute; left: 0; right: 0; top: 0; z-index: 4; box-sizing: border-box; padding: 52px 20px 12px; display: flex; align-items: center; gap: 10px; {{barStyle}}"><a href="ArchiveList.dc.html" aria-label="뒤로" style="border: none; width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg></a><span style="flex-grow: 1; min-width: 0; font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">기계식 키보드</span><button type="button" onClick="{{toggleMenu}}" aria-label="더보기" style="border: none; width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg></button><span aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 100%; height: 20px; {{barBg}}"><span style="position: absolute; inset: 0; border-radius: 28px 28px 0 0; background: #FFFFFF"></span></span></div>
+<nav aria-label="하단 탭" style="position: absolute; left: 16px; right: 16px; bottom: 24px; z-index: 5; height: 64px; box-sizing: border-box; padding: 8px; border-radius: 32px; background: #1A1A1A; display: flex; align-items: center; justify-content: space-between"><a href="Home.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #FFFFFF; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>홈</a><a href="CategoryHome.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #FFFFFF; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect></svg>카테고리</a><a href="PurposeHome.dc.html" aria-current="page" style="flex-grow: 1; height: 48px; border-radius: 24px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; color: #1A1A1A; font-size: 15px; font-weight: 700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="8" width="16" height="12" rx="3"></rect><path d="M7 5h10"></path></svg>목적</a></nav>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{closeMenu}}" aria-label="메뉴 닫기" style="all: unset; position: absolute; inset: 0; z-index: 8"></button>
+<div style="position: absolute; right: 20px; top: 104px; z-index: 9; width: 188px; padding: 6px 0; border-radius: 18px; background: #FFFFFF; border: 1.5px solid #D6D6D6; display: flex; flex-direction: column">
+<button type="button" onClick="{{startEdit}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 10px; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>제목 수정</button>
+<button type="button" onClick="{{openRestore}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 10px; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 14L4 9l5-5"></path><path d="M4 9h11a5 5 0 0 1 0 10h-3"></path></svg>비교 다시 열기</button>
+<button type="button" onClick="{{openDelete}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 48px; padding: 0 16px; display: flex; align-items: center; gap: 10px; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"></path></svg>기록 삭제</button>
+</div></sc-if>
+<sc-if value="{{isRestore}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 12; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="비교를 다시 열까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 13; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">비교를 다시 열까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>목적과 후보 3개가 비교 중으로 돌아가요</li><li>이 기록은 끝난 비교에서 사라져요</li></ul>
+
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{closeRestore}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font-size: 16px">취소</button><a href="PurposeHome.dc.html" style="flex: 1 1 0; height: 52px; border-radius: 26px; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px">다시 열기</a></div>
+</div></sc-if>
+<sc-if value="{{isDelete}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 12; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="기록을 삭제할까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 13; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">기록을 삭제할까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>기록 전체가 삭제돼요</li><li>되돌릴 수 없어요</li></ul>
+<button type="button" onClick="{{toggleDelList}}" style="all: unset; cursor: pointer; min-height: 44px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; border-bottom: 1px solid #E2E2E2">함께 삭제되는 후보 기록 3개<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6 6-6"></path></svg></button>
+<sc-if value="{{delList}}" hint-placeholder-val="{{false}}"><div style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px"><div style="display: flex; align-items: center; gap: 10px; font-size: 14px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: #C9C9C9"></span>키크론 Q1 Pro</div><div style="display: flex; align-items: center; gap: 10px; font-size: 14px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: #C9C9C9"></span>레오폴드 FC900R</div><div style="display: flex; align-items: center; gap: 10px; font-size: 14px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: #C9C9C9"></span>리얼포스 R3</div></div></sc-if>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{closeDelete}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font-size: 16px">취소</button><a href="ArchiveList.dc.html" style="flex: 1 1 0; height: 52px; border-radius: 26px; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px">삭제</a></div>
+</div></sc-if>
+<sc-if value="{{isDiscard}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 12; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="변경 사항 버리기 확인" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 13; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">변경 사항을 버릴까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>편집한 내용이 저장되지 않아요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{keepEditing}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font-size: 16px">계속 편집</button><button type="button" onClick="{{discardAll}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1A1A1A; color: #FFFFFF; font-size: 16px">버리기</button></div>
+</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = Object.assign({ menu: false, edit: false, dirty: false, discard: false, restore: false, del: false, delList: false }, {}); }
+renderVals() {
+const v = this._rv();
+const c = !!this.state.collapsed;
+return Object.assign(v, {
+barStyle: 'background: #E4E4E4' + '; transition: opacity 220ms ease, transform 220ms ease;' + (c ? 'opacity: 1; transform: none;' : 'opacity: 0; transform: translateY(-8px); pointer-events: none;'),
+barBg: 'background: #E4E4E4',
+handleLabel: c ? '헤더 펼치기' : '목록 넓게 보기',
+onScroll: (e) => { const top = e.currentTarget.scrollTop; const sheet = e.currentTarget.querySelector('[data-sheet]'); const t = sheet ? sheet.offsetTop - 108 - 24 : 180; const n = top > t; if (n !== c) this.setState({ collapsed: n }); },
+toggleCollapse: (e) => { const sc = e.currentTarget.closest('[data-scroll]'); const sheet = sc && sc.querySelector('[data-sheet]'); if (!sc || !sheet) return; sc.scrollTo({ top: c ? 0 : sheet.offsetTop - 108, behavior: 'smooth' }); }
+});
+}
+_rv() {
+const s = this.state;
+return {
+view: !s.edit, edit: s.edit,
+menuOpen: s.menu, toggleMenu: () => this.setState({ menu: !s.menu }), closeMenu: () => this.setState({ menu: false }),
+startEdit: () => this.setState({ edit: true, menu: false, dirty: false }),
+cancel: () => s.dirty ? this.setState({ discard: true }) : this.setState({ edit: false }),
+save: () => this.setState({ edit: false, dirty: false }),
+markDirty: () => { if (!s.dirty) this.setState({ dirty: true }); },
+isDiscard: s.discard, keepEditing: () => this.setState({ discard: false }), discardAll: () => this.setState({ discard: false, edit: false, dirty: false }),
+isRestore: s.restore, openRestore: () => this.setState({ restore: true, menu: false }), closeRestore: () => this.setState({ restore: false }),
+isDelete: s.del, openDelete: () => this.setState({ del: true, menu: false, delList: false }), closeDelete: () => this.setState({ del: false }),
+delList: s.delList, toggleDelList: () => this.setState({ delList: !s.delList })
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>홈 로그인 전</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1A1A1A;text-decoration:none}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; color: #1A1A1A; font-family: 'IBM Plex Sans KR', sans-serif">
+<div style="position: absolute; inset: 0; overflow-y: auto">
+<div style="padding: 56px 20px 140px; display: flex; flex-direction: column; gap: 24px">
+<header style="display: flex; align-items: flex-start; justify-content: space-between">
+<div style="display: flex; flex-direction: column; gap: 4px"><h1 style="margin: 0; font-size: 32px; font-weight: 700">홈</h1><div style="font-size: 14px; color: #6B6B6B">로그인 전</div></div>
+<a href="SettingsLoggedOut.dc.html" aria-label="설정" style="width: 44px; height: 44px; border-radius: 22px; background: #F0F0F0; display: flex; align-items: center; justify-content: center; color: #1A1A1A"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg></a>
+</header>
+<section style="padding: 18px; border-radius: 22px; border: 2px solid #1A1A1A; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 18px; font-weight: 700">로그인하면 정보를 가져와요</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6"><li>저장한 링크의 이름·사진·가격을 채워요</li><li>다른 기기에서도 볼 수 있어요</li></ul>
+<a href="Login.dc.html" style="height: 48px; border-radius: 24px; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 15px">로그인</a>
+</section>
+<section style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 500; color: #6B6B6B">할 일</h2>
+<div style="border-radius: 22px; background: #F0F0F0; overflow: hidden">
+<button type="button" onClick="{{toggle}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; padding: 16px; display: flex; align-items: center; gap: 14px">
+<span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 700">분석 대기</span><span style="font-size: 13px; color: #6B6B6B">로그인하면 바로 정보를 가져와요</span></span>
+<span style="font-size: 28px; font-weight: 700">3</span>
+<sc-if value="{{closed}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9l6 6 6-6"></path></svg></sc-if><sc-if value="{{open}}" hint-placeholder-val="{{true}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 15l6-6 6 6"></path></svg></sc-if>
+</button>
+<sc-if value="{{open}}" hint-placeholder-val="{{true}}"><div style="padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px"><div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 16px; background: #FFFFFF"><span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: #E4E4E4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 500">musinsa.com</span><span style="font-size: 12px; color: #6B6B6B">2일 전 저장 · 이 기기에만 있어요</span></span><a href="#" style="min-height: 44px; display: flex; align-items: center; font-size: 13px; color: #1A1A1A">원본</a></div><div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 16px; background: #FFFFFF"><span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: #E4E4E4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 500">coupang.com</span><span style="font-size: 12px; color: #6B6B6B">어제 저장 · 이 기기에만 있어요</span></span><a href="#" style="min-height: 44px; display: flex; align-items: center; font-size: 13px; color: #1A1A1A">원본</a></div><div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 16px; background: #FFFFFF"><span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: #E4E4E4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 500">ohou.se</span><span style="font-size: 12px; color: #6B6B6B">방금 저장 · 이 기기에만 있어요</span></span><a href="#" style="min-height: 44px; display: flex; align-items: center; font-size: 13px; color: #1A1A1A">원본</a></div></div></sc-if>
+</div>
+</section>
+</div>
+</div>
+<nav aria-label="하단 탭" style="position: absolute; left: 16px; right: 16px; bottom: 24px; z-index: 2; height: 64px; box-sizing: border-box; padding: 8px; border-radius: 32px; background: #1A1A1A; display: flex; align-items: center; justify-content: space-between"><a href="Home.dc.html" aria-current="page" style="flex-grow: 1; height: 48px; border-radius: 24px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; color: #1A1A1A; font-size: 15px; font-weight: 700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>홈</a><a href="CategoryHome.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #FFFFFF; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect></svg>카테고리</a><a href="PurposeHome.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #FFFFFF; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="8" width="16" height="12" rx="3"></rect><path d="M7 5h10"></path></svg>목적</a></nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = { open: true }; }
+renderVals() { return { open: this.state.open, closed: !this.state.open, toggle: () => this.setState({ open: !this.state.open }) }; }
+}
+</script>
+</body>
+</html>
