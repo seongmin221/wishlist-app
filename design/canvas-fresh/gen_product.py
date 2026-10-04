@@ -49,7 +49,7 @@ def menu(items):
 
 def bottom_bar():
     return """<div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 12px 20px 36px; background: [[bg]]; display: flex; gap: 10px">
-<sc-if value="{{view}}" hint-placeholder-val="{{true}}"><a href="#" style="flex: 1 1 0; height: 56px; border-radius: 28px; background: [[inv]]; color: [[inv_text]]; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">원본 보기[[EXT]]</a></sc-if>
+<sc-if value="{{view}}" hint-placeholder-val="{{true}}"><a href="FWebView[[s]].dc.html" style="flex: 1 1 0; height: 56px; border-radius: 28px; background: [[inv]]; color: [[inv_text]]; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">원본 보기[[EXT]]</a></sc-if>
 <sc-if value="{{edit}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{cancel}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: [[card]]; color: [[text]]; font-size: 16px; font-weight: 500">취소</button><button type="button" onClick="{{save}}" style="flex: 2 1 0; height: 56px; border-radius: 28px; border: none; background: [[inv]]; color: [[inv_text]]; font-size: 16px; font-weight: 700">저장</button></sc-if>
 </div>"""
 
@@ -272,7 +272,7 @@ def processing_board(theme, title, init):
 <span style="[[lbl13:sub]]">방금 저장</span>
 </div>
 </div>
-<div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 12px 20px 36px; background: [[bg]]"><a href="#" style="height: 56px; border-radius: 28px; background: [[inv]]; color: [[inv_text]]; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">원본 보기[[EXT]]</a></div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 12px 20px 36px; background: [[bg]]"><a href="FWebView[[s]].dc.html" style="height: 56px; border-radius: 28px; background: [[inv]]; color: [[inv_text]]; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">원본 보기[[EXT]]</a></div>
 {menu([("openDelete", "[[TRASH]]", "삭제")])}{dlg}
 </div>
 """

@@ -496,7 +496,7 @@ def home_board(theme):
 <div style="padding: 56px 20px 140px; display: flex; flex-direction: column; gap: 32px">
 <header style="display: flex; align-items: flex-start; justify-content: space-between">
 <div style="display: flex; flex-direction: column; gap: 6px"><h1 style="margin: 0; font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 28px; line-height: 1.0">홈</h1><span style="{lbl(13, T['sub'])}">할 일 7개</span></div>
-<a href="#" aria-label="설정" style="width: 44px; height: 44px; border-radius: 22px; background: {T['card']}; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg></a>
+<a href="FSettings{s}.dc.html" aria-label="설정" style="width: 44px; height: 44px; border-radius: 22px; background: {T['card']}; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg></a>
 </header>
 <section style="display: flex; flex-direction: column; gap: 12px">
 <h2 style="margin: 0; font-size: 13px; font-weight: 500; color: {T['sub']}">할 일</h2>

@@ -236,12 +236,12 @@ def purpose_detail(theme, title, init, empty=False):
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><p style="{desc_box}">{pdesc}</p></sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block"><span style="position: absolute; left: -9999px">목적 설명</span><input type="text" defaultValue="{pdesc}" placeholder="설명 · 선택" onInput="{{{{markDirty}}}}" class="ed" style="{desc_box}; {edit_bg}"></label></sc-if>
 </div>
-<sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><div style="display: flex; gap: 8px"><button type="button" onClick="{{{{openAdd}}}}" style="{pill}; background: [[card]]; color: [[text]]">[[PLUS]]후보 추가</button>
-<sc-if value="{{{{hasItems}}}}" hint-placeholder-val="{{{{true}}}}"><button type="button" onClick="{{{{end}}}}" style="{pill}; background: [[inv]]; color: [[inv_text]]">[[ARCHIVE]]비교 끝내기</button></sc-if></div></sc-if>
-<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><div style="display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 28px; background: [[card]]; color: [[text]]">
+<div aria-hidden="{{{{edit}}}}" style="display: flex; gap: 8px; overflow: hidden; transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease; {{{{viewRowStyle}}}}"><button type="button" onClick="{{{{openAdd}}}}" style="{pill}; background: [[card]]; color: [[text]]">[[PLUS]]후보 추가</button>
+<sc-if value="{{{{hasItems}}}}" hint-placeholder-val="{{{{true}}}}"><button type="button" onClick="{{{{end}}}}" style="{pill}; background: [[inv]]; color: [[inv_text]]">[[ARCHIVE]]비교 끝내기</button></sc-if></div>
+<div aria-hidden="{{{{view}}}}" style="display: flex; flex-direction: column; gap: 16px; overflow: hidden; transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease; {{{{editBlockStyle}}}}"><div style="display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 28px; background: [[card]]; color: [[text]]">
 <span style="font-size: 13px; color: [[sub]]">색</span>{color_picker()}
 <span style="font-size: 13px; color: [[sub]]">아이콘 · 필수</span>{icon_picker("[[inv]]", "[[inv_text]]", "[[tile]]", "[[text]]")}</div>
-<div style="display: flex; gap: 8px"><button type="button" onClick="{{{{cancel}}}}" style="{pill}; padding: 0 22px; background: [[card]]; color: [[text]]">취소</button><button type="button" onClick="{{{{save}}}}" style="{pill}; padding: 0 24px; background: [[inv]]; color: [[inv_text]]; font-weight: 700">저장</button></div></sc-if>
+<div style="display: flex; gap: 8px"><button type="button" onClick="{{{{cancel}}}}" style="{pill}; padding: 0 22px; background: [[card]]; color: [[text]]">취소</button><button type="button" onClick="{{{{save}}}}" style="{pill}; padding: 0 24px; background: [[inv]]; color: [[inv_text]]; font-weight: 700">저장</button></div></div>
 </section>
 <section data-sheet="1" style="min-height: 740px; box-sizing: border-box; border-radius: 36px 36px 0 0; background: [[sheet]]; color: [[text]]; padding: 0 16px 140px; display: flex; flex-direction: column; gap: 12px">
 <button type="button" onClick="{{{{toggleCollapse}}}}" aria-label="{{{{handleLabel}}}}" style="all: unset; cursor: grab; align-self: stretch; height: 28px; display: flex; align-items: center; justify-content: center"><span style="width: 40px; height: 5px; border-radius: 3px; background: [[handle]]"></span></button>
@@ -368,6 +368,8 @@ hasItems: items.length > 0, isEmpty: items.length === 0, count: items.length,
 left: items.filter((_, i) => i % 2 === 0), right: items.filter((_, i) => i % 2 === 1),
 headStyle: 'background: ' + palette[s.color].face, doneFace: palette[s.color].face,
 view: !s.edit, edit: s.edit,
+viewRowStyle: s.edit ? 'max-height: 0; opacity: 0; margin-top: -16px; pointer-events: none' : 'max-height: 60px; opacity: 1; margin-top: 0',
+editBlockStyle: s.edit ? 'max-height: 420px; opacity: 1; margin-top: 0' : 'max-height: 0; opacity: 0; margin-top: -16px; pointer-events: none',
 menuOpen: s.menu, toggleMenu: () => this.setState({{ menu: !s.menu }}), closeMenu: () => this.setState({{ menu: false }}),
 startEdit: (e) => {{ const root = e.currentTarget.closest('[data-root]'); const sc = root && root.querySelector('[data-scroll]'); if (sc && sc.scrollTop > 0) {{ this._snap = true; sc.scrollTo({{ top: 0, behavior: 'smooth' }}); clearTimeout(this._st); this._st = setTimeout(() => {{ this._snap = false; this._last = 0; }}, 450); }} this.setState({{ edit: true, menu: false, dirty: false, collapsed: false }}); }},
 hi: Object.fromEntries(iconKeys.map((k) => ['k_' + k, s.icon === k])),
