@@ -149,12 +149,13 @@ def product_board(theme, title, init, kind="normal", es="gray"):
     elif es == "fill":
         box = box.replace("border-bottom: 1.5px solid transparent", "border-bottom: 0").replace("width: 100%; margin: 0;", "width: calc(100% + 24px); margin: 0 -12px;").replace("border-radius: 0;", "border-radius: 12px;")
         uline = "background: [[card]]"
-    # 두 칸 모두 줄 높이 1.2, 위 2px·아래 4px 여백이라 글자 아래와 밑줄 사이가 같아 보인다
-    brand_box = box + "; height: 24px; padding: 2px 0 4px; font-size: 14px; font-weight: 700; line-height: 1.2"
-    name_box = box + "; height: 34px; padding: 2px 0 4px; font-size: 22px; font-weight: 700; line-height: 1.2"
+    # 한글 글자 아래 끝에서 밑줄까지 3px. 줄 높이를 글자 크기와 같게 두고, 글꼴별로 잰 한글 아래 여백을 빼서 아래 패딩을 정했다.
+    # (IBM Plex Sans KR: 14px 굵게 0.25px, 22px 굵게 0.5px) 영문만 있는 칸은 기준선이 높아 조금 더 떨어진다.
+    brand_box = box + "; height: 20.25px; padding: 3px 0 2.25px; font-size: 14px; font-weight: 700; line-height: 14px"
+    name_box = box + "; height: 28.5px; padding: 3px 0 2.5px; font-size: 22px; font-weight: 700; line-height: 22px; margin-top: 8px"
     if es == "fill":
-        brand_box = brand_box.replace("padding: 2px 0 4px;", "padding: 2px 12px 4px;")
-        name_box = name_box.replace("padding: 2px 0 4px;", "padding: 2px 12px 4px;")
+        brand_box = brand_box.replace("padding: 3px 0 2.25px;", "padding: 3px 12px 2.25px;")
+        name_box = name_box.replace("padding: 3px 0 2.5px;", "padding: 3px 12px 2.5px;")
     row_view = lambda label, val: f'<div style="min-height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 12px"><span style="width: 60px; flex-shrink: 0; font-size: 14px; color: [[sub]]">{label}</span><span style="flex-grow: 1; min-width: 0; display: flex; justify-content: flex-end; font-size: 15px; font-weight: 700">{val}</span></div>'
     row_edit = lambda label, val, on: f'<button type="button" onClick="{{{{{on}}}}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 56px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 12px"><span style="width: 60px; flex-shrink: 0; font-size: 14px; color: [[sub]]">{label}</span><span style="flex-grow: 1; min-width: 0; display: flex; justify-content: flex-end; font-size: 15px; font-weight: 700">{val}</span>{CHEV}</button>'
     cat_val = '<sc-if value="{{hasCat}}" hint-placeholder-val="{{true}}">{{catLabel}}</sc-if><sc-if value="{{noCat}}" hint-placeholder-val="{{false}}"><span style="font-weight: 400; color: [[sub]]">골라 주세요</span></sc-if>'
@@ -169,7 +170,7 @@ def product_board(theme, title, init, kind="normal", es="gray"):
         body = f"""<div style="display: flex; flex-direction: column; gap: 0">
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><div style="{brand_box}">소니</div><div style="{name_box}">WH-1000XM6</div></sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block; position: relative"><span style="position: absolute; left: -9999px">브랜드</span><input type="text" defaultValue="소니" onInput="{{{{markDirty}}}}" class="ed" style="{brand_box}; {uline}">{pen_html}</label><label style="display: block; position: relative"><span style="position: absolute; left: -9999px">제품명</span><input type="text" defaultValue="WH-1000XM6" onInput="{{{{markDirty}}}}" class="ed" style="{name_box}; {uline}">{pen_html}</label></sc-if>
-<div style="display: flex; align-items: baseline; gap: 6px; margin-top: 6px"><span style="font-size: 24px; [[NUM]]">KRW 549,000</span></div>
+<div style="display: flex; align-items: baseline; gap: 6px; margin-top: 10px"><span style="font-size: 24px; [[NUM]]">KRW 549,000</span></div>
 <div style="margin-top: 4px; font-size: 13px; line-height: 1.5; word-break: keep-all; color: [[sub]]">2일 전 확인한 가격이에요. 지금 가격은 원본에서 확인해 주세요.</div>
 </div>
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}">{group(row_view("카테고리", cat_val) + row_view("목적", pur_val))}</sc-if>
