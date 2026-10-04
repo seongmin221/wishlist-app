@@ -50,7 +50,7 @@ def menu(items):
 def bottom_bar():
     return """<div style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 12px 20px 36px; background: [[bg]]; display: flex; gap: 10px">
 <sc-if value="{{view}}" hint-placeholder-val="{{true}}"><a href="#" style="flex: 1 1 0; height: 56px; border-radius: 28px; background: [[inv]]; color: [[inv_text]]; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">원본 보기[[EXT]]</a></sc-if>
-<sc-if value="{{edit}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{save}}" style="flex: 2 1 0; height: 56px; border-radius: 28px; border: none; background: [[inv]]; color: [[inv_text]]; font-size: 16px; font-weight: 700">저장</button><button type="button" onClick="{{cancel}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: [[card]]; color: [[text]]; font-size: 16px; font-weight: 500">취소</button></sc-if>
+<sc-if value="{{edit}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{cancel}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: [[card]]; color: [[text]]; font-size: 16px; font-weight: 500">취소</button><button type="button" onClick="{{save}}" style="flex: 2 1 0; height: 56px; border-radius: 28px; border: none; background: [[inv]]; color: [[inv_text]]; font-size: 16px; font-weight: 700">저장</button></sc-if>
 </div>"""
 
 
@@ -107,7 +107,7 @@ def category_sheet():
 <div style="align-self: center; width: 40px; height: 5px; margin-top: 10px; border-radius: 3px; background: [[handle]]"></div>
 <div style="padding: 8px 12px 12px 20px; display: flex; align-items: center; gap: 8px">
 <sc-if value="{{{{create}}}}" hint-placeholder-val="{{{{false}}}}"><button type="button" onClick="{{{{endCreate}}}}" aria-label="뒤로" style="width: 44px; height: 44px; margin-left: -8px; flex-shrink: 0; border-radius: 22px; border: none; background: [[tile]]; color: [[text]]; display: flex; align-items: center; justify-content: center">[[BACK]]</button></sc-if>
-<h2 style="flex-grow: 1; margin: 0; font-size: 20px; font-weight: 700"><sc-if value="{{{{notCreate}}}}" hint-placeholder-val="{{{{true}}}}">카테고리 선택</sc-if><sc-if value="{{{{create}}}}" hint-placeholder-val="{{{{false}}}}">새 세부 카테고리</sc-if></h2>
+<h2 style="flex-grow: 1; margin: 0; font-size: 20px; font-weight: 700"><sc-if value="{{{{notCreate}}}}" hint-placeholder-val="{{{{true}}}}">카테고리 선택</sc-if><sc-if value="{{{{create}}}}" hint-placeholder-val="{{{{false}}}}">신규 카테고리</sc-if></h2>
 <button type="button" onClick="{{{{closeCat}}}}" aria-label="닫기" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; border: none; background: [[tile]]; color: [[text]]; display: flex; align-items: center; justify-content: center">[[X]]</button>
 </div>
 <sc-if value="{{{{notCreate}}}}" hint-placeholder-val="{{{{true}}}}"><div style="flex-grow: 1; min-height: 0; display: flex; border-top: 1px solid [[line]]">
@@ -115,8 +115,8 @@ def category_sheet():
 <div style="flex-grow: 1; min-width: 0; padding: 4px 16px 36px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px">
 <h3 style="margin: 0; min-height: 44px; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: [[sub]]">{{{{curTop}}}}</h3>
 <div style="display: flex; flex-wrap: wrap; gap: 8px">
-<sc-for list="{{{{chips}}}}" as="c" hint-placeholder-count="8"><sc-if value="{{{{c.on}}}}" hint-placeholder-val="{{{{false}}}}"><button type="button" onClick="{{{{c.pick}}}}" aria-pressed="true" style="{chip}; background: [[inv]]; color: [[inv_text]]; font-weight: 700">[[CHECK]]{{{{c.name}}}}</button></sc-if><sc-if value="{{{{c.off}}}}" hint-placeholder-val="{{{{true}}}}"><button type="button" onClick="{{{{c.pick}}}}" style="{chip}; background: [[tile]]; color: [[text]]">{{{{c.name}}}}</button></sc-if></sc-for>
-<button type="button" onClick="{{{{startCreate}}}}" style="{chip}; border: 1.5px dashed [[sub]]; color: [[sub]]">[[PLUS]]새 세부 카테고리</button>
+<sc-for list="{{{{chips}}}}" as="c" hint-placeholder-count="8"><sc-if value="{{{{c.on}}}}" hint-placeholder-val="{{{{false}}}}"><button type="button" onClick="{{{{c.pick}}}}" aria-pressed="true" style="{chip}; background: [[inv]]; color: [[inv_text]]; font-weight: 700">{{{{c.name}}}}</button></sc-if><sc-if value="{{{{c.off}}}}" hint-placeholder-val="{{{{true}}}}"><button type="button" onClick="{{{{c.pick}}}}" style="{chip}; background: [[tile]]; color: [[text]]">{{{{c.name}}}}</button></sc-if></sc-for>
+<button type="button" onClick="{{{{startCreate}}}}" style="{chip}; border: 1.5px dashed [[sub]]; color: [[sub]]">[[PLUS]]카테고리</button>
 </div></div></div></sc-if>
 <sc-if value="{{{{create}}}}" hint-placeholder-val="{{{{false}}}}"><div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 8px 20px 36px; border-top: 1px solid [[line]]; display: flex; flex-direction: column; gap: 20px">
 <p style="margin: 8px 0 0; font-size: 14px; line-height: 1.5; word-break: keep-all; color: [[sub]]">‘{{{{curTop}}}}’ 아래에 나만 쓰는 세부 카테고리를 만들어요. 공용 카테고리는 바뀌지 않아요.</p>
@@ -136,8 +136,8 @@ def product_board(theme, title, init, kind="normal"):
     bg, st, fl = PHOTO["white"]
     # 보기와 편집에서 같은 칸에 두고, 편집이면 밑줄만 보인다
     box = "box-sizing: border-box; width: 100%; margin: 0; padding: 4px 0; border: none; border-bottom: 1.5px solid transparent; border-radius: 0; background: transparent; font-family: 'IBM Plex Sans KR', sans-serif; color: [[text]]; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
-    brand_box = box + "; height: 30px; font-size: 14px; font-weight: 700; line-height: 1.5"
-    name_box = box + "; height: 40px; font-size: 22px; font-weight: 700; line-height: 1.4"
+    brand_box = box + "; height: 24px; padding: 1px 0; font-size: 14px; font-weight: 700; line-height: 1.5"
+    name_box = box + "; height: 34px; padding: 1px 0; font-size: 22px; font-weight: 700; line-height: 1.4"
     uline = "border-bottom-color: [[text]]"
     row_view = lambda label, val: f'<div style="min-height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 12px"><span style="width: 60px; flex-shrink: 0; font-size: 14px; color: [[sub]]">{label}</span><span style="flex-grow: 1; min-width: 0; display: flex; justify-content: flex-end; font-size: 15px; font-weight: 700">{val}</span></div>'
     row_edit = lambda label, val, on: f'<button type="button" onClick="{{{{{on}}}}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 56px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 12px"><span style="width: 60px; flex-shrink: 0; font-size: 14px; color: [[sub]]">{label}</span><span style="flex-grow: 1; min-width: 0; display: flex; justify-content: flex-end; font-size: 15px; font-weight: 700">{val}</span>{CHEV}</button>'
@@ -150,11 +150,11 @@ def product_board(theme, title, init, kind="normal"):
         photo = f"""<div style="padding: 108px 20px 0"><div style="position: relative; aspect-ratio: 1 / 1; box-sizing: border-box; padding: 56px; border-radius: 20px; background: {bg}; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="100%" height="100%" viewBox="0 0 48 48" fill="none" stroke="{st}" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="{fl}"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="{fl}"></rect></svg>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><button type="button" onClick="{{{{markDirty}}}}" style="position: absolute; right: 12px; bottom: 12px; height: 40px; padding: 0 16px 0 12px; border-radius: 20px; border: none; background: [[inv]]; color: [[inv_text]]; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500">{CAM}사진 변경</button></sc-if></div></div>
 """
-        body = f"""<div style="display: flex; flex-direction: column; gap: 2px">
+        body = f"""<div style="display: flex; flex-direction: column; gap: 0">
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><div style="{brand_box}">소니</div><div style="{name_box}">WH-1000XM6</div></sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block"><span style="position: absolute; left: -9999px">브랜드</span><input type="text" defaultValue="소니" onInput="{{{{markDirty}}}}" style="{brand_box}; {uline}"></label><label style="display: block"><span style="position: absolute; left: -9999px">제품명</span><input type="text" defaultValue="WH-1000XM6" onInput="{{{{markDirty}}}}" style="{name_box}; {uline}"></label></sc-if>
-<div style="display: flex; align-items: baseline; gap: 6px; margin-top: 8px"><span style="font-size: 24px; [[NUM]]">₩549,000</span><span style="[[lbl12:sub]]">KRW</span></div>
-<div style="margin-top: 6px; font-size: 13px; line-height: 1.5; word-break: keep-all; color: [[sub]]">2일 전 확인한 가격이에요. 지금 가격은 원본에서 확인해 주세요.</div>
+<div style="display: flex; align-items: baseline; gap: 6px; margin-top: 6px"><span style="font-size: 24px; [[NUM]]">₩549,000</span></div>
+<div style="margin-top: 4px; font-size: 13px; line-height: 1.5; word-break: keep-all; color: [[sub]]">2일 전 확인한 가격이에요. 지금 가격은 원본에서 확인해 주세요.</div>
 </div>
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}">{group(row_view("카테고리", cat_val) + row_view("목적", pur_val))}</sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}">{group(row_edit("카테고리", cat_val, "openCat") + row_edit("목적", pur_val, "openSheet"))}</sc-if>
@@ -278,7 +278,7 @@ BOARDS = [
     ("FProductEdit", "상품 · 그 자리에서 편집"),
     ("FProductPurposeSheet", "상품 · 편집 · 목적 선택 시트"),
     ("FProductCategoryPicker", "상품 · 편집 · 카테고리 선택 시트"),
-    ("FProductCategoryCreate", "상품 · 편집 · 새 세부 카테고리"),
+    ("FProductCategoryCreate", "상품 · 편집 · 신규 카테고리"),
     ("FProductDeleteConfirm", "상품 · 삭제 확인 (도움말 펼침)"),
     ("FProductFill", "상품 · 정보 보완 필요"),
     ("FProductFillEdit", "상품 · 정보 보완 필요 · 편집"),
@@ -296,7 +296,7 @@ def main():
         boards[f"FProductEdit{th}"] = product_board(th, f"{nm} 상품 편집", "{ edit: true }")
         boards[f"FProductPurposeSheet{th}"] = product_board(th, f"{nm} 상품 목적 선택", "{ edit: true, sheet: true }")
         boards[f"FProductCategoryPicker{th}"] = product_board(th, f"{nm} 상품 카테고리 선택", "{ edit: true, catSheet: true }")
-        boards[f"FProductCategoryCreate{th}"] = product_board(th, f"{nm} 새 세부 카테고리", "{ edit: true, catSheet: true, create: true }")
+        boards[f"FProductCategoryCreate{th}"] = product_board(th, f"{nm} 신규 카테고리", "{ edit: true, catSheet: true, create: true }")
         boards[f"FProductDeleteConfirm{th}"] = product_board(th, f"{nm} 상품 삭제 확인", "{ del: true, help: true }")
         boards[f"FProductFill{th}"] = product_board(th, f"{nm} 상품 정보 보완 필요", "{}", kind="fill")
         boards[f"FProductFillEdit{th}"] = product_board(th, f"{nm} 상품 정보 보완 편집", "{ edit: true }", kind="fill")

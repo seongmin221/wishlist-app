@@ -240,7 +240,7 @@ def purpose_detail(theme, title, init, empty=False):
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><div style="display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 28px; background: [[card]]; color: [[text]]">
 <span style="font-size: 13px; color: [[sub]]">색</span>{color_picker()}
 <span style="font-size: 13px; color: [[sub]]">아이콘 · 필수</span>{icon_picker("[[inv]]", "[[inv_text]]", "[[tile]]", "[[text]]")}</div>
-<div style="display: flex; gap: 8px"><button type="button" onClick="{{{{save}}}}" style="{pill}; padding: 0 24px; background: [[inv]]; color: [[inv_text]]; font-weight: 700">저장</button><button type="button" onClick="{{{{cancel}}}}" style="{pill}; padding: 0 22px; background: [[card]]; color: [[text]]">취소</button></div></sc-if>
+<div style="display: flex; gap: 8px"><button type="button" onClick="{{{{cancel}}}}" style="{pill}; padding: 0 22px; background: [[card]]; color: [[text]]">취소</button><button type="button" onClick="{{{{save}}}}" style="{pill}; padding: 0 24px; background: [[inv]]; color: [[inv_text]]; font-weight: 700">저장</button></div></sc-if>
 </section>
 <section data-sheet="1" style="min-height: 740px; box-sizing: border-box; border-radius: 36px 36px 0 0; background: [[sheet]]; color: [[text]]; padding: 0 16px 140px; display: flex; flex-direction: column; gap: 12px">
 <button type="button" onClick="{{{{toggleCollapse}}}}" aria-label="{{{{handleLabel}}}}" style="all: unset; cursor: grab; align-self: stretch; height: 28px; display: flex; align-items: center; justify-content: center"><span style="width: 40px; height: 5px; border-radius: 3px; background: [[handle]]"></span></button>
