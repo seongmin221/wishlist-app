@@ -222,7 +222,7 @@ def purpose_detail(theme, title, init, empty=False):
     item_line = lambda with_price: f'<sc-for list="{{{{all}}}}" as="a" hint-placeholder-count="5"><div style="display: flex; align-items: center; gap: 12px; font-size: 14px">{thumb("a", 36, 10, 4)}<span style="flex-grow: 1; min-width: 0">{{{{a.name}}}}</span>' + ('<span style="font-size: 13px; [[NUM]] color: [[sub]]">{{a.price}}</span>' if with_price else "") + "</div></sc-for>"
     tpl = f"""<div data-root="1" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: [[bg]]; color: [[text]]; font-family: 'IBM Plex Sans KR', sans-serif">
 <div data-scroll="1" onScroll="{{{{onScroll}}}}" style="position: absolute; inset: 0; overflow-y: auto; {{{{headStyle}}}}">
-<section style="padding: 52px 20px 52px; display: flex; flex-direction: column; gap: 16px; color: #1D1D1D">
+<section style="padding: 52px 20px 28px; display: flex; flex-direction: column; gap: 16px; color: #1D1D1D">
 <div style="display: flex; justify-content: space-between; min-height: 44px">
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><a href="FPurposeHome[[s]].dc.html" aria-label="뒤로" style="{white_btn}">[[BACK]]</a><button type="button" onClick="{{{{toggleMenu}}}}" aria-label="더보기" style="{white_btn}">[[MORE]]</button></sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><button type="button" onClick="{{{{cancel}}}}" aria-label="뒤로" style="{white_btn}">[[BACK]]</button></sc-if>

@@ -102,7 +102,7 @@ def detail_board(theme, key, title, init):
     mi = lambda on, icon, label: f'<button type="button" onClick="{{{{{on}}}}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 52px; padding: 0 18px; display: flex; align-items: center; gap: 12px; font-size: 15px">{icon}{label}</button>'
     tpl = f"""<div data-root="1" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: [[bg]]; color: [[text]]; font-family: 'IBM Plex Sans KR', sans-serif">
 <div data-scroll="1" onScroll="{{{{onScroll}}}}" style="position: absolute; inset: 0; overflow-y: auto; background: {face}">
-<section style="padding: 52px 20px 52px; display: flex; flex-direction: column; gap: 16px">
+<section style="padding: 52px 20px 28px; display: flex; flex-direction: column; gap: 16px">
 <div style="display: flex; justify-content: space-between; min-height: 44px">
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><a href="FArchiveList[[s]].dc.html" aria-label="뒤로" style="{btn}">[[BACK]]</a><button type="button" onClick="{{{{toggleMenu}}}}" aria-label="더보기" style="{btn}">[[MORE]]</button></sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><button type="button" onClick="{{{{cancel}}}}" aria-label="뒤로" style="{btn}">[[BACK]]</button></sc-if>
@@ -114,8 +114,8 @@ def detail_board(theme, key, title, init):
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><h1 style="flex-grow: 1; min-width: 0; {name_box}">{r['title']}</h1></sc-if>
 <sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="flex-grow: 1; min-width: 0; display: block"><span style="position: absolute; left: -9999px">기록 제목</span><input type="text" class="ed" defaultValue="{r['title']}" onInput="{{{{markDirty}}}}" style="{name_box}; border-bottom-color: [[dash]]"></label></sc-if>
 </div>
-<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><p style="margin: 0; font-size: 13px; line-height: 1.5; word-break: keep-all; color: [[sub]]">제목만 바뀌어요. 다른 목적의 이름은 바뀌지 않아요.</p>
-<div style="display: flex; gap: 8px"><button type="button" onClick="{{{{cancel}}}}" style="{pill}; padding: 0 22px; background: [[card]]; color: [[text]]; font-weight: 500">취소</button><button type="button" onClick="{{{{save}}}}" style="{pill}; padding: 0 24px; background: [[inv]]; color: [[inv_text]]; font-weight: 700">저장</button></div></sc-if>
+<div aria-hidden="{{{{view}}}}" style="display: flex; flex-direction: column; gap: 10px; overflow: hidden; transition: max-height 260ms ease, opacity 200ms ease, margin-top 260ms ease; {{{{extraStyle}}}}"><p style="margin: 0; font-size: 13px; line-height: 1.5; word-break: keep-all; color: [[sub]]">제목만 바뀌어요. 다른 목적의 이름은 바뀌지 않아요.</p>
+<div style="display: flex; gap: 8px"><button type="button" onClick="{{{{cancel}}}}" style="{pill}; padding: 0 22px; background: [[card]]; color: [[text]]; font-weight: 500">취소</button><button type="button" onClick="{{{{save}}}}" style="{pill}; padding: 0 24px; background: [[inv]]; color: [[inv_text]]; font-weight: 700">저장</button></div></div>
 </div>
 </section>
 <section data-sheet="1" style="min-height: 740px; box-sizing: border-box; border-radius: 36px 36px 0 0; background: [[sheet]]; color: [[text]]; padding: 0 16px 140px; display: flex; flex-direction: column; gap: 12px">
@@ -147,6 +147,7 @@ return {{
 left: items.filter((_, i) => i % 2 === 0), right: items.filter((_, i) => i % 2 === 1),
 hi: {json.dumps(hi)},
 view: !s.edit, edit: s.edit,
+extraStyle: s.edit ? 'max-height: 120px; opacity: 1; margin-top: 0' : 'max-height: 0; opacity: 0; margin-top: -10px; pointer-events: none',
 menuOpen: s.menu, toggleMenu: () => this.setState({{ menu: !s.menu }}), closeMenu: () => this.setState({{ menu: false }}),
 startEdit: (e) => {{ const root = e.currentTarget.closest('[data-root]'); const sc = root && root.querySelector('[data-scroll]'); if (sc && sc.scrollTop > 0) {{ this._snap = true; sc.scrollTo({{ top: 0, behavior: 'smooth' }}); clearTimeout(this._st); this._st = setTimeout(() => {{ this._snap = false; this._last = 0; }}, 450); }} this.setState({{ edit: true, menu: false, dirty: false, collapsed: false }}); }},
 cancel: () => s.dirty ? this.setState({{ discard: true }}) : this.setState({{ edit: false }}),
