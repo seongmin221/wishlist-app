@@ -129,16 +129,32 @@ def category_sheet():
 </div></sc-if>"""
 
 
-def product_board(theme, title, init, kind="normal"):
+def product_board(theme, title, init, kind="normal", es="gray"):
+    """es: 편집 표시 방식. line(먹색 밑줄), gray(회색 밑줄), pencil(연필 아이콘), fill(면)"""
     """kind: normal(일반 상품), fill(정보 보완 필요)"""
     T = THEMES[theme]
     s = theme
     bg, st, fl = PHOTO["white"]
     # 보기와 편집에서 같은 칸에 두고, 편집이면 밑줄만 보인다
     box = "box-sizing: border-box; width: 100%; margin: 0; padding: 4px 0; border: none; border-bottom: 1.5px solid transparent; border-radius: 0; background: transparent; font-family: 'IBM Plex Sans KR', sans-serif; color: [[text]]; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
-    brand_box = box + "; height: 24px; padding: 1px 0; font-size: 14px; font-weight: 700; line-height: 1.5"
-    name_box = box + "; height: 34px; padding: 1px 0; font-size: 22px; font-weight: 700; line-height: 1.4"
     uline = "border-bottom-color: [[text]]"
+    pen_html = ""
+    if es == "gray":
+        box = box.replace("border-bottom: 1.5px solid transparent", "border-bottom: 1px solid transparent")
+        uline = "border-bottom-color: [[dash]]"
+    elif es == "pencil":
+        box = box.replace("border-bottom: 1.5px solid transparent", "border-bottom: 0")
+        uline = "padding-right: 32px"
+        pen_html = '<span aria-hidden="true" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: [[sub]]; display: flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="M13 7l4 4"></path></svg></span>'
+    elif es == "fill":
+        box = box.replace("border-bottom: 1.5px solid transparent", "border-bottom: 0").replace("width: 100%; margin: 0;", "width: calc(100% + 24px); margin: 0 -12px;").replace("border-radius: 0;", "border-radius: 12px;")
+        uline = "background: [[card]]"
+    # 두 칸 모두 줄 높이 1.2, 위 2px·아래 4px 여백이라 글자 아래와 밑줄 사이가 같아 보인다
+    brand_box = box + "; height: 24px; padding: 2px 0 4px; font-size: 14px; font-weight: 700; line-height: 1.2"
+    name_box = box + "; height: 34px; padding: 2px 0 4px; font-size: 22px; font-weight: 700; line-height: 1.2"
+    if es == "fill":
+        brand_box = brand_box.replace("padding: 2px 0 4px;", "padding: 2px 12px 4px;")
+        name_box = name_box.replace("padding: 2px 0 4px;", "padding: 2px 12px 4px;")
     row_view = lambda label, val: f'<div style="min-height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 12px"><span style="width: 60px; flex-shrink: 0; font-size: 14px; color: [[sub]]">{label}</span><span style="flex-grow: 1; min-width: 0; display: flex; justify-content: flex-end; font-size: 15px; font-weight: 700">{val}</span></div>'
     row_edit = lambda label, val, on: f'<button type="button" onClick="{{{{{on}}}}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 56px; padding: 0 12px 0 16px; display: flex; align-items: center; gap: 12px"><span style="width: 60px; flex-shrink: 0; font-size: 14px; color: [[sub]]">{label}</span><span style="flex-grow: 1; min-width: 0; display: flex; justify-content: flex-end; font-size: 15px; font-weight: 700">{val}</span>{CHEV}</button>'
     cat_val = '<sc-if value="{{hasCat}}" hint-placeholder-val="{{true}}">{{catLabel}}</sc-if><sc-if value="{{noCat}}" hint-placeholder-val="{{false}}"><span style="font-weight: 400; color: [[sub]]">골라 주세요</span></sc-if>'
@@ -152,7 +168,7 @@ def product_board(theme, title, init, kind="normal"):
 """
         body = f"""<div style="display: flex; flex-direction: column; gap: 0">
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><div style="{brand_box}">소니</div><div style="{name_box}">WH-1000XM6</div></sc-if>
-<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block"><span style="position: absolute; left: -9999px">브랜드</span><input type="text" defaultValue="소니" onInput="{{{{markDirty}}}}" style="{brand_box}; {uline}"></label><label style="display: block"><span style="position: absolute; left: -9999px">제품명</span><input type="text" defaultValue="WH-1000XM6" onInput="{{{{markDirty}}}}" style="{name_box}; {uline}"></label></sc-if>
+<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block; position: relative"><span style="position: absolute; left: -9999px">브랜드</span><input type="text" defaultValue="소니" onInput="{{{{markDirty}}}}" class="ed" style="{brand_box}; {uline}">{pen_html}</label><label style="display: block; position: relative"><span style="position: absolute; left: -9999px">제품명</span><input type="text" defaultValue="WH-1000XM6" onInput="{{{{markDirty}}}}" class="ed" style="{name_box}; {uline}">{pen_html}</label></sc-if>
 <div style="display: flex; align-items: baseline; gap: 6px; margin-top: 6px"><span style="font-size: 24px; [[NUM]]">KRW 549,000</span></div>
 <div style="margin-top: 4px; font-size: 13px; line-height: 1.5; word-break: keep-all; color: [[sub]]">2일 전 확인한 가격이에요. 지금 가격은 원본에서 확인해 주세요.</div>
 </div>

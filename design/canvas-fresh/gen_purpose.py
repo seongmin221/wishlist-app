@@ -208,9 +208,10 @@ def purpose_detail(theme, title, init, empty=False):
     white_btn = "border: none; width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: [[card]]; color: [[text]]; display: flex; align-items: center; justify-content: center"
     pill = "height: 44px; padding: 0 18px 0 14px; border-radius: 22px; border: none; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 500"
     # 보기와 편집에서 이름·설명 칸의 크기와 여백을 같게 두고, 편집일 때만 반투명 면을 깐다
-    name_box = "box-sizing: border-box; width: 100%; height: 46px; margin: 0; padding: 6px 0; border: none; border-bottom: 1.5px solid transparent; border-radius: 0; background: transparent; font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 28px; line-height: 1.2; color: #1D1D1D; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
-    desc_box = "box-sizing: border-box; width: 100%; height: 36px; margin: 0; padding: 6px 0; border: none; border-bottom: 1.5px solid transparent; border-radius: 0; background: transparent; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 15px; line-height: 1.5; color: #1D1D1D; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
-    edit_bg = "border-bottom-color: #1D1D1D"
+    # 도현은 줄 안에서 글자가 위쪽에 앉아 아래 여백을 0으로 두어야 설명 칸과 밑줄 간격이 같아진다
+    name_box = "box-sizing: border-box; width: 100%; height: 38px; margin: 0; padding: 2px 0 0; border: none; border-bottom: 1px solid transparent; border-radius: 0; background: transparent; font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 28px; line-height: 1.2; color: #1D1D1D; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
+    desc_box = "box-sizing: border-box; width: 100%; height: 30px; margin: 0; padding: 4px 0 6px; border: none; border-bottom: 1px solid transparent; border-radius: 0; background: transparent; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 15px; line-height: 1.2; color: #1D1D1D; outline: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
+    edit_bg = "border-bottom-color: rgba(29,29,29,0.35)"
     radio_on = '<span style="width: 24px; height: 24px; flex-shrink: 0; border-radius: 12px; background: [[inv]]; color: [[inv_text]]; display: flex; align-items: center; justify-content: center">[[CHECK]]</span>'
     radio_off = '<span style="width: 24px; height: 24px; flex-shrink: 0; box-sizing: border-box; border-radius: 12px; border: 2px solid [[dash]]"></span>'
     chip = lambda on: ("all: unset; cursor: pointer; flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 20px; display: flex; align-items: center; gap: 4px; font-size: 14px; white-space: nowrap; "
@@ -230,10 +231,10 @@ def purpose_detail(theme, title, init, empty=False):
 <div style="display: flex; align-items: center; gap: 12px">
 <span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; background: [[card]]; color: [[text]]; display: flex; align-items: center; justify-content: center">{icon_switch("hi", 22)}</span>
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><h1 style="flex-grow: 1; min-width: 0; {name_box}">{pname}</h1></sc-if>
-<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="flex-grow: 1; min-width: 0; display: block"><span style="position: absolute; left: -9999px">목적 이름</span><input type="text" defaultValue="{pname}" onInput="{{{{markDirty}}}}" style="{name_box}; {edit_bg}"></label></sc-if>
+<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="flex-grow: 1; min-width: 0; display: block"><span style="position: absolute; left: -9999px">목적 이름</span><input type="text" defaultValue="{pname}" onInput="{{{{markDirty}}}}" class="ed" style="{name_box}; {edit_bg}"></label></sc-if>
 </div>
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><p style="{desc_box}">{pdesc}</p></sc-if>
-<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block"><span style="position: absolute; left: -9999px">목적 설명</span><input type="text" defaultValue="{pdesc}" placeholder="설명 · 선택" onInput="{{{{markDirty}}}}" style="{desc_box}; {edit_bg}"></label></sc-if>
+<sc-if value="{{{{edit}}}}" hint-placeholder-val="{{{{false}}}}"><label style="display: block"><span style="position: absolute; left: -9999px">목적 설명</span><input type="text" defaultValue="{pdesc}" placeholder="설명 · 선택" onInput="{{{{markDirty}}}}" class="ed" style="{desc_box}; {edit_bg}"></label></sc-if>
 </div>
 <sc-if value="{{{{view}}}}" hint-placeholder-val="{{{{true}}}}"><div style="display: flex; gap: 8px"><button type="button" onClick="{{{{openAdd}}}}" style="{pill}; background: [[card]]; color: [[text]]">[[PLUS]]후보 추가</button>
 <sc-if value="{{{{hasItems}}}}" hint-placeholder-val="{{{{true}}}}"><button type="button" onClick="{{{{end}}}}" style="{pill}; background: [[inv]]; color: [[inv_text]]">[[ARCHIVE]]비교 끝내기</button></sc-if></div></sc-if>

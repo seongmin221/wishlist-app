@@ -85,6 +85,7 @@ body{{margin:0}}
 button{{font:inherit;color:inherit}}
 a{{color:{T['text']};text-decoration:none}}a:hover{{color:{T['sub']}}}
 input::placeholder{{color:{T['sub']}}}
+input.ed:focus{{border-bottom-color:currentColor !important}}
 </style>
 </helmet>
 """
