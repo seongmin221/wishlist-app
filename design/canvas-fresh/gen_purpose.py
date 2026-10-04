@@ -154,7 +154,7 @@ def purpose_home(theme, title, init):
 <div style="padding: 20px 20px 0"><button type="button" onClick="{{{{openCreate}}}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 56px; border-radius: 28px; border: 1.5px dashed [[sub]]; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">[[PLUS]]목적 추가</button></div>
 <section style="padding: 32px 20px 140px; display: flex; flex-direction: column; gap: 12px">
 <h2 style="margin: 0; font-size: 13px; font-weight: 500; color: [[sub]]">끝난 비교</h2>
-<a href="#" style="box-sizing: border-box; min-height: 64px; padding: 0 16px; border-radius: 28px; background: [[card]]; display: flex; align-items: center; gap: 12px">
+<a href="FArchiveList[[s]].dc.html" style="box-sizing: border-box; min-height: 64px; padding: 0 16px; border-radius: 28px; background: [[card]]; display: flex; align-items: center; gap: 12px">
 <span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 14px; background: [[icon_tile]]; display: flex; align-items: center; justify-content: center">[[ARCHIVE]]</span>
 <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 3px"><span style="display: flex; align-items: baseline; gap: 6px; font-size: 16px; font-weight: 700">아카이브<span style="font-size: 16px; [[NUM]]">2</span></span><span style="[[lbl12:sub]]">겨울 패딩 · 기계식 키보드</span></span>[[RIGHT]]</a>
 </section>

@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from gen_purpose import purpose_home, purpose_detail
 
 LINKS = [("FPurposeDetailEmpty", "VisPurposeDetail"), ("FPurposeDetail", "VisPurposeDetail"), ("FPurposeHome", "VisPurpose"),
-         ("FCategoryHome", "VisCategory"), ("FHome", "VisHome"), ("FProductDetail{}.dc.html", "#")]
+         ("FCategoryHome", "VisCategory"), ("FHome", "VisHome"), ("FProductDetail{}.dc.html", "#"), ("FArchiveList{}.dc.html", "#")]
 
 
 def relink(html, th):
