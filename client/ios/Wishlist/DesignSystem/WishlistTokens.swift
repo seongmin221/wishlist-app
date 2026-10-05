@@ -39,6 +39,9 @@ struct WLColors {
     let underline: Color
     let handle: Color
     let onInverse: Color
+    let tabPill: Color
+    let onTabBar: Color
+    let onTabPill: Color
     let scrimDim: Color
 
     static let light = WLColors(
@@ -56,6 +59,9 @@ struct WLColors {
         underline: WishlistTokens.Light.underline,
         handle: WishlistTokens.Light.handle,
         onInverse: WishlistTokens.Light.onInverse,
+        tabPill: WishlistTokens.Light.tabPill,
+        onTabBar: WishlistTokens.Light.onTabBar,
+        onTabPill: WishlistTokens.Light.onTabPill,
         scrimDim: WishlistTokens.Light.scrimDim
     )
 
@@ -74,6 +80,9 @@ struct WLColors {
         underline: WishlistTokens.Dark.underline,
         handle: WishlistTokens.Dark.handle,
         onInverse: WishlistTokens.Dark.onInverse,
+        tabPill: WishlistTokens.Dark.tabPill,
+        onTabBar: WishlistTokens.Dark.onTabBar,
+        onTabPill: WishlistTokens.Dark.onTabPill,
         scrimDim: WishlistTokens.Dark.scrimDim
     )
 }
@@ -94,6 +103,9 @@ enum WishlistTokens {
         static let underline = Color(wlHex: 0xBDBDBD)
         static let handle = Color(wlHex: 0xDCDCDC)
         static let onInverse = Color(wlHex: 0xFFFFFF)
+        static let tabPill = Color(wlHex: 0xFFFFFF)
+        static let onTabBar = Color(wlHex: 0xFFFFFF)
+        static let onTabPill = Color(wlHex: 0x1D1D1D)
         static let scrimDim = Color.black.opacity(0.24)
     }
 
@@ -112,6 +124,9 @@ enum WishlistTokens {
         static let underline = Color(wlHex: 0x5A5958)
         static let handle = Color(wlHex: 0x4A4948)
         static let onInverse = Color(wlHex: 0x1D1D1D)
+        static let tabPill = Color(wlHex: 0xF4F3F0)
+        static let onTabBar = Color(wlHex: 0xF4F3F0)
+        static let onTabPill = Color(wlHex: 0x1D1D1D)
         static let scrimDim = Color.black.opacity(0.45)
     }
 
@@ -214,16 +229,28 @@ enum WishlistTokens {
         static let pushPhotoOpen: Int = 420
         static let pushPhotoBack: Int = 360
         static let pushSurfaceExpand: Int = 420
+        static let pushPhotoContent: Int = 420
+        static let pushPhotoBackContent: Int = 250
+        static let pushSurfaceLift: Int = 80
+        static let pushSurfaceContentDelay: Int = 190
+        static let pushSurfaceContent: Int = 230
         static let pushSurfaceBack: Int = 360
+        static let pushSurfaceBackContent: Int = 180
+        static let pushSurfaceSettle: Int = 80
         static let tabOutgoing: Int = 90
         static let tabIncoming: Int = 210
         static let tabIncomingDelay: Int = 90
         static let tabPill: Int = 250
+        static let tabLabelSwapAt: Int = 125
         static let overflowMenu: Int = 150
         static let disclosureArrow: Int = 200
         static let disclosureContent: Int = 200
         static let sheetDragDismissDistanceRatio: Double = 0.25
         static let sheetDragDismissVelocity: Double = 1000
         static let interactiveBackCommitProgress: Double = 0.5
+        static let pushSurfaceLiftOutset: Double = 3
+        static let pushSurfaceLiftShadowY: Double = 8
+        static let pushSurfaceLiftShadowBlur: Double = 24
+        static let pushSurfaceLiftShadowAlpha: Double = 0.14
     }
 }

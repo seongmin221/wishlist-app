@@ -21,6 +21,9 @@ data class WLColors(
     val underline: Color,
     val handle: Color,
     val onInverse: Color,
+    val tabPill: Color,
+    val onTabBar: Color,
+    val onTabPill: Color,
     val scrimDim: Color,
 )
 
@@ -39,6 +42,9 @@ val LightColors = WLColors(
     underline = WishlistTokens.Light.underline,
     handle = WishlistTokens.Light.handle,
     onInverse = WishlistTokens.Light.onInverse,
+    tabPill = WishlistTokens.Light.tabPill,
+    onTabBar = WishlistTokens.Light.onTabBar,
+    onTabPill = WishlistTokens.Light.onTabPill,
     scrimDim = WishlistTokens.Light.scrimDim,
 )
 
@@ -57,6 +63,9 @@ val DarkColors = WLColors(
     underline = WishlistTokens.Dark.underline,
     handle = WishlistTokens.Dark.handle,
     onInverse = WishlistTokens.Dark.onInverse,
+    tabPill = WishlistTokens.Dark.tabPill,
+    onTabBar = WishlistTokens.Dark.onTabBar,
+    onTabPill = WishlistTokens.Dark.onTabPill,
     scrimDim = WishlistTokens.Dark.scrimDim,
 )
 
@@ -76,6 +85,9 @@ object WishlistTokens {
         val underline = Color(0xFFBDBDBD)
         val handle = Color(0xFFDCDCDC)
         val onInverse = Color(0xFFFFFFFF)
+        val tabPill = Color(0xFFFFFFFF)
+        val onTabBar = Color(0xFFFFFFFF)
+        val onTabPill = Color(0xFF1D1D1D)
         val scrimDim = Color.Black.copy(alpha = 0.24f)
     }
 
@@ -94,6 +106,9 @@ object WishlistTokens {
         val underline = Color(0xFF5A5958)
         val handle = Color(0xFF4A4948)
         val onInverse = Color(0xFF1D1D1D)
+        val tabPill = Color(0xFFF4F3F0)
+        val onTabBar = Color(0xFFF4F3F0)
+        val onTabPill = Color(0xFF1D1D1D)
         val scrimDim = Color.Black.copy(alpha = 0.45f)
     }
 
@@ -196,16 +211,28 @@ object WishlistTokens {
         const val pushPhotoOpen: Int = 420
         const val pushPhotoBack: Int = 360
         const val pushSurfaceExpand: Int = 420
+        const val pushPhotoContent: Int = 420
+        const val pushPhotoBackContent: Int = 250
+        const val pushSurfaceLift: Int = 80
+        const val pushSurfaceContentDelay: Int = 190
+        const val pushSurfaceContent: Int = 230
         const val pushSurfaceBack: Int = 360
+        const val pushSurfaceBackContent: Int = 180
+        const val pushSurfaceSettle: Int = 80
         const val tabOutgoing: Int = 90
         const val tabIncoming: Int = 210
         const val tabIncomingDelay: Int = 90
         const val tabPill: Int = 250
+        const val tabLabelSwapAt: Int = 125
         const val overflowMenu: Int = 150
         const val disclosureArrow: Int = 200
         const val disclosureContent: Int = 200
         const val sheetDragDismissDistanceRatio: Float = 0.25f
         const val sheetDragDismissVelocity: Float = 1000f
         const val interactiveBackCommitProgress: Float = 0.5f
+        const val pushSurfaceLiftOutset: Float = 3f
+        const val pushSurfaceLiftShadowY: Float = 8f
+        const val pushSurfaceLiftShadowBlur: Float = 24f
+        const val pushSurfaceLiftShadowAlpha: Float = 0.14f
     }
 }

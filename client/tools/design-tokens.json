@@ -58,6 +58,18 @@
         "value": "#FFFFFF",
         "source": "2026-10-05 board"
       },
+      "tabPill": {
+        "value": "#FFFFFF",
+        "source": "2026-10-02 board (탭 바)"
+      },
+      "onTabBar": {
+        "value": "#FFFFFF",
+        "source": "2026-10-02 board (탭 바)"
+      },
+      "onTabPill": {
+        "value": "#1D1D1D",
+        "source": "2026-10-02 board (탭 바)"
+      },
       "scrimDim": {
         "value": 0.24,
         "source": "2026-10-05"
@@ -119,6 +131,18 @@
       "onInverse": {
         "value": "#1D1D1D",
         "source": "2026-10-05 board"
+      },
+      "tabPill": {
+        "value": "#F4F3F0",
+        "source": "2026-10-02 board (탭 바)"
+      },
+      "onTabBar": {
+        "value": "#F4F3F0",
+        "source": "2026-10-02 board (탭 바)"
+      },
+      "onTabPill": {
+        "value": "#1D1D1D",
+        "source": "2026-10-02 board (탭 바)"
       },
       "scrimDim": {
         "value": 0.45,
