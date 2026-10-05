@@ -77,3 +77,5 @@
 - [B0 Task 8 IO와 자원 수명](b0-task-8-runtime-resources-2026-10-05.md) — 역할 pool·client 재사용·종료 gate·실제 발행과 취소
 
 - [B0 전체 구현·검증 기록](b0-foundation-implementation.md) — Task 1~9·전체 회귀·쓰기 감사·legacy rollout·B1 인계
+
+- [B0 외부 리뷰 보완](b0-review-hardening-2026-10-05.md) — 시간 상한·동시 발행·오류 관측·DB 시각·PENDING 복구 설계

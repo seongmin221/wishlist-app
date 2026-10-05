@@ -1,9 +1,12 @@
 package app.extraction
 
+import app.analysis.WorkerExecution
+import java.time.Duration
 import java.net.InetAddress
 import java.net.Proxy
 import java.net.URI
 import java.util.concurrent.TimeUnit
+import okhttp3.ConnectionPool
 import okhttp3.Call
 import okhttp3.Dns
 import okhttp3.OkHttpClient
@@ -18,6 +21,7 @@ class SafeHttpTransport : AutoCloseable {
         .followRedirects(false)
         .followSslRedirects(false)
         .retryOnConnectionFailure(false)
+        .connectionPool(ConnectionPool(0, 1, TimeUnit.SECONDS))
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .callTimeout(15, TimeUnit.SECONDS)
@@ -41,7 +45,7 @@ class SafeHttpTransport : AutoCloseable {
         val call = synchronized(lock) {
             check(!closed) { "HTTP transport is closed" }
             // A distinct DNS identity per request prevents reuse of a connection with old pins.
-            sharedClient.newBuilder().dns(Dns { requested ->
+            sharedClient.newBuilder().callTimeout(WorkerExecution.remaining(Duration.ofSeconds(15))).dns(Dns { requested ->
                 if (!requested.equals(host, ignoreCase = true)) throw UnsafeUrlException("unexpected DNS lookup")
                 addresses
             }).build().newCall(Request.Builder().url(url).get().build()).also { activeCalls.add(it) }

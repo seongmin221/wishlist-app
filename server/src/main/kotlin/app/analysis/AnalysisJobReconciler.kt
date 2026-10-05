@@ -4,8 +4,17 @@ import java.sql.Connection
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
+import kotlinx.coroutines.CancellationException
+import org.slf4j.LoggerFactory
 
-class AnalysisJobReconciler(private val dataSource: DataSource) {
+class AnalysisJobReconciler(
+    private val dataSource: DataSource,
+    private val batchSize: Int = 100,
+    private val onFailure: (UUID, Exception) -> Unit = { id, cause ->
+        LoggerFactory.getLogger(AnalysisJobReconciler::class.java).error("Analysis recovery failed jobId={} exceptionType={}", id, cause.javaClass.name)
+    },
+) {
+    init { require(batchSize in 1..1000) }
     fun reconcileExpired(): Int {
         // Discovery has no row locks. Each candidate is rechecked under item -> job locks.
         val candidates = dataSource.connection.use { connection ->
@@ -13,8 +22,9 @@ class AnalysisJobReconciler(private val dataSource: DataSource) {
                 select id,wishlist_item_id,generation,stage,execution_token,lease_until,claimed_item_version
                 from analysis_jobs where stage in ('GENERAL_RUNNING','BROWSER_RUNNING')
                 and (lease_until<=clock_timestamp() or (execution_token is null and lease_until is null and claimed_item_version is null))
-                order by wishlist_item_id,id
+                order by wishlist_item_id,id limit ?
             """.trimIndent()).use { statement ->
+                statement.setInt(1, batchSize)
                 statement.executeQuery().use { rows ->
                     buildList {
                         while (rows.next()) add(Candidate(
@@ -27,7 +37,7 @@ class AnalysisJobReconciler(private val dataSource: DataSource) {
             }
         }
         return candidates.count { candidate ->
-            dataSource.connection.use { connection ->
+            try { dataSource.connection.use { connection ->
                 connection.autoCommit = false
                 try {
                     val changed = recoverLocked(connection, candidate)
@@ -37,6 +47,10 @@ class AnalysisJobReconciler(private val dataSource: DataSource) {
                     connection.rollback()
                     throw cause
                 }
+            } } catch (cause: Exception) {
+                if (cause is CancellationException || cause is InterruptedException) throw cause
+                onFailure(candidate.id, cause)
+                false
             }
         }
     }

@@ -1,5 +1,6 @@
 package app.ai
 
+import app.analysis.WorkerExecution
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -48,7 +49,7 @@ class OpenAiResponsesGateway(
         val responseBody = Json.parseToJsonElement(body).jsonObject
         val countBody = JsonObject(responseBody.filterKeys { it in setOf("model", "input", "text") }).toString()
         val countRequest = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses/input_tokens"))
-            .timeout(Duration.ofSeconds(20))
+            .timeout(WorkerExecution.remaining(Duration.ofSeconds(20)))
             .header("Authorization", "Bearer ${config.apiKey}")
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(countBody))
@@ -62,7 +63,7 @@ class OpenAiResponsesGateway(
         if (count < 0) return GatewayResponse(ClassificationResult.Unusable("invalid_token_count"), null, null)
         if (count > 2000) return GatewayResponse(ClassificationResult.Unusable("input_too_large"), null, null)
         val request = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses"))
-            .timeout(Duration.ofSeconds(70))
+            .timeout(WorkerExecution.remaining(Duration.ofSeconds(70)))
             .header("Authorization", "Bearer ${config.apiKey}")
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body))

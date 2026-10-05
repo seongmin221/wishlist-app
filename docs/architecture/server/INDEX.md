@@ -12,3 +12,5 @@
 | 상품 상태·claim·중간/최종 쓰기 보호·lease 복구·AI 예산 경계 | [wishlist-state-persistence.md](wishlist-state-persistence.md) |
 | 요청 IO·역할별 DB pool·client 재사용·종료 gate | [runtime-resources.md](runtime-resources.md) |
 | B0 전체 회귀·쓰기 감사·legacy rollout·B1 인계 | [완료 기록](../../history/architecture/server/b0-foundation-implementation.md) |
+| B5 오래된 PENDING·queue 소진·미발행 outbox 복구 설계 | [analysis-pending-recovery.md](analysis-pending-recovery.md) |
+| B0 외부 리뷰의 실행 시간·동시 발행·오류·복구 보완 | [보완 기록](../../history/architecture/server/b0-review-hardening-2026-10-05.md) |

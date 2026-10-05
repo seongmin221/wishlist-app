@@ -20,6 +20,34 @@ import app.analysis.*
 import kotlin.test.assertNull
 
 class LlmBudgetServiceTest {
+    @Test fun `reservation flight and default recovery use database clock despite application clock difference`() = withAnalysisDatabase { source ->
+        val claim = newAnalysisClaim(source)
+        val shifted = object : javax.sql.DataSource by source {
+            override fun getConnection(): java.sql.Connection {
+                val connection = source.connection
+                return java.lang.reflect.Proxy.newProxyInstance(java.sql.Connection::class.java.classLoader, arrayOf(java.sql.Connection::class.java)) { _, method, args ->
+                    val result = try { method.invoke(connection, *args.orEmpty()) } catch (cause: java.lang.reflect.InvocationTargetException) { throw cause.targetException }
+                    if (method.name != "createStatement") result else {
+                        val statement = result as java.sql.Statement
+                        java.lang.reflect.Proxy.newProxyInstance(java.sql.Statement::class.java.classLoader, arrayOf(java.sql.Statement::class.java)) { _, sm, sa ->
+                            val actual = if (sm.name == "executeQuery" && sa?.firstOrNull() == "select clock_timestamp()") arrayOf<Any>("select clock_timestamp()+interval '30 seconds'") else sa.orEmpty()
+                            try { sm.invoke(statement, *actual) } catch (cause: java.lang.reflect.InvocationTargetException) { throw cause.targetException }
+                        }
+                    }
+                } as java.sql.Connection
+            }
+        }
+        val budget = LlmBudgetService(shifted)
+        val reservation = assertIs<ReserveResult.Reserved>(budget.reserveBeforeCall(claim, UUID.randomUUID())).reservation
+        fun remaining() = analysisScalar(source, "select extract(epoch from lease_until-clock_timestamp()) from llm_budget_reservations where id='${reservation.id}'")!!.toDouble()
+        kotlin.test.assertTrue(remaining() in 145.0..155.0)
+        budget.markInFlight(reservation.id)
+        kotlin.test.assertTrue(remaining() in 145.0..155.0)
+        analysisSql(source, "update llm_budget_reservations set lease_until=clock_timestamp()+interval '20 seconds' where id='${reservation.id}'")
+        assertEquals(1, budget.reconcileExpired())
+        assertEquals(ReservationState.SETTLED, budget.state(reservation.id))
+    }
+
     @Test fun `expired claim cannot reserve even when request id already exists`() = withAnalysisDatabase { source ->
         val claim = newAnalysisClaim(source)
         val budget = LlmBudgetService(source)

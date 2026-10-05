@@ -17,6 +17,48 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
 class ApiErrorTest {
+    @Test fun `unexpected error logs request id type and frames without sensitive message`() = testApplication {
+        val messages = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val logger = java.lang.reflect.Proxy.newProxyInstance(org.slf4j.Logger::class.java.classLoader, arrayOf(org.slf4j.Logger::class.java)) { _, method, args ->
+            when {
+                method.name == "getName" -> "api-error-test"
+                method.name.startsWith("is") -> true
+                method.name == "error" -> { messages.add(args.orEmpty().joinToString { if (it is Array<*>) it.contentToString() else it.toString() }); null }
+                else -> null
+            }
+        } as org.slf4j.Logger
+        environment { log = logger }
+        application {
+            installApiHttpSupport()
+            routing { get("/boom") { error("credential-and-query-must-not-leak") } }
+        }
+        val response = client.get("/boom")
+        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        val diagnostic = messages.joinToString()
+        assertTrue(diagnostic.contains(response.headers["X-Request-ID"]!!))
+        assertTrue(diagnostic.contains("IllegalStateException"))
+        assertTrue(diagnostic.contains("ApiErrorTest"))
+        assertFalse(diagnostic.contains("credential-and-query-must-not-leak"))
+    }
+
+    @Test fun `Ktor request errors stay client errors with safe envelope`() = testApplication {
+        application {
+            installApiHttpSupport()
+            routing {
+                get("/bad") { throw io.ktor.server.plugins.BadRequestException("sensitive request") }
+                get("/missing") { throw io.ktor.server.plugins.NotFoundException("sensitive path") }
+            }
+        }
+        for ((path, status, code) in listOf(Triple("/bad", HttpStatusCode.BadRequest, "BAD_REQUEST"), Triple("/missing", HttpStatusCode.NotFound, "NOT_FOUND"))) {
+            val response = client.get(path)
+            assertEquals(status, response.status)
+            val envelope = ApiJson.decodeFromString<ApiErrorEnvelope>(response.bodyAsText())
+            assertEquals(code, envelope.error.code)
+            assertEquals(response.headers["X-Request-ID"], envelope.error.requestId)
+            assertFalse(response.bodyAsText().contains("sensitive"))
+        }
+    }
+
     @Test fun `missing authentication keeps unauthorized code and trace`() =
         assertCreateError(HttpStatusCode.Unauthorized, "UNAUTHORIZED", "{}", authenticated = false)
 

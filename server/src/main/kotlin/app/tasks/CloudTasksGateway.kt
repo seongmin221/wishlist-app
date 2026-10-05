@@ -1,6 +1,8 @@
 package app.tasks
 
 import com.google.api.gax.rpc.AlreadyExistsException
+import app.analysis.AnalysisTiming
+import com.google.cloud.tasks.v2.CloudTasksSettings
 import com.google.cloud.tasks.v2.CloudTasksClient
 import com.google.cloud.tasks.v2.HttpMethod
 import com.google.cloud.tasks.v2.HttpRequest
@@ -32,6 +34,17 @@ class CloudTasksGateway(private val client: CloudTasksClient, private val config
     }
 
     companion object {
+        fun clientSettings(): CloudTasksSettings {
+            val builder = CloudTasksSettings.newBuilder()
+            val create = builder.createTaskSettings()
+            create.setRetryableCodes(emptySet<com.google.api.gax.rpc.StatusCode.Code>())
+            create.setRetrySettings(create.retrySettings.toBuilder()
+                .setInitialRpcTimeoutDuration(java.time.Duration.ofSeconds(5))
+                .setMaxRpcTimeoutDuration(java.time.Duration.ofSeconds(5))
+                .setTotalTimeoutDuration(java.time.Duration.ofSeconds(5)).build())
+            return builder.build()
+        }
+
         fun buildTask(config: CloudTasksConfig, task: AnalysisTask): Task {
             val browser = task.type == "BROWSER_ANALYSIS"
             val queue = if (browser) config.browserQueue else config.generalQueue
@@ -41,7 +54,7 @@ class CloudTasksGateway(private val client: CloudTasksClient, private val config
             val body = """{"jobId":"${task.jobId}","generation":${task.generation}}"""
             return Task.newBuilder()
                 .setName("$parent/tasks/${task.name}")
-                .setDispatchDeadline(Duration.newBuilder().setSeconds(105).build())
+                .setDispatchDeadline(Duration.newBuilder().setSeconds(AnalysisTiming.TASK_SECONDS).build())
                 .setHttpRequest(
                     HttpRequest.newBuilder()
                         .setHttpMethod(HttpMethod.POST)

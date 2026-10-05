@@ -21,7 +21,7 @@
 - 삭제에는 expectedVersion이 없다. 편집·보완·검토는 expectedVersion을 요구한다. B0는 이 정책을 정의·검증하며 신규 변경 route는 B7에서 구현한다.
 - 사용자 값·목적 해제·manual completion을 이전 분석이 덮어쓰지 않는다. currentGeneration, executionToken, lease, stage, owner, lifecycle, claimedItemVersion을 함께 확인한다.
 - 내부 Worker payload는 기존 jobId/generation을 유지한다. executionToken은 DB claim에서 만들며 외부 요청이 지정하지 못한다.
-- Worker timeout 90초·Task deadline 105초, 기존 복구 판단 120초를 기준으로 **claim lease 120초**를 사용한다. 임의 heartbeat/lease 연장은 추가하지 않는다. 전체 retry 3회·30분 합산 및 timeout 재구성은 B5이며 B0에서 조용히 정책을 바꾸지 않는다.
+- Worker timeout 90초·Task deadline 105초, 기존 복구 판단 120초를 기준으로 **claim lease 120초**를 사용한다. 임의 heartbeat/lease 연장은 추가하지 않는다. 후속 리뷰 보완에서 처리 80초·전체 Worker 응답 90초 상한을 구현하고 외부 호출이 남은 시간을 공유하도록 했다. 전체 retry 3회·30분 합산 및 timeout 재구성은 B5이며 B0에서 조용히 정책을 바꾸지 않는다.
 - local은 Docker PostgreSQL, 인증/queue/AI fake를 사용한다. 외부 AI opt-in pilot과 production 배포는 실행하지 않는다. runtime 시작 시 Flyway를 실행하지 않는다.
 - 모든 Task는 실패 확인→최소 구현→대상/영향 테스트 통과→문서 갱신→해당 변경만 커밋 순서다. 기존 미커밋 문서 변경을 임의로 섞거나 되돌리지 않는다.
 
@@ -285,3 +285,7 @@ Hikari 버전은 [공식 7.0.2 tag POM](https://github.com/brettwooldridge/Hikar
 B0의 다섯 범위(문서·상태·DTO/owner·claim/결과 보호·DB 실행 기반)를 Task 1~9에 배정했다. 기존 SQL 경로를 기준으로 processor/classifier/budget/reconciler의 빠진 보호를 포함했다. 타입/파일/선행 관계·테스트 명령을 대조하며 B5의 전체 retry budget/runtime 배포와 B1의 GET/mapper 구현은 후속 범위로 유지했다.
 
 계획 작성 당시에는 신규 코드·migration·테스트를 생성하지 않았고 Docker 연결 실패는 실행 준비 항목이었다. 이후 Task 1~9에서 실제 구현과 PostgreSQL 검증을 마쳤다. 전체 151개 중 150개 통과, opt-in RealUrlPilot 1개 skip이며 최종 독립 리뷰의 blocking 지적은 없다. 세부 결과·판단·후속 범위는 완료 기록에 보존한다.
+
+## 완료 후 리뷰 보완
+
+사용자 외부 리뷰의 시간 제한·발행 동시성·오류 관측·복구 batch·DB 예산 시각·SQL 가독성·문서 품질을 보완했다. 실행 당시 판단 29건은 [완료 기록의 한국어 표](../../history/architecture/server/b0-foundation-implementation.md#구현-중-판단-기록)에 보존한다. PENDING 복구와 신규 event 지정 발행은 B5 설계에 추가했다. 상세 변경과 재검증은 [보완 기록](../../history/architecture/server/b0-review-hardening-2026-10-05.md)을 따른다.

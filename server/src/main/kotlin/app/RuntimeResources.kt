@@ -1,26 +1,37 @@
 package app
 
 import java.util.IdentityHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 class RuntimeResources : AutoCloseable {
-    private val lock = Any()
+    private val lock = ReentrantLock()
+    private val drained = lock.newCondition()
+    private var activeWork = 0
     private val seen = IdentityHashMap<AutoCloseable, Boolean>()
     private val resources = mutableListOf<AutoCloseable>()
     private var closed = false
     private var acceptingWork = true
-    val isClosed: Boolean get() = synchronized(lock) { closed }
+    val isClosed: Boolean get() = lock.withLock { closed }
 
     /** Stop waits for admitted synchronous work; later calls cannot begin. */
-    fun stopAcceptingWork() { synchronized(lock) { acceptingWork = false } }
+    fun stopAcceptingWork() = lock.withLock {
+        acceptingWork = false
+        while (activeWork > 0) drained.awaitUninterruptibly()
+    }
 
-    fun runIfOpen(action: () -> Unit): Boolean = synchronized(lock) {
-        if (closed || !acceptingWork) return false
-        action()
-        true
+    fun runIfOpen(action: () -> Unit): Boolean {
+        lock.withLock {
+            if (closed || !acceptingWork) return false
+            activeWork++
+        }
+        try { action(); return true } finally {
+            lock.withLock { activeWork--; if (activeWork == 0) drained.signalAll() }
+        }
     }
 
     fun <T : AutoCloseable> own(resource: T): T {
-        val releaseLate = synchronized(lock) {
+        val releaseLate = lock.withLock {
             if (!closed) {
                 if (seen.put(resource, true) == null) resources.add(resource)
                 return resource
@@ -33,10 +44,12 @@ class RuntimeResources : AutoCloseable {
     }
 
     override fun close() {
-        val toClose = synchronized(lock) {
+        val toClose = lock.withLock {
+            if (closed) return
+            acceptingWork = false
+            while (activeWork > 0) drained.awaitUninterruptibly()
             if (closed) return
             closed = true
-            acceptingWork = false
             resources.asReversed().toList().also { resources.clear() }
         }
         var failure: Throwable? = null

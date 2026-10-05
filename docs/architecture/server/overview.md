@@ -53,7 +53,7 @@ production migration은 API·Worker와 별도의 Neon DB role·credential을 사
 
 기본 인프라는 평균 월 30,000원 상한으로 관리한다. GCP production project에는 월 20,000원 budget alert를 두고 50%·80%·100%에서 알림을 받으며, Neon은 월 10,000원 목표 비용으로 별도 확인한다. 자동 billing·서비스 중단은 하지 않는다. API·Worker latency·오류·instance, Worker 실행 시간·retry, Queue backlog와 저장부터 분석 완료까지의 p95 시간을 비용과 함께 관측한다.
 
-Worker request timeout은 90초, Cloud Tasks task deadline은 105초로 시작한다. 대표 URL 부하 시험에서 전체 완료 p95 5분, timeout·retry 비율과 queue backlog를 확인해 timeout과 capacity를 함께 조정한다.
+처리 예산은 80초, Worker 전체 응답 상한은 90초, Cloud Tasks task deadline은 105초, DB 분석 lease는 120초다. 외부 호출은 남은 처리 예산을 공유한다. retry 전환은 새 outbox를 함께 저장하며 오래된 PENDING 복구는 B5 maintenance에 연결한다. 대표 URL 부하 시험에서 전체 완료 p95 5분, timeout·retry 비율과 queue backlog를 확인해 timeout과 capacity를 함께 조정한다.
 
 production은 전용 Google Cloud project 하나에 Firebase Authentication, Cloud Run, Cloud Tasks, Cloud Scheduler와 Secret Manager를 함께 둔다. Neon은 별도의 production 전용 project·database를 사용한다. staging을 추가할 때는 production 자원을 공유하지 않는다.
 

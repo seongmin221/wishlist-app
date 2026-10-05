@@ -13,6 +13,41 @@ import app.testutil.*
 import app.analysis.AnalysisLane
 
 class GeneralWorkerServiceTest {
+    @Test fun `both worker lanes enforce response deadline and interrupted processing retries durably`() = withAnalysisDatabase { source ->
+        for (lane in AnalysisLane.entries) {
+            val job = newFinishJob(source, lane)
+            val before = analysisScalar(source, "select count(*) from outbox_events")!!.toInt()
+            WorkerExecution(timeoutMillis = 200, processingMillis = 150).use { execution ->
+                val block: () -> ProcessingOutcome = {
+                    try { java.util.concurrent.CountDownLatch(1).await() } catch (_: InterruptedException) { }
+                    ProcessingOutcome.Complete
+                }
+                val result = if (lane == AnalysisLane.GENERAL) GeneralWorkerService(source, execution) { block() }.runGeneral(job.jobId, 1)
+                    else app.browser.BrowserWorkerService(source, { block(); null }, { _, _ -> error("must not classify") }, execution).runBrowser(job.jobId, 1)
+                assertEquals(WorkerDisposition.RETRY, result)
+                val until = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(3)
+                while (analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'") == "${lane.name}_RUNNING" && System.nanoTime() < until) Thread.yield()
+                assertEquals("${lane.name}_PENDING", analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
+                assertEquals(before + 1, analysisScalar(source, "select count(*) from outbox_events")!!.toInt())
+                assertEquals("PROCESSING", analysisScalar(source, "select analysis_status from wishlist_items where id='${job.itemId}'"))
+            }
+        }
+    }
+
+    @Test fun `retry persists new outbox even when duplicate delivery already acknowledged running job`() = withAnalysisDatabase { source ->
+        for (lane in AnalysisLane.entries) {
+            val job = newFinishJob(source, lane)
+            val claim = claimJob(source, job.jobId, lane)
+            val before = analysisScalar(source, "select count(*) from outbox_events")!!.toInt()
+            assertEquals(ClaimResult.Ignored, AnalysisClaimRepository(source).claim(job.jobId, 1, lane))
+            assertEquals(WorkerDisposition.RETRY, AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Retryable))
+            assertEquals(before + 1, analysisScalar(source, "select count(*) from outbox_events")!!.toInt())
+            assertEquals("${lane.name}_PENDING", analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
+            assertEquals(WorkerDisposition.ACKNOWLEDGE, AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Retryable))
+            assertEquals(before + 1, analysisScalar(source, "select count(*) from outbox_events")!!.toInt())
+        }
+    }
+
     @Test fun `user edit holding item lock wins finish race without inverse job locking`() = withAnalysisDatabase { source ->
         val job = newFinishJob(source, AnalysisLane.GENERAL)
         val processing = java.util.concurrent.CountDownLatch(1)

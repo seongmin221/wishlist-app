@@ -4,9 +4,14 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.log
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.NotFoundException
+import io.ktor.server.plugins.UnsupportedMediaTypeException
+import io.ktor.server.plugins.PayloadTooLargeException
 import io.ktor.server.response.respondText
 import io.ktor.util.AttributeKey
 import java.util.UUID
@@ -33,7 +38,21 @@ fun Application.installApiHttpSupport() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             if (cause is CancellationException) throw cause
-            call.respondApiError(HttpStatusCode.InternalServerError, "INTERNAL_ERROR")
+            val clientError = when (cause) {
+                is BadRequestException -> HttpStatusCode.BadRequest to "BAD_REQUEST"
+                is NotFoundException -> HttpStatusCode.NotFound to "NOT_FOUND"
+                is UnsupportedMediaTypeException -> HttpStatusCode.UnsupportedMediaType to "UNSUPPORTED_MEDIA_TYPE"
+                is PayloadTooLargeException -> HttpStatusCode.PayloadTooLarge to "PAYLOAD_TOO_LARGE"
+                else -> null
+            }
+            if (clientError != null) {
+                call.respondApiError(clientError.first, clientError.second)
+            } else {
+                // Exception messages may contain credentials, SQL or user input. Keep type and frames only.
+                call.application.log.error("Unhandled API error requestId={} exceptionType={} stackTrace={}",
+                    call.ensureApiRequestId(), cause.javaClass.name, cause.stackTrace.joinToString("\n"))
+                call.respondApiError(HttpStatusCode.InternalServerError, "INTERNAL_ERROR")
+            }
         }
     }
 }

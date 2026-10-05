@@ -2,6 +2,7 @@ package app
 
 import app.ai.*
 import app.analysis.GeneralWorkerService
+import app.analysis.WorkerExecution
 import app.budget.LlmBudgetService
 import app.extraction.*
 import app.http.*
@@ -54,9 +55,10 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val transport = resources.own(SafeHttpTransport())
         val extractor = HttpMetadataExtractor(UrlSafetyPolicy(), transport::fetch)
         val processor = GeneralExtractionProcessor(source, extractor::extract, classifier::classify)
+        val execution = resources.own(WorkerExecution())
         routing {
             get("/health") { call.respondText("ok") }
-            workerRoutes(GeneralWorkerService(source, processor::process))
+            workerRoutes(GeneralWorkerService(source, execution, processor::process))
         }
         return
     }
@@ -69,7 +71,7 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val config = CloudTasksConfig(env.getValue("TASKS_PROJECT_ID"), env["TASKS_LOCATION"] ?: "asia-southeast1",
             env["GENERAL_QUEUE"] ?: "general-analysis", env["BROWSER_QUEUE"] ?: "browser-analysis", env.getValue("GENERAL_WORKER_URL"),
             env["BROWSER_WORKER_URL"] ?: env.getValue("GENERAL_WORKER_URL"), env.getValue("TASKS_CALLER_SERVICE_ACCOUNT"))
-        val client = resources.own(CloudTasksClient.create())
+        val client = resources.own(CloudTasksClient.create(CloudTasksGateway.clientSettings()))
         OutboxDispatcher(source, CloudTasksGateway(client, config))
     } else null
     val service = CreateWishlistItemService(source) {

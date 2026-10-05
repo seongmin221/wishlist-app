@@ -2,6 +2,7 @@ package app.budget
 
 import app.analysis.AnalysisClaim
 import app.analysis.AnalysisWriteGuard
+import app.analysis.analysisDatabaseTime
 import java.sql.Connection
 import java.sql.Timestamp
 import java.time.Instant
@@ -38,7 +39,7 @@ class LlmBudgetService(
                 return@transaction ReserveResult.Reserved(BudgetReservation(r.getObject(1, UUID::class.java), requestId, r.getLong(2)))
             } }
         }
-        val now = Instant.now()
+        val now = c.analysisDatabaseTime()
         val windows = windows(now)
         val maximum = price.maximumMicrousd()
         windows.forEach { (type, start, ceiling) ->
@@ -63,16 +64,16 @@ class LlmBudgetService(
             }
         }
         val id = UUID.randomUUID()
-        c.prepareStatement("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,model_snapshot,state,maximum_microusd,lease_until) values(?,?,?,?,?,?,'RESERVED',?,?)").use { s ->
+        c.prepareStatement("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,model_snapshot,state,maximum_microusd,lease_until,created_at) values(?,?,?,?,?,?,'RESERVED',?,?,?)").use { s ->
             s.setObject(1, id); s.setObject(2, requestId); s.setObject(3, claim.jobId); s.setInt(4, claim.generation)
-            s.setString(5, price.version); s.setString(6, modelSnapshot); s.setLong(7, maximum); s.setTimestamp(8, Timestamp.from(now.plusSeconds(120))); s.executeUpdate()
+            s.setString(5, price.version); s.setString(6, modelSnapshot); s.setLong(7, maximum); s.setTimestamp(8, Timestamp.from(c.analysisDatabaseTime().plusSeconds(120))); s.setTimestamp(9, Timestamp.from(now)); s.executeUpdate()
         }
         ReserveResult.Reserved(BudgetReservation(id, requestId, maximum))
     }
 
     fun markInFlight(id: UUID) = transaction { c ->
         c.prepareStatement("update llm_budget_reservations set state='IN_FLIGHT', lease_until=? where id=? and state='RESERVED'").use { s ->
-            s.setTimestamp(1, Timestamp.from(Instant.now().plusSeconds(120))); s.setObject(2, id)
+            s.setTimestamp(1, Timestamp.from(c.analysisDatabaseTime().plusSeconds(120))); s.setObject(2, id)
             check(s.executeUpdate() == 1) { "Reservation cannot enter flight" }
         }
     }
@@ -81,9 +82,10 @@ class LlmBudgetService(
 
     fun settleMaximum(id: UUID) = finalize(id, price.maximumMicrousd(), false)
 
-    fun reconcileExpired(now: Instant = Instant.now()): Int = transaction { c ->
+    fun reconcileExpired(now: Instant? = null): Int = transaction { c ->
+        val databaseNow = now ?: c.analysisDatabaseTime()
         val expired = c.prepareStatement("select id,state,maximum_microusd from llm_budget_reservations where state in ('RESERVED','IN_FLIGHT') and lease_until<? for update skip locked").use { s ->
-            s.setTimestamp(1, Timestamp.from(now)); s.executeQuery().use { r -> buildList { while (r.next()) add(Triple(r.getObject(1, UUID::class.java), ReservationState.valueOf(r.getString(2)), r.getLong(3))) } }
+            s.setTimestamp(1, Timestamp.from(databaseNow)); s.executeQuery().use { r -> buildList { while (r.next()) add(Triple(r.getObject(1, UUID::class.java), ReservationState.valueOf(r.getString(2)), r.getLong(3))) } }
         }
         expired.forEach { (id, state, maximum) -> c.finalizeLocked(id, if (state == ReservationState.IN_FLIGHT) maximum else 0, state == ReservationState.RESERVED) }
         expired.size

@@ -130,7 +130,7 @@ class BrowserWorkerServiceTest {
         assertEquals(WorkerDisposition.RETRY, browser.runBrowser(jobId, 1))
         assertEquals("BROWSER_PENDING", analysisScalar(source, "select stage from analysis_jobs where id='$jobId'"))
         kotlin.test.assertNull(analysisScalar(source, "select execution_token from analysis_jobs where id='$jobId'"))
-        assertEquals("1", analysisScalar(source, "select count(*) from outbox_events where event_type='BROWSER_ANALYSIS'"))
+        assertEquals("2", analysisScalar(source, "select count(*) from outbox_events where event_type='BROWSER_ANALYSIS'"))
     }
 
     private fun withJob(block: (PostgreSQLContainer<*>, UUID) -> Unit) {

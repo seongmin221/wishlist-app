@@ -33,7 +33,7 @@ B0 Task 4~7에서 중간·최종 반영과 복구에 현재 상태·출처·실�
 
 ## 원자 claim과 쓰기 보호
 
-`AnalysisClaimRepository.claim(jobId, generation, lane)`는 먼저 job의 item ID를 잠금 없이 찾고, transaction에서 item→job 순서로 `FOR UPDATE`한 뒤 관계와 상태를 다시 검증한다. 현재 generation의 ACTIVE·PROCESSING·수동 미완료 상품과 해당 lane의 PENDING job만 실행 가능하다. BROWSER는 기존 fallback 플래그도 필요하다. owner는 요청에서 받지 않고 잠근 상품 row에서 얻는다.
+`AnalysisClaimRepository.claim(jobId, generation, lane)`는 먼저 job의 item ID를 잠금 없이 찾고, transaction에서 item→job 순서로 `FOR UPDATE`한 뒤 관계와 상태를 다시 검증한다. 현재 generation의 ACTIVE·PROCESSING·수동 미완료 상품과 해당 lane의 PENDING job만 실행 가능하다. BROWSER는 기존 fallback 플래그도 필요하다. owner는 요청에서 받지 않고 잠근 상품 row에서 얻는다. 같은 job/generation/lane의 PENDING이 삭제된 상품에 속하면 item→job 잠금 안에서 CANCELLED로 바꾸고 분석/추가 outbox 없이 ACK한다.
 
 유효한 claim은 새 UUID token, DB 시각 기준 120초 lease, 현재 item version을 저장하고 해당 lane의 attempt만 한 번 증가시킨다. 다른 요청은 이미 RUNNING인 job을 Ignored로 처리하므로 중복 attempt가 없다. lane별 3회 또는 첫 시도로부터 30분을 소진하면 Exhausted를 반환하고 같은 잠금 아래 현재 상품을 FAILED_RETRYABLE로 바꾸며 version을 한 번 증가시킨다. 오래된 generation이나 비활성·수동 완료 상품에는 이 소진 처리를 적용하지 않는다.
 
@@ -50,7 +50,7 @@ Task 5의 AnalysisPendingResultRepository는 guard와 source URL 읽기, 임시 
 
 추출/rendering/AI는 AnalysisClaim을 전달한다. 외부 호출 동안 DB connection이나 잠금을 유지하지 않으며, 응답 뒤의 저장은 새 guard transaction을 거친다. invalid claim은 ProcessingOutcome.Stale이며 browser의 nullable rendering은 null을 반환한다. Worker는 실제 claim을 발급하고 final transaction 입구에서 다시 guard를 확인해 stale partial/fallback도 반영하지 않는다.
 
-예산 reserve는 guard 후 window를 DAILY→MONTHLY 순서로 잠그고 새 reservation을 생성하기 전에 lease를 재검증한다. request ID 재사용도 유효 claim과 같은 job/generation을 요구한다. reserve가 Stale이면 gateway를 호출하지 않는다. 예약 후 gateway 직전에 다시 확인하고, 이 검사 뒤 무효화와의 좁은 race는 응답 저장에서 차단한다.
+예산 예약·IN_FLIGHT lease·기본 만료 복구는 DB 시각을 사용한다. 예약 생성 시각은 window 선택에 사용한 DB 시각으로 저장해 정산의 일/월 window와 일치시킨다. 예산 reserve는 guard 후 window를 DAILY→MONTHLY 순서로 잠그고 새 reservation을 생성하기 전에 lease를 재검증한다. request ID 재사용도 유효 claim과 같은 job/generation을 요구한다. reserve가 Stale이면 gateway를 호출하지 않는다. 예약 후 gateway 직전에 다시 확인하고, 이 검사 뒤 무효화와의 좁은 race는 응답 저장에서 차단한다.
 
 예약·정산은 서로 다른 책임이다. 실제 gateway의 유효 usage는 실행 권한을 잃어도 SETTLED로 기록한다. usage가 없는 non-retry 응답은 maximum settlement, usage 없는 retry/호출 실패는 IN_FLIGHT lease reconciliation을 유지한다. gateway를 보내기 전 무효화된 RESERVED는 reconciliation에서 해제한다. 정산은 reservation/window만 잠그고 item/job를 뒤늦게 잠그지 않는다.
 
@@ -65,15 +65,17 @@ NAME/IMAGE/CATEGORY/PURPOSE는 USER 출처 또는 userOverrideFields 중 하나�
 
 CONFIRMED/DEFERRED는 유지한다. 사용 가능한 이름·category가 있고 실제 미확정 AI category 또는 nonnull AI purpose 연결이 있으면 PENDING이다. USER category를 유지하고 목적만 AI로 연결해도 검토 대상이다. 연결되지 않은 AI 예측 진단만으로 PENDING을 만들지 않는다.
 
-일반 NeedsBrowser는 BROWSER_PENDING, fallback flag, token 해제, browser outbox 1건을 원자적으로 저장한다. 양쪽 Worker의 infrastructure exception은 Retryable로 처리한다. 현재 실행이 한도 안이면 lane PENDING으로 token을 해제하고 RETRY/HTTP 503을 반환한다. 한도 소진은 FAILED_RETRYABLE로 최종 반영한다. stale·완료는 ACK/HTTP 204다. CancellationException은 다시 던지고 남은 RUNNING lease의 복구는 Task 7에서 처리한다.
+일반 NeedsBrowser는 BROWSER_PENDING, fallback flag, token 해제, browser outbox 1건을 원자적으로 저장한다. 양쪽 Worker의 infrastructure exception은 Retryable로 처리한다. 현재 실행이 한도 안이면 lane PENDING·token 해제·새 retry outbox를 같은 transaction에 저장하고 RETRY/HTTP 503을 반환한다. task 이름에 실행 token을 넣어 이전 task와 구분한다. 원래 task가 delivery 마감/중복 ACK로 사라져도 발행할 event가 남는다. 한도 소진은 FAILED_RETRYABLE로 최종 반영한다. stale·완료는 ACK/HTTP 204다. CancellationException은 다시 던지고 남은 RUNNING lease의 복구는 Task 7에서 처리한다.
 
 
 ## 만료 실행 복구
 
-AnalysisJobReconciler.reconcileExpired는 updated_at 대신 DB clock_timestamp와 lease_until을 비교한다. RUNNING 후보를 잠금 없이 발견한 뒤 각 후보를 별도 transaction에서 item→job 순서로 SKIP LOCKED한다. 두 잠금을 얻은 뒤 발견 당시의 관계·generation·stage·token·lease·claimed version을 재검증하고 DB 시각으로 만료를 다시 확인한다. 실행이 바뀌거나 행이 사용 중이면 이번 스캔에서 건너뛴다. 반환값은 commit한 복구·취소·한도 실패 전이 수다.
+AnalysisJobReconciler.reconcileExpired는 updated_at 대신 DB clock_timestamp와 lease_until을 비교한다. RUNNING 후보를 기본 100개(설정 1~1000)까지 잠금 없이 발견한 뒤 각 후보를 별도 transaction에서 item→job 순서로 SKIP LOCKED한다. 두 잠금을 얻은 뒤 발견 당시의 관계·generation·stage·token·lease·claimed version을 재검증하고 DB 시각으로 만료를 다시 확인한다. 실행이 바뀌거나 행이 사용 중이면 이번 스캔에서 건너뛴다. 후보 하나의 오류는 job ID·예외 타입을 기록하고 다음 후보로 진행하며 취소/interrupt는 재전파한다. 반환값은 commit한 복구·취소·한도 실패 전이 수다.
 
 ACTIVE·PROCESSING·현재 generation·수동 미완료·claimed version 일치인 실행만 재시도하거나 한도 실패로 반영한다. 그 외에는 CANCELLED로 token/lease/claimed version을 해제하며 상품과 outbox는 유지한다. browser는 기존 fallback flag도 필요하다. V9가 만료시킨 legacy RUNNING은 token/claimed version이 null이므로 기존 version 검증을 우회하고 재claim에서 새 identity를 받는다. identity와 lease가 모두 null인 중단된 legacy도 복구한다.
 
 한도 내 복구는 lane PENDING, 실행 identity 해제, recovery outbox 1건을 한 transaction으로 저장한다. task_name에는 generation·시도 횟수·옛 token(legacy는 새 UUID)을 넣는다. 복구에서는 attempt나 item version을 올리지 않으며 다음 claim에서 해당 lane attempt가 증가한다. 재claim 이후 옛 token의 중간/최종 쓰기는 모두 무효다.
 
 lane별 3회 또는 첫 시도에서 30분을 소진하면 job FAILED와 identity 해제, 현재 상품 FAILED_RETRYABLE 및 version +1을 함께 저장한다. 다음 스캔은 이미 전이된 job을 처리하지 않는다. 정상 finish가 먼저 commit하면 복구는 건너뛰고, 복구가 먼저 commit하면 옛 finish는 stale ACK다. 이 경로는 AI budget reservation/window를 수정하지 않으며 실제 사용량 정산은 별도 책임으로 유지한다.
+
+오래된 PENDING·queue retry 소진·미발행 fallback의 실제 발행/복구는 [B5 설계](analysis-pending-recovery.md)에 따라 연결한다.

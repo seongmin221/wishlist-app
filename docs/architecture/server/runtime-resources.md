@@ -33,14 +33,22 @@ pool config는 양의 크기와 250ms 이상의 획득 timeout을 요구한다. 
 
 RuntimeResources.own은 동일 object identity를 한 번 등록한다. close는 등록 역순으로 한 번씩 닫는다. 하나가 실패해도 나머지를 닫고 나머지 예외를 suppressed로 보존한다. 중복 close는 안전하며, 종료 후 새 등록은 자원을 닫고 거부한다. 이미 등록된 자원은 다시 닫지 않는다.
 
-ApplicationStopping은 dispatch admission을 닫는다. `runIfOpen`은 발행 시작과 stop을 같은 gate로 직렬화한다. 이미 허용된 동기 발행을 마친 뒤 stopping이 진행하고, 이후 콜백은 새 outbox를 claim하거나 task를 등록하지 않는다. 따라서 종료는 진행 중인 Cloud Tasks 호출의 완료를 기다릴 수 있다.
+ApplicationStopping은 dispatch admission을 닫는다. `runIfOpen`은 짧은 잠금 안에서 진행 중 작업 수만 증가시키고 네트워크 호출은 잠금 밖에서 실행한다. 서로 다른 생성 요청의 발행은 동시에 진행한다. stop은 새 admission을 닫고 진행 중 작업 수가 0이 될 때까지 기다린다. 이미 허용된 동기 발행을 마친 뒤 stopping이 진행하고, 이후 콜백은 새 outbox를 claim하거나 task를 등록하지 않는다. createTask RPC는 숨은 재시도 없이 총 5초로 제한한다. 종료는 이미 허용된 발행의 완료와 후속 DB 정리를 기다린다.
 
-ApplicationStopped에서 자원을 닫는다. 종료 실패 로그는 고정 문장만 기록하고 예외·credential을 출력하지 않는다. API는 pool, 직접 초기화한 Firebase app, Cloud Tasks client를 소유하므로 Tasks→Firebase→pool 순서로 닫는다. 외부에서 이미 만든 default Firebase app은 재사용하지만 삭제하지 않는다. 일반 Worker는 pool과 HTTP transport를 소유해 transport→pool 순서로 닫는다.
+ApplicationStopped에서 자원을 닫는다. 종료 실패 로그는 고정 문장만 기록하고 예외·credential을 출력하지 않는다. API는 pool, 직접 초기화한 Firebase app, Cloud Tasks client를 소유하므로 Tasks→Firebase→pool 순서로 닫는다. 외부에서 이미 만든 default Firebase app은 재사용하지만 삭제하지 않는다. 일반 Worker는 pool·HTTP transport·처리 executor를 소유해 executor→transport→pool 순서로 닫는다.
 
 CloudTasksClient는 요청마다 생성하지 않고 API runtime에서 한 번 생성해 재사용한다. 일반 Worker의 JDK 17 HttpClient는 OpenAiResponsesGateway에서 기존처럼 재사용하며 지원하지 않는 close API를 호출하지 않는다.
 
 ## HTTP transport와 DNS 고정
 
-SafeHttpTransport는 OkHttp dispatcher/connectionPool을 공유한다. 각 요청은 별도 DNS identity로 pinned 주소 복사본만 사용하며 proxy·자동 redirect·자동 retry를 끈다. 같은 host의 이전 pinned connection을 재사용해 새 주소 검증을 우회하지 않는다. IPv4와 IPv6 loopback의 서로 다른 서버를 같은 host/port로 호출해 pin 변경을 검증한다.
+SafeHttpTransport는 OkHttp dispatcher/connectionPool을 공유하되 유휴 연결 수는 0으로 둔다. DNS identity가 달라 연결 재사용이 불가능하므로 오래된 연결을 보관하지 않는다. 각 요청은 별도 DNS identity로 pinned 주소 복사본만 사용하며 proxy·자동 redirect·자동 retry를 끈다. 같은 host의 이전 pinned connection을 재사용해 새 주소 검증을 우회하지 않는다. IPv4와 IPv6 loopback의 서로 다른 서버를 같은 host/port로 호출해 pin 변경을 검증한다.
 
-fetch는 call을 lock 아래 등록한 뒤 외부 IO를 수행한다. close는 신규 call을 거부하고 dispatcher에 들어가기 전 call을 포함해 등록된 call을 취소한 뒤 executor와 pool을 종료한다. 응답 사용과 등록 해제는 finally에서 수행한다. 기존 timeout과 HTML 512KiB 제한을 유지한다.
+fetch는 call을 lock 아래 등록한 뒤 외부 IO를 수행한다. close는 신규 call을 거부하고 dispatcher에 들어가기 전 call을 포함해 등록된 call을 취소한 뒤 executor와 pool을 종료한다. 응답 사용과 등록 해제는 finally에서 수행한다. 호출당 최대 15초와 HTML 512KiB 제한을 유지하며 Worker 내에서는 남은 처리 예산으로 timeout을 줄인다.
+
+## 분석 전체 시간 제한
+
+`AnalysisTiming`의 처리 80초 < Worker 응답 90초 < Cloud Tasks dispatch 105초 < DB lease 120초를 테스트로 고정한다. WorkerExecution은 claim·처리·finish를 bounded executor에서 실행하고 queue 대기까지 포함해 90초가 지나면 요청에 RETRY를 반환하고 작업 interrupt를 시도한다. redirect HTTP·token 계산·LLM·browser launch/navigation은 같은 단조 시계의 남은 80초 예산을 사용한다. 처리 예산을 넘긴 결과는 성공으로 반영하지 않고 guarded retry로 전환한다.
+
+JVM interrupt가 모든 JDBC/SDK 호출을 즉시 멈추는 것은 아니다. 반환하지 않는 작업은 executor의 제한된 slot을 계속 사용하되 요청 응답은 기다리지 않는다. 늦게 끝난 retry는 PENDING+새 outbox를 원자 저장하고, 끝나지 않은 RUNNING은 120초 lease로 복구한다. 사용량이 도착한 실제 AI 비용 정산은 stale 결과 폐기와 별도로 유지한다. lease heartbeat를 추가하지 않는다.
+
+예상치 못한 API 오류는 requestId·예외 타입·발생 stack frame을 ERROR로 기록한다. 예외 메시지에는 SQL/credential/사용자 입력이 포함될 수 있어 로그와 공개 응답에 넣지 않는다. Ktor 요청 오류(400/404/413/415)는 안전한 4xx envelope로 반환하며 취소는 재전파한다.

@@ -10,16 +10,15 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
         return dataSource.connection.use { c ->
             c.autoCommit = false
             try {
-                val result = if (AnalysisWriteGuard.lockCurrent(c, claim)) finishLocked(c, claim, outcome)
-                    else WorkerDisposition.ACKNOWLEDGE
+                val job = AnalysisWriteGuard.lockCurrentJob(c, claim)
+                val result = if (job != null) finishLocked(c, claim, outcome, job) else WorkerDisposition.ACKNOWLEDGE
                 c.commit()
                 result
             } catch (cause: Throwable) { c.rollback(); throw cause }
         }
     }
 
-    private fun finishLocked(c: Connection, claim: AnalysisClaim, outcome: ProcessingOutcome): WorkerDisposition {
-        val job = checkNotNull(c.lockAnalysisJob(claim.jobId))
+    private fun finishLocked(c: Connection, claim: AnalysisClaim, outcome: ProcessingOutcome, job: LockedAnalysisJob): WorkerDisposition {
         if (outcome == ProcessingOutcome.NeedsBrowser && claim.lane == AnalysisLane.GENERAL && !job.browserAttempted) {
             transitionJob(c, claim.jobId, "BROWSER_PENDING", fallback = true)
             c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,'BROWSER_ANALYSIS',?)").use { s ->
@@ -33,6 +32,12 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             val first = if (claim.lane == AnalysisLane.GENERAL) job.firstAttemptAt else job.firstBrowserAttemptAt
             if (attempts < 3 && first?.plusSeconds(1800)?.isAfter(c.analysisDatabaseTime()) != false) {
                 transitionJob(c, claim.jobId, "${claim.lane.name}_PENDING")
+                c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,?,?)").use { s ->
+                    s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
+                    s.setString(3, if (claim.lane == AnalysisLane.GENERAL) "GENERAL_ANALYSIS" else "BROWSER_ANALYSIS")
+                    s.setString(4, "${claim.lane.name.lowercase()}-${claim.jobId}-${claim.generation}-retry-${claim.executionToken}")
+                    check(s.executeUpdate() == 1)
+                }
                 return WorkerDisposition.RETRY
             }
         }
@@ -72,19 +77,23 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             !category.isNullOrBlank() && !name.isNullOrBlank() && (unconfirmedAiCategory || unconfirmedAiPurpose) -> "PENDING"
             else -> "NOT_REQUIRED"
         }
-        c.prepareStatement("""
-            update wishlist_items set analysis_status=?,product_name=?,product_description=?,product_image_url=?,canonical_url=?,
-                name_source=?,image_source=?,category_id=?,category_source=?,category_missing_reason=?,purpose_id=?,purpose_source=?,
-                review_status=?,predicted_category_id=?,predicted_purpose_id=?,analysis_failure_code=?,
-                classified_at=case when ? then clock_timestamp() else classified_at end,version=version+1,updated_at=clock_timestamp()
-            where id=?
-        """.trimIndent()).use { s ->
-            val values = listOf(status, name, mergedMetadata(item.description, pending.description, complete, false), image,
-                mergedMetadata(item.canonical, pending.canonical, complete, false), nameSource, imageSource, category, categorySource,
-                reason, purpose, purposeSource, review, if (assigned) pending.category else item.predictedCategory,
-                if (assigned) pending.purpose else item.predictedPurpose, failure)
-            values.forEachIndexed { index, value -> s.setString(index + 1, value) }
-            s.setBoolean(17, assigned); s.setObject(18, claim.itemId); check(s.executeUpdate() == 1)
+        // Keep each column adjacent to its value; subsequent parameter positions are derived.
+        val values = linkedMapOf(
+            "analysis_status" to status, "product_name" to name,
+            "product_description" to mergedMetadata(item.description, pending.description, complete, false),
+            "product_image_url" to image, "canonical_url" to mergedMetadata(item.canonical, pending.canonical, complete, false),
+            "name_source" to nameSource, "image_source" to imageSource, "category_id" to category,
+            "category_source" to categorySource, "category_missing_reason" to reason, "purpose_id" to purpose,
+            "purpose_source" to purposeSource, "review_status" to review,
+            "predicted_category_id" to if (assigned) pending.category else item.predictedCategory,
+            "predicted_purpose_id" to if (assigned) pending.purpose else item.predictedPurpose,
+            "analysis_failure_code" to failure,
+        )
+        c.prepareStatement("update wishlist_items set ${values.keys.joinToString { "$it=?" }}, " +
+            "classified_at=case when ? then clock_timestamp() else classified_at end,version=version+1,updated_at=clock_timestamp() where id=?").use { s ->
+            var parameter = 1
+            values.values.forEach { s.setString(parameter++, it) }
+            s.setBoolean(parameter++, assigned); s.setObject(parameter, claim.itemId); check(s.executeUpdate() == 1)
         }
         transitionJob(c, claim.jobId, when (status) { "READY" -> "COMPLETE"; "PARTIAL" -> "PARTIAL"; else -> "FAILED" })
         return WorkerDisposition.ACKNOWLEDGE
@@ -115,7 +124,9 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
     private data class Pending(val name: String?, val description: String?, val image: String?, val canonical: String?,
         val category: String?, val purpose: String?, val failure: String?)
 
-    private fun readItem(c: Connection, itemId: UUID): Item = c.prepareStatement("select * from wishlist_items where id=?").use { s ->
+    private fun readItem(c: Connection, itemId: UUID): Item = c.prepareStatement("""select product_name,product_description,product_image_url,canonical_url,
+        name_source,image_source,category_id,category_source,category_missing_reason,purpose_id,purpose_source,
+        review_status,predicted_category_id,predicted_purpose_id,user_override_fields from wishlist_items where id=?""").use { s ->
         s.setObject(1, itemId)
         s.executeQuery().use { r ->
             check(r.next())

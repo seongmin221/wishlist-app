@@ -13,6 +13,30 @@ import javax.sql.DataSource
 import kotlin.test.*
 
 class AnalysisJobReconcilerTest {
+    @Test fun `recovery bounds discovery and resumes remaining candidates on later scans`() = withAnalysisDatabase { source ->
+        repeat(3) { expire(source, newAnalysisClaim(source)) }
+        val reconciler = AnalysisJobReconciler(source, batchSize = 2)
+        assertEquals(2, reconciler.reconcileExpired())
+        assertEquals("1", analysisScalar(source, "select count(*) from analysis_jobs where stage='GENERAL_RUNNING'"))
+        assertEquals(1, reconciler.reconcileExpired())
+        assertEquals(0, reconciler.reconcileExpired())
+    }
+
+    @Test fun `one candidate connection failure does not prevent other recoveries`() = withAnalysisDatabase { source ->
+        repeat(2) { expire(source, newAnalysisClaim(source)) }
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val observed = object : DataSource by source {
+            override fun getConnection(): java.sql.Connection {
+                if (calls.incrementAndGet() == 2) throw java.sql.SQLException("candidate unavailable")
+                return source.connection
+            }
+        }
+        val failures = mutableListOf<UUID>()
+        assertEquals(1, AnalysisJobReconciler(observed, batchSize = 2, onFailure = { id, _ -> failures.add(id) }).reconcileExpired())
+        assertEquals(1, failures.size)
+        assertEquals(1, AnalysisJobReconciler(source).reconcileExpired())
+    }
+
     @Test fun `expired lease requeues each lane and old claim cannot write after new claim`() = withAnalysisDatabase { source ->
         for (lane in AnalysisLane.entries) {
             val old = newAnalysisClaim(source, lane)

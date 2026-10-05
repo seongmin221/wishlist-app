@@ -25,6 +25,13 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
         } ?: return ClaimResult.Ignored
         val item = connection.lockAnalysisItem(itemId) ?: return ClaimResult.Ignored
         val job = connection.lockAnalysisJob(jobId) ?: return ClaimResult.Ignored
+        if (job.itemId == itemId && job.generation == generation && job.stage == "${lane.name}_PENDING" &&
+            item.lifecycleStatus == "DELETED") {
+            connection.prepareStatement("update analysis_jobs set stage='CANCELLED',execution_token=null,lease_until=null,claimed_item_version=null,updated_at=clock_timestamp() where id=?").use {
+                it.setObject(1, jobId); check(it.executeUpdate() == 1)
+            }
+            return ClaimResult.Ignored
+        }
         if (!item.canAnalyze(generation) || job.itemId != itemId || job.generation != generation ||
             job.stage != "${lane.name}_PENDING" || (lane == AnalysisLane.BROWSER && !job.browserAttempted)) return ClaimResult.Ignored
 
@@ -47,7 +54,7 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
         val clearMetadata = if (lane == AnalysisLane.GENERAL)
             "pending_product_name=null,pending_product_description=null,pending_product_image_url=null,pending_canonical_url=null," else ""
         val lease = connection.prepareStatement("""
-            update analysis_jobs set stage=?,execution_token=?,lease_until=clock_timestamp()+interval '120 seconds',
+            update analysis_jobs set stage=?,execution_token=?,lease_until=clock_timestamp()+interval '${AnalysisTiming.LEASE_SECONDS} seconds',
                 claimed_item_version=?, $countColumn=$countColumn+1,$firstColumn=coalesce($firstColumn,clock_timestamp()),
                 ${clearMetadata}pending_category_id=null,pending_purpose_id=null,pending_failure_code=null,updated_at=clock_timestamp()
             where id=? returning lease_until

@@ -6,15 +6,17 @@ import java.util.UUID
 
 object AnalysisWriteGuard {
     /** Caller owns the transaction, including commit/rollback and releasing both locks. */
-    fun lockCurrent(connection: Connection, claim: AnalysisClaim): Boolean {
+    fun lockCurrent(connection: Connection, claim: AnalysisClaim): Boolean = lockCurrentJob(connection, claim) != null
+
+    internal fun lockCurrentJob(connection: Connection, claim: AnalysisClaim): LockedAnalysisJob? {
         require(!connection.autoCommit) { "Analysis writes require an explicit transaction" }
-        val item = connection.lockAnalysisItem(claim.itemId) ?: return false
-        if (!item.canAnalyze(claim.generation) || item.ownerId != claim.ownerId || item.version != claim.expectedItemVersion) return false
-        val job = connection.lockAnalysisJob(claim.jobId) ?: return false
+        val item = connection.lockAnalysisItem(claim.itemId) ?: return null
+        if (!item.canAnalyze(claim.generation) || item.ownerId != claim.ownerId || item.version != claim.expectedItemVersion) return null
+        val job = connection.lockAnalysisJob(claim.jobId) ?: return null
         if (job.itemId != claim.itemId || job.generation != claim.generation || job.stage != "${claim.lane.name}_RUNNING" ||
-            job.executionToken != claim.executionToken || job.claimedItemVersion != item.version) return false
+            job.executionToken != claim.executionToken || job.claimedItemVersion != item.version) return null
         // Read the clock after both lock acquisitions: waiting for a lock can expire a lease.
-        return job.leaseUntil?.isAfter(connection.analysisDatabaseTime()) == true
+        return job.takeIf { it.leaseUntil?.isAfter(connection.analysisDatabaseTime()) == true }
     }
 }
 

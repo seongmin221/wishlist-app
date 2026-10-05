@@ -88,35 +88,40 @@ category/purpose 실자원·owner FK·후보 version은 B2/B3에서 연결한다
 
 ## 구현 중 판단 기록
 
-아래 기록은 계획 실행 ledger의 모든 Ruling을 보존한다. 각 행의 비용은 판단이 잘못됐을 때 또는 선택에 따른 부담이다.
+계획 실행 중의 판단 29건을 순서대로 보존했다. 테스트 이름·코드 식별자를 제외한 설명을 한국어로 정리했다. 비용은 선택에 따른 부담과 잘못 판단했을 때의 영향을 포함한다.
 
-- Ruling: 최신 origin/main을 base로 선택 — 서버 코드는 초기 셋업과 같고 계획에서 요청한 최신 제품 변경이 이미 통합돼 있기 때문 — 비용: 새 main의 문서 정책과 계획 차이를 대조해야 한다.
-- Ruling: 실행 범위는 Task 1 — 사용자가 직전에 어떤 작업부터 진행하는지 물었고 Task 1을 제시한 뒤 진행을 승인했기 때문 — 비용: 나머지 B0 Task는 후속 작업으로 남는다.
-- Ruling: category 없는 READY도 누락 사유가 없으면 INFORMATION_COMPLETION으로 fallback — 불완전 legacy 상태가 검토/NONE로 숨지 않게 하려는 공통 누락 정책 — 비용: future migration에서 reason을 명확히 보관해야 한다.
-- Ruling: 공통 DB test fixture를 선행 보완 — 기존 B0 DB 회귀31 실패를 실제 DB 테스트로 해소하고 Task 2 계약을 검증하려면 host-port 준비가 필요 — 비용: 테스트 시작 시 호스트 연결까지 기다려 실행 시간이 소폭 늘 수 있음. production code/schema 변경 없음.
-- Ruling: JsonPrimitive price를 BigDecimal+JsonUnquotedLiteral serializer로 교체 — JsonPrimitive(Number)가 Double로 변환해 소수 원문을 잃는 실패를 관찰 — 비용: JSON 전용 custom serializer 유지.
-- Ruling: cancellation 검증은 API envelope와 engine 진단 응답 구분 — Ktor3.6.0 test engine은 취소에 기본 HTTP500을 대응하고 throwOnException도 이 기본 대응을 바꾸지 않음(로컬 bytecode 확인) — 비용: engine 진단 형식에 의존하는 integration assertion. 실제 support는 취소 예외를 rethrow.
-- Task4 start base d8150fd. Scope Task4 after user accepted next-task proposal. RED: missing AnalysisClaim/Lane/Result/repository/guard compile failure. Tests target duplicateclaim, stale identity/version/lease, lock retention, limits and pendingcleanup. Ruling: guard requires explicit transaction — caller-owned locks cannot protect writes with autoCommit — cost: callers must begin transaction (already plan requirement). Database time is read after both locks, avoiding lease evaluation before lock waits.
-- Task5 start baseabcfdfa. Scope Task5 after user accepted next proposal. RED: stale tests show missingclaim signatures/ProcessingOutcome.Stale/ReserveResult.Stale. Corrected testfixture canonicalUrl nullable typo (Metadata requiresString). No productchange. Ruling: Workers must use Task4claim now and guard existing finish transaction before writes — passing validclaim and preventing stale callback outcomes requires this bridge before Task6; existing finalfield-policy SQL stays untilTask6 — cost: remove transitional finalcode nexttask. Browser nullable render means stale distinguished by worker guard, not fabricatedmetadata.
-- Ruling: Complete with no usable final category normalizes to Partial+AI_INVALID_CANDIDATE (preserveexplicit user missingreason) — READY requires usablecategory, oldcode ACKleftRUNNING — cost: faultyprocessor Complete is surfaced as manualcompletion instead of strandingjob.
-- Ruling: failure/partial metadata preserves existingnon-null values, fills missingvalues frompending; USER/override protectednulls kept — spec sayspreserveexistingmetadata, stillshow usefulpartialextract — cost: metadatarefreshonpartial awaits successfulanalysis ormanualedit.
-- Ruling: browser infrastructure exception maps guardedRetryable/503 likegeneral; cancellation rethrows — Task6step3 requirescurrentfaultRETRY503 andstalefaultACK, previousbrowserthrow reliedon500/reconciler — cost: existinginfrastructuretest changes to immediate lane retry; lease recovery remainsTask7.
-- Ruling: legacy execution identity absent (token and claimedversion null) can recover with expired or null lease — V9 migrates V7 RUNNING to expired lease, pre-identity fixture may have null lease — cost: malformed legacy rows treated as interrupted execution but no valid claim can write through them.
-- Ruling: discover without locks then per-candidate transaction takes item SKIP LOCKED followed by job SKIP LOCKED and rechecks discovered identity/lease — shared lock order and avoid waiting on active writes — cost: busy candidates defer until next scheduled scan. Recovery count includes only committed transitions.
-- Ruling: add default-false skipLocked argument to shared internal lock helpers — reuse same typed item/job fields without duplicate lock SQL; current claim/guard callers retain blocking behavior — cost: helpers now offer explicit recovery locking mode.
-- Ruling: BrowserWorkerServiceTest has no updated_at-based recovery fixture after Task6 exception/retry change; shared new recovery matrix exercises bothlanes — no redundant browser test edits — cost: browser recovery coverage is in AnalysisJobReconcilerTest rather than Worker class.
-- Ruling: route overloads accept production synchronous functions while existing concrete service overloads delegate — permits boundary behavior testing without fake subclasses or test-only hooks, keeps Main service signatures — cost: one additional route assembly API.
-- Ruling: late RuntimeResources ownership rejects and closes a new resource; duplicate identity only closes once even after shutdown — avoids leak in registration/shutdown race — cost: caller must handle registration failure. Failure from close is propagated with suppressed others; stopped-event log is fixed text with no exception/secrets.
-- Ruling: Firebase app initialized by this module is owned/deleted; pre-existing default app reused without deleting someone else's resource — avoid SDK executor leak while preserving global app ownership — cost: startup still relies on existing default project matching deployment config.
-- Ruling: extend Task8 to CreateWishlistItemService release-before-dispatch — bounded pool creates real starvation if postcommit callback keeps creation connection; preserve synchronous dispatch and durable outbox — cost: snapshot returned reflects creation transaction before task dispatch rather than rereading after external work. Cancellation after commit must propagate while replay remains durable.
-- Ruling: serialize dispatch admission and stopping with RuntimeResources gate; stop drains already admitted synchronous dispatch then denies new work — atomic shutdown boundary, no background dispatch — cost: stopping waits for admitted Cloud Tasks call. Extend OutboxDispatcher cancellation cleanup/rethrow to honor real route composition, not only direct callbackfake.
-- Task9 Ruling: 최종 whole-branch review를 Task9 커밋 전에 한 번 수행 — 계획 Step5의 문서 검토와 실행 skill의 최종 리뷰를 합쳐 runtime 전체와 최종 문서를 함께 검토 — 비용: 문서는 리뷰 시 미커밋이므로 최종 diff와 커밋을 다시 대조해야 한다.
+| 번호 | 결정과 근거 | 비용·후속 부담 |
+| --- | --- | --- |
+| 1 | 제품 문서가 통합된 최신 origin/main에서 분기했다. 서버 코드는 초기 셋업과 같았다. | 새 main과 기존 계획의 문서 차이를 대조해야 한다. |
+| 2 | 최초 실행은 사용자가 승인한 Task 1로 제한했다. 이후 Task는 각 후속 요청으로 진행했다. | 나머지 Task는 최초 승인만으로 완료됐다고 간주할 수 없다. |
+| 3 | category 없는 READY도 사유가 없으면 정보 보완으로 표시한다. 불완전한 과거 상태를 숨기지 않는다. | 후속 migration은 누락 사유를 명확히 보관해야 한다. |
+| 4 | 공통 DB 테스트에 호스트 포트 준비 대기를 추가했다. 기존 연결 실패 31건의 원인을 해소했다. | 테스트 시작 시간이 조금 늘어난다. 운영 코드/schema는 바꾸지 않았다. |
+| 5 | 가격을 BigDecimal과 JSON 전용 serializer로 처리한다. Double 변환의 정밀도 손실을 재현했다. | 전용 serializer를 유지해야 한다. |
+| 6 | 취소 예외 재전파와 Ktor 테스트 엔진의 500 진단 응답을 구분한다. | 통합 assertion 일부가 엔진 진단 형식에 의존한다. |
+| 7 | 쓰기 guard는 명시적 transaction을 요구한다. autoCommit에서는 잠금이 결과 쓰기를 보호하지 못한다. | 호출자가 transaction을 시작하고 종료해야 한다. |
+| 8 | Task 5에서 Worker claim 전달과 임시 최종 쓰기 보호를 선행했다. | 임시 최종 SQL을 Task 6에서 교체해야 했으며 교체했다. |
+| 9 | category 없는 Complete는 Partial과 AI_INVALID_CANDIDATE로 처리하고 사용자 누락 사유를 보존한다. READY에는 유효 category가 필요하다. | 잘못된 처리 결과가 직접 보완 대상으로 표시된다. |
+| 10 | 부분/실패 결과는 기존 metadata를 보존하고 없는 값만 채운다. USER/override로 보호된 null도 유지한다. | metadata 갱신은 성공 분석 또는 수동 편집이 필요하다. |
+| 11 | browser 인프라 예외도 현재 실행에만 retry/503을 적용하고 취소는 재전파한다. | 이전 500/복구 의존 동작의 테스트를 즉시 retry에 맞춰 변경했다. |
+| 12 | token과 claimed version이 없는 legacy RUNNING은 만료되거나 null인 lease로 복구한다. | 비정상 과거 행도 중단된 실행으로 취급하지만 유효 claim 없이 쓰지는 못한다. |
+| 13 | 잠금 없는 발견 후 후보별 transaction에서 item→job SKIP LOCKED 순서로 다시 검증한다. | 사용 중인 후보는 다음 검사로 넘긴다. 완료된 전이만 복구 수에 포함한다. |
+| 14 | 공통 잠금 함수에 기본 false인 skipLocked 옵션을 추가했다. | 내부 함수에 복구용 모드가 하나 늘었다. 기존 claim/guard의 대기 동작은 유지한다. |
+| 15 | browser lease 복구 검증은 공통 reconciler 테스트에 둔다. | browser 복구 검증의 위치가 Worker 테스트와 분리된다. |
+| 16 | route가 동기 service 함수를 받을 수 있게 overload를 추가했다. | route 조립 API가 하나 늘었다. production과 테스트가 같은 경계를 사용한다. |
+| 17 | 종료 후 등록은 새 자원을 닫고 거부하며 같은 객체는 한 번만 닫는다. | 호출자가 등록 실패를 처리해야 한다. 여러 종료 실패는 suppressed로 보존한다. |
+| 18 | 직접 초기화한 Firebase app만 종료하고 기존 default app은 재사용한다. | 기존 app의 project와 배포 설정이 일치해야 한다. |
+| 19 | 생성 connection을 반환한 뒤 동기 발행한다. 제한된 pool에서 connection 고갈을 막는다. | 생성 응답은 외부 발행 전 transaction의 snapshot이다. commit 후 취소에도 replay는 가능하다. |
+| 20 | 최초 구현은 발행과 종료를 같은 잠금으로 직렬화했다. 종료 경계의 원자성을 우선했다. | 종료 대기뿐 아니라 동시 생성 발행의 처리량도 제한했다. 후속 리뷰에서 확인해 작업 수 집계와 잠금 밖 발행으로 교체했다. |
+| 21 | 최종 코드·Task 9 문서를 한 번의 독립 리뷰로 검토했다. | 리뷰 시 미커밋인 문서를 최종 커밋과 대조해야 한다. |
+| 22 | 전체 생성/replay 응답·상세 GET·clientCreatedAt는 B1이다. | 현재 응답의 상수/null 필드가 제품 계약을 완성하지 못한다. |
+| 23 | 일반 추출/retry의 null failureCode는 B1 공개 mapper/B5 실패 분류에서 보완한다. | 현재 일부 실패에는 구체적인 공개 사유가 없다. |
+| 24 | category/purpose ownership·삭제/version·FK는 실자원 구현 이후에 연결한다. | 현재 snapshot은 실제 자원 삭제/수정의 최종 유효성을 보장하지 않는다. |
+| 25 | 현재 후보 공급은 로컬 catalog이며 향후 DB 공급은 connection 공유와 pool 경계를 설계한다. | 별도 connection을 무조건 열면 pool 고갈이나 대기가 생길 수 있다. |
+| 26 | browser/maintenance runtime·Scheduler/private 인증·generation 전체 재시도 예산은 B5다. | B0 단독으로 운영 경로와 전체 retry 정책이 완성되지 않는다. |
+| 27 | 사용량 미상 또는 만료 예약의 보수적 최대 비용 정산을 유지한다. | 실제 사용량이 없으면 최대 비용이 계상될 수 있다. |
+| 28 | 사용자 변경·media·cache/list/archive는 후속 묶음이다. | 아직 해당 제품 기능을 공개 API로 이용할 수 없다. |
+| 29 | 운영 IAM·외부 AI/browser·용량·rollout은 별도 검증이다. | 로컬 테스트 통과가 운영 준비 완료를 보장하지 않는다. |
 
-- Final: Ruling: 생성/replay 전체 응답·상세 GET·clientCreatedAt — 승인한 B1에서 완성하며 B0에서는 기존 POST 동작과 재사용 기반을 제공 — 비용: 현재 응답의 상수/null 필드는 제품 계약을 완성하지 못한다.
-- Final: Ruling: generic extraction/retry의 null failureCode — 기존 실패 mapping을 유지하고 B1 공개 mapper/B5 실패 분류에서 안전한 코드를 보완 — 비용: 현재 일부 실패에는 구체적인 공개 사유가 없다.
-- Final: Ruling: category/purpose 실자원 ownership·삭제/version·FK — 실자원과 후속 삭제 연계가 생기는 B2/B3 이후 검증 — 비용: 현재 snapshot은 실제 자원 삭제/수정의 최종 유효성을 보장하지 않는다.
-- Final: Ruling: snapshot transaction 안의 향후 DB 후보 조회 — 현재 runtime은 local catalog 공급이며 DB 연계 시 connection을 공유하거나 pool 경계를 설계 — 비용: 별도 connection을 무조건 열면 bounded pool에서 대기/고갈이 생길 수 있다.
-- Final: Ruling: browser/maintenance runtime·Scheduler/private 인증·generation 전체 3회/30분 — 승인한 B5 범위로 남기고 현재 lane별 한도를 유지 — 비용: B0 단독으로 제품 운영 경로와 전체 retry 정책이 완성되지 않는다.
-- Final: Ruling: unknown usage/만료 reservation의 보수적 최대 정산 — Task5의 기존 예산 정책 보존 요구에 따라 유지 — 비용: 실제 사용량 미상인 경우 최대 비용이 계상될 수 있다.
-- Final: Ruling: 사용자 변경 route·media·cache/list/archive — 후속 묶음에서 구현하며 B0 DB fixture로 결과 무효화 경계를 검증 — 비용: 해당 제품 동작은 아직 공개 API로 이용할 수 없다.
-- Final: Ruling: 운영 IAM·외부 AI/browser·용량·rollout 실행 — 승인된 local B0 범위 밖이므로 별도 검증/배포 단계에서 확인 — 비용: local 통과가 운영 준비 완료를 보장하지 않는다.
+## 후속 리뷰 반영
+
+초기 완료/리뷰는 `70ced87` 시점의 기록이다. 이후 사용자 외부 리뷰에서 전체 실행 시간과 task 마감의 불일치, 발행 직렬화, 오류 관측 누락을 확인했다. [보완 기록](b0-review-hardening-2026-10-05.md)에 수정·검증과 B5 인계를 기록한다. 초기 리뷰의 지적 없음 판정은 이후 발견된 결함이 없다는 의미가 아니다.

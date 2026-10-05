@@ -13,6 +13,20 @@ import javax.sql.DataSource
 import kotlin.test.*
 
 class AnalysisClaimRepositoryTest {
+    @Test fun `deleted pending jobs cancel without attempts item updates or additional events`() = app.testutil.withAnalysisDatabase { source ->
+        for (lane in AnalysisLane.entries) {
+            val job = app.testutil.newFinishJob(source, lane)
+            app.testutil.analysisSql(source, "update wishlist_items set lifecycle_status='DELETED' where id='${job.itemId}'")
+            val before = app.testutil.finishSnapshot(source, job)
+            assertEquals(ClaimResult.Ignored, AnalysisClaimRepository(source).claim(job.jobId, 1, lane))
+            assertEquals("CANCELLED", app.testutil.analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
+            val after = app.testutil.finishSnapshot(source, job)
+            assertEquals(before[0], after[0])
+            assertEquals(before[2], after[2])
+            assertEquals("0", app.testutil.analysisScalar(source, "select attempt_count+browser_attempt_count from analysis_jobs where id='${job.jobId}'"))
+        }
+    }
+
     @Test
     fun `concurrent lane claims have one winner and consume one attempt`() = withDatabase { source ->
         for (lane in AnalysisLane.entries) {
@@ -74,7 +88,7 @@ class AnalysisClaimRepositoryTest {
             sql(source, "update wishlist_items set $assignment where id='${job.itemId}'")
             sql(source, "update analysis_jobs set attempt_count=3 where id='${job.jobId}'")
             assertEquals(ClaimResult.Ignored, AnalysisClaimRepository(source).claim(job.jobId, 1, AnalysisLane.GENERAL))
-            assertEquals("GENERAL_PENDING", scalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
+            assertEquals(if (assignment == "lifecycle_status='DELETED'") "CANCELLED" else "GENERAL_PENDING", scalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
             assertEquals("1", scalar(source, "select version from wishlist_items where id='${job.itemId}'"))
         }
         val job = createJob(source)

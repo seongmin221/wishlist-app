@@ -3,6 +3,21 @@ package app
 import kotlin.test.*
 
 class RuntimeResourcesTest {
+    @Test fun `admitted dispatches run concurrently instead of holding lifecycle monitor`() {
+        val resources = RuntimeResources()
+        val entered = java.util.concurrent.CountDownLatch(2)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val futures = (1..2).map { pool.submit<Boolean> {
+                resources.runIfOpen { entered.countDown(); check(release.await(5, java.util.concurrent.TimeUnit.SECONDS)) }
+            } }
+            assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS), "independent publishes must overlap")
+            release.countDown()
+            futures.forEach { assertTrue(it.get(5, java.util.concurrent.TimeUnit.SECONDS)) }
+        } finally { release.countDown(); pool.shutdownNow(); resources.close() }
+    }
+
     @Test fun `stopping drains admitted dispatch and rejects new work`() {
         val resources = RuntimeResources()
         val admitted = java.util.concurrent.CountDownLatch(1)
