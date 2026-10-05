@@ -16,6 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,7 +45,8 @@ fun WLInput(
     Column(modifier, verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
         if (label != null || hint != null) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                WLText(label.orEmpty(), WLType.body.copy(fontSize = 13.sp), color = c.textSecondary)
+                // 입력칸이 같은 라벨을 읽으므로 보이는 라벨은 접근성에서 뺀다(두 번 읽지 않게, iOS와 같음).
+                WLText(label.orEmpty(), WLType.body.copy(fontSize = 13.sp), Modifier.clearAndSetSemantics { }, color = c.textSecondary)
                 WLText(hint.orEmpty(), WLType.label, color = c.textSecondary)
             }
         }
@@ -54,7 +58,8 @@ fun WLInput(
             textStyle = WLType.button.copy(color = c.text),
             cursorBrush = SolidColor(c.text),
             keyboardOptions = keyboardOptions,
-            modifier = Modifier.fillMaxWidth(),
+            // 칸의 이름은 라벨(없으면 안내 글자). TalkBack이 라벨과 칸을 따로 읽지 않는다.
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = label ?: placeholder },
             decorationBox = { inner ->
                 Box(
                     Modifier
@@ -66,7 +71,13 @@ fun WLInput(
                     contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart,
                 ) {
                     if (value.isEmpty() && placeholder.isNotEmpty()) {
-                        WLText(placeholder, WLType.button.copy(fontWeight = FontWeight.Normal), color = c.textSecondary)
+                        // 라벨이 있으면 안내 글자는 칸 이름 뒤에 읽힌다(iOS 힌트). 라벨이 없으면 칸 이름이 곧 안내 글자라 뺀다.
+                        WLText(
+                            placeholder,
+                            WLType.button.copy(fontWeight = FontWeight.Normal),
+                            if (label == null) Modifier.clearAndSetSemantics { } else Modifier,
+                            color = c.textSecondary,
+                        )
                     }
                     inner()
                 }

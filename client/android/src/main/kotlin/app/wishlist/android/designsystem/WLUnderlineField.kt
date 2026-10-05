@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -54,7 +55,9 @@ fun WLUnderlineField(
         decorationBox = { inner ->
             Box {
                 if (value.isEmpty() && placeholder.isNotEmpty()) {
-                    WLText(placeholder, style, color = c.textSecondary)
+                    // 칸 자체에 이미 wlLineBox가 있으므로 WLText(줄 상자를 한 번 더 적용)가 아니라 BasicText로 그린다.
+                    // 그래야 안내 글자가 입력 글자와 같은 자리에 있고 첫 글자를 칠 때 튀지 않는다.
+                    BasicText(placeholder, style = style.copy(color = c.textSecondary))
                 }
                 inner()
             }
