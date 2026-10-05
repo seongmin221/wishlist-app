@@ -102,21 +102,22 @@ allowedActions: ACTIVE 비PROCESSING은 EDIT/DELETE, 수동 미완료 PARTIAL/�
 ### Task 2: 공통 DTO와 안전한 공개 오류를 준비한다
 
 **Files:**
-- Create: `server/src/main/kotlin/app/http/ApiError.kt`, `WishlistItemDtos.kt`, `ApiHttpSupport.kt`
+- Create: `server/src/main/kotlin/app/http/ApiError.kt`, `WishlistItemDtos.kt`, `ApiHttpSupport.kt`, `DecimalJsonSerializer.kt`
 - Modify: `server/src/main/kotlin/app/http/WishlistRoutes.kt`, `server/src/main/kotlin/app/Main.kt`, `server/build.gradle.kts`
 - Test: `server/src/test/kotlin/app/http/ApiErrorTest.kt`, 기존 `WishlistRoutesTest.kt`, `FirebaseOwnerResolverTest.kt`
 
 **Interfaces:**
-- `@Serializable ApiErrorEnvelope(error: ApiError)`와 `ApiError(code: String, requestId: String, details: Map<String,String> = emptyMap())`.
-- `suspend fun ApplicationCall.respondApiError(status: HttpStatusCode, code: String, details: Map<String,String> = emptyMap())`.
+- `@Serializable ApiErrorEnvelope(error: ApiError)`와 `ApiError(code: String, requestId: String, details: Map<String,JsonElement> = emptyMap())`.
+- `suspend fun ApplicationCall.respondApiError(status: HttpStatusCode, code: String, details: Map<String,JsonElement> = emptyMap())`.
 - `fun Application.installApiHttpSupport()`는 request UUID 발급·X-Request-ID 응답과 미처리 오류 500 INTERNAL_ERROR 변환을 등록한다. 임의 입력 request ID/exception message를 공개 응답에 복사하지 않는다.
-- `WishlistItemDto`와 `ProductDto/CategoryDto/PurposeDto/AnalysisDto`의 기존 key, nullable 의미·상태 enum을 선언하고 encodeDefaults로 필수 null/default 필드가 사라지지 않게 한다. UUID와 Instant는 wire DTO에서 String이다. 실제 entity→DTO mapper와 상세 route 연결은 B1이다.
+- `WishlistItemDto`와 `ProductDto/CategoryDto/PurposeDto/AnalysisDto`의 기존 key, nullable 의미·상태 enum을 선언하고 encodeDefaults로 필수 null/default 필드가 사라지지 않게 한다. UUID와 Instant는 wire DTO에서 String이다. 실제 entity→DTO mapper와 상세 route 연결은 B1이다. 가격은 nullable BigDecimal과 숫자 serializer로 정밀도를 보존한다. 오류 details의 JSON 숫자도 문자열로 바꾸지 않는다.
+- 취소 검증은 test engine의 기본 진단 응답에 예외가 전달되고 API `INTERNAL_ERROR` envelope로 변환되지 않는지 확인한다. Ktor test engine이 취소를 HTTP 500으로 표현하므로 client 예외 assertion으로 판단하지 않는다.
 
-- [ ] **Step 1: 실패할 오류·직렬화 테스트 작성.** missing auth→401 UNAUTHORIZED, malformed key→400 INVALID_IDEMPOTENCY_KEY, 잘못된/누락 URL→기존 422 INVALID_URL, key 재사용→409 IDEMPOTENCY_KEY_REUSED를 유지하며 모든 오류의 requestId가 UUID이고 header와 일치해야 한다. RuntimeException의 비밀 문자열은 500 body에 없어야 하고 CancellationException은 500으로 삼키지 않아야 한다. DTO의 explicit null·enum 값과 기존 key를 roundtrip한다.
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.http.ApiErrorTest --tests app.http.WishlistRoutesTest --tests app.http.FirebaseOwnerResolverTest` — 새 오류 envelope/타입 부재로 실패. DB 준비 실패와 구별한다.
-- [ ] **Step 3: helper·DTO 구현.** Ktor StatusPages dependency는 기존 ktorVersion을 사용한다. 기존 생성 성공 JSON을 여기서 가짜 mapper로 치환하지 않는다. 오류를 공통 helper로 변경하고 testApplication도 support를 설치하게 수정한다. FirebaseOwnerResolver의 owner 생성 규칙은 유지한다.
-- [ ] **Step 4: GREEN 확인.** 같은 명령 PASS, 기존 생성/replay 성공·Location/header assertions 유지.
-- [ ] **Step 5: 커밋.** `feature(server): 공통 API 오류와 응답 타입 준비` / `기존 오류 코드를 유지하며 요청 식별자와 안전한 응답 기반을 추가한다.`
+- [x] **Step 1: 실패할 오류·직렬화 테스트 작성.** missing auth→401 UNAUTHORIZED, malformed key→400 INVALID_IDEMPOTENCY_KEY, 잘못된/누락 URL→기존 422 INVALID_URL, key 재사용→409 IDEMPOTENCY_KEY_REUSED를 유지하며 모든 오류의 requestId가 UUID이고 header와 일치해야 한다. RuntimeException의 비밀 문자열은 500 body에 없어야 하고 CancellationException은 500으로 삼키지 않아야 한다. DTO의 explicit null·enum 값과 기존 key를 roundtrip한다.
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.http.ApiErrorTest --tests app.http.WishlistRoutesTest --tests app.http.FirebaseOwnerResolverTest` — 새 오류 envelope/타입 부재로 실패. DB 준비 실패와 구별한다.
+- [x] **Step 3: helper·DTO 구현.** Ktor StatusPages dependency는 기존 ktorVersion을 사용한다. 기존 생성 성공 JSON을 여기서 가짜 mapper로 치환하지 않는다. 오류를 공통 helper로 변경하고 testApplication도 support를 설치하게 수정한다. FirebaseOwnerResolver의 owner 생성 규칙은 유지한다.
+- [x] **Step 4: GREEN 확인.** 같은 명령 PASS, 기존 생성/replay 성공·Location/header assertions 유지.
+- [x] **Step 5: 커밋.** `feature(server): 공통 API 오류와 응답 타입 준비` / `기존 오류 코드를 유지하며 요청 식별자와 안전한 응답 기반을 추가한다.`
 
 ### Task 3: 상태·generation·claim schema와 owner 조회를 확장한다
 

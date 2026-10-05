@@ -61,3 +61,5 @@
 - [B0 Task 1 상태 정책 구현](b0-task-1-state-policy-2026-10-05.md) — server 브랜치 분리·상태별 허용 행동·단위/회귀 검증
 
 - [DB 테스트 호스트 준비 대기](db-test-host-readiness-2026-10-05.md) — 기존 연결 실패 해소·공통 fixture·전체 회귀
+
+- [B0 Task 2 공통 API 응답 구현](b0-task-2-api-contract-2026-10-05.md) — 요청 ID·공개 오류·DTO·가격 정밀도

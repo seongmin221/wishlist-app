@@ -16,24 +16,22 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonPrimitive
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 
 fun Route.wishlistRoutes(
     service: CreateWishlistItemService,
     ownerResolver: suspend (ApplicationCall) -> UUID?,
 ) {
     post("/v1/wishlist-items") {
-        val owner = ownerResolver(call) ?: return@post call.respondText(
-            """{"error":{"code":"UNAUTHORIZED"}}""", ContentType.Application.Json, HttpStatusCode.Unauthorized,
-        )
+        val owner = ownerResolver(call) ?: return@post call.respondApiError(HttpStatusCode.Unauthorized, "UNAUTHORIZED")
         val key = call.request.headers["Idempotency-Key"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            ?: return@post call.respondText(
-                """{"error":{"code":"INVALID_IDEMPOTENCY_KEY"}}""", ContentType.Application.Json, HttpStatusCode.BadRequest,
-            )
-        val sourceUrl = runCatching {
+            ?: return@post call.respondApiError(HttpStatusCode.BadRequest, "INVALID_IDEMPOTENCY_KEY")
+        val sourceUrl = try {
             Json.parseToJsonElement(call.receiveText()).jsonObject["sourceUrl"]?.jsonPrimitive?.content
-        }.getOrNull() ?: return@post call.respondText(
-            """{"error":{"code":"INVALID_URL"}}""", ContentType.Application.Json, HttpStatusCode.UnprocessableEntity,
-        )
+        } catch (cause: Exception) {
+            if (cause is CancellationException) throw cause
+            null
+        } ?: return@post call.respondApiError(HttpStatusCode.UnprocessableEntity, "INVALID_URL")
 
         when (val result = service.create(owner, key, sourceUrl)) {
             is CreateResult.Created -> {
@@ -44,12 +42,8 @@ fun Route.wishlistRoutes(
                 call.response.headers.append("Idempotency-Replayed", "true")
                 call.respondText(itemJson(result.item), ContentType.Application.Json, HttpStatusCode.OK)
             }
-            is CreateResult.IdempotencyKeyReused -> call.respondText(
-                """{"error":{"code":"IDEMPOTENCY_KEY_REUSED"}}""", ContentType.Application.Json, HttpStatusCode.Conflict,
-            )
-            CreateResult.InvalidUrl -> call.respondText(
-                """{"error":{"code":"INVALID_URL"}}""", ContentType.Application.Json, HttpStatusCode.UnprocessableEntity,
-            )
+            is CreateResult.IdempotencyKeyReused -> call.respondApiError(HttpStatusCode.Conflict, "IDEMPOTENCY_KEY_REUSED")
+            CreateResult.InvalidUrl -> call.respondApiError(HttpStatusCode.UnprocessableEntity, "INVALID_URL")
         }
     }
 }

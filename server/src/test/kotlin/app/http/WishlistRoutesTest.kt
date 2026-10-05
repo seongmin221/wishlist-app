@@ -16,6 +16,9 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import app.testutil.PostgresTestContainer
 
 class WishlistRoutesTest {
@@ -29,7 +32,7 @@ class WishlistRoutesTest {
             val key = UUID.randomUUID()
 
             testApplication {
-                application { routing { wishlistRoutes(service) { owner } } }
+                application { installApiHttpSupport(); routing { wishlistRoutes(service) { owner } } }
                 suspend fun submit(url: String) = client.post("/v1/wishlist-items") {
                     header("Idempotency-Key", key.toString())
                     contentType(ContentType.Application.Json)
@@ -49,6 +52,11 @@ class WishlistRoutesTest {
 
                 val conflict = submit("https://example.com/another")
                 assertEquals(HttpStatusCode.Conflict, conflict.status)
+                val error = Json.parseToJsonElement(conflict.bodyAsText()).jsonObject.getValue("error").jsonObject
+                assertEquals("IDEMPOTENCY_KEY_REUSED", error.getValue("code").jsonPrimitive.content)
+                assertEquals(conflict.headers["X-Request-ID"], error.getValue("requestId").jsonPrimitive.content)
+                UUID.fromString(first.headers["X-Request-ID"]!!)
+                UUID.fromString(replay.headers["X-Request-ID"]!!)
 
                 val invalid = submit("http://127.0.0.1/private")
                 assertEquals(HttpStatusCode.UnprocessableEntity, invalid.status)

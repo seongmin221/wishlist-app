@@ -276,6 +276,8 @@ DELETE /v1/wishlist-items/{id}
 }
 ```
 
+가격 wire 타입은 JSON number 또는 null이다. 공통 DTO는 BigDecimal을 사용하고 부동소수점 변환 없이 소수 값을 직렬화한다. 금액 단위와 통화 validation은 metadata 구현에서 확정한다.
+
 ## 오류 계약
 
 API 오류는 안정된 `code`, 추적 가능한 `requestId`와 필요한 최소 `details`만 반환한다.
@@ -284,7 +286,7 @@ API 오류는 안정된 `code`, 추적 가능한 `requestId`와 필요한 최소
 {
   "error": {
     "code": "WISHLIST_ITEM_STATE_CONFLICT",
-    "requestId": "safe-trace-id",
+    "requestId": "096dfcd0-cade-4e63-a916-b3fefc07d4b7",
     "details": {
       "currentVersion": 8
     }
@@ -292,6 +294,9 @@ API 오류는 안정된 `code`, 추적 가능한 `requestId`와 필요한 최소
 }
 ```
 
+- 서버는 요청마다 UUID를 생성하고 성공·오류 응답의 `X-Request-ID`에 넣는다. 공개 오류의 `requestId`는 같은 값이며, 입력 헤더는 복사하지 않는다.
+- `details`는 허용한 최소 JSON 값으로 구성한다. `currentVersion` 같은 숫자를 문자열로 바꾸지 않으며 상세 정보가 없으면 `{}`를 반환한다.
+- 미처리 예외는 `500 INTERNAL_ERROR`로 변환한다. coroutine 취소 예외는 다시 던져 요청 취소 의미를 유지한다.
 - 앱은 `code`를 현지화된 문구와 행동으로 매핑한다.
 - 알 수 없는 코드는 일반 오류로 안전하게 처리한다.
 - `429`에는 `Retry-After`를 포함한다.

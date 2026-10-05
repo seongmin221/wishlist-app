@@ -12,6 +12,8 @@ import io.ktor.server.routing.routing
 import org.flywaydb.core.Flyway
 import javax.sql.DataSource
 import org.postgresql.ds.PGSimpleDataSource
+import app.http.ApiJson
+import app.http.installApiHttpSupport
 import app.http.FirebaseOwnerResolver
 import app.http.wishlistRoutes
 import app.http.workerRoutes
@@ -44,7 +46,8 @@ fun main() {
 fun Application.module() {
     val env = System.getenv()
     val runtime = RuntimeConfig.fromEnvironment(env)
-    install(ContentNegotiation) { json() }
+    install(ContentNegotiation) { json(ApiJson) }
+    installApiHttpSupport()
     routing {
         get("/health") { call.respondText("ok") }
         if (runtime.role == RuntimeRole.GENERAL_WORKER) {
