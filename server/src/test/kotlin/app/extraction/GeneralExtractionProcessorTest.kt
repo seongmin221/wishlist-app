@@ -7,12 +7,12 @@ import app.wishlist.CreateWishlistItemService
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 
 class GeneralExtractionProcessorTest {
     @Test
     fun `complete extraction stores metadata before marking item ready`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
@@ -40,7 +40,7 @@ class GeneralExtractionProcessorTest {
 
     @Test
     fun `insufficient metadata becomes partial and asks for manual completion`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
@@ -61,7 +61,7 @@ class GeneralExtractionProcessorTest {
 
     @Test
     fun `blocked redirect is terminal without retry`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)

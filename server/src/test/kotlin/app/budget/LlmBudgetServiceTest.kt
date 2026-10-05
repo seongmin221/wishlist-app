@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertFailsWith
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 
 class LlmBudgetServiceTest {
     @Test fun `concurrent reservations cannot exceed either ceiling`() = withBudget { service, jobId ->
@@ -58,7 +58,7 @@ class LlmBudgetServiceTest {
     }
 
     private fun withBudget(block: (LlmBudgetService, UUID) -> Unit) {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
+        PostgresTestContainer().use { db ->
             db.start()
             DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)
             val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)

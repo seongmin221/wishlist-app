@@ -6,11 +6,11 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 
 class BudgetMaintenanceServiceTest {
     @Test fun `one maintenance run settles expired in flight and delivers pending alert`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
+        PostgresTestContainer().use { db ->
             db.start(); DatabaseFactory.migrate(db.jdbcUrl,db.username,db.password)
             val source = DatabaseFactory.dataSource(db.jdbcUrl,db.username,db.password)
             CreateWishlistItemService(source).create(UUID.randomUUID(),UUID.randomUUID(),"https://example.com/item")

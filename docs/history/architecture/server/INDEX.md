@@ -59,3 +59,5 @@
 - [MVP API 구현 순서 결정](api-implementation-sequencing-2026-10-04.md) — 37개 API 최초 배정·자원 의존 순서·단계 통과 조건
 
 - [B0 Task 1 상태 정책 구현](b0-task-1-state-policy-2026-10-05.md) — server 브랜치 분리·상태별 허용 행동·단위/회귀 검증
+
+- [DB 테스트 호스트 준비 대기](db-test-host-readiness-2026-10-05.md) — 기존 연결 실패 해소·공통 fixture·전체 회귀

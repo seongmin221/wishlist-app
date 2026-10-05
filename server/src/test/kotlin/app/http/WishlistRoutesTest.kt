@@ -16,12 +16,12 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 
 class WishlistRoutesTest {
     @Test
     fun `create replay conflict and invalid url use stable http contract`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val service = CreateWishlistItemService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password))

@@ -6,12 +6,12 @@ import app.wishlist.CreateWishlistItemService
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 
 class BrowserRenderProcessorTest {
     @Test
     fun `processor renders the source url belonging to its job`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)

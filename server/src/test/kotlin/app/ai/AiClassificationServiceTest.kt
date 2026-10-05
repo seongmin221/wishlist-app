@@ -12,7 +12,7 @@ import app.wishlist.CreateWishlistItemService
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 
 class AiClassificationServiceTest {
     @Test fun `extraction is not ready until classification succeeds`() = withJob { source, jobId ->
@@ -92,7 +92,7 @@ class AiClassificationServiceTest {
     }
 
     private fun withJob(block: (javax.sql.DataSource, UUID) -> Unit) {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
+        PostgresTestContainer().use { db ->
             db.start(); DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)
             val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)
             CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item")

@@ -7,12 +7,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import app.testutil.PostgresTestContainer
 import org.testcontainers.containers.PostgreSQLContainer
 
 class OutboxDispatcherTest {
     @Test
     fun `failed publication remains recoverable and keeps its task name`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             CreateWishlistItemService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password))

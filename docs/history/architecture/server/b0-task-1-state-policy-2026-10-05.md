@@ -58,3 +58,7 @@ PROCESSING은 삭제만 가능하며 실패/PARTIAL 수동 완료, 재시도 가
 - `app.browser.BrowserWorkerServiceTest :: needs browser stores stage flag and outbox together()`
 
 추가로 Docker가 필요 없는 기존 테스트 24개와 새 정책 테스트 14개를 함께 실행해 **38개 통과, 실패/skip 0개**를 확인했다.
+
+## 후속 DB 회귀 해결
+
+Task 2 착수 시 [호스트 포트 준비 대기](db-test-host-readiness-2026-10-05.md)를 공통 fixture에 적용해 기존 suite 81개 중 80개 통과·실패 0개·opt-in 1개 skip을 확인했다. 위 Task 1 당시 실패 기록은 당시 증거로 유지하며 DB 회귀 보류는 이 후속 검증으로 해소됐다.

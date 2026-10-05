@@ -6,6 +6,7 @@ import app.wishlist.CreateWishlistItemService
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import app.testutil.PostgresTestContainer
 import org.testcontainers.containers.PostgreSQLContainer
 
 class GeneralWorkerServiceTest {
@@ -91,7 +92,7 @@ class GeneralWorkerServiceTest {
     }
 
     private fun withJob(block: (PostgreSQLContainer<*>, UUID, UUID) -> Unit) {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val item = CreateWishlistItemService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password))

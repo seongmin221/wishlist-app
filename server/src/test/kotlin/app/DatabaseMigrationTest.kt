@@ -3,13 +3,13 @@ package app
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 import java.sql.DriverManager
 
 class DatabaseMigrationTest {
     @Test
     fun `all Flyway migrations apply to an empty postgres database`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
 
             assertDoesNotThrow {

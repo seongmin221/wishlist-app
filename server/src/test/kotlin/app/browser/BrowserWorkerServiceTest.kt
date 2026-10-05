@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import app.analysis.AnalysisJobReconciler
+import app.testutil.PostgresTestContainer
 import org.testcontainers.containers.PostgreSQLContainer
 
 class BrowserWorkerServiceTest {
@@ -132,7 +133,7 @@ class BrowserWorkerServiceTest {
     }
 
     private fun withJob(block: (PostgreSQLContainer<*>, UUID) -> Unit) {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             CreateWishlistItemService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password))
