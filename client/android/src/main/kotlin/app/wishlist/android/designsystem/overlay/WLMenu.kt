@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -111,6 +113,7 @@ internal fun MenuLayer(entry: MenuEntry, state: OverlayHostState) {
             onItemClick = { item -> if (state.requestDismiss(entry.id)) item.onClick() },
             modifier = Modifier
                 .offset { IntOffset(clampedX.roundToInt(), y.roundToInt()) }
+                .semantics { paneTitle = "메뉴" }
                 .graphicsLayer {
                     alpha = q.value
                     val s = 0.96f + 0.04f * q.value

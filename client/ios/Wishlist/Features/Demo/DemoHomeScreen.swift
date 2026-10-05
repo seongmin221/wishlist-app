@@ -122,6 +122,10 @@ private struct DemoSheet: View {
         VStack(spacing: WishlistTokens.Space.s20) {
             WLSheetHeader(title: "시트 데모") { overlay?.dismiss() }
             WLInput(value: $name, label: "이름", placeholder: DemoContent.longestPurposeName, maxLength: 40)
+            // 확인창의 확인이 아래 시트까지 닫는 경로(dismissAll).
+            WLButton("삭제(시트까지 닫기)", kind: .danger) {
+                overlay?.showDialog(demoDeleteDialog { overlay?.dismissAll() })
+            }
             WLButtonPair(cancelText: "취소", primaryText: "저장", primaryKind: .primary,
                          onCancel: { overlay?.dismiss() }, onPrimary: { overlay?.dismiss() })
         }

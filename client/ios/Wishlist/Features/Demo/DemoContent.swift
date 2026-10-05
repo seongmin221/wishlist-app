@@ -229,14 +229,14 @@ struct DemoFlowLayout: Layout {
     }
 }
 
-func demoDeleteDialog() -> WLDialogSpec {
+func demoDeleteDialog(onConfirm: @escaping () -> Void = {}) -> WLDialogSpec {
     WLDialogSpec(
         title: "상품을 삭제할까요?",
         bullets: ["'\(DemoContent.longestPurposeName)' 목적의 비교 후보에서도 빠져요.", "삭제한 상품은 되돌릴 수 없어요."],
         cancelText: "취소",
         confirmText: "삭제",
         confirmKind: .danger,
-        onConfirm: {}
+        onConfirm: onConfirm
     )
 }
 

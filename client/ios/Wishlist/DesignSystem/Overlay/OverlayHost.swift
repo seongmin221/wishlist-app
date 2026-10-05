@@ -61,11 +61,15 @@ final class OverlayEntry: Identifiable {
 /// - `show*`: 열리는 중이면 무시(false). 닫히는 중이면 **하나만 줄 세운다**: 닫기가 끝난 직후 열린다(나중 요청이 앞 요청을 대체).
 ///   "메뉴 항목 -> 닫기 -> 확인창 열기"를 호출 순서대로 써도 확인창이 사라지지 않는다. 그 외에는 바로 쌓는다.
 /// - 닫기는 항상 가장 위 overlay 하나만 닫는다(확인창이 시트 위에 있으면 확인창만).
+/// - `dismissAll`: 쌓인 overlay를 위에서부터 차례로 모두 닫는다. 가장 위가 이미 닫히는 중이어도 받는다(줄 세운 닫기).
+///   확인창의 `onConfirm`(창이 닫히기 시작한 뒤 불린다) 안에서 불러 "확인 -> 아래 시트까지 닫기"를 쓴다.
+///   그 전에 줄 세운 `show*`는 버린다(그 뒤의 `show*`는 모두 닫힌 뒤 열린다).
 @Observable
 final class OverlayHostState {
     private(set) var entries: [OverlayEntry] = []
     @ObservationIgnored private var nextId = 0
     @ObservationIgnored private var pending: (() -> Void)?
+    @ObservationIgnored private var dismissingAll = false
 
     var isAnimating: Bool { entries.contains { $0.phase != .open } }
 
@@ -96,6 +100,17 @@ final class OverlayHostState {
         return true
     }
 
+    /// 모든 overlay를 위에서부터 차례로 닫는다. 열리는 중인 overlay가 있으면 무시(false).
+    /// 가장 위가 `open`이면 바로 닫기 시작하고, 이미 `closing`이면 그 닫기가 끝난 뒤 이어서 닫는다.
+    @discardableResult
+    func dismissAll() -> Bool {
+        guard let top = entries.last, !entries.contains(where: { $0.phase == .opening }) else { return false }
+        dismissingAll = true
+        pending = nil
+        if top.phase == .open { top.phase = .closing }
+        return true
+    }
+
     /// 확인창의 확인 버튼. 닫기를 시작할 수 있을 때만(=한 번만) `onConfirm`을 부른다.
     @discardableResult
     func confirm(_ id: Int) -> Bool {
@@ -112,6 +127,13 @@ final class OverlayHostState {
     func onClosed(_ id: Int) {
         entries.removeAll { $0.id == id }
         if !entries.contains(where: { $0.phase == .closing }) {
+            if dismissingAll {
+                if let top = entries.last {
+                    top.phase = .closing
+                    return
+                }
+                dismissingAll = false
+            }
             let next = pending
             pending = nil
             next?()

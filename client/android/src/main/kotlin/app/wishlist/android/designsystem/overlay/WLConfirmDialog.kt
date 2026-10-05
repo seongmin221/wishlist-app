@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -110,6 +112,7 @@ internal fun DialogLayer(entry: DialogEntry, state: OverlayHostState, dimBelow: 
                 .safeDrawingPadding()
                 .padding(horizontal = WishlistTokens.Space.s24)
                 .widthIn(max = 480.dp)
+                .semantics { paneTitle = entry.spec.title }
                 .graphicsLayer {
                     this.alpha = alpha.value
                     scaleX = scale.value
@@ -119,7 +122,7 @@ internal fun DialogLayer(entry: DialogEntry, state: OverlayHostState, dimBelow: 
             WLConfirmDialogCard(
                 spec = entry.spec,
                 onCancel = { state.requestDismiss(entry.id) },
-                onConfirm = { if (state.requestDismiss(entry.id)) entry.spec.onConfirm() },
+                onConfirm = { state.confirm(entry.id) },
             )
         }
     }

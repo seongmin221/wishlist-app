@@ -23,6 +23,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLButtonKind
 import app.wishlist.android.designsystem.WishlistTokens
@@ -72,13 +73,20 @@ internal class MenuEntry(id: Long, val anchor: Rect, val items: List<WLMenuItem>
  * - `show*`: 열리는 중이면 무시(false). 닫히는 중이면 **하나만 줄 세운다**: 닫기가 끝난 직후 열린다(나중 요청이 앞 요청을 대체).
  *   "메뉴 항목 -> 닫기 -> 확인창 열기"를 호출 순서대로 써도 확인창이 사라지지 않는다. 그 외에는 바로 쌓는다.
  * - 닫기는 항상 가장 위 overlay 하나만 닫는다(확인창이 시트 위에 있으면 확인창만).
+ * - `dismissAll`: 쌓인 overlay를 위에서부터 차례로 모두 닫는다. 가장 위가 이미 닫히는 중이어도 받는다(줄 세운 닫기).
+ *   확인창의 `onConfirm`(창이 닫히기 시작한 뒤 불린다) 안에서 불러 "확인 -> 아래 시트까지 닫기"를 쓴다.
+ *   그 전에 줄 세운 `show*`는 버린다(그 뒤의 `show*`는 모두 닫힌 뒤 열린다).
  */
 class OverlayHostState {
     internal val entries = mutableStateListOf<OverlayEntry>()
     private var nextId = 0L
     private var pending: (() -> Unit)? = null
+    private var dismissingAll = false
 
     val isAnimating: Boolean get() = entries.any { it.phase != OverlayPhase.Open }
+
+    /** overlay가 하나라도 있는지(닫히는 중 포함). 뒤 화면을 접근성에서 숨기고 라우터의 뒤로를 끈다. */
+    val isShowing: Boolean get() = entries.isNotEmpty()
 
     fun showSheet(draggable: Boolean = true, content: @Composable () -> Unit): Boolean =
         push { SheetEntry(it, draggable, content) }
@@ -102,6 +110,27 @@ class OverlayHostState {
         return true
     }
 
+    /**
+     * 모든 overlay를 위에서부터 차례로 닫는다. 열리는 중인 overlay가 있으면 무시(false).
+     * 가장 위가 `Open`이면 바로 닫기 시작하고, 이미 `Closing`이면 그 닫기가 끝난 뒤 이어서 닫는다.
+     */
+    fun dismissAll(): Boolean {
+        if (entries.isEmpty() || entries.any { it.phase == OverlayPhase.Opening }) return false
+        dismissingAll = true
+        pending = null
+        val top = entries.last()
+        if (top.phase == OverlayPhase.Open) top.phase = OverlayPhase.Closing
+        return true
+    }
+
+    /** 확인창의 확인 버튼. 닫기를 시작할 수 있을 때만(=한 번만) `onConfirm`을 부른다. */
+    internal fun confirm(id: Long): Boolean {
+        val entry = entries.firstOrNull { it.id == id } as? DialogEntry ?: return false
+        if (!requestDismiss(id)) return false
+        entry.spec.onConfirm()
+        return true
+    }
+
     internal fun onOpened(id: Long) {
         entries.firstOrNull { it.id == id && it.phase == OverlayPhase.Opening }?.phase = OverlayPhase.Open
     }
@@ -109,6 +138,14 @@ class OverlayHostState {
     internal fun onClosed(id: Long) {
         entries.removeAll { it.id == id }
         if (entries.none { it.phase == OverlayPhase.Closing }) {
+            if (dismissingAll) {
+                val top = entries.lastOrNull()
+                if (top != null) {
+                    top.phase = OverlayPhase.Closing
+                    return
+                }
+                dismissingAll = false
+            }
             val next = pending
             pending = null
             next?.invoke()
@@ -157,7 +194,9 @@ fun OverlayHost(state: OverlayHostState, content: @Composable () -> Unit) {
 
     CompositionLocalProvider(LocalOverlayHostState provides state) {
         Box(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().wlBackdropBlur { scrim.value }) { content() }
+            // overlay가 있으면(닫히는 중 포함) 뒤 화면을 접근성 트리에서 뺀다. TalkBack 클릭은 막·InputBlocker(포인터만)를
+            // 거치지 않으므로 숨기지 않으면 시트 아래 목록·탭 바를 누를 수 있다. 수식자만 바꿔 content의 상태는 유지된다.
+            Box(Modifier.fillMaxSize().wlBackdropBlur { scrim.value }.wlAccessibilityCovered(state.isShowing)) { content() }
             if (scrimActive) {
                 WLScrim(
                     progress = { scrim.value },
@@ -168,22 +207,35 @@ fun OverlayHost(state: OverlayHostState, content: @Composable () -> Unit) {
                     },
                 )
             }
+            val last = state.entries.lastIndex
             state.entries.forEachIndexed { index, entry ->
                 key(entry.id) {
-                    when (entry) {
-                        is SheetEntry -> SheetLayer(entry, state)
-                        is DialogEntry -> DialogLayer(entry, state, dimBelow = index > 0)
-                        is MenuEntry -> MenuLayer(entry, state)
+                    // 가장 위가 아닌 층(확인창 아래 시트)과 열고 닫는 중인 층은 접근성에서 뺀다. 전환 중 TalkBack 클릭이
+                    // InputBlocker를 우회해 시트 안 버튼을 누르지 못하게 한다.
+                    Box(Modifier.wlAccessibilityCovered(index != last || entry.phase != OverlayPhase.Open)) {
+                        when (entry) {
+                            is SheetEntry -> SheetLayer(entry, state)
+                            is DialogEntry -> DialogLayer(entry, state, dimBelow = index > 0)
+                            is MenuEntry -> MenuLayer(entry, state)
+                        }
                     }
                 }
             }
             // 전환 중에는 overlay 안쪽(시트 내용·메뉴 항목·확인창 버튼)도 입력을 받지 않는다(motion.md 구현 기본값).
             if (state.isAnimating) InputBlocker()
         }
-        // content 뒤에 등록해 content 안의 뒤로 처리(내비게이션)보다 우선한다. overlay가 새로 생길 때마다 가장 나중 등록이 된다.
-        if (state.entries.isNotEmpty()) BackHandler { state.dismiss() }
+        // 뒤로 우선순위: 라우터(WLNavHost)의 뒤로 처리는 overlay가 있는 동안 꺼진다(`LocalOverlayHostState.isShowing`).
+        // 등록 순서에 기대지 않으므로 overlay 아래에서 새 탭 스택이 그려져 나중에 등록되어도 뒤로가 그 아래로 새지 않는다.
+        if (state.isShowing) BackHandler { state.dismiss() }
     }
 }
+
+/**
+ * 가려진 층을 접근성 트리에서 뺀다(후손까지). 가려지지 않으면 아무것도 하지 않는다.
+ * 같은 자리의 수식자만 바뀌므로 composition(상태)은 그대로다.
+ */
+internal fun Modifier.wlAccessibilityCovered(covered: Boolean): Modifier =
+    if (covered) this.clearAndSetSemantics { } else this
 
 @Composable
 private fun InputBlocker() {

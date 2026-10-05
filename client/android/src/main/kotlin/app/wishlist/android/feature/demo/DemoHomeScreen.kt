@@ -175,6 +175,13 @@ private fun DemoSheet(overlay: OverlayHostState) {
     Column(verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s20)) {
         WLSheetHeader("시트 데모", onClose = { overlay.dismiss() })
         WLInput(name, { name = it }, label = "이름", placeholder = DemoContent.LONGEST_PURPOSE_NAME, maxLength = 40)
+        // 확인창의 확인이 아래 시트까지 닫는 경로(dismissAll).
+        WLButton(
+            "삭제(시트까지 닫기)",
+            WLButtonKind.Danger,
+            { overlay.showDialog(demoDeleteDialog().copy(onConfirm = { overlay.dismissAll() })) },
+            Modifier.fillMaxWidth(),
+        )
         WLButtonPair("취소", "저장", WLButtonKind.Primary, onCancel = { overlay.dismiss() }, onPrimary = { overlay.dismiss() })
     }
 }
