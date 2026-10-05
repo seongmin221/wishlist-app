@@ -7,12 +7,14 @@
 /* Begin PBXBuildFile section */
         A10000000000000000000001 /* WishlistApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* WishlistApp.swift */; };
         A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* ContentView.swift */; };
+        A10000000000000000000003 /* WishlistTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* WishlistTokens.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
         A20000000000000000000001 /* WishlistApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistApp.swift; sourceTree = "<group>"; };
         A20000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
         A20000000000000000000003 /* Wishlist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wishlist.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        A20000000000000000000004 /* WishlistTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistTokens.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -27,8 +29,14 @@
         };
         A40000000000000000000002 /* Wishlist */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000002 /* ContentView.swift */);
+            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000002 /* ContentView.swift */, A40000000000000000000004 /* DesignSystem */);
             path = Wishlist;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000004 /* DesignSystem */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000004 /* WishlistTokens.swift */);
+            path = DesignSystem;
             sourceTree = "<group>";
         };
         A40000000000000000000003 /* Products */ = {
@@ -93,7 +101,7 @@
         A60000000000000000000001 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */);
+            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXSourcesBuildPhase section */

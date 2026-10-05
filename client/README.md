@@ -75,6 +75,10 @@ xcodebuild -project ios/Wishlist.xcodeproj -scheme Wishlist \
 
 2026-10-05 Xcode 26.6에서 Debug/Release arm64 simulator build와 Release arm64 device build를 확인했다. iPhone 17 Pro / iOS 26.5 simulator에서 Debug 앱을 설치·실행하고 라이트·다크 화면의 공통 코드 문구를 확인했다. device build는 서명 없이 수행했으며 실제 iPhone 설치·실행과 배포 서명은 검증하지 않았다. shared iOS test는 아직 테스트가 없어 compile/link가 `NO-SOURCE`, 실행 task가 `SKIPPED`다.
 
+## 디자인 토큰
+
+색·모서리·간격·모션 상수는 `python3 client/tools/gen_tokens.py`로 생성한다(`--check`는 생성물이 오래됐는지 검사). 생성물은 손으로 고치지 않는다.
+
 ## 기능 개발 기준
 
 - [클라이언트 구조](../docs/architecture/client/README.md)

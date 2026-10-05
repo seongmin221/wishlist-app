@@ -1,0 +1,355 @@
+{
+  "$note": "디자인 결정(docs/design/decisions.md)의 값 사본. source는 결정 날짜. 수정 후 python3 client/tools/gen_tokens.py 로 다시 생성한다.",
+  "colors": {
+    "light": {
+      "background": {
+        "value": "#F8F8F8",
+        "source": "2026-10-02"
+      },
+      "card": {
+        "value": "#FFFFFF",
+        "source": "2026-10-02"
+      },
+      "sheet": {
+        "value": "#FFFFFF",
+        "source": "2026-10-02"
+      },
+      "chip": {
+        "value": "#FFFFFF",
+        "source": "2026-10-02"
+      },
+      "iconTile": {
+        "value": "#F0F0F0",
+        "source": "2026-10-02"
+      },
+      "sheetField": {
+        "value": "#F0F0F0",
+        "source": "2026-10-03"
+      },
+      "photo": {
+        "value": "#EEEEEE",
+        "source": "2026-10-02"
+      },
+      "line": {
+        "value": "#E2E2E2",
+        "source": "2026-10-02"
+      },
+      "text": {
+        "value": "#1D1D1D",
+        "source": "2026-10-02"
+      },
+      "textSecondary": {
+        "value": "#5E5E5E",
+        "source": "2026-10-02"
+      },
+      "tabBar": {
+        "value": "#1D1D1D",
+        "source": "2026-10-02"
+      },
+      "underline": {
+        "value": "#BDBDBD",
+        "source": "2026-10-04"
+      },
+      "scrimDim": {
+        "value": 0.24,
+        "source": "2026-10-05"
+      }
+    },
+    "dark": {
+      "background": {
+        "value": "#1D1D1D",
+        "source": "2026-10-02"
+      },
+      "card": {
+        "value": "#312F30",
+        "source": "2026-10-02"
+      },
+      "sheet": {
+        "value": "#2A2A2A",
+        "source": "2026-10-02"
+      },
+      "chip": {
+        "value": "#3A3939",
+        "source": "2026-10-02"
+      },
+      "iconTile": {
+        "value": "#1D1D1D",
+        "source": "2026-10-02"
+      },
+      "sheetField": {
+        "value": "#3A3939",
+        "source": "2026-10-03"
+      },
+      "photo": {
+        "value": "#3A3939",
+        "source": "2026-10-02"
+      },
+      "line": {
+        "value": "#3A3939",
+        "source": "2026-10-02"
+      },
+      "text": {
+        "value": "#F4F3F0",
+        "source": "2026-10-02"
+      },
+      "textSecondary": {
+        "value": "#A9A7A2",
+        "source": "2026-10-02"
+      },
+      "tabBar": {
+        "value": "#312F30",
+        "source": "2026-10-02"
+      },
+      "underline": {
+        "value": "#5A5958",
+        "source": "2026-10-04"
+      },
+      "scrimDim": {
+        "value": 0.45,
+        "source": "2026-10-05"
+      }
+    }
+  },
+  "purpose": {
+    "surface": {
+      "coral": {
+        "value": "#F96857",
+        "source": "2026-10-02"
+      },
+      "mustard": {
+        "value": "#F9CD61",
+        "source": "2026-10-02"
+      },
+      "periwinkle": {
+        "value": "#7477FF",
+        "source": "2026-10-02"
+      },
+      "cyan": {
+        "value": "#BBF3FE",
+        "source": "2026-10-02"
+      },
+      "mint": {
+        "value": "#8ED8B0",
+        "source": "2026-10-02"
+      },
+      "pink": {
+        "value": "#F4A6C6",
+        "source": "2026-10-02"
+      }
+    },
+    "lightBorder": {
+      "coral": {
+        "value": "#F84D39",
+        "source": "2026-10-02"
+      },
+      "mustard": {
+        "value": "#B38107",
+        "source": "2026-10-02"
+      },
+      "periwinkle": {
+        "value": "#7477FF",
+        "source": "2026-10-02"
+      },
+      "cyan": {
+        "value": "#0398B5",
+        "source": "2026-10-02"
+      },
+      "mint": {
+        "value": "#369C65",
+        "source": "2026-10-02"
+      },
+      "pink": {
+        "value": "#EA5492",
+        "source": "2026-10-02"
+      }
+    },
+    "onPurpose": {
+      "value": "#1D1D1D",
+      "source": "2026-10-02"
+    }
+  },
+  "status": {
+    "light": {
+      "done": {
+        "surface": {
+          "value": "#DCF1E4",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#1F7A4D",
+          "source": "2026-10-04"
+        }
+      },
+      "pending": {
+        "surface": {
+          "value": "#FBEFCB",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#8A6200",
+          "source": "2026-10-04"
+        }
+      },
+      "offline": {
+        "surface": {
+          "value": "#E2E5FA",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#3E48B8",
+          "source": "2026-10-04"
+        }
+      },
+      "failed": {
+        "surface": {
+          "value": "#FBE1DB",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#B03A21",
+          "source": "2026-10-04"
+        }
+      },
+      "analyzing": {
+        "surface": {
+          "value": "#DDF0F5",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#1C6E82",
+          "source": "2026-10-04"
+        }
+      }
+    },
+    "dark": {
+      "done": {
+        "surface": {
+          "value": "#1E3A2B",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#7DD3A5",
+          "source": "2026-10-04"
+        }
+      },
+      "pending": {
+        "surface": {
+          "value": "#3D3216",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#F2C95A",
+          "source": "2026-10-04"
+        }
+      },
+      "offline": {
+        "surface": {
+          "value": "#262B4D",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#A3ABF5",
+          "source": "2026-10-04"
+        }
+      },
+      "failed": {
+        "surface": {
+          "value": "#432420",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#F59A86",
+          "source": "2026-10-04"
+        }
+      },
+      "analyzing": {
+        "surface": {
+          "value": "#1C3740",
+          "source": "2026-10-04"
+        },
+        "icon": {
+          "value": "#86D3E6",
+          "source": "2026-10-04"
+        }
+      }
+    }
+  },
+  "danger": {
+    "surface": {
+      "value": "#C62828",
+      "source": "2026-10-03"
+    },
+    "onSurface": {
+      "value": "#FFFFFF",
+      "source": "2026-10-03"
+    }
+  },
+  "radius": {
+    "xs": {
+      "value": 10,
+      "source": "2026-10-02"
+    },
+    "s": {
+      "value": 14,
+      "source": "2026-10-02"
+    },
+    "m": {
+      "value": 20,
+      "source": "2026-10-02"
+    },
+    "l": {
+      "value": 28,
+      "source": "2026-10-02"
+    },
+    "xl": {
+      "value": 36,
+      "source": "2026-10-02"
+    },
+    "pill": {
+      "value": 999,
+      "source": "2026-10-02"
+    }
+  },
+  "space": {
+    "s4": {
+      "value": 4,
+      "source": "2026-10-02"
+    },
+    "s8": {
+      "value": 8,
+      "source": "2026-10-02"
+    },
+    "s12": {
+      "value": 12,
+      "source": "2026-10-02"
+    },
+    "s16": {
+      "value": 16,
+      "source": "2026-10-02"
+    },
+    "s20": {
+      "value": 20,
+      "source": "2026-10-02"
+    },
+    "s24": {
+      "value": 24,
+      "source": "2026-10-02"
+    },
+    "s32": {
+      "value": 32,
+      "source": "2026-10-02"
+    },
+    "s40": {
+      "value": 40,
+      "source": "2026-10-02"
+    },
+    "screenMargin": {
+      "value": 20,
+      "source": "2026-10-02"
+    },
+    "minTouch": {
+      "value": 44,
+      "source": "2026-10-02"
+    }
+  }
+}
