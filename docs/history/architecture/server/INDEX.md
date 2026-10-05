@@ -65,3 +65,5 @@
 - [B0 Task 2 공통 API 응답 구현](b0-task-2-api-contract-2026-10-05.md) — 요청 ID·공개 오류·DTO·가격 정밀도
 
 - [B0 Task 3 상태·실행 스키마 구현](b0-task-3-state-schema-2026-10-05.md) — V7 업그레이드·데이터 보존·사용자 범위 조회
+
+- [B0 Task 4 원자 claim·쓰기 보호](b0-task-4-analysis-claim-2026-10-05.md) — item→job 잠금·실행 token·DB 시각·경합 검증

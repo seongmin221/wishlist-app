@@ -164,11 +164,11 @@ claim transaction: job의 item ID를 먼저 찾은 뒤 item→job `FOR UPDATE`�
 
 claim 회전 시 이전 assignment/failure 임시 필드는 지운다. general 재claim은 임시 metadata도 지우고 browser 진입은 general에서 얻은 metadata를 보존한다. generation의 candidate snapshot은 유지하되 token 없는 실행이 수정하지 못하게 한다.
 
-- [ ] **Step 1: 실패할 claim 경합 테스트 작성.** 두 connection·CountDownLatch로 동시에 claim해 Claimed 정확히 1건, token/lease/claimed version 저장, 다른 generation/DELETED/ARCHIVED/manual 완료는 Ignored를 assert한다. lease를 SQL로 만료시켜 옛 claim guard=false, 현재 item version 증가 시 false를 확인한다. 서로 다른 job 두 개를 같은 item에 만들고 currentGeneration과 맞는 하나만 claim되는지 확인한다. 테스트의 시간 대기는 sleep 대신 SQL lease 변경·latch를 사용한다.
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.analysis.AnalysisClaimRepositoryTest` — 새 repository 부재로 실패.
-- [ ] **Step 3: 위 인터페이스 구현.** DB 시각을 lease 판단의 기준으로 사용한다. 모든 잠금 순서는 item→job이며 job만 잠근 뒤 item을 잠그는 helper를 만들지 않는다.
-- [ ] **Step 4: GREEN 확인.** 같은 명령 PASS, 중복 claim은 attempt_count를 두 번 올리지 않는다.
-- [ ] **Step 5: 커밋.** `feature(server): 분석 작업 claim과 쓰기 보호 추가` / `generation과 실행 token 및 lease를 transaction에서 검증한다.`
+- [x] **Step 1: 실패할 claim 경합 테스트 작성.** 두 connection·CountDownLatch로 동시에 claim해 Claimed 정확히 1건, token/lease/claimed version 저장, 다른 generation/DELETED/ARCHIVED/manual 완료는 Ignored를 assert한다. lease를 SQL로 만료시켜 옛 claim guard=false, 현재 item version 증가 시 false를 확인한다. 서로 다른 job 두 개를 같은 item에 만들고 currentGeneration과 맞는 하나만 claim되는지 확인한다. 테스트의 시간 대기는 sleep 대신 SQL lease 변경·latch를 사용한다.
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.analysis.AnalysisClaimRepositoryTest` — 새 repository 부재로 실패.
+- [x] **Step 3: 위 인터페이스 구현.** DB 시각을 lease 판단의 기준으로 사용한다. 모든 잠금 순서는 item→job이며 job만 잠근 뒤 item을 잠그는 helper를 만들지 않는다.
+- [x] **Step 4: GREEN 확인.** 같은 명령 PASS, 중복 claim은 attempt_count를 두 번 올리지 않는다.
+- [x] **Step 5: 커밋.** `feature(server): 분석 작업 claim과 쓰기 보호 추가` / `generation과 실행 token 및 lease를 transaction에서 검증한다.`
 
 ### Task 5: processor·AI의 모든 중간 쓰기에 claim을 전달한다
 
