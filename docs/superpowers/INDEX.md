@@ -1,5 +1,6 @@
 # 설계와 구현 계획
 
+- [KMP 클라이언트 MVP 구현 로드맵 설계](specs/2026-10-05-client-implementation-roadmap-design.md) — 계약 우선 + fake, 기반 C0~C2와 서버 묶음에 맞춘 C3~C12 단계
 - [KMP 클라이언트 초기 셋업 계획](plans/2026-10-05-client-initial-setup.md) — 독립 Gradle build, Android·SwiftUI 앱과 공통 framework 연결
 
 - [MVP 서버 운영과 AI 평가 설계](specs/2026-09-22-mvp-server-operation-and-evaluation-design.md) — 서버 운영, 비용 상한, browser fallback, AI 평가 기준
