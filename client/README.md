@@ -4,13 +4,14 @@ iOS는 SwiftUI, Android는 Jetpack Compose, 공통 비즈니스 계층은 KMP로
 
 ## 현재 범위
 
-초기 앱 진입점과 공통 코드 연결만 구성했다. 두 앱은 `shared`의 `AppInfo.displayName`을 표시한다. 로그인, 상품 저장, 공유 수신, DB, API, 탭 화면과 디자인 모션은 아직 구현하지 않았다.
+C1까지 디자인 토큰 생성기, 서체·글자 스타일, 공통 컴포넌트, 시트·확인창·메뉴 overlay, 탭 셸과 자체 라우터(공유 요소 화면 이동, 끌어서 뒤로)를 두 앱에 구현했다. 탭 첫 화면은 debug 빌드에서 이것들을 보여 주는 데모다. 로그인, 상품 저장, 공유 수신, DB, API와 실제 기능 화면은 아직 구현하지 않았다. 구조는 [디자인 시스템과 앱 뼈대](../docs/architecture/client/design-system.md)를 따른다.
 
 | 위치 | 역할 |
 | --- | --- |
 | `android/` | Compose application, AGP 내장 Kotlin |
 | `shared/` | Android·iOS Kotlin library, UI 의존성 없음 |
-| `ios/` | SwiftUI app, Xcode project와 공유 scheme |
+| `ios/` | SwiftUI app, Xcode project와 공유 scheme(`WishlistTests` 단위 테스트 포함) |
+| `tools/` | 디자인 토큰 원본(`design-tokens.json`)과 생성기 |
 | `gradle/libs.versions.toml` | 클라이언트 dependency·plugin 버전 |
 
 ## 개발 환경
@@ -78,6 +79,30 @@ xcodebuild -project ios/Wishlist.xcodeproj -scheme Wishlist \
 ## 디자인 토큰
 
 색·모서리·간격·모션 상수는 `python3 client/tools/gen_tokens.py`로 생성한다(`--check`는 생성물이 오래됐는지 검사). 생성물은 손으로 고치지 않는다.
+
+```sh
+# repository root에서
+python3 -m unittest client/tools/test_gen_tokens.py
+python3 client/tools/gen_tokens.py --check
+```
+
+## 테스트와 데모
+
+```sh
+cd client
+export JAVA_HOME="$(/usr/libexec/java_home -v 17)" ANDROID_HOME="$HOME/Library/Android/sdk"
+./gradlew :android:testDebugUnitTest :android:assembleDebug :android:lintDebug :shared:allTests
+
+cd ..
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
+  -project client/ios/Wishlist.xcodeproj -scheme Wishlist \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -derivedDataPath client/ios/DerivedData CODE_SIGNING_ALLOWED=NO
+```
+
+- Android 단위 테스트는 가격 형식, 시트 끌기 판단, overlay 상태 기계, `WLNavigator`를 다룬다. iOS `WishlistTests`는 같은 사례를 Swift로 확인한다. iOS 17 확인은 iOS 17.5 simulator를 `-destination 'platform=iOS Simulator,id=<기기 id>'`로 지정한다.
+- `:shared:allTests`는 shared에 테스트가 아직 없어 `NO-SOURCE`(iOS 실행 task는 `SKIPPED`)다. 통과와 구분한다.
+- 데모: debug 빌드를 실행하면 탭 첫 화면에 시트·확인창·메뉴, 사진·면 화면 이동, 가장 긴 이름·긴 가격 예시가 나온다. release 빌드는 탭 이름만 있는 빈 첫 화면이다.
 
 ## 기능 개발 기준
 

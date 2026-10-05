@@ -106,4 +106,3 @@ Task 7 실제 라우터를 만들며 iOS 17.5·26.5 시뮬레이터에서 serve-
 - **escape 전달 경로:** 자식이 하나뿐인 `ZStack`에 건 `.contain` 컨테이너는 트리에서 접혀, 거기 건 escape 동작이 전달 경로에서 빠졌다(상세 안 글자에서 8단계 올라가도 처리 안 됨). 칸마다 보이지 않는 형제를 하나 두자 3단계(글자 → 스크롤 → 칸 컨테이너)에서 처리됐다. 흉내는 UIView에도 `superview`보다 `accessibilityContainer`를 먼저 따라가야 VoiceOver 순서와 맞다.
 - **깊이 2:** 모든 칸을 살려 두는 방식으로 깊이 2의 push·pop·끌어서 뒤로가 두 OS에서 통과했다.
 - **실기기 VoiceOver:** 여전히 미검증이다(연결된 기기 없음). `.screenChanged` 보완은 코드에 넣지 않았다.
-

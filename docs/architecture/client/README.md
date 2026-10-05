@@ -32,6 +32,7 @@
 - [iOS 구조](ios.md)
 - [Android 구조](android.md)
 - [KMP 구조](kmp.md)
+- [디자인 시스템과 앱 뼈대](design-system.md)
 
 ## 미결정 사항
 

@@ -9,6 +9,8 @@
 ## 구현 결정
 
 - [ADR-027: 클라이언트는 계약 우선 fake와 KMP Presenter로 기능 단위 구현한다](ADR-027-client-implementation-strategy.md) — 서버 의존 방식, KMP 스택, 화면 상태 소유, 진행 단위
+- [ADR-028: iOS 화면 이동은 NavigationStack 없는 자체 라우터로 구현한다](ADR-028-ios-custom-router.md) — 조건부 go, window 수준 끌어서 뒤로, 실기기 VoiceOver 확인 조건
+- [ADR-029: 디자인 토큰은 Python 표준 라이브러리 생성기로 두 플랫폼 상수를 만든다](ADR-029-design-token-generator.md) — 두 입력, 생성물 커밋과 `--check`
 
 ## 검증 기록
 
