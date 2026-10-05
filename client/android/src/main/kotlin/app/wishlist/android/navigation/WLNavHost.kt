@@ -115,7 +115,7 @@ fun WLNavHost(
 
 private fun tabFadeThrough(): ContentTransform {
     val incoming = tween<Float>(Motion.tabIncoming, delayMillis = Motion.tabIncomingDelay, easing = Curve.fadeIn)
-    return (fadeIn(incoming) + scaleIn(incoming, initialScale = 0.97f)) togetherWith
+    return (fadeIn(incoming) + scaleIn(incoming, initialScale = Motion.tabIncomingScale)) togetherWith
         fadeOut(tween(Motion.tabOutgoing, easing = Curve.easeIn))
 }
 
@@ -152,13 +152,13 @@ private fun tabBarSpec(initial: WLBackStackEntry, target: WLBackStackEntry) = ru
     }
 }
 
-/** 현재 탭을 다시 누르면 이 탭 첫 화면을 맨 위로 부드럽게 스크롤한다(300 `emphasized`, motion.md 머리 접기와 같은 값). */
+/** 현재 탭을 다시 누르면 이 탭 첫 화면을 맨 위로 부드럽게 스크롤한다(motion.md 머리 접기의 부드러운 스크롤 값). */
 @Composable
 fun WLScrollToTopEffect(tab: WLTab, scroll: ScrollState) {
     val navigator = LocalWLNavigator.current
     LaunchedEffect(navigator, tab, scroll) {
         navigator.scrollToTopRequests.collect {
-            if (it == tab) scroll.animateScrollTo(0, tween(300, easing = Curve.emphasized))
+            if (it == tab) scroll.animateScrollTo(0, tween(Motion.headerCollapseScroll, easing = Curve.emphasized))
         }
     }
 }
@@ -183,9 +183,14 @@ private fun SharedTransitionScope.TabStack(
     val known = remember { mutableSetOf<Long>() }
 
     LaunchedEffect(top) {
-        seek.animateTo(top)
-        val t = navigator.activeTransition
-        if ((t is WLNavTransition.Push || t is WLNavTransition.Pop) && t.tab == tab) navigator.finishTransition()
+        // 이 효과가 맡은 전환(이 탭의 Push·Pop)만 끝낸다. 애니메이션이 끊겨도(취소·예외) finally에서 반드시 끝내
+        // 입력이 영구히 막히지 않게 한다. 같은 전환 객체일 때만 끝내므로 두 번 끝내거나 다음 전환을 끝내지 않는다.
+        val mine = navigator.activeTransition?.takeIf { (it is WLNavTransition.Push || it is WLNavTransition.Pop) && it.tab == tab }
+        try {
+            seek.animateTo(top)
+        } finally {
+            if (mine != null && navigator.activeTransition === mine) navigator.finishTransition()
+        }
         // pop된 칸의 저장 상태를 지운다.
         val alive = navigator.entries(tab).map { it.id }.toSet()
         (known - alive).forEach { holder.removeState(it) }
@@ -253,17 +258,25 @@ private suspend fun revert(
     progress: Float,
     navigator: WLNavigator,
 ) {
-    if (seek.targetState == to && progress > 0f) {
-        coroutineScope {
-            val a = Animatable(progress)
-            val follower = launch { snapshotFlow { a.value }.collect { seek.seekTo(it.coerceIn(0f, 1f), to) } }
-            a.animateTo(0f, tween((Motion.pushPhotoBack * progress).toInt().coerceAtLeast(120), easing = Curve.emphasized))
-            follower.cancel()
+    try {
+        if (seek.targetState == to && progress > 0f) {
+            coroutineScope {
+                val a = Animatable(progress)
+                val follower = launch { snapshotFlow { a.value }.collect { seek.seekTo(it.coerceIn(0f, 1f), to) } }
+                val ms = (Motion.pushPhotoBack * progress).toInt().coerceAtLeast(RevertMinMillis)
+                a.animateTo(0f, tween(ms, easing = Curve.emphasized))
+                follower.cancel()
+            }
         }
+        seek.snapTo(from)
+    } finally {
+        // 되돌림이 끊겨도 끌기 상태를 반드시 풀어 입력이 막힌 채 남지 않게 한다(BackGesture일 때만 풀린다).
+        navigator.cancelBackGesture()
     }
-    seek.snapTo(from)
-    navigator.cancelBackGesture()
 }
+
+/** 되돌림 최소 시간. 거의 끌지 않았을 때 튀어 보이지 않게 하는 구현 기본값(디자인 값 아님). */
+private const val RevertMinMillis = 120
 
 @Composable
 private fun InputBlocker() {

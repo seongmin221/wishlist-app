@@ -242,12 +242,14 @@ enum WishlistTokens {
         static let tabIncomingDelay: Int = 90
         static let tabPill: Int = 250
         static let tabLabelSwapAt: Int = 125
+        static let headerCollapseScroll: Int = 300
         static let overflowMenu: Int = 150
         static let disclosureArrow: Int = 200
         static let disclosureContent: Int = 200
         static let sheetDragDismissDistanceRatio: Double = 0.25
         static let sheetDragDismissVelocity: Double = 1000
         static let interactiveBackCommitProgress: Double = 0.5
+        static let tabIncomingScale: Double = 0.97
         static let pushSurfaceLiftOutset: Double = 3
         static let pushSurfaceLiftShadowY: Double = 8
         static let pushSurfaceLiftShadowBlur: Double = 24

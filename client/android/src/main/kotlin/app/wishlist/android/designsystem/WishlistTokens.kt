@@ -224,12 +224,14 @@ object WishlistTokens {
         const val tabIncomingDelay: Int = 90
         const val tabPill: Int = 250
         const val tabLabelSwapAt: Int = 125
+        const val headerCollapseScroll: Int = 300
         const val overflowMenu: Int = 150
         const val disclosureArrow: Int = 200
         const val disclosureContent: Int = 200
         const val sheetDragDismissDistanceRatio: Float = 0.25f
         const val sheetDragDismissVelocity: Float = 1000f
         const val interactiveBackCommitProgress: Float = 0.5f
+        const val tabIncomingScale: Float = 0.97f
         const val pushSurfaceLiftOutset: Float = 3f
         const val pushSurfaceLiftShadowY: Float = 8f
         const val pushSurfaceLiftShadowBlur: Float = 24f
