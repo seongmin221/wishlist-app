@@ -1,6 +1,6 @@
 # 상품 상태 저장 기반
 
-> 구현 범위: B0 Task 3~5 · V8/V9 migration·claim·쓰기 guard · 공개 조회 연결은 B1
+> 구현 범위: B0 Task 3~6 · V8/V9 migration·claim·쓰기 guard · 공개 조회 연결은 B1
 
 ## 상품 상태와 출처
 
@@ -41,7 +41,7 @@ claim을 다시 발급할 때 assignment/purpose/failure 임시 결과를 지운
 
 `AnalysisWriteGuard.lockCurrent(connection, claim)`는 명시적 transaction을 요구한다. item→job 잠금 뒤 owner·item 관계·generation·token·lane RUNNING·상품 상태·수동 완료·현재 version과 claimed version을 검증한다. lease는 두 잠금을 얻은 뒤 읽은 DB `clock_timestamp()`와 비교한다. 잠금 대기 전에 시각을 읽으면 대기 중 만료를 놓칠 수 있기 때문이다.
 
-false 결과는 현재 실행을 취소하거나 token을 수정하지 않는다. true/false 모두 transaction commit/rollback과 잠금 해제는 호출자 책임이다. guard 뒤의 DB 쓰기는 같은 transaction에서 수행하며 외부 네트워크 호출 중에는 connection이나 잠금을 유지하지 않는다. 중간 쓰기 경로와 기존 Worker 최종 transaction 입구에는 Task 5에서 적용했다. 최종 상태·출처 정책과 token 해제를 한 repository로 모으는 작업은 Task 6이다.
+false 결과는 현재 실행을 취소하거나 token을 수정하지 않는다. true/false 모두 transaction commit/rollback과 잠금 해제는 호출자 책임이다. guard 뒤의 DB 쓰기는 같은 transaction에서 수행하며 외부 네트워크 호출 중에는 connection이나 잠금을 유지하지 않는다. 중간 쓰기 경로와 기존 Worker 최종 transaction 입구에는 Task 5에서 적용했다. Task 6의 AnalysisResultRepository는 최종 상태·출처 정책과 token 해제를 같은 guard transaction에 둔다.
 
 
 ## 중간 결과와 외부 호출 경계
@@ -53,3 +53,16 @@ Task 5의 AnalysisPendingResultRepository는 guard와 source URL 읽기, 임시 
 예산 reserve는 guard 후 window를 DAILY→MONTHLY 순서로 잠그고 새 reservation을 생성하기 전에 lease를 재검증한다. request ID 재사용도 유효 claim과 같은 job/generation을 요구한다. reserve가 Stale이면 gateway를 호출하지 않는다. 예약 후 gateway 직전에 다시 확인하고, 이 검사 뒤 무효화와의 좁은 race는 응답 저장에서 차단한다.
 
 예약·정산은 서로 다른 책임이다. 실제 gateway의 유효 usage는 실행 권한을 잃어도 SETTLED로 기록한다. usage가 없는 non-retry 응답은 maximum settlement, usage 없는 retry/호출 실패는 IN_FLIGHT lease reconciliation을 유지한다. gateway를 보내기 전 무효화된 RESERVED는 reconciliation에서 해제한다. 정산은 reservation/window만 잠그고 item/job를 뒤늦게 잠그지 않는다.
+
+
+## 최종 결과와 재시도
+
+일반·browser Worker는 AnalysisResultRepository.finish를 공유한다. item→job 잠금과 guard 뒤에 최종 item, job stage, execution token 해제를 같은 transaction으로 commit한다. stale 결과는 item/job/outbox를 바꾸지 않고 ACK한다. 최종 성공·부분·실패는 item version을 한 번 올린다. 현재 실행의 재시도와 browser fallback은 item version을 유지한다.
+
+READY에는 사용 가능한 현재 category가 필요하다. Complete여도 현재 category가 없으면 PARTIAL과 AI_INVALID_CANDIDATE 진단을 남겨 RUNNING에 갇히지 않게 한다. 현재 category가 있으면 누락 사유는 null이다. 새 분류의 predicted 값은 진단으로 저장하고 현재 값과 구분한다.
+
+NAME/IMAGE/CATEGORY/PURPOSE는 USER 출처 또는 userOverrideFields 중 하나만 있어도 보호하며 null도 사용자 선택으로 보존한다. PURPOSE의 USER+null은 명시적 해제다. 성공은 보호되지 않은 새 metadata를 반영하고, 부분·실패는 기존 nonnull metadata를 우선 보존하며 빈 필드만 채운다. 보호된 category의 기존 누락 사유도 유지한다.
+
+CONFIRMED/DEFERRED는 유지한다. 사용 가능한 이름·category가 있고 실제 미확정 AI category 또는 nonnull AI purpose 연결이 있으면 PENDING이다. USER category를 유지하고 목적만 AI로 연결해도 검토 대상이다. 연결되지 않은 AI 예측 진단만으로 PENDING을 만들지 않는다.
+
+일반 NeedsBrowser는 BROWSER_PENDING, fallback flag, token 해제, browser outbox 1건을 원자적으로 저장한다. 양쪽 Worker의 infrastructure exception은 Retryable로 처리한다. 현재 실행이 한도 안이면 lane PENDING으로 token을 해제하고 RETRY/HTTP 503을 반환한다. 한도 소진은 FAILED_RETRYABLE로 최종 반영한다. stale·완료는 ACK/HTTP 204다. CancellationException은 다시 던지고 남은 RUNNING lease의 복구는 Task 7에서 처리한다.

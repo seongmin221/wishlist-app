@@ -208,11 +208,11 @@ finish는 guard와 job/item 변경을 같은 transaction에서 실행한다. sta
 
 NeedsBrowser는 stage/flag/token 해제+browser outbox가 한 transaction이다. 이미 취소된 실행은 fallback outbox를 만들지 않는다. browser가 받은 metadata는 Task 5의 pending repository에 저장하고 최종 item 반영은 finish 하나로 모은다. infrastructure exception과 CancellationException 처리는 기존 retry 의미를 보존하고 취소를 삼키지 않는다.
 
-- [ ] **Step 1: 실패할 결과별 race 테스트 작성.** 일반/browser 각각 Complete/Partial/Terminal/Retryable 및 일반 NeedsBrowser를 parameterize한다. 처리 중 generation 증가·ARCHIVED·DELETED·manual completion·item version 변경·lease 만료·token 회전 뒤 item과 현 job/outbox가 불변이며 ACK인지 assert한다. 정상 처리 각 결과의 item version은 +1, retry/fallback에는 item version 유지다. claim 전 이미 NAME/CATEGORY/PURPOSE를 USER로 지정하고 CONFIRMED/DEFERRED인 fixture에서도 USER 값·명시적 목적 해제·검토 상태가 유지돼야 한다.
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.analysis.GeneralWorkerServiceTest --tests app.browser.BrowserWorkerServiceTest --tests app.http.WorkerRoutesTest` — 기존 unguarded final/retry 쓰기가 stale 상태를 변경해 실패.
-- [ ] **Step 3: finish와 worker 조립 구현.** 만료 한도 처리·예외→retry도 같은 guard를 거친다. current 실행의 fault만 RETRY/503, stale와 완료는 ACK/204로 처리한다. claim 결과 Ignored/Exhausted는 추가 processor 호출 없이 ACK다.
-- [ ] **Step 4: GREEN 확인.** 같은 명령 PASS. item 수정과 finish를 두 connection/latch로 경합시켜 deadlock 없이 먼저 commit된 변경 기준으로 한쪽만 유효함을 확인한다.
-- [ ] **Step 5: 커밋.** `feature(server): Worker 최종 반영과 실패 경로 보호` / `일반 및 browser 결과와 fallback을 동일한 실행 검증으로 반영한다.`
+- [x] **Step 1: 실패할 결과별 race 테스트 작성.** 일반/browser 각각 Complete/Partial/Terminal/Retryable 및 일반 NeedsBrowser를 parameterize한다. 처리 중 generation 증가·ARCHIVED·DELETED·manual completion·item version 변경·lease 만료·token 회전 뒤 item과 현 job/outbox가 불변이며 ACK인지 assert한다. 정상 처리 각 결과의 item version은 +1, retry/fallback에는 item version 유지다. claim 전 이미 NAME/CATEGORY/PURPOSE를 USER로 지정하고 CONFIRMED/DEFERRED인 fixture에서도 USER 값·명시적 목적 해제·검토 상태가 유지돼야 한다.
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.analysis.GeneralWorkerServiceTest --tests app.browser.BrowserWorkerServiceTest --tests app.http.WorkerRoutesTest` — 기존 unguarded final/retry 쓰기가 stale 상태를 변경해 실패.
+- [x] **Step 3: finish와 worker 조립 구현.** 만료 한도 처리·예외→retry도 같은 guard를 거친다. current 실행의 fault만 RETRY/503, stale와 완료는 ACK/204로 처리한다. claim 결과 Ignored/Exhausted는 추가 processor 호출 없이 ACK다.
+- [x] **Step 4: GREEN 확인.** 같은 명령 PASS. item 수정과 finish를 두 connection/latch로 경합시켜 deadlock 없이 먼저 commit된 변경 기준으로 한쪽만 유효함을 확인한다.
+- [x] **Step 5: 커밋.** `feature(server): Worker 최종 반영과 실패 경로 보호` / `일반 및 browser 결과와 fallback을 동일한 실행 검증으로 반영한다.`
 
 ### Task 7: reconciler가 옛 실행을 확실히 폐기하고 복구한다
 

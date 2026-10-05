@@ -15,7 +15,22 @@ import app.analysis.AnalysisJobReconciler
 import app.testutil.PostgresTestContainer
 import org.testcontainers.containers.PostgreSQLContainer
 
+import app.testutil.*
+import app.analysis.AnalysisLane
+
 class BrowserWorkerServiceTest {
+    @Test fun `all browser final outcomes ignore stale claims without mutating rows`() = withAnalysisDatabase { source ->
+        assertStaleFinishMatrix(source, AnalysisLane.BROWSER)
+    }
+
+    @Test fun `browser final outcomes update version once and invalidate execution`() = withAnalysisDatabase { source ->
+        assertNormalFinishMatrix(source, AnalysisLane.BROWSER)
+    }
+
+    @Test fun `browser results preserve user and override values and finalized review`() = withAnalysisDatabase { source ->
+        assertProtectedFinishMatrix(source, AnalysisLane.BROWSER)
+    }
+
     @Test
     fun `needs browser stores stage flag and outbox together`() = withJob { database, jobId ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
@@ -108,28 +123,14 @@ class BrowserWorkerServiceTest {
     }
 
     @Test
-    fun `infrastructure failure leaves browser claim for reconciler retry`() = withJob { database, jobId ->
+    fun `infrastructure failure retries current browser execution without fallback duplication`() = withJob { database, jobId ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
         val browser = BrowserWorkerService(source, { error("browser runtime exited") }, { _, _ -> error("classification must not run") })
-        assertFailsWith<IllegalStateException> { browser.runBrowser(jobId, 1) }
-        database.createConnection("").use { connection ->
-            connection.prepareStatement("update analysis_jobs set updated_at=now()-interval '121 seconds' where id=?").use {
-                it.setObject(1, jobId)
-                it.executeUpdate()
-            }
-        }
-        assertEquals(1, AnalysisJobReconciler(source).reconcileExpired())
-        database.createConnection("").use { connection ->
-            connection.createStatement().executeQuery("select stage from analysis_jobs").use { rows ->
-                rows.next()
-                assertEquals("BROWSER_PENDING", rows.getString(1))
-            }
-            connection.createStatement().executeQuery("select count(*) from outbox_events where event_type='BROWSER_ANALYSIS'").use { rows ->
-                rows.next()
-                assertEquals(2, rows.getInt(1))
-            }
-        }
+        assertEquals(WorkerDisposition.RETRY, browser.runBrowser(jobId, 1))
+        assertEquals("BROWSER_PENDING", analysisScalar(source, "select stage from analysis_jobs where id='$jobId'"))
+        kotlin.test.assertNull(analysisScalar(source, "select execution_token from analysis_jobs where id='$jobId'"))
+        assertEquals("1", analysisScalar(source, "select count(*) from outbox_events where event_type='BROWSER_ANALYSIS'"))
     }
 
     private fun withJob(block: (PostgreSQLContainer<*>, UUID) -> Unit) {
