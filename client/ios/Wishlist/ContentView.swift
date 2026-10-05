@@ -1,41 +1,59 @@
-import Shared
 import SwiftUI
 
+/// 앱 루트: 테마 → overlay(시트·확인창·메뉴) → 탭 셸.
 struct ContentView: View {
-    @Environment(\.colorScheme) private var colorScheme
-    private let appInfo = AppInfo()
+    @State private var overlay = OverlayHostState()
 
     var body: some View {
-        #if DEBUG
-        // Task 5 iOS 라우터 spike 진입점. Task 7에서 Spike/와 함께 지운다.
-        if ProcessInfo.processInfo.arguments.contains("-RouterSpike") {
-            RouterSpikeView()
-        } else {
-            placeholder
-        }
-        #else
-        placeholder
-        #endif
-    }
-
-    private var placeholder: some View {
-        ZStack {
-            background.ignoresSafeArea()
-            Text(appInfo.displayName)
-                .font(.largeTitle)
-                .foregroundStyle(foreground)
+        WLTheme {
+            OverlayHost(state: overlay) {
+                WLNavHost { route in AppRoute(route: route) }
+            }
         }
     }
+}
 
-    private var background: Color {
-        colorScheme == .dark
-            ? Color(red: 29 / 255, green: 29 / 255, blue: 29 / 255)
-            : Color(red: 248 / 255, green: 248 / 255, blue: 248 / 255)
+private struct AppRoute: View {
+    let route: WLRoute
+
+    var body: some View {
+        switch route {
+        case .tabRoot(let tab):
+            #if DEBUG
+            DemoTabRoot(tab: tab)
+            #else
+            PlainTabRoot(tab: tab)
+            #endif
+        case .demoDetail(let id, let hasPhoto):
+            // 데모 상세는 debug 빌드의 데모 첫 화면에서만 열린다.
+            DemoDetailScreen(id: id, hasPhoto: hasPhoto)
+        }
     }
+}
 
-    private var foreground: Color {
-        colorScheme == .dark
-            ? Color(red: 244 / 255, green: 243 / 255, blue: 240 / 255)
-            : Color(red: 29 / 255, green: 29 / 255, blue: 29 / 255)
+#if DEBUG
+private struct DemoTabRoot: View {
+    let tab: WLTab
+
+    var body: some View {
+        switch tab {
+        case .home: DemoHomeScreen()
+        case .category: DemoCategoryScreen()
+        case .purpose: DemoPurposeScreen()
+        }
+    }
+}
+#endif
+
+/// release 빌드의 탭 첫 화면(C1에는 기능 화면이 없다).
+private struct PlainTabRoot: View {
+    let tab: WLTab
+
+    var body: some View {
+        WLText(tab.label, .display28)
+            .accessibilityAddTraits(.isHeader)
+            .padding(.horizontal, WishlistTokens.Space.screenMargin)
+            .padding(.vertical, WishlistTokens.Space.s24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

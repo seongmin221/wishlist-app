@@ -16,3 +16,17 @@
 - 공유 대상에는 URL 외의 텍스트·이미지가 올 수 있으므로 MVP에서는 URL만 명확히 지원하고, 지원하지 않는 입력은 안내한다.
 - 인증 토큰과 공유용 임시 데이터의 저장 경계를 별도로 설계한다.
 - 웹뷰 닫기와 외부 앱 복귀를 구분하고, 외부 앱 복귀 시 기존 웹뷰 상태를 유지한다.
+
+## 탭 셸과 화면 이동 (C1)
+
+- `TabView`·`NavigationStack`·시스템 `.sheet`를 쓰지 않는다. `Navigation/WLNavigator`가 탭별 독립 스택과 현재 탭을 가진 순수 상태 기계(`@Observable`, 단위 테스트 대상)이고 `WLNavHost`가 그린다. 규칙은 Android `WLNavigator`와 같다. 모션 원본은 [motion.md](../../../design/handoff/interactions/motion.md) 2·3절이고 [iOS 라우터 spike](../../history/architecture/client/ios-router-spike-2026-10-05.md)의 조건부 진행 결정을 따른다.
+- 전환 중 입력: `push`·`pop`·`selectTab`은 전환을 시작하고 상태를 바로 바꾼다. 화면이 모션을 끝내면 자기 전환일 때만 `finishTransition()`을 부른다. 그동안 이동·탭·뒤로는 무시하고 화면 전체를 `InputBlocker`로 막는다. pop된 칸은 `exiting`으로 남아 뒤로 모션 동안 그려진다.
+- 세 탭의 모든 스택 칸을 한 `ZStack`에 펼쳐 살려 둔다(칸 id가 정체성). 스크롤·입력 상태와 공유 요소의 원래 자리가 깊이 2 이상에서도 남는다. 탭 전환은 탭마다 opacity·scale 값으로 페이드 스루하고, 현재 탭을 다시 누르면 `scrollToTopRequest`로 맨 위 스크롤을 요청한다(`WLTabScrollView`).
+- 공유 요소는 `matchedGeometryEffect` 대신 원래 자리 ↔ 상세 자리 사각형을 phase 하나로 보간해 그린다(`WLNavMotion`, `WLSharedElement`). 사각형은 요소 뒤의 UIKit 탐침에서 전환을 시작할 때만 읽는다(스크롤마다 올리지 않는다). 사진은 전환 층이 그리다가 끝나면 상세 안의 사진으로 넘긴다. 자리 표시 면은 칸 바로 아래 층에 그려 탭 바 밑으로 커지고, 탭 바는 다음 화면 내용과 같은 시간표로 옅어진다.
+- 모션 값은 칸마다 `@Observable` 객체의 속성으로 둔다. 같은 사전(dictionary) 속성에 담으면 곡선이 다른 두 `withAnimation`이 한 무효화로 합쳐질 수 있어서다.
+- 왼쪽 가장자리 끌어 뒤로는 window 수준 `UIPanGestureRecognizer`(`WLEdgeBackGesture`)다. 왼쪽 20pt·오른쪽 가로 우세에서만 시작하고, 띠 안에서는 스크롤·다른 pan보다 먼저다. 전환 중이거나 시트·확인창·메뉴가 떠 있으면 받지 않는다. 놓을 때 50% 이상이거나 초당 1.5 이상이면 확정한다(반대로 튕겨도 50% 이상이면 확정, Android와 같다). 되돌림은 스타일별 뒤로 시간을 남은 비율만큼 줄이고 하한 120ms다.
+- 접근성: 가려진 칸·다른 탭·숨은 탭 바는 `wlAccessibilityCovered`로 층마다 뺀다(가려지면 `.ignore` + `accessibilityHidden(true)`, 보이면 `.contain` + `accessibilityHidden(false)`). `.isModal`은 쓰지 않는다. 상세 칸 컨테이너의 escape(두 손가락 문지르기)가 `pop()`이고, push가 끝나면 상세 제목에 VoiceOver 포커스를 준다(`wlArrivalFocus`).
+- 칸 `ZStack`은 늘 자식이 둘 이상이게 보이지 않는 자리를 둔다. 자식이 하나인 `.contain` 컨테이너는 접근성 트리에서 접혀 escape 동작이 전달 경로에서 빠졌다.
+- 실기기 VoiceOver(포커스 이동·문지르기)는 아직 확인하지 않았다. TODO: 실기기에서 push 뒤 포커스가 제목으로 옮겨 가지 않으면 전환 끝에 `UIAccessibility.post(notification: .screenChanged, argument:)`를 보낸다(spike 기록의 권고).
+- 탭 바는 화면 아래 끝에서 24(보드 값) 위에 놓는다. 탭 글자는 Dynamic Type `xxLarge`까지만 따른다.
+- 데모 화면(`Features/Demo`)은 debug 빌드의 탭 첫 화면에서만 보이고 release는 탭 이름만 보인다.
