@@ -1,6 +1,6 @@
 # B0 서버 상태·DB·Worker 기반 구현 계획
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. 실행은 현재 세션에서 순차 진행하며 각 Task를 검증하고 다음으로 넘어간다.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking. 실행은 현재 세션에서 순차 진행하며 각 Task를 검증하고 다음으로 넘어간다.
 
 **Goal:** B1 상품 API를 시작하기 전에 상태·owner 조회·DB 확장·Worker 실행 보호·IO 및 자원 종료 기반을 실제 PostgreSQL로 검증한다.
 
@@ -10,7 +10,7 @@
 
 **Spec:** [승인한 전체 구현 순서의 B0](../../architecture/server/mvp-api-implementation-order.md), [상품 상태·API 계약](../../architecture/wishlist-item-state-api.md), [제품 API·데이터 설계](../../architecture/server/mvp-product-api-design.md).
 
-> 상태: **실행 전 계획** · 2026-10-04. 체크박스는 실제 구현·검증 이후에만 체크한다. 제품 API 추가와 B1의 생성 응답/상세 mapper 완성은 다음 묶음이다.
+> 상태: **완료** · 계획 2026-10-04 / 구현·검증 2026-10-05. Task 1~9와 전체 회귀를 통과했다. [완료 증거·리뷰·B1 인계](../../history/architecture/server/b0-foundation-implementation.md). 제품 API 추가와 B1의 생성 응답/상세 mapper 완성은 다음 묶음이다.
 
 ## Global Constraints
 
@@ -33,16 +33,16 @@
 4. item 변경과 Worker 완료·reconciler가 동시에 잠금을 잡아도 교착하거나 일부 데이터만 반영하지 않는다. Task 4·6·7.
 5. DTO/error·IO/pool 교체가 생성 201/replay 200/key conflict 409·인증·health를 바꾸거나 취소를 삼키지 않는다. Task 2·8·9.
 
-## 착수 전 확인과 현재 증거
+## 착수 전 확인 기록 — 2026-10-04
 
 - 조사 시 `docker info --format '{{.ServerVersion}}'`는 `/Users/user/.colima/default/docker.sock`의 Docker daemon 연결 실패였다. 계획 작성에서 엔진을 시작하거나 DB 테스트를 실행하지 않았다.
 - Task 3 이전에 `docker info`와 JDK 17을 확인한다. daemon이 없으면 사용 중인 local Docker/Colima를 실행하고 동일 명령으로 준비를 확인한다. 실제 DB 실행 실패는 RED 단계의 기능 실패로 취급하지 않는다.
-- 현재 `DatabaseMigrationTest`는 migration 성공 건수를 7로 고정한다. 현재 processor/classifier는 `(jobId)`만 받고 여러 곳이 token 없이 UPDATE한다. Main의 DataSource는 PGSimpleDataSource이고 생성/Worker 경로는 동기 IO다.
+- 계획 작성 당시 `DatabaseMigrationTest`는 migration 성공 건수를 7로 고정했다. 당시 processor/classifier는 `(jobId)`만 받고 여러 곳이 token 없이 UPDATE한다. Main의 DataSource는 PGSimpleDataSource이고 생성/Worker 경로는 동기 IO다.
 - 전체 suite의 `RealUrlPilotTest`는 opt-in이다. 테스트 명령에는 `RUN_REAL_URL_PILOT=0`을 명시한다. secret 환경변수 내용을 출력하지 않는다.
 
 ## 파일 책임과 작업 의존성
 
-아래 `app/`는 `server/src/main/kotlin/app/`, test의 `app/`는 `server/src/test/kotlin/app/` 기준이다. Files에 표시된 새 파일은 이번 계획의 생성 대상이며 현재 존재한다고 가정하지 않는다.
+아래 `app/`는 `server/src/main/kotlin/app/`, test의 `app/`는 `server/src/test/kotlin/app/` 기준이다. Files의 Create는 계획 작성 시 생성 예정 파일을 뜻한다. 구현 결과는 체크박스와 완료 기록으로 확인한다.
 
 | Task | 담당 경계 | 산출물 | 선행 |
 | --- | --- | --- | --- |
@@ -261,27 +261,27 @@ Hikari 버전은 [공식 7.0.2 tag POM](https://github.com/brettwooldridge/Hikar
 
 **Interfaces:** B1은 Task 1의 정책·Task 2 DTO/error·Task 3 owner 조회·Task 8 pool/IO를 사용한다. B5는 Task 4~7 claim/guard/result/recovery를 일반/browser runtime에 재사용한다.
 
-- [ ] **Step 1: 테스트 환경 확인.** `docker info --format '{{.ServerVersion}}'`와 `./gradlew --version` 성공·JDK 17 확인. 가용하지 않으면 DB 회귀 미실행 사유를 기록하며 B0 완료로 넘기지 않는다.
-- [ ] **Step 2: 전체 회귀.** `RUN_REAL_URL_PILOT=0 ./gradlew test` PASS. 테스트 보고서에서 신규 DB/경합 사례가 실행됐고 환경 이유로 skip되지 않았음을 확인한다. opt-in RealUrlPilot만 skip 가능하다. compile·unit 통과만으로 완료하지 않는다.
-- [ ] **Step 3: 쓰기 경로 감사.** `rg -n 'update wishlist_items|update analysis_jobs|candidate_snapshot_json|pending_' src/main/kotlin/app`로 모든 쓰기 위치를 다시 읽는다. 처리/실패/복구 SQL에는 공통 guard 또는 같은 잠금의 current 검증이 있어야 하며 budget 정산/outbox publish는 상품 결과 쓰기와 구분한다. token 없는 runtime overload·옛 updated_at 회복 조건이 남지 않음을 확인한다.
-- [ ] **Step 4: legacy rollout 기록.** production 적용 시 구 Worker drain/중지→V8/V9 적용→보호 코드 배포→queue 재개 순서가 필요함을 기록한다. 구 코드와 새 코드 혼재 시 구 Worker의 unguarded SQL을 migration만으로 차단할 수 없기 때문이다. 이번 Task에서 production 작업을 수행하지 않는다.
-- [ ] **Step 5: 문서·리뷰 확인.** migration/type/상태표 실제 결과와 미실행 범위를 기록하고 INDEX를 갱신한다. `git diff --check` PASS, 계획 밖 파일 변경 없음, B1 GET/mapper 등 새 route를 구현하지 않았음 확인. 변경을 검토한다.
-- [ ] **Step 6: 완료 기록 커밋.** `docs: B0 서버 기반 구현과 검증 기록` / `상태 및 Worker 실행 보호 검증 결과와 B1 인계 사항을 정리한다.`
+- [x] **Step 1: 테스트 환경 확인.** `docker info --format '{{.ServerVersion}}'`와 `./gradlew --version` 성공·JDK 17 확인. 가용하지 않으면 DB 회귀 미실행 사유를 기록하며 B0 완료로 넘기지 않는다.
+- [x] **Step 2: 전체 회귀.** `RUN_REAL_URL_PILOT=0 ./gradlew test` PASS. 테스트 보고서에서 신규 DB/경합 사례가 실행됐고 환경 이유로 skip되지 않았음을 확인한다. opt-in RealUrlPilot만 skip 가능하다. compile·unit 통과만으로 완료하지 않는다.
+- [x] **Step 3: 쓰기 경로 감사.** `rg -n 'update wishlist_items|update analysis_jobs|candidate_snapshot_json|pending_' src/main/kotlin/app`로 모든 쓰기 위치를 다시 읽는다. 처리/실패/복구 SQL에는 공통 guard 또는 같은 잠금의 current 검증이 있어야 하며 budget 정산/outbox publish는 상품 결과 쓰기와 구분한다. token 없는 runtime overload·옛 updated_at 회복 조건이 남지 않음을 확인한다.
+- [x] **Step 4: legacy rollout 기록.** production 적용 시 구 Worker drain/중지→V8/V9 적용→보호 코드 배포→queue 재개 순서가 필요함을 기록한다. 구 코드와 새 코드 혼재 시 구 Worker의 unguarded SQL을 migration만으로 차단할 수 없기 때문이다. 이번 Task에서 production 작업을 수행하지 않는다.
+- [x] **Step 5: 문서·리뷰 확인.** migration/type/상태표 실제 결과와 미실행 범위를 기록하고 INDEX를 갱신한다. `git diff --check` PASS, 계획 밖 파일 변경 없음, B1 GET/mapper 등 새 route를 구현하지 않았음 확인. 변경을 검토한다.
+- [x] **Step 6: 완료 기록 커밋.** `docs: B0 서버 기반 구현과 검증 기록` / `상태 및 Worker 실행 보호 검증 결과와 B1 인계 사항을 정리한다.`
 
 ## B0 완료 체크리스트
 
-- [ ] 최신 제품 의미와 기존 requiredAction을 함께 보존하며 재지정/수동 완료가 구분된다.
-- [ ] DTO/error/owner 조회는 계약에 맞고 인증·생성/replay·health 기존 동작이 유지된다.
-- [ ] 빈 DB와 V7 데이터 upgrade, 원본 식별·key·metadata·예산 보존을 실제 PostgreSQL로 확인했다.
-- [ ] generation/token/lease/stage/owner/lifecycle/manual/version 보호가 모든 중간·최종 결과와 복구에 적용된다.
-- [ ] 재claim 후 옛 실행의 성공·실패·retry·fallback·candidate 쓰기가 모두 무효다.
-- [ ] 실제 발생 AI 비용은 stale와 관계없이 정산되고 예산 reservation 정책을 보존한다.
-- [ ] 잠금 순서·복구/outbox 원자성·동시 실행 결과를 latch 기반 DB 테스트로 확인했다.
-- [ ] JDBC/외부 호출 IO 경계·bounded pool·client 재사용·종료 처리와 전체 회귀가 통과했다.
-- [ ] 문서와 변경 리뷰 및 결과 기록이 완료됐으며 B1 미구현 범위를 정확히 인계했다.
+- [x] 최신 제품 의미와 기존 requiredAction을 함께 보존하며 재지정/수동 완료가 구분된다.
+- [x] DTO/error/owner 조회는 계약에 맞고 인증·생성/replay·health 기존 동작이 유지된다.
+- [x] 빈 DB와 V7 데이터 upgrade, 원본 식별·key·metadata·예산 보존을 실제 PostgreSQL로 확인했다.
+- [x] generation/token/lease/stage/owner/lifecycle/manual/version 보호가 모든 중간·최종 결과와 복구에 적용된다.
+- [x] 재claim 후 옛 실행의 성공·실패·retry·fallback·candidate 쓰기가 모두 무효다.
+- [x] 실제 발생 AI 비용은 stale와 관계없이 정산되고 예산 reservation 정책을 보존한다.
+- [x] 잠금 순서·복구/outbox 원자성·동시 실행 결과를 latch 기반 DB 테스트로 확인했다.
+- [x] JDBC/외부 호출 IO 경계·bounded pool·client 재사용·종료 처리와 전체 회귀가 통과했다.
+- [x] 문서와 변경 리뷰 및 결과 기록이 완료됐으며 B1 미구현 범위를 정확히 인계했다.
 
 ## 계획 자체 검토 결과
 
 B0의 다섯 범위(문서·상태·DTO/owner·claim/결과 보호·DB 실행 기반)를 Task 1~9에 배정했다. 기존 SQL 경로를 기준으로 processor/classifier/budget/reconciler의 빠진 보호를 포함했다. 타입/파일/선행 관계·테스트 명령을 대조하며 B5의 전체 retry budget/runtime 배포와 B1의 GET/mapper 구현은 후속 범위로 유지했다.
 
-계획 작성에서는 신규 코드·migration·테스트를 생성하지 않았다. 현재 Docker 연결 실패는 실행 단계의 준비 항목이며 B0 검증 통과를 의미하지 않는다. 실행 전 이 계획을 검토하고, 실행 시 세부 체크 결과를 기록한다.
+계획 작성 당시에는 신규 코드·migration·테스트를 생성하지 않았고 Docker 연결 실패는 실행 준비 항목이었다. 이후 Task 1~9에서 실제 구현과 PostgreSQL 검증을 마쳤다. 전체 151개 중 150개 통과, opt-in RealUrlPilot 1개 skip이며 최종 독립 리뷰의 blocking 지적은 없다. 세부 결과·판단·후속 범위는 완료 기록에 보존한다.

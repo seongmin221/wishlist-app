@@ -1,12 +1,12 @@
 # 와이어프레임을 지원하는 MVP 제품 API 설계
 
-> 상태: 설계 제안 · 2026-10-04 · 아직 구현·승인된 API 계약이 아님
+> 상태: 제품 API 설계 제안 · 2026-10-04 · B0 기반 구현 현황 갱신 2026-10-05 · 신규 API 계약은 묶음별 확정
 
 ## 목표와 기준
 
 디자인을 진행하는 동안 서버의 조회·사용자 변경·목적별 비교·아카이브를 구현할 수 있도록 화면과 데이터의 경계를 정한다. 사용자는 상품 URL을 먼저 보관하고, 자동 결과를 검토·보완하며 목적별로 비교한 뒤 구매 결정을 기록한다.
 
-기준은 `design/handoff@c59741d`의 제품 규칙·디자인 결정과 `server/initial-setup@9eacba5`의 코드다. 서버 워크스페이스의 product 문서는 아직 디자인 브랜치 변경을 포함하지 않으므로 구현에 앞서 관련 문서 변경을 통합해야 한다. 전체 API 목록은 이후 `design/handoff@51c67e0`까지 다시 대조했다. 이번 설계는 기존 [상품 상태·API 계약](../wishlist-item-state-api.md)을 보완하는 제안이며 기존 확정 문서를 자동으로 대체하지 않는다.
+기준은 `design/handoff@c59741d`의 제품 규칙·디자인 결정과 `server/initial-setup@9eacba5`의 코드다. B0는 관련 제품 문서가 통합된 main@4d31e3c에서 server/b0-foundation으로 시작했다. 현재 구현은 B0 완료 기록과 구분해 추적한다. 전체 API 목록은 이후 `design/handoff@51c67e0`까지 다시 대조했다. 이번 설계는 기존 [상품 상태·API 계약](../wishlist-item-state-api.md)을 보완하는 제안이며 기존 확정 문서를 자동으로 대체하지 않는다.
 
 ## 구조 선택
 
@@ -192,7 +192,7 @@ generation 전체 deadline과 retry budget을 공통으로 보관하고 일반/b
 
 runtime은 `api`, `general-worker`, `browser-worker`, `maintenance`를 명시적으로 조립하는 방향을 권장한다. maintenance는 outbox 발행·중단 job 복구·budget 정산/경고·미사용 media 정리를 제한된 batch로 실행한다. Scheduler의 1분 주기 호출은 private maintenance 서비스로 향한다. Worker/Scheduler 호출자의 ID token과 invoker 권한 설정은 [Cloud Run 공식 안내](https://docs.cloud.google.com/run/docs/authenticating/service-to-service)를 따른다.
 
-JDBC 작업과 동기 외부 호출은 IO dispatcher에서 실행하고, DB pool·HTTP client·Cloud Tasks client를 역할별로 재사용해 application 종료 시 닫는다. 초기 pool 크기는 API 5·Worker 2를 측정 시작값으로 제안하며 instance 최대 수를 곱한 총 연결이 DB 허용 범위 안에 있는지 확인한다. 수치는 배포 승인값이 아니다.
+JDBC 작업과 동기 외부 호출은 IO dispatcher에서 실행하고, DB pool·HTTP client·Cloud Tasks client를 역할별로 재사용해 application 종료 시 닫는다. B0의 runtime pool 기본 크기는 API 5·일반 Worker 2이며 instance 최대 수를 곱한 총 연결이 DB 허용 범위 안에 있는지 확인한다. 수치는 배포 승인값이 아니다.
 
 ### B0에서 구체화한 실행 보호
 
@@ -200,7 +200,7 @@ JDBC 작업과 동기 외부 호출은 IO dispatcher에서 실행하고, DB pool
 
 lease는 현재 120초 복구 기준에 맞추고, 모든 결과와 retry/fallback/recovery는 token을 회전 또는 해제한다. stale 실행은 현재 token을 취소할 수 없다. 이미 발생한 AI 비용 정산은 item 결과 쓰기와 분리한다. 일반/browser의 전체 retry 예산 재구성과 runtime 배포는 B5다.
 
-B0 Task 1에서 기존 requiredAction 값은 유지하고 홈 표시용 그룹을 따로 계산하는 순수 정책을 구현했다. 신규 route·DB 연결은 후속 Task다. 사용자 category 재지정과 실패/PARTIAL 수동 완료를 같은 홈 영역에 표시해도 허용 API는 구분한다. 새 claim 없는 V7 실행은 복구로 이어받으며 production schema 전환 때는 구 Worker를 먼저 drain해야 한다.
+B0 Task 1~9에서 기존 requiredAction 값과 별도 홈 projection 정책, 공통 DTO/error, owner 범위 상태 조회, V8/V9 migration, 실행 claim과 모든 중간/최종 쓰기·복구 보호, IO·pool·client 수명을 구현·검증했다. 상세 GET과 공통 item mapper는 B1이며 DTO 정의가 기존 생성 문자열 응답을 자동 교체하지 않는다. 사용자 category 재지정과 실패/PARTIAL 수동 완료를 같은 홈 영역에 표시해도 허용 API는 구분한다. 새 claim 없는 V7 실행은 lease 복구로 이어받으며 production schema 전환 때는 구 Worker를 먼저 drain/중지해야 한다. [B0 완료·B1 인계](../../history/architecture/server/b0-foundation-implementation.md)에 감사·검증·rollout·미구현 범위를 기록한다.
 
 ## 이미지 저장
 

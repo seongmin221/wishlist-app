@@ -75,3 +75,5 @@
 - [B0 Task 7 lease 기반 복구](b0-task-7-lease-recovery-2026-10-05.md) — 만료 token 폐기·현재 상품 재검증·동시 복구·예산 보존
 
 - [B0 Task 8 IO와 자원 수명](b0-task-8-runtime-resources-2026-10-05.md) — 역할 pool·client 재사용·종료 gate·실제 발행과 취소
+
+- [B0 전체 구현·검증 기록](b0-foundation-implementation.md) — Task 1~9·전체 회귀·쓰기 감사·legacy rollout·B1 인계

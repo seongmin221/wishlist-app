@@ -12,11 +12,11 @@
 
 > 상태: **구현 순서 결정 · 상세 계약은 묶음별 확정** · 2026-10-04
 >
-> 이 문서는 전체 구현의 순서와 통과 조건이다. 모든 DTO·오류·SQL이 확정된 작업별 코딩 명세는 아니다. 제품의 미결정 정책을 임의로 확정하지 않는다. 이번 작업에서는 서버 코드를 변경하지 않았다.
+> 이 문서는 전체 구현의 순서와 통과 조건이다. 모든 DTO·오류·SQL이 확정된 작업별 코딩 명세는 아니다. 제품의 미결정 정책을 임의로 확정하지 않는다. 최초 순서 결정 시 서버 코드를 변경하지 않았으며, 현재 B0 기반은 Task 1~9에서 구현했다. 후속 B1~B11의 완료를 의미하지 않는다.
 
 ## 기준과 전역 제약
 
-- 제품·디자인 기준은 `design/handoff@51c67e0`, 현재 서버 구현은 `server/initial-setup@9eacba5`다. 구현 시작 시 변경 여부를 확인하고 관련 문서 차이를 반영한다.
+- 제품·디자인 기준은 `design/handoff@51c67e0`, 최초 서버 조사 기준은 `server/initial-setup@9eacba5`이고 B0는 제품 문서 통합 main@4d31e3c에서 시작했다. 구현 시작 시 변경 여부를 확인하고 관련 문서 차이를 반영한다.
 - 아래 순서를 기본으로 실행한다. 선행 조건을 생략하려고 임시 성공 응답·가짜 집계·부분 원자성으로 API를 완성 처리하지 않는다.
 - 목록의 API ID를 유지한다. 전체 37개 각각에 최초 구현 묶음이 하나만 있다. 이후 확장은 별도 표로 추적한다.
 - Firebase owner 격리, 다른 owner 자원 404, 기존 생성 key의 의미, ITEM-05의 version 없는 반복 삭제 계약을 보존한다.
@@ -76,19 +76,21 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 
 **기존 변경 지점:** `server/src/main/kotlin/app/wishlist/WishlistItem.kt`, `app/http/WishlistRoutes.kt`, `app/analysis/GeneralWorkerService.kt`, `app/browser/BrowserWorkerService.kt`, `app/extraction/GeneralExtractionProcessor.kt`, `app/browser/BrowserRenderProcessor.kt`, `app/ai/AiClassificationService.kt`, `app/Main.kt`, `server/src/main/resources/db/migration/`. 경로의 `app/`는 `server/src/main/kotlin/` 기준이다.
 
-- [ ] 디자인 브랜치의 제품 문서와 서버의 확정 계약을 대조해 필요한 변경만 반영한다. `READY + CUSTOM_CATEGORY_DELETED` 재지정과 PARTIAL/실패 수동 완료를 구분한다.
-- [ ] lifecycle/review/manual/current generation·값 출처의 기본 모델과 requiredAction/allowedActions의 상태표를 정한다. 아직 없는 목적·이미지는 nullable 참조의 의미를 정하고 해당 테이블/완전한 기능은 소유 묶음에서 추가한다.
-- [ ] 공통 DTO·오류 응답과 owner 범위 조회 기반을 마련한다. 동기 JDBC/외부 호출의 IO 경계·연결 수 제한·종료 처리를 정하고 적용한다.
-- [ ] 기존 job generation backfill과 claim execution token/lease를 추가한다. 성공·부분·terminal·retry·복구의 모든 **최종 item 반영**에 현재 generation/lease/lifecycle/수동 변경 보호를 적용한다. processor의 임시 결과 저장과 최종 반영을 구분해 빠진 쓰기 경로를 남기지 않는다.
-- [ ] Testcontainers PostgreSQL과 기존 테스트가 실행 가능한지 확인한다. migration test의 현재 `7개` 고정 검사는 후속 migration을 반영하도록 수정하고, 빈 DB뿐 아니라 V7 데이터에서의 upgrade도 검증한다.
+- [x] 디자인 브랜치의 제품 문서와 서버의 확정 계약을 대조해 필요한 변경만 반영한다. `READY + CUSTOM_CATEGORY_DELETED` 재지정과 PARTIAL/실패 수동 완료를 구분한다.
+- [x] lifecycle/review/manual/current generation·값 출처의 기본 모델과 requiredAction/allowedActions의 상태표를 정한다. 아직 없는 목적·이미지는 nullable 참조의 의미를 정하고 해당 테이블/완전한 기능은 소유 묶음에서 추가한다.
+- [x] 공통 DTO·오류 응답과 owner 범위 조회 기반을 마련한다. 동기 JDBC/외부 호출의 IO 경계·연결 수 제한·종료 처리를 정하고 적용한다.
+- [x] 기존 job generation backfill과 claim execution token/lease를 추가한다. 성공·부분·terminal·retry·복구의 모든 **최종 item 반영**에 현재 generation/lease/lifecycle/수동 변경 보호를 적용한다. processor의 임시 결과 저장과 최종 반영을 구분해 빠진 쓰기 경로를 남기지 않는다.
+- [x] Testcontainers PostgreSQL과 기존 테스트가 실행 가능한지 확인한다. migration test의 현재 `7개` 고정 검사는 후속 migration을 반영하도록 수정하고, 빈 DB뿐 아니라 V7 데이터에서의 upgrade도 검증한다.
 
 **통과:** 기존 item/owner/key 유지, 상태표 테스트, 삭제 상태에 Worker 반영 없음, generation N+1 뒤 N 성공·실패 무시, lease 만료 실행 무시, migration upgrade 성공. B5에서는 runtime/복구 전체를 완성하지만 이 보호를 B5까지 미루지 않는다.
+
+**현재 상태:** B0 기반 구현·검증을 완료했다. [감사·회귀·B1 인계 기록](../../history/architecture/server/b0-foundation-implementation.md)을 통과 증거로 사용한다. B5 browser/maintenance runtime과 운영 적용은 완료 범위에 포함하지 않는다.
 
 ## B1 — 상품 상세와 실제 생성/replay
 
 **산출물:** 클라이언트가 저장 후 같은 ID를 조회해 실제 분석 상태·metadata를 표시할 수 있다.
 
-**파일 경계:** 기존 `WishlistItem.kt`, `CreateWishlistItemService.kt`, `WishlistRoutes.kt`를 수정하고 `app/wishlist/GetWishlistItemService.kt`, `app/wishlist/WishlistItemViewMapper.kt`, `app/http/WishlistItemDtos.kt`를 추가하는 구성을 권장한다. 생성·상세·replay는 동일 mapper를 사용한다.
+**파일 경계:** B0의 `WishlistItemStateRepository`, `WishlistItemPolicy`, `app/http/WishlistItemDtos.kt`, `ApiHttpSupport`와 IO/pool을 사용한다. 기존 `WishlistItem.kt`, `CreateWishlistItemService.kt`, `WishlistRoutes.kt`, DTO를 확장하고 `app/wishlist/GetWishlistItemService.kt`와 `app/wishlist/WishlistItemViewMapper.kt`를 추가한다. 현재 state repository에 없는 표시 metadata·시각·원본 URL은 owner 조건을 유지한 조회 projection으로 확장한다. 생성·상세·replay는 동일 mapper를 사용한다.
 
 **내부 순서:** owner-scoped 상세 조회 → ITEM-03 route → 생성 DTO·clientCreatedAt 보관 → ITEM-01/replay mapper 교체. metadata를 상수 null로 만드는 현재 문자열 응답을 제거한다. 공유 시각은 서버 정렬 시각과 분리한다.
 

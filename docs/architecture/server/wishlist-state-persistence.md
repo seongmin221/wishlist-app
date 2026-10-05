@@ -28,7 +28,7 @@ legacy GENERAL_RUNNING/BROWSER_RUNNING은 execution token과 claimed version을 
 
 `WishlistItemStateRepository.findOwned(ownerId, itemId)`는 owner와 item ID를 SQL에서 함께 조건으로 사용한다. 다른 사용자의 항목과 없는 항목은 모두 null이다. 내부에서는 ARCHIVED/DELETED도 읽을 수 있으며 공개 상세 조회 정책은 B1에서 적용한다. 읽은 row를 상태 enum, 출처, nullable 시각과 override 집합으로 매핑한다.
 
-현재 Worker의 상태 반영 경로에 새 필드를 모두 연결한 단계는 아니다. B0 나머지 Task를 통과한 뒤 공개 DTO 조회에 연결한다.
+B0 Task 4~7에서 중간·최종 반영과 복구에 현재 상태·출처·실행 보호를 연결했다. 이 repository는 상태 projection이며 원본 URL·전체 metadata·시각을 포함한 공개 상세 DTO 조회와 mapper는 B1에서 확장한다.
 
 
 ## 원자 claim과 쓰기 보호
