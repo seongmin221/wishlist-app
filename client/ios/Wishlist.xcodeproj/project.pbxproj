@@ -1,0 +1,200 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+/* Begin PBXBuildFile section */
+        A10000000000000000000001 /* WishlistApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* WishlistApp.swift */; };
+        A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* ContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+        A20000000000000000000001 /* WishlistApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistApp.swift; sourceTree = "<group>"; };
+        A20000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+        A20000000000000000000003 /* Wishlist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wishlist.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+        A30000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+        A40000000000000000000001 = {
+            isa = PBXGroup;
+            children = (A40000000000000000000002 /* Wishlist */, A40000000000000000000003 /* Products */);
+            sourceTree = "<group>";
+        };
+        A40000000000000000000002 /* Wishlist */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000002 /* ContentView.swift */);
+            path = Wishlist;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000003 /* Products */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000003 /* Wishlist.app */);
+            name = Products;
+            sourceTree = "<group>";
+        };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+        A50000000000000000000001 /* Wishlist */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = A90000000000000000000002 /* Target configuration list */;
+            buildPhases = (A70000000000000000000001 /* Build Shared */, A60000000000000000000001 /* Sources */, A30000000000000000000001 /* Frameworks */, A60000000000000000000002 /* Resources */);
+            buildRules = ();
+            dependencies = ();
+            name = Wishlist;
+            productName = Wishlist;
+            productReference = A20000000000000000000003 /* Wishlist.app */;
+            productType = "com.apple.product-type.application";
+        };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+        A80000000000000000000001 /* Project object */ = {
+            isa = PBXProject;
+            attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; TargetAttributes = {A50000000000000000000001 = {CreatedOnToolsVersion = 26.0; }; }; };
+            buildConfigurationList = A90000000000000000000001 /* Project configuration list */;
+            compatibilityVersion = "Xcode 14.0";
+            developmentRegion = ko;
+            hasScannedForEncodings = 0;
+            knownRegions = (ko, en, Base);
+            mainGroup = A40000000000000000000001;
+            productRefGroup = A40000000000000000000003 /* Products */;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (A50000000000000000000001 /* Wishlist */);
+        };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+        A60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        A70000000000000000000001 /* Build Shared */ = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = ();
+            inputPaths = ();
+            name = "Build Shared";
+            outputPaths = ();
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = /bin/sh;
+            shellScript = "\"$SRCROOT/scripts/build-shared.sh\"\n";
+        };
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+        A60000000000000000000001 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */);
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+        B10000000000000000000001 /* Project Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_TESTABILITY = YES;
+                GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)");
+                IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+                SDKROOT = iphoneos;
+                SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            };
+            name = Debug;
+        };
+        B10000000000000000000002 /* Project Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CLANG_ENABLE_MODULES = YES;
+                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+                SDKROOT = iphoneos;
+                SWIFT_COMPILATION_MODE = wholemodule;
+                SWIFT_OPTIMIZATION_LEVEL = "-O";
+                VALIDATE_PRODUCT = YES;
+            };
+            name = Release;
+        };
+        B10000000000000000000003 /* Target Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_PREVIEWS = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+                FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_CFBundleDisplayName = "위시리스트";
+                INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+                MARKETING_VERSION = 0.1.0;
+                OTHER_LDFLAGS = ("$(inherited)", "-framework", Shared);
+                PRODUCT_BUNDLE_IDENTIFIER = app.wishlist.ios;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SUPPORTS_MACCATALYST = NO;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Debug;
+        };
+        B10000000000000000000004 /* Target Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+                FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_CFBundleDisplayName = "위시리스트";
+                INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
+                INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+                INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
+                MARKETING_VERSION = 0.1.0;
+                OTHER_LDFLAGS = ("$(inherited)", "-framework", Shared);
+                PRODUCT_BUNDLE_IDENTIFIER = app.wishlist.ios;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SUPPORTS_MACCATALYST = NO;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Release;
+        };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+        A90000000000000000000001 /* Project configuration list */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (B10000000000000000000001 /* Project Debug */, B10000000000000000000002 /* Project Release */);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        A90000000000000000000002 /* Target configuration list */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (B10000000000000000000003 /* Target Debug */, B10000000000000000000004 /* Target Release */);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+/* End XCConfigurationList section */
+    };
+    rootObject = A80000000000000000000001 /* Project object */;
+}
