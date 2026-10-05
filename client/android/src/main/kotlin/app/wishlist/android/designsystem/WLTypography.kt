@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -140,20 +141,26 @@ private fun TextStyle.metrics(): WLFontMetrics = when {
 /** 밑줄 윗면과 한글 아래 끝 사이 거리(디자인 결정 2026-10-04). */
 val WLUnderlineGap: Dp = 3.dp
 
-/**
- * 한글 아래 끝에서 줄 상자 아래까지의 거리(sp 값, dp와 같은 크기). 줄 높이와 글꼴 내용 높이(ascent+descent)의 차이 절반이
- * 위아래로 나뉜다(CSS half-leading, `LineHeightStyle.Alignment.Center`와 같은 모델).
- * 예: 도현 28 줄 높이 28 -> 4.96, 줄 높이 24 -> 2.96(=밑줄 3px 규칙).
- */
-fun TextStyle.hangulBottomGap(): Float {
-    val m = metrics()
-    val size = fontSize.value
-    val line = if (lineHeight.isEm) lineHeight.value * size else lineHeight.value
-    return (line - (m.ascent + m.descent) * size) / 2f + (m.descent - m.hangulDepth) * size
+/** 줄 높이(px). sp는 API 34+의 비선형 글자 크기 배율 때문에 값마다 따로 px로 바꿔야 한다(합·차를 sp로 계산한 뒤 바꾸면 틀린다). */
+private fun TextStyle.lineHeightPx(density: Density): Float = with(density) {
+    if (lineHeight.isEm) lineHeight.value * fontSize.toPx() else lineHeight.toPx()
 }
 
-private fun TextStyle.lineHeightSp(): Float =
-    if (lineHeight.isEm) lineHeight.value * fontSize.value else lineHeight.value
+/** 글꼴 자연 높이(px) = (ascent+descent) x 글자 크기. */
+private fun TextStyle.naturalHeightPx(density: Density): Float =
+    with(density) { (metrics().ascent + metrics().descent) * fontSize.toPx() }
+
+/**
+ * 한글 아래 끝에서 줄 상자 아래까지의 거리(px). 줄 높이와 글꼴 내용 높이(ascent+descent)의 차이 절반이
+ * 위아래로 나뉜다(CSS half-leading, `LineHeightStyle.Alignment.Center`와 같은 모델).
+ * 글자 크기 배율(fontScale, 비선형 포함)은 `density`가 반영한다.
+ * 예(배율 1): 도현 28 줄 높이 28 -> 4.96dp, 줄 높이 24 -> 2.96dp(=밑줄 3dp 규칙).
+ */
+fun TextStyle.hangulBottomGapPx(density: Density): Float {
+    val m = metrics()
+    return (lineHeightPx(density) - naturalHeightPx(density)) / 2f +
+        (m.descent - m.hangulDepth) * with(density) { fontSize.toPx() }
+}
 
 /**
  * 텍스트 상자를 CSS line-height와 같게 만든다: 높이 = N x lineHeight. Compose가 만드는 높이(자연 높이 + (N-1) x lineHeight)에
@@ -162,8 +169,7 @@ private fun TextStyle.lineHeightSp(): Float =
  */
 fun Modifier.wlLineBox(style: TextStyle): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
-    val m = style.metrics()
-    val extra = ((style.lineHeightSp() - (m.ascent + m.descent) * style.fontSize.value) * density).roundToInt()
+    val extra = (style.lineHeightPx(this) - style.naturalHeightPx(this)).roundToInt()
     layout(placeable.width, (placeable.height + extra).coerceAtLeast(0)) {
         placeable.place(0, extra shr 1)
     }
@@ -176,6 +182,6 @@ fun Modifier.wlLineBox(style: TextStyle): Modifier = layout { measurable, constr
  */
 fun Modifier.wlUnderline(style: TextStyle, color: Color, thickness: Dp = 1.dp): Modifier =
     drawBehind {
-        val top = size.height + (WLUnderlineGap.toPx() - style.hangulBottomGap() * density)
+        val top = size.height + (WLUnderlineGap.toPx() - style.hangulBottomGapPx(this))
         drawRect(color, Offset(0f, top), Size(size.width, thickness.toPx()))
     }
