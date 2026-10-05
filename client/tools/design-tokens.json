@@ -50,6 +50,14 @@
         "value": "#BDBDBD",
         "source": "2026-10-04"
       },
+      "handle": {
+        "value": "#DCDCDC",
+        "source": "2026-10-05 board"
+      },
+      "onInverse": {
+        "value": "#FFFFFF",
+        "source": "2026-10-05 board"
+      },
       "scrimDim": {
         "value": 0.24,
         "source": "2026-10-05"
@@ -103,6 +111,14 @@
       "underline": {
         "value": "#5A5958",
         "source": "2026-10-04"
+      },
+      "handle": {
+        "value": "#4A4948",
+        "source": "2026-10-05 board"
+      },
+      "onInverse": {
+        "value": "#1D1D1D",
+        "source": "2026-10-05 board"
       },
       "scrimDim": {
         "value": 0.45,

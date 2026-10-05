@@ -37,6 +37,8 @@ struct WLColors {
     let textSecondary: Color
     let tabBar: Color
     let underline: Color
+    let handle: Color
+    let onInverse: Color
     let scrimDim: Color
 
     static let light = WLColors(
@@ -52,6 +54,8 @@ struct WLColors {
         textSecondary: WishlistTokens.Light.textSecondary,
         tabBar: WishlistTokens.Light.tabBar,
         underline: WishlistTokens.Light.underline,
+        handle: WishlistTokens.Light.handle,
+        onInverse: WishlistTokens.Light.onInverse,
         scrimDim: WishlistTokens.Light.scrimDim
     )
 
@@ -68,6 +72,8 @@ struct WLColors {
         textSecondary: WishlistTokens.Dark.textSecondary,
         tabBar: WishlistTokens.Dark.tabBar,
         underline: WishlistTokens.Dark.underline,
+        handle: WishlistTokens.Dark.handle,
+        onInverse: WishlistTokens.Dark.onInverse,
         scrimDim: WishlistTokens.Dark.scrimDim
     )
 }
@@ -86,6 +92,8 @@ enum WishlistTokens {
         static let textSecondary = Color(wlHex: 0x5E5E5E)
         static let tabBar = Color(wlHex: 0x1D1D1D)
         static let underline = Color(wlHex: 0xBDBDBD)
+        static let handle = Color(wlHex: 0xDCDCDC)
+        static let onInverse = Color(wlHex: 0xFFFFFF)
         static let scrimDim = Color.black.opacity(0.24)
     }
 
@@ -102,6 +110,8 @@ enum WishlistTokens {
         static let textSecondary = Color(wlHex: 0xA9A7A2)
         static let tabBar = Color(wlHex: 0x312F30)
         static let underline = Color(wlHex: 0x5A5958)
+        static let handle = Color(wlHex: 0x4A4948)
+        static let onInverse = Color(wlHex: 0x1D1D1D)
         static let scrimDim = Color.black.opacity(0.45)
     }
 
@@ -210,6 +220,8 @@ enum WishlistTokens {
         static let tabIncomingDelay: Int = 90
         static let tabPill: Int = 250
         static let overflowMenu: Int = 150
+        static let disclosureArrow: Int = 200
+        static let disclosureContent: Int = 200
         static let sheetDragDismissDistanceRatio: Double = 0.25
         static let sheetDragDismissVelocity: Double = 1000
         static let interactiveBackCommitProgress: Double = 0.5

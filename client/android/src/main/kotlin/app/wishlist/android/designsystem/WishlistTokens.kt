@@ -19,6 +19,8 @@ data class WLColors(
     val textSecondary: Color,
     val tabBar: Color,
     val underline: Color,
+    val handle: Color,
+    val onInverse: Color,
     val scrimDim: Color,
 )
 
@@ -35,6 +37,8 @@ val LightColors = WLColors(
     textSecondary = WishlistTokens.Light.textSecondary,
     tabBar = WishlistTokens.Light.tabBar,
     underline = WishlistTokens.Light.underline,
+    handle = WishlistTokens.Light.handle,
+    onInverse = WishlistTokens.Light.onInverse,
     scrimDim = WishlistTokens.Light.scrimDim,
 )
 
@@ -51,6 +55,8 @@ val DarkColors = WLColors(
     textSecondary = WishlistTokens.Dark.textSecondary,
     tabBar = WishlistTokens.Dark.tabBar,
     underline = WishlistTokens.Dark.underline,
+    handle = WishlistTokens.Dark.handle,
+    onInverse = WishlistTokens.Dark.onInverse,
     scrimDim = WishlistTokens.Dark.scrimDim,
 )
 
@@ -68,6 +74,8 @@ object WishlistTokens {
         val textSecondary = Color(0xFF5E5E5E)
         val tabBar = Color(0xFF1D1D1D)
         val underline = Color(0xFFBDBDBD)
+        val handle = Color(0xFFDCDCDC)
+        val onInverse = Color(0xFFFFFFFF)
         val scrimDim = Color.Black.copy(alpha = 0.24f)
     }
 
@@ -84,6 +92,8 @@ object WishlistTokens {
         val textSecondary = Color(0xFFA9A7A2)
         val tabBar = Color(0xFF312F30)
         val underline = Color(0xFF5A5958)
+        val handle = Color(0xFF4A4948)
+        val onInverse = Color(0xFF1D1D1D)
         val scrimDim = Color.Black.copy(alpha = 0.45f)
     }
 
@@ -192,6 +202,8 @@ object WishlistTokens {
         const val tabIncomingDelay: Int = 90
         const val tabPill: Int = 250
         const val overflowMenu: Int = 150
+        const val disclosureArrow: Int = 200
+        const val disclosureContent: Int = 200
         const val sheetDragDismissDistanceRatio: Float = 0.25f
         const val sheetDragDismissVelocity: Float = 1000f
         const val interactiveBackCommitProgress: Float = 0.5f
