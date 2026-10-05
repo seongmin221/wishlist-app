@@ -143,12 +143,9 @@ struct SheetLayer: View {
     private func run(_ phase: OverlayPhase) async {
         switch phase {
         case .opening:
-            // 높이가 재어지기 전에 움직이면 첫 프레임이 튄다. 한 프레임씩 최대 30번 기다린다.
-            var tries = 0
-            while height == 0 && tries < 30 {
-                await overlaySleep(ms: 16)
-                tries += 1
-            }
+            // 높이가 재어지기 전에 움직이면 첫 프레임이 튄다(재어질 때까지 한 프레임씩 기다린다. 뷰가 사라지면 취소).
+            while height == 0 && !Task.isCancelled { await overlaySleep(ms: 16) }
+            if Task.isCancelled { return }
             withAnimation(WishlistTokens.Curve.springSheet.animation(ms: WishlistTokens.Motion.sheetOpen)) { progress = 1 }
             await overlaySleep(ms: WishlistTokens.Motion.sheetOpen)
             if !Task.isCancelled { state.onOpened(entry.id) }

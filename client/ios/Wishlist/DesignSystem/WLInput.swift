@@ -30,18 +30,12 @@ struct WLInput: View {
                 }
             }
             ZStack(alignment: singleLine ? .leading : .topLeading) {
-                if value.isEmpty && !placeholder.isEmpty {
-                    Text(placeholder)
-                        .font(WLTextStyle.buttonRegular.font)
-                        .foregroundStyle(c.textSecondary)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
                 field
                     .font(WLTextStyle.button.font)
                     .foregroundStyle(c.text)
                     .tint(c.text)
                     .keyboardType(keyboard)
+                    .accessibilityLabel(label ?? placeholder)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, singleLine ? 0 : 16)
@@ -50,11 +44,15 @@ struct WLInput: View {
         }
     }
 
+    private var prompt: Text {
+        Text(placeholder).font(WLTextStyle.buttonRegular.font).foregroundStyle(c.textSecondary)
+    }
+
     @ViewBuilder private var field: some View {
         if singleLine {
-            TextField(placeholder, text: limited).labelsHidden()
+            TextField("", text: limited, prompt: prompt)
         } else {
-            TextField(placeholder, text: limited, axis: .vertical).lineLimit(minLines...).labelsHidden()
+            TextField("", text: limited, prompt: prompt, axis: .vertical).lineLimit(minLines...)
         }
     }
 }

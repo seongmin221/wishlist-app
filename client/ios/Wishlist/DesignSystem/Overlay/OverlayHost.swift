@@ -144,6 +144,15 @@ extension EnvironmentValues {
     }
 }
 
+extension View {
+    /// 가려진 층을 접근성에서 뺀다. `.accessibilityHidden(false)`를 조상에 걸면 후손의 `.accessibilityHidden(true)`까지 취소되므로
+    /// (Task 5 spike) `false`를 절대 넘기지 않고, 같은 modifier의 값만 바꾼다: 가려지면 `.ignore`(라벨 없는 한 덩어리 = 읽을 것 없음),
+    /// 아니면 `.contain`(후손의 숨김·라벨을 그대로 둔다). 뷰 정체성(상태)은 바뀌지 않는다.
+    func wlAccessibilityCovered(_ covered: Bool) -> some View {
+        accessibilityElement(children: covered ? .ignore : .contain)
+    }
+}
+
 func overlaySleep(ms: Int) async {
     try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
 }
@@ -178,7 +187,7 @@ struct OverlayHost<Content: View>: View {
         ZStack {
             content()
                 .blur(radius: CGFloat(WishlistTokens.Motion.scrimBlur) * scrimProgress)
-                .accessibilityHidden(!entries.isEmpty)
+                .wlAccessibilityCovered(!entries.isEmpty)
             if scrimMounted {
                 WLScrim(progress: scrimProgress, color: colors.scrimDim) {
                     // 막 누르기는 시트만 닫는다. 확인창은 취소·확인 버튼으로만 닫힌다. 전환 중에는 dismiss가 무시한다.
@@ -208,9 +217,8 @@ struct OverlayHost<Content: View>: View {
                 MenuLayer(entry: entry, state: state, anchor: anchor, items: items)
             }
         }
-        // 가장 위가 아닌 overlay(확인창 아래의 시트)도 가려진 층이므로 스스로 접근성에서 숨긴다.
-        .accessibilityHidden(!isTop)
-        .accessibilityElement(children: .contain)
+        // 가장 위가 아닌 overlay(확인창 아래의 시트)도 가려진 층이다. 가장 위는 .contain(안쪽 숨김 보존).
+        .wlAccessibilityCovered(!isTop)
         .accessibilityAction(.escape) { state.dismiss() }
     }
 
