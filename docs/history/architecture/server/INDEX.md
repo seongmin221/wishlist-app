@@ -57,3 +57,5 @@
 추가 결정은 `ADR-번호-제목.md` 형식으로 이 폴더에 기록한다.
 
 - [MVP API 구현 순서 결정](api-implementation-sequencing-2026-10-04.md) — 37개 API 최초 배정·자원 의존 순서·단계 통과 조건
+
+- [B0 Task 1 상태 정책 구현](b0-task-1-state-policy-2026-10-05.md) — server 브랜치 분리·상태별 허용 행동·단위/회귀 검증

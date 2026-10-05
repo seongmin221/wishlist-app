@@ -200,7 +200,7 @@ JDBC 작업과 동기 외부 호출은 IO dispatcher에서 실행하고, DB pool
 
 lease는 현재 120초 복구 기준에 맞추고, 모든 결과와 retry/fallback/recovery는 token을 회전 또는 해제한다. stale 실행은 현재 token을 취소할 수 없다. 이미 발생한 AI 비용 정산은 item 결과 쓰기와 분리한다. 일반/browser의 전체 retry 예산 재구성과 runtime 배포는 B5다.
 
-기존 requiredAction 값은 유지하고 홈 표시용 그룹을 따로 계산한다. 사용자 category 재지정과 실패/PARTIAL 수동 완료를 같은 홈 영역에 표시해도 허용 API는 구분한다. 새 claim 없는 V7 실행은 복구로 이어받으며 production schema 전환 때는 구 Worker를 먼저 drain해야 한다.
+B0 Task 1에서 기존 requiredAction 값은 유지하고 홈 표시용 그룹을 따로 계산하는 순수 정책을 구현했다. 신규 route·DB 연결은 후속 Task다. 사용자 category 재지정과 실패/PARTIAL 수동 완료를 같은 홈 영역에 표시해도 허용 API는 구분한다. 새 claim 없는 V7 실행은 복구로 이어받으며 production schema 전환 때는 구 Worker를 먼저 drain해야 한다.
 
 ## 이미지 저장
 

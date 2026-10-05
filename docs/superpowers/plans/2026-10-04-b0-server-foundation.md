@@ -80,7 +80,7 @@ ACTIVE에서는 PROCESSING → 누락 이름 → category 누락 원인 → revi
 
 allowedActions: ACTIVE 비PROCESSING은 EDIT/DELETE, 수동 미완료 PARTIAL/실패는 MANUAL_COMPLETE, 수동 미완료 FAILED_RETRYABLE은 REANALYZE를 추가한다. REVIEW는 READY이고 name/category가 있고 review PENDING일 때만 허용한다. manualCompletionAt이 있으면 REVIEW/MANUAL_COMPLETE/REANALYZE를 제외한다. READY의 삭제 category 재지정은 EDIT로 수행한다.
 
-- [ ] **Step 1: 실패할 상태표 테스트 작성.** 아래 행을 parameterized 또는 table-driven 단위 테스트로 고정한다.
+- [x] **Step 1: 실패할 상태표 테스트 작성.** 아래 행을 parameterized 또는 table-driven 단위 테스트로 고정한다.
 
 | fixture | requiredAction·home 영역 | 핵심 assertion |
 | --- | --- | --- |
@@ -94,10 +94,10 @@ allowedActions: ACTIVE 비PROCESSING은 EDIT/DELETE, 수동 미완료 PARTIAL/�
 | READY DEFERRED, name/category 있음 | NONE·null | REVIEW 불가 |
 | ARCHIVED/DELETED 각각 모든 analysisStatus | NONE·null | allowedActions.isEmpty() |
 
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.wishlist.WishlistItemPolicyTest` — 정책 타입 미구현으로 compile 실패여야 한다.
-- [ ] **Step 3: 위 순수 타입/정책 구현 및 최신 제품 문서 차이 통합.** 상태 JSON key를 제거/rename하지 않고 홈 그룹·manual 상태의 차이를 계약에 명시한다. 목적 활동순·이미지 제한 등 다른 묶음 결정을 섞지 않는다.
-- [ ] **Step 4: GREEN 확인.** 같은 명령이 PASS이고 상태별 assertion이 모두 실행돼야 한다.
-- [ ] **Step 5: 해당 파일만 stage하고 커밋.** `feature(server): 상품 상태와 허용 행동 기반 정의` / 본문 `홈 조치 영역과 상태별 사용자 행동을 공통 정책으로 정리한다.`
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.wishlist.WishlistItemPolicyTest` — 정책 타입 미구현으로 compile 실패여야 한다.
+- [x] **Step 3: 위 순수 타입/정책 구현 및 최신 제품 문서 차이 통합.** 상태 JSON key를 제거/rename하지 않고 홈 그룹·manual 상태의 차이를 계약에 명시한다. 목적 활동순·이미지 제한 등 다른 묶음 결정을 섞지 않는다.
+- [x] **Step 4: GREEN 확인.** 같은 명령이 PASS이고 상태별 assertion이 모두 실행돼야 한다.
+- [x] **Step 5: 해당 파일만 stage하고 커밋.** `feature(server): 상품 상태와 허용 행동 기반 정의` / 본문 `홈 조치 영역과 상태별 사용자 행동을 공통 정책으로 정리한다.`
 
 ### Task 2: 공통 DTO와 안전한 공개 오류를 준비한다
 

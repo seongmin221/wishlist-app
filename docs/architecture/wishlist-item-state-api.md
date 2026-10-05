@@ -113,6 +113,16 @@ canonical URL이 같은 `READY` Product cache 결과는 7일 동안 새 `Wishlis
 5. `reviewStatus == PENDING`이면 `CLASSIFICATION_REVIEW`
 6. 그 외에는 `NONE`
 
+### 홈 표시 그룹과 허용 행동
+
+B0 공통 정책은 기존 `requiredAction` 값을 유지하고 `homeActionGroup`을 별도로 계산한다. `CATEGORY_ASSIGNMENT`와 `CATEGORY_REASSIGNMENT`도 `INFORMATION_COMPLETION` 홈 영역에 포함한다. `ANALYSIS_IN_PROGRESS`·`CLASSIFICATION_REVIEW`는 같은 이름의 그룹, `NONE`은 그룹 없음이다. 이 내부 projection은 현재 공개 JSON에 추가되지 않았다.
+
+ACTIVE가 아니면 requiredAction은 NONE이고 허용 행동은 없다. ACTIVE PROCESSING은 DELETE만 허용한다. ACTIVE 비PROCESSING은 EDIT/DELETE가 기본이며, 수동 미완료 PARTIAL/실패에는 MANUAL_COMPLETE, 수동 미완료 FAILED_RETRYABLE에는 REANALYZE를 추가한다. REVIEW는 READY·제품명/category 있음·PENDING이고 수동 완료 전인 경우만 허용한다.
+
+수동 완료 후 원래 분석 상태는 유지하지만 REVIEW/MANUAL_COMPLETE/REANALYZE를 허용하지 않는다. 이후 사용자 category가 삭제되면 CATEGORY_REASSIGNMENT로 표시하고 EDIT로 재지정한다. READY 재지정에는 manual-completion을 사용하지 않는다.
+
+제품명은 null·빈 문자열·공백만 있는 경우 모두 누락이다. category가 없고 누락 사유도 없는 legacy 항목은 INFORMATION_COMPLETION으로 처리한다. 실패 항목의 metadata가 이미 충분하면 홈 그룹이 없을 수 있지만, 직접 보완·재분석 가능 여부는 분석 상태로 별도 계산한다.
+
 서버 전송 전의 `ANALYSIS_PENDING`은 기기에만 존재하므로 KMP가 `LocalSubmission`에서 계산해 서버의 홈 응답과 합성한다. 하나의 서버 항목에는 하나의 `requiredAction`만 적용한다.
 
 제품명과 카테고리가 있다면 `reviewStatus == PENDING`이어도 일반 카테고리 목록에 함께 표시할 수 있다. 홈 조치 상태와 일반 목록 포함 여부는 별도 조건이다.

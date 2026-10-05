@@ -2,3 +2,4 @@
 .superpowers/
 server/.gradle/
 server/build/
+server/.kotlin/
