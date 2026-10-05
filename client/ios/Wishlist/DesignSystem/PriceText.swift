@@ -28,6 +28,9 @@ func formatPrice(_ amount: Decimal, currency: String) -> String {
 }
 
 /// 가격(Plex 700 tabular). 기본 `WLTextStyle.price`.
+/// 한 줄에 들어가면 한 줄(디자인 결정 2026-10-04: 가장 좁은 카드에서도 KRW 1,190,000은 한 줄). 큰 글자 크기에서 넘치면
+/// 통화 코드와 금액 사이에서만 줄을 바꾸고, 금액은 숫자 중간에서 끊지 않는다(그래도 넘치면 금액만 줄여 한 줄에 둔다).
+/// 숫자 중간 줄바꿈("1,190,00 / 0")은 Task 7 접근성 최대 크기 확인에서 찾았다.
 struct PriceText: View {
     let amount: Decimal
     let currency: String
@@ -35,6 +38,21 @@ struct PriceText: View {
     var color: Color?
 
     var body: some View {
-        WLText(formatPrice(amount, currency: currency), style, color: color)
+        let text = formatPrice(amount, currency: currency)
+        let parts = text.split(separator: " ", maxSplits: 1).map(String.init)
+        ViewThatFits(in: .horizontal) {
+            WLText(text, style, color: color)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            VStack(alignment: .leading, spacing: 0) {
+                WLText(parts.first ?? text, style, color: color).lineLimit(1)
+                WLText(parts.count > 1 ? parts[1] : "", style, color: color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+        .accessibilityAddTraits(.isStaticText)
     }
 }

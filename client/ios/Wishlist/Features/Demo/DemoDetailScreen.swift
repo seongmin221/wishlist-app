@@ -23,7 +23,7 @@ struct DemoDetailScreen: View {
 private struct DemoTopBar: View {
     @Environment(\.wlNavigator) private var nav
     @Environment(\.overlayHostState) private var overlay
-    @State private var anchor = CGRect.zero
+    @State private var anchor = WLAnchor()
 
     var body: some View {
         HStack {
@@ -31,9 +31,9 @@ private struct DemoTopBar: View {
             DemoCircleButton(description: "뒤로", action: { nav?.pop() }) { BackChevron() }
             Spacer()
             DemoCircleButton(description: "더 보기", action: {
-                if let overlay { overlay.showMenu(anchor: anchor, items: demoMenuItems(overlay)) }
+                if let overlay { overlay.showMenu(anchor: anchor.frame, items: demoMenuItems(overlay)) }
             }) { MoreDots() }
-            .wlAnchor { anchor = $0 }
+            .wlAnchor(anchor)
         }
         .padding(.vertical, WishlistTokens.Space.s8)
     }

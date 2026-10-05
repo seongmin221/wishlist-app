@@ -1,5 +1,6 @@
 import Observation
 import SwiftUI
+import UIKit
 
 /// 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다.
 struct WLDialogSpec {
@@ -160,12 +161,38 @@ func overlaySleep(ms: Int) async {
     try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
 }
 
+/// 메뉴를 띄우는 버튼의 자리. 버튼 뒤에 둔 보이지 않는 UIKit 뷰를 약하게 들고, 누른 순간에만 window 좌표를 읽는다
+/// (`frame`). 관찰하지 않는 참조라 스크롤·탭 전환 중 위치가 바뀌어도 화면을 다시 그리지 않는다.
+/// PreferenceKey 방식은 탭 셸 안에서 늘 `.zero`가 왔고, 위치 변화마다 상태를 쓰는 방식은 스크롤마다 화면 전체를 다시 그려 쓰지 않는다.
+/// 화면에서는 `@State private var anchor = WLAnchor()`로 들고 `.wlAnchor(anchor)`를 붙인 뒤 `anchor.frame`을 넘긴다.
+final class WLAnchor {
+    fileprivate weak var view: UIView?
+
+    var frame: CGRect {
+        guard let view, view.window != nil else { return .zero }
+        return view.convert(view.bounds, to: nil)
+    }
+}
+
+private struct WLAnchorProbe: UIViewRepresentable {
+    let anchor: WLAnchor
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        view.isAccessibilityElement = false
+        view.accessibilityElementsHidden = true
+        anchor.view = view
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) { anchor.view = view }
+}
+
 extension View {
-    /// 메뉴를 띄우는 버튼에 붙여 `showMenu`의 anchor(전역 좌표)를 얻는다. 위치가 바뀔 때마다(스크롤 포함) 알린다
-    /// (Android `onGloballyPositioned`와 같다). PreferenceKey 방식은 탭 셸 안(ScrollView·층 modifier 아래)에서 늘 `.zero`가
-    /// 와서(Task 7에서 확인) `onGeometryChange`로 바꿨다.
-    func wlAnchor(_ onFrame: @escaping (CGRect) -> Void) -> some View {
-        onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { onFrame($0) }
+    /// 메뉴를 띄우는 버튼에 붙인다. 누를 때 `anchor.frame`(전역 좌표)을 `showMenu`에 넘긴다.
+    func wlAnchor(_ anchor: WLAnchor) -> some View {
+        background(WLAnchorProbe(anchor: anchor))
     }
 }
 

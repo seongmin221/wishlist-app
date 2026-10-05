@@ -58,7 +58,9 @@ struct WLNavHost<Content: View>: View {
             }
             WLTabBarSlot(navigator: navigator, motion: motion, top: displayed(navigator.currentTab).last)
                 .zIndex(tabBarZ())
-            if let t = navigator.activeTransition, t.kind != .backGesture {
+            // 끌어서 뒤로·되돌림 중에도 막는다(두 번째 손가락·누르기가 상세에 닿지 않게). 끌기 자체는 window 인식기가 받으므로
+            // 이 막과 상관없다.
+            if navigator.isTransitioning {
                 InputBlocker().zIndex(Double(Int32.max))
             }
         }

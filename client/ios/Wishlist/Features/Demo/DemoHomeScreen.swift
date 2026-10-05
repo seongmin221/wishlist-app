@@ -4,16 +4,16 @@ import SwiftUI
 struct DemoHomeScreen: View {
     @Environment(\.wlNavigator) private var nav
     @Environment(\.overlayHostState) private var overlay
-    @State private var menuAnchor = CGRect.zero
+    @State private var menuAnchor = WLAnchor()
 
     var body: some View {
         WLTabScrollView(tab: .home) {
             VStack(alignment: .leading, spacing: 0) {
                 DemoTabHeader(title: "홈", subtitle: "데모 · 화면 이동과 overlay") {
                     DemoCircleButton(description: "더 보기", action: {
-                        if let overlay { overlay.showMenu(anchor: menuAnchor, items: demoMenuItems(overlay)) }
+                        if let overlay { overlay.showMenu(anchor: menuAnchor.frame, items: demoMenuItems(overlay)) }
                     }) { MoreDots() }
-                    .wlAnchor { menuAnchor = $0 }
+                    .wlAnchor(menuAnchor)
                 }
 
                 DemoSectionLabel(text: "overlay")
