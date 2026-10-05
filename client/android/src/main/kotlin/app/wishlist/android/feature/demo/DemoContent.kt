@@ -72,6 +72,8 @@ internal object DemoContent {
         DemoProduct("p2", "보스", "QuietComfort Ultra", BigDecimal(499000), "KRW", "헤드폰", purposes[0], WLPurposeColor.Periwinkle, 1.25f),
         DemoProduct("p3", "살로몬", "Speedcross 6", BigDecimal("159.99"), "USD", "러닝화", purposes[1], WLPurposeColor.Mustard, 1.25f),
         DemoProduct("p4", "헬리녹스", "체어 원 라이트", BigDecimal(139000), "KRW", "캠핑 의자", purposes[6], WLPurposeColor.Mint, 1f),
+        // 가장 긴 가격(보드 FPurposeAddCategoryFilterL). 가장 좁은 상품 카드에서도 한 줄이어야 한다(디자인 결정 2026-10-04).
+        DemoProduct("p5", "뱅앤올룹슨", "Beoplay H95", BigDecimal(1190000), "KRW", "헤드폰", purposes[0], WLPurposeColor.Pink, 1.25f),
     )
 
     val railCategories = listOf("패션·잡화", "뷰티·퍼스널케어", "디지털·IT", "가구·인테리어", "생활·주방·가전", "스포츠·아웃도어·여행")
