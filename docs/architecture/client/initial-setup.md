@@ -12,9 +12,9 @@
 
 - [제품 개요](../../product/overview.md), [상품 저장](../../product/save-a-product.md), [구매 후보 정리](../../product/organize-candidates.md), [상품 확인과 편집](../../product/inspect-and-edit-a-product.md), [구매 결정 종료](../../product/finish-a-purchase-decision.md)
 - [상품 상태](../../product/references/item-states.md), [상태/API 계약](../wishlist-item-state-api.md)
-- [디자인 결정](../../design/decisions.md), [인터랙션과 애니메이션](../../../design/handoff/interactions.md), [화면 생성기](../../../design/canvas-fresh/README.md)
+- [디자인 결정](../../design/decisions.md), [인터랙션 핸드오프](../../../design/handoff/interactions/README.md), [화면 생성기](../../../design/canvas-fresh/README.md)
 
-핸드오프가 참조하는 `design/handoff/screens/`와 `wireframes/`는 이 체크아웃에 없다. 현재 확보된 화면 자료는 `design/canvas-fresh/` 생성기와 디자인 결정이다. 없는 PNG/HTML을 검토했다고 간주하지 않는다.
+초기 셋업 당시에는 `design/handoff/screens/`와 `wireframes/`가 이 브랜치에 없어 `design/canvas-fresh/` 생성기와 디자인 결정만 검토했다. 2026-10-05 `origin/main`(핸드오프 병합, PR #4) 위로 리베이스해 [완성 화면](../../../design/handoff/screens/README.md)·[인터랙션](../../../design/handoff/interactions/README.md)·[와이어프레임](../../../design/handoff/wireframes/README.md)을 확보했다. 화면 구현은 [구현 로드맵](../../superpowers/specs/2026-10-05-client-implementation-roadmap-design.md)의 단계별로 이 자료를 기준으로 한다.
 
 후속 구현에서 유지할 조건:
 

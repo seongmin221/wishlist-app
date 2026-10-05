@@ -80,6 +80,6 @@ xcodebuild -project ios/Wishlist.xcodeproj -scheme Wishlist \
 - [클라이언트 구조](../docs/architecture/client/README.md)
 - [셋업 설계와 핸드오프 검토](../docs/architecture/client/initial-setup.md)
 - [기능 문서](../docs/product/INDEX.md)
-- [디자인 결정](../docs/design/decisions.md), [인터랙션](../design/handoff/interactions.md)
+- [디자인 결정](../docs/design/decisions.md), [완성 화면](../design/handoff/screens/README.md), [인터랙션](../design/handoff/interactions/README.md)
 
-핸드오프의 `screens/`·`wireframes/` 사본은 현재 checkout에 없다. 화면 구현 전에 사본을 확보하거나 `design/canvas-fresh/` 생성기와 디자인 결정을 기준으로 검토한다.
+화면은 핸드오프 [README](../design/handoff/README.md)의 순서(디자인 결정 → 완성 화면 → 와이어프레임)를 기준으로 구현한다. 단계 구성은 [구현 로드맵](../docs/superpowers/specs/2026-10-05-client-implementation-roadmap-design.md)을 따른다.
