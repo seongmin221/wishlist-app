@@ -26,7 +26,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +51,9 @@ import app.wishlist.android.designsystem.WLOnSheet
 import app.wishlist.android.designsystem.WLText
 import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /** 시트 제목·확인창 제목 20/700(`WLType.title`에서 크기만 줄임). */
@@ -63,6 +69,18 @@ private val OvershootPadding = 80.dp
 fun shouldDismissSheet(dragDistance: Float, sheetHeight: Float, velocity: Float): Boolean =
     dragDistance >= sheetHeight * WishlistTokens.Motion.sheetDragDismissDistanceRatio ||
         velocity >= WishlistTokens.Motion.sheetDragDismissVelocity
+
+internal enum class SheetDragEnd { Dismiss, SnapBack, Ignore }
+
+/**
+ * 끌기가 끝났을 때의 결정(순수 함수). 이미 닫히는 중이거나 열리는 중이면(예: 끄는 중 뒤로·막 누르기로 닫기가 시작되어
+ * 끌기가 취소로 끝난 경우) 아무것도 하지 않는다. 되돌림 애니메이션이 닫기 애니메이션을 끊으면 overlay가 영영 멈춘다.
+ */
+internal fun sheetDragEnd(phase: OverlayPhase, dragDistance: Float, sheetHeight: Float, velocity: Float): SheetDragEnd = when {
+    phase != OverlayPhase.Open -> SheetDragEnd.Ignore
+    shouldDismissSheet(dragDistance, sheetHeight, velocity) -> SheetDragEnd.Dismiss
+    else -> SheetDragEnd.SnapBack
+}
 
 /** 시트 머리: 제목(20/700) + 닫기 44 원형 버튼. */
 @Composable
@@ -109,16 +127,25 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                 state.onOpened(entry.id)
             }
             OverlayPhase.Closing -> {
-                p.animateTo(0f, tween(WishlistTokens.Motion.sheetClose, easing = WishlistTokens.Curve.accelerate))
+                // 다른 곳이 p를 건드려 이 애니메이션이 끊겨도(CancellationException) 이 효과가 살아 있으면 다시 시작해 반드시 끝낸다.
+                while (p.value > 0f) {
+                    try {
+                        p.animateTo(0f, tween(WishlistTokens.Motion.sheetClose, easing = WishlistTokens.Curve.accelerate))
+                    } catch (e: CancellationException) {
+                        currentCoroutineContext().ensureActive()
+                    }
+                }
                 state.onClosed(entry.id)
             }
             OverlayPhase.Open -> Unit
         }
     }
 
-    var heightPx = 0f
+    var heightPx by remember { mutableFloatStateOf(0f) }
     val dragState = rememberDraggableState { delta ->
-        if (heightPx > 0f) scope.launch { p.snapTo((p.value - delta / heightPx).coerceIn(0f, 1f)) }
+        if (entry.phase == OverlayPhase.Open && heightPx > 0f) {
+            scope.launch { p.snapTo((p.value - delta / heightPx).coerceIn(0f, 1f)) }
+        }
     }
     val extra = OvershootPadding
 
@@ -128,7 +155,7 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                 .fillMaxWidth()
                 .heightIn(max = SheetMaxHeight)
                 .graphicsLayer {
-                    heightPx = size.height
+                    if (heightPx != size.height) heightPx = size.height
                     translationY = (1f - p.value) * size.height
                 }
                 .drawBehind {
@@ -152,10 +179,10 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                             enabled = entry.phase == OverlayPhase.Open,
                             onDragStopped = { velocity ->
                                 val distance = (1f - p.value) * heightPx
-                                if (!(shouldDismissSheet(distance, heightPx, velocity) && state.requestDismiss(entry.id))) {
-                                    scope.launch {
-                                        p.animateTo(1f, tween(WishlistTokens.Motion.sheetDragDismissSnapBack, easing = WishlistTokens.Curve.springSheet))
-                                    }
+                                when (sheetDragEnd(entry.phase, distance, heightPx, velocity)) {
+                                    SheetDragEnd.Dismiss -> if (!state.requestDismiss(entry.id)) scope.launch { snapBack(p) }
+                                    SheetDragEnd.SnapBack -> scope.launch { snapBack(p) }
+                                    SheetDragEnd.Ignore -> Unit
                                 }
                             },
                         ),
@@ -176,4 +203,8 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
             }
         }
     }
+}
+
+private suspend fun snapBack(p: Animatable<Float, *>) {
+    p.animateTo(1f, tween(WishlistTokens.Motion.sheetDragDismissSnapBack, easing = WishlistTokens.Curve.springSheet))
 }

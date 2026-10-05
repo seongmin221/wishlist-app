@@ -19,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import app.wishlist.android.designsystem.LocalWLColors
@@ -142,8 +144,6 @@ fun Modifier.wlAnchor(onBounds: (Rect) -> Unit): Modifier =
 @Composable
 fun OverlayHost(state: OverlayHostState, content: @Composable () -> Unit) {
     val colors = LocalWLColors.current
-    BackHandler(enabled = state.entries.isNotEmpty()) { state.dismiss() }
-
     val scrimWanted = state.entries.any { it.needsScrim && it.phase != OverlayPhase.Closing }
     val scrim = remember { Animatable(0f) }
     LaunchedEffect(scrimWanted) {
@@ -177,6 +177,21 @@ fun OverlayHost(state: OverlayHostState, content: @Composable () -> Unit) {
                     }
                 }
             }
+            // 전환 중에는 overlay 안쪽(시트 내용·메뉴 항목·확인창 버튼)도 입력을 받지 않는다(motion.md 구현 기본값).
+            if (state.isAnimating) InputBlocker()
         }
+        // content 뒤에 등록해 content 안의 뒤로 처리(내비게이션)보다 우선한다. overlay가 새로 생길 때마다 가장 나중 등록이 된다.
+        if (state.entries.isNotEmpty()) BackHandler { state.dismiss() }
     }
+}
+
+@Composable
+private fun InputBlocker() {
+    Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+            }
+        },
+    )
 }

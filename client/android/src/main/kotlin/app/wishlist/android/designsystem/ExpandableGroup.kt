@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
@@ -41,7 +40,6 @@ fun WLChevron(expanded: Boolean, modifier: Modifier = Modifier, color: Color = L
         val cx = size.width / 2
         val cy = size.height / 2
         val d = 4.5.dp.toPx()
-        val stroke = Stroke(w, cap = StrokeCap.Round)
         drawLine(color, Offset(cx - d, cy - d / 2), Offset(cx, cy + d / 2), w, StrokeCap.Round)
         drawLine(color, Offset(cx, cy + d / 2), Offset(cx + d, cy - d / 2), w, StrokeCap.Round)
     }

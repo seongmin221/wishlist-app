@@ -26,7 +26,7 @@ fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12, Alignment.CenterVertically),
     ) {
-        WLIconTile(size = 56.dp, radius = WishlistTokens.Radius.m, icon = icon)
+        WLIconTile(size = 56.dp, radius = WishlistTokens.Radius.m, color = c.card, icon = icon)
         WLText(title, WLType.title.copy(fontSize = 18.sp), color = c.text, textAlign = TextAlign.Center)
         WLText(description, WLType.body.copy(lineHeight = 1.5f.times(14).sp), color = c.textSecondary, textAlign = TextAlign.Center)
     }
