@@ -73,3 +73,5 @@
 - [B0 Task 6 Worker 최종 반영](b0-task-6-final-results-2026-10-05.md) — 사용자 값·검토 보호·최종 version·fallback·503/204 경합 검증
 
 - [B0 Task 7 lease 기반 복구](b0-task-7-lease-recovery-2026-10-05.md) — 만료 token 폐기·현재 상품 재검증·동시 복구·예산 보존
+
+- [B0 Task 8 IO와 자원 수명](b0-task-8-runtime-resources-2026-10-05.md) — 역할 pool·client 재사용·종료 gate·실제 발행과 취소

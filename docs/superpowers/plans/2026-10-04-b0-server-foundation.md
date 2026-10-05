@@ -244,11 +244,11 @@ NeedsBrowser는 stage/flag/token 해제+browser outbox가 한 transaction이다.
 
 pool 기본값 API 5·일반 Worker 2, minimumIdle=0, connectionTimeout=5000ms다. `DB_POOL_MAX_SIZE`가 있으면 양수만 허용하며 운영 DB 허용 연결은 B11에서 instance 수를 곱해 검증한다. LOCAL_HEALTH는 DB/Firebase/Tasks 초기화를 요구하지 않는다.
 
-- [ ] **Step 1: 실패할 pool/lifecycle 테스트 작성.** max=1에서 한 connection을 잡은 동안 두 번째 획득은 정해진 timeout으로 실패, 첫 connection 반환 뒤 재획득 가능, pool close 뒤 획득 불가. RuntimeResources는 역순·중복 close 안전·한 자원 close 실패에도 다음 자원 close를 assert한다. fake service latch로 blocking call이 route 실행 스레드에서 벗어나는지 확인하고 request cancellation은 전파돼야 한다.
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.DatabaseFactoryTest --tests app.RuntimeResourcesTest --tests app.RuntimeConfigTest --tests app.HealthRouteTest` — pool·종료 기반 부재로 실패.
-- [ ] **Step 3: 구현.** HikariCP 7.0.2를 명시적으로 추가하고 DatabaseFactory를 Main에서 추출한다. Main은 역할별 pool을 한 번 만들고 ApplicationStopped에서 닫는다. CloudTasksClient는 요청마다 생성하지 않고 역할 resource로 재사용한다. 실제 HTTP transport의 pinned DNS per request는 유지하면서 공유 OkHttp dispatcher/connectionPool을 관리·종료한다. JDK 17 HttpClient는 이미 gateway에서 재사용하며 존재하지 않는 close API를 호출하지 않는다.
-- [ ] **Step 4: GREEN 확인.** 위 명령과 `./gradlew test --tests app.http.WishlistRoutesTest --tests app.http.WorkerRoutesTest --tests app.extraction.SafeHttpTransportTest --tests app.http.FirebaseOwnerResolverTest` PASS. health는 env credential 없이 200 ok, malformed production 설정의 기존 fail-fast 유지. 종료 중 새로운 task 등록을 예약하지 않는다.
-- [ ] **Step 5: 커밋.** `feature(server): 서버 IO와 연결 자원 수명 관리` / `역할별 연결 pool과 외부 client 재사용 및 종료 처리를 적용한다.`
+- [x] **Step 1: 실패할 pool/lifecycle 테스트 작성.** max=1에서 한 connection을 잡은 동안 두 번째 획득은 정해진 timeout으로 실패, 첫 connection 반환 뒤 재획득 가능, pool close 뒤 획득 불가. RuntimeResources는 역순·중복 close 안전·한 자원 close 실패에도 다음 자원 close를 assert한다. fake service latch로 blocking call이 route 실행 스레드에서 벗어나는지 확인하고 request cancellation은 전파돼야 한다.
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.DatabaseFactoryTest --tests app.RuntimeResourcesTest --tests app.RuntimeConfigTest --tests app.HealthRouteTest` — pool·종료 기반 부재로 실패.
+- [x] **Step 3: 구현.** HikariCP 7.0.2를 명시적으로 추가하고 DatabaseFactory를 Main에서 추출한다. Main은 역할별 pool을 한 번 만들고 ApplicationStopped에서 닫는다. CloudTasksClient는 요청마다 생성하지 않고 역할 resource로 재사용한다. 실제 HTTP transport의 pinned DNS per request는 유지하면서 공유 OkHttp dispatcher/connectionPool을 관리·종료한다. JDK 17 HttpClient는 이미 gateway에서 재사용하며 존재하지 않는 close API를 호출하지 않는다.
+- [x] **Step 4: GREEN 확인.** 위 명령과 `./gradlew test --tests app.http.WishlistRoutesTest --tests app.http.WorkerRoutesTest --tests app.extraction.SafeHttpTransportTest --tests app.http.FirebaseOwnerResolverTest` PASS. health는 env credential 없이 200 ok, malformed production 설정의 기존 fail-fast 유지. 종료 중 새로운 task 등록을 예약하지 않는다.
+- [x] **Step 5: 커밋.** `feature(server): 서버 IO와 연결 자원 수명 관리` / `역할별 연결 pool과 외부 client 재사용 및 종료 처리를 적용한다.`
 
 Hikari 버전은 [공식 7.0.2 tag POM](https://github.com/brettwooldridge/HikariCP/blob/HikariCP-7.0.2/pom.xml)에서 존재를 확인했다. 최신 버전이라는 주장은 하지 않으며 이번 계획은 이 버전을 사용한다.
 

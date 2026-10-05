@@ -10,3 +10,4 @@
 | B0 상세 구현 계획·변경 파일·실패/통과 검증 | [B0 구현 계획](../../superpowers/plans/2026-10-04-b0-server-foundation.md) |
 | 상품 상태·허용 행동·공통 DTO·공개 오류 계약 | [wishlist-item-state-api.md](../wishlist-item-state-api.md) |
 | 상품 상태·claim·중간/최종 쓰기 보호·lease 복구·AI 예산 경계 | [wishlist-state-persistence.md](wishlist-state-persistence.md) |
+| 요청 IO·역할별 DB pool·client 재사용·종료 gate | [runtime-resources.md](runtime-resources.md) |

@@ -19,6 +19,22 @@ import app.analysis.AnalysisLane
 import app.analysis.AnalysisClaim
 
 class WorkerRoutesTest {
+    @Test fun `blocking general and browser services run outside the route executor`() {
+        for (lane in listOf("general", "browser")) {
+            assertBlockingRouteIo({ block -> workerRoutes({ _, _ -> block(); app.analysis.WorkerDisposition.ACKNOWLEDGE }, { _, _ -> block(); app.analysis.WorkerDisposition.ACKNOWLEDGE }) }, {
+                post("/internal/worker/$lane") { setBody("""{"jobId":"00000000-0000-0000-0000-000000000001","generation":1}""") }
+            })
+        }
+    }
+
+    @Test fun `general and browser cancellation propagate to request pipeline`() {
+        for (lane in listOf("general", "browser")) {
+            assertRouteCancellation({ block -> workerRoutes({ _, _ -> block(); app.analysis.WorkerDisposition.ACKNOWLEDGE }, { _, _ -> block(); app.analysis.WorkerDisposition.ACKNOWLEDGE }) }, {
+                post("/internal/worker/$lane") { setBody("""{"jobId":"00000000-0000-0000-0000-000000000001","generation":1}""") }
+            })
+        }
+    }
+
     @Test fun `only current faults return retry while stale faults and finished work are acknowledged`() = withAnalysisDatabase { source ->
         var mode = "fault"
         val process: (AnalysisClaim) -> ProcessingOutcome = { claim ->

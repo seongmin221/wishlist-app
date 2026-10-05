@@ -11,6 +11,16 @@ import app.testutil.PostgresTestContainer
 import org.testcontainers.containers.PostgreSQLContainer
 
 class OutboxDispatcherTest {
+    @Test fun `gateway cancellation propagates through creation after releasing outbox lease`() = app.testutil.withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val key = UUID.randomUUID()
+        val dispatcher = OutboxDispatcher(source, TaskGateway { throw kotlinx.coroutines.CancellationException("cancel task request") })
+        val service = CreateWishlistItemService(source) { dispatcher.dispatchPending(1) }
+        kotlin.test.assertFailsWith<kotlinx.coroutines.CancellationException> { service.create(owner, key, "https://example.com/item") }
+        kotlin.test.assertIs<app.wishlist.CreateResult.Replayed>(service.create(owner, key, "https://example.com/item"))
+        assertEquals("1", app.testutil.analysisScalar(source, "select count(*) from outbox_events where published_at is null and lease_until is null"))
+    }
+
     @Test
     fun `failed publication remains recoverable and keeps its task name`() {
         PostgresTestContainer().use { database ->

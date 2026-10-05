@@ -1,5 +1,6 @@
 package app.tasks
 
+import kotlinx.coroutines.CancellationException
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
@@ -18,13 +19,22 @@ class OutboxDispatcher(private val dataSource: DataSource, private val gateway: 
                     }
                 }
                 published++
-            } catch (_: Exception) {
-                dataSource.connection.use { connection ->
-                    connection.prepareStatement("update outbox_events set lease_until=null where id=? and published_at is null").use {
-                        it.setObject(1, event.id)
-                        it.executeUpdate()
+            } catch (cause: Exception) {
+                try {
+                    dataSource.connection.use { connection ->
+                        connection.prepareStatement("update outbox_events set lease_until=null where id=? and published_at is null").use {
+                            it.setObject(1, event.id)
+                            it.executeUpdate()
+                        }
                     }
+                } catch (cleanup: Exception) {
+                    if (cause is CancellationException) {
+                        if (cleanup !== cause) cause.addSuppressed(cleanup)
+                        throw cause
+                    }
+                    throw cleanup
                 }
+                if (cause is CancellationException) throw cause
                 return published
             }
         }

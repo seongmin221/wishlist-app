@@ -22,6 +22,18 @@ import kotlinx.serialization.json.jsonPrimitive
 import app.testutil.PostgresTestContainer
 
 class WishlistRoutesTest {
+    @Test fun `blocking creation runs outside the route executor`() {
+        app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes({ _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }) { UUID.randomUUID() } }, {
+            post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
+        })
+    }
+
+    @Test fun `creation cancellation propagates to the request pipeline`() {
+        app.testutil.assertRouteCancellation({ block -> wishlistRoutes({ _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }) { UUID.randomUUID() } }, {
+            post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
+        })
+    }
+
     @Test
     fun `create replay conflict and invalid url use stable http contract`() {
         PostgresTestContainer().use { database ->

@@ -16,6 +16,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     implementation("org.flywaydb:flyway-core:11.20.0")
     implementation("org.flywaydb:flyway-database-postgresql:11.20.0")
+    implementation("com.zaxxer:HikariCP:7.0.2")
     implementation("org.postgresql:postgresql:42.7.8")
     implementation("com.google.firebase:firebase-admin:9.10.0")
     implementation("com.google.cloud:google-cloud-tasks:2.95.0")

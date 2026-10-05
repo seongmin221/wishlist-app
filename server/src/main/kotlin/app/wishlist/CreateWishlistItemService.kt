@@ -1,5 +1,6 @@
 package app.wishlist
 
+import kotlinx.coroutines.CancellationException
 import java.net.URI
 import java.sql.Connection
 import java.util.UUID
@@ -22,7 +23,7 @@ class CreateWishlistItemService(
     fun create(ownerId: UUID, key: UUID, sourceUrl: String): CreateResult {
         if (!isPublicHttpUrl(sourceUrl)) return CreateResult.InvalidUrl
 
-        dataSource.connection.use { connection ->
+        val result = dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
                 val itemId = UUID.randomUUID()
@@ -38,9 +39,9 @@ class CreateWishlistItemService(
                             UUID.fromString(rows.getString("id")) to rows.getString("source_url")
                         }
                     }
-                    connection.commit()
                     val item = connection.loadItem(existing.first)
-                    return if (existing.second == sourceUrl) CreateResult.Replayed(item)
+                    connection.commit()
+                    return@use if (existing.second == sourceUrl) CreateResult.Replayed(item)
                     else CreateResult.IdempotencyKeyReused(item)
                 }
                 connection.prepareStatement(
@@ -58,14 +59,21 @@ class CreateWishlistItemService(
                     statement.setString(3, "analysis-$jobId-1")
                     statement.executeUpdate()
                 }
+                val item = connection.loadItem(itemId)
                 connection.commit()
-                runCatching { dispatchAfterCommit() }
-                return CreateResult.Created(connection.loadItem(itemId))
+                CreateResult.Created(item)
             } catch (error: Exception) {
                 connection.rollback()
                 throw error
             }
         }
+        if (result is CreateResult.Created) {
+            try { dispatchAfterCommit() } catch (cause: Exception) {
+                if (cause is CancellationException) throw cause
+                // The committed outbox remains available to the scheduled dispatcher.
+            }
+        }
+        return result
     }
 
     private fun Connection.loadItem(itemId: UUID): WishlistItem = prepareStatement(

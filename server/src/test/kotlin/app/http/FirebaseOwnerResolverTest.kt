@@ -11,6 +11,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class FirebaseOwnerResolverTest {
+    @Test fun `verification cancellation is propagated instead of unauthorized`() {
+        app.testutil.assertRouteCancellation({ block ->
+            val resolver = FirebaseOwnerResolver("project") { block(); "uid" }
+            get("/owner") { resolver.resolve(call); call.respondText("unexpected") }
+        }, { get("/owner") { header("Authorization", "Bearer token") } })
+    }
+
     @Test
     fun `only a verified bearer token resolves an owner`() = testApplication {
         val resolver = FirebaseOwnerResolver("project-a") { token -> if (token == "valid") "uid-1" else null }

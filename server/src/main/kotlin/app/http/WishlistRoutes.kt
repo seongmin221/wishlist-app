@@ -16,10 +16,17 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonPrimitive
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 
 fun Route.wishlistRoutes(
     service: CreateWishlistItemService,
+    ownerResolver: suspend (ApplicationCall) -> UUID?,
+) = wishlistRoutes(service::create, ownerResolver)
+
+fun Route.wishlistRoutes(
+    create: (UUID, UUID, String) -> CreateResult,
     ownerResolver: suspend (ApplicationCall) -> UUID?,
 ) {
     post("/v1/wishlist-items") {
@@ -33,7 +40,7 @@ fun Route.wishlistRoutes(
             null
         } ?: return@post call.respondApiError(HttpStatusCode.UnprocessableEntity, "INVALID_URL")
 
-        when (val result = service.create(owner, key, sourceUrl)) {
+        when (val result = withContext(Dispatchers.IO) { create(owner, key, sourceUrl) }) {
             is CreateResult.Created -> {
                 call.response.headers.append(HttpHeaders.Location, "/v1/wishlist-items/${result.itemId}")
                 call.respondText(itemJson(result.item), ContentType.Application.Json, HttpStatusCode.Created)
