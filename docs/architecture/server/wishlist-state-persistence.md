@@ -1,6 +1,6 @@
 # 상품 상태 저장 기반
 
-> 구현 범위: B0 Task 3~4 · V8/V9 migration·claim·쓰기 guard · 공개 조회 연결은 B1
+> 구현 범위: B0 Task 3~5 · V8/V9 migration·claim·쓰기 guard · 공개 조회 연결은 B1
 
 ## 상품 상태와 출처
 
@@ -22,7 +22,7 @@ analysis/review/lifecycle와 값 출처는 enum 허용 목록으로 제한하고
 
 V9는 analysis job에 execution token, lease 만료 시각, claim 당시 상품 version을 추가한다. job generation은 양수여야 하며 기존 `(wishlist_item_id, generation)` uniqueness를 유지한다. `(stage, lease_until, id)` index는 만료 실행 복구 조회를 준비한다.
 
-legacy GENERAL_RUNNING/BROWSER_RUNNING은 execution token과 claimed version을 null로 두고 lease를 migration 시각으로 만료시킨다. 기존 실행을 유효한 claim으로 취급하지 않는다. 실제 claim과 쓰기 guard는 Task 4에서 구현했고 processor/Worker 연결은 Task 5~6, 만료 실행 복구는 Task 7에서 진행한다.
+legacy GENERAL_RUNNING/BROWSER_RUNNING은 execution token과 claimed version을 null로 두고 lease를 migration 시각으로 만료시킨다. 기존 실행을 유효한 claim으로 취급하지 않는다. 실제 claim과 쓰기 guard는 Task 4에서 구현했고 중간 결과와 Worker의 claim 전달은 Task 5에서 연결했고 최종 상태 정책은 Task 6, 만료 실행 복구는 Task 7에서 진행한다.
 
 ## 사용자 범위 조회
 
@@ -41,4 +41,15 @@ claim을 다시 발급할 때 assignment/purpose/failure 임시 결과를 지운
 
 `AnalysisWriteGuard.lockCurrent(connection, claim)`는 명시적 transaction을 요구한다. item→job 잠금 뒤 owner·item 관계·generation·token·lane RUNNING·상품 상태·수동 완료·현재 version과 claimed version을 검증한다. lease는 두 잠금을 얻은 뒤 읽은 DB `clock_timestamp()`와 비교한다. 잠금 대기 전에 시각을 읽으면 대기 중 만료를 놓칠 수 있기 때문이다.
 
-false 결과는 현재 실행을 취소하거나 token을 수정하지 않는다. true/false 모두 transaction commit/rollback과 잠금 해제는 호출자 책임이다. guard 뒤의 DB 쓰기는 같은 transaction에서 수행하며 외부 네트워크 호출 중에는 connection이나 잠금을 유지하지 않는다. 실제 중간·최종 쓰기 경로에 이 guard를 적용하는 작업은 Task 5~6이다.
+false 결과는 현재 실행을 취소하거나 token을 수정하지 않는다. true/false 모두 transaction commit/rollback과 잠금 해제는 호출자 책임이다. guard 뒤의 DB 쓰기는 같은 transaction에서 수행하며 외부 네트워크 호출 중에는 connection이나 잠금을 유지하지 않는다. 중간 쓰기 경로와 기존 Worker 최종 transaction 입구에는 Task 5에서 적용했다. 최종 상태·출처 정책과 token 해제를 한 repository로 모으는 작업은 Task 6이다.
+
+
+## 중간 결과와 외부 호출 경계
+
+Task 5의 AnalysisPendingResultRepository는 guard와 source URL 읽기, 임시 metadata/assignment/failure 저장, 후보 snapshot 읽기·최초 저장을 같은 transaction에 둔다. 후보 공급은 DB/local 조회이며 원격 호출을 하지 않는다. 최초 snapshot의 ID·label은 재claim에서도 그대로 유지하고 GENERAL 재추출의 임시 metadata와 구분한다.
+
+추출/rendering/AI는 AnalysisClaim을 전달한다. 외부 호출 동안 DB connection이나 잠금을 유지하지 않으며, 응답 뒤의 저장은 새 guard transaction을 거친다. invalid claim은 ProcessingOutcome.Stale이며 browser의 nullable rendering은 null을 반환한다. Worker는 실제 claim을 발급하고 final transaction 입구에서 다시 guard를 확인해 stale partial/fallback도 반영하지 않는다.
+
+예산 reserve는 guard 후 window를 DAILY→MONTHLY 순서로 잠그고 새 reservation을 생성하기 전에 lease를 재검증한다. request ID 재사용도 유효 claim과 같은 job/generation을 요구한다. reserve가 Stale이면 gateway를 호출하지 않는다. 예약 후 gateway 직전에 다시 확인하고, 이 검사 뒤 무효화와의 좁은 race는 응답 저장에서 차단한다.
+
+예약·정산은 서로 다른 책임이다. 실제 gateway의 유효 usage는 실행 권한을 잃어도 SETTLED로 기록한다. usage가 없는 non-retry 응답은 maximum settlement, usage 없는 retry/호출 실패는 IN_FLIGHT lease reconciliation을 유지한다. gateway를 보내기 전 무효화된 RESERVED는 reconciliation에서 해제한다. 정산은 reservation/window만 잠그고 item/job를 뒤늦게 잠그지 않는다.

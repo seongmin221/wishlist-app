@@ -1,5 +1,7 @@
 package app.budget
 
+import app.testutil.claimJob
+import app.analysis.AnalysisClaim
 import app.DatabaseFactory
 import app.wishlist.CreateWishlistItemService
 import java.util.UUID
@@ -15,11 +17,11 @@ class BudgetMaintenanceServiceTest {
             val source = DatabaseFactory.dataSource(db.jdbcUrl,db.username,db.password)
             CreateWishlistItemService(source).create(UUID.randomUUID(),UUID.randomUUID(),"https://example.com/item")
             val jobId = source.connection.use { c -> c.createStatement().executeQuery("select id from analysis_jobs").use { r -> r.next(); r.getObject(1,UUID::class.java) } }
-            source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING' where id=?").use { s -> s.setObject(1,jobId); s.executeUpdate() } }
+            val claim = claimJob(source, jobId)
             val budget = LlmBudgetService(source,dailyCeilingMicrousd=1000,monthlyCeilingMicrousd=1000)
-            val first = budget.reserveBeforeCall(jobId,1,UUID.randomUUID()) as ReserveResult.Reserved
+            val first = budget.reserveBeforeCall(claim,UUID.randomUUID()) as ReserveResult.Reserved
             budget.markInFlight(first.reservation.id)
-            budget.reserveBeforeCall(jobId,1,UUID.randomUUID())
+            budget.reserveBeforeCall(claim,UUID.randomUUID())
             source.connection.use { c -> c.createStatement().executeUpdate("update llm_budget_reservations set lease_until=now()-interval '1 second'") }
             val notified = mutableSetOf<UUID>()
             val maintenance = BudgetMaintenanceService(source) { alert -> notified.add(alert.id) }

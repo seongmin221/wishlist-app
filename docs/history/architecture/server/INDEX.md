@@ -67,3 +67,5 @@
 - [B0 Task 3 상태·실행 스키마 구현](b0-task-3-state-schema-2026-10-05.md) — V7 업그레이드·데이터 보존·사용자 범위 조회
 
 - [B0 Task 4 원자 claim·쓰기 보호](b0-task-4-analysis-claim-2026-10-05.md) — item→job 잠금·실행 token·DB 시각·경합 검증
+
+- [B0 Task 5 중간 결과·AI 예산 claim 연결](b0-task-5-pending-claims-2026-10-05.md) — stale 저장 차단·후보 snapshot·실제 비용 정산

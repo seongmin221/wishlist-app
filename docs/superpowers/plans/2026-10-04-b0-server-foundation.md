@@ -186,12 +186,12 @@ claim 회전 시 이전 assignment/failure 임시 필드는 지운다. general �
 - `AnalysisPendingResultRepository.candidateSnapshot(claim: AnalysisClaim, supply: (UUID) -> CandidateSnapshot): CandidateSnapshot?`은 guard transaction 안에서 기존 snapshot 읽기/최초 저장을 원자 처리한다. supply는 DB/local 후보 조회만 하고 원격 호출하지 않는다.
 - `LlmBudgetService.reserveBeforeCall(claim: AnalysisClaim, requestId: UUID): ReserveResult`와 `ReserveResult.Stale` 추가. 실제 runtime 경로에는 기존 token 없는 overload를 남기지 않는다. 예산 테스트도 유효 claim을 사용한다.
 
-- [ ] **Step 1: 실패할 stale 중간 쓰기 테스트 작성.** extract/gateway 진행 중 latch로 멈추고 claim token 회전 또는 item generation/version/manual 상태를 변경한다. resume 뒤 pending metadata/assignment/failure/candidate snapshot 불변, outcome Stale를 assert한다. 만료 claim의 새 예산 reserve도 Stale이고 LLM gateway 호출 0건이어야 한다.
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.extraction.GeneralExtractionProcessorTest --tests app.browser.BrowserRenderProcessorTest --tests app.ai.AiClassificationServiceTest --tests app.budget.LlmBudgetServiceTest` — token 보호 없이 stale UPDATE 또는 reserve가 수행돼 실패.
-- [ ] **Step 3: 인터페이스와 모든 호출자 변경.** guard로 source URL 읽기/중간 쓰기를 보호한다. budget reserve의 잠금 순서는 item→job→예산 window(기존 고정 순서)이고 정산은 item/job를 뒤늦게 잠그지 않는다. gateway 호출 전 claim을 다시 확인하며 검사 후 무효화와의 좁은 race는 결과 쓰기에서 차단한다.
-- [ ] **Step 4: 비용 정산 검증.** gateway가 유효 usage를 반환한 뒤 claim이 stale여도 reservation SETTLED·실제 비용 유지, 상품/임시 결과는 불변이어야 한다. usage 누락 시 기존 maximum settlement/lease reconciliation 정책을 유지한다.
-- [ ] **Step 5: GREEN 및 caller 검증.** 위 명령과 `./gradlew compileKotlin compileTestKotlin` PASS. `rg 'process\(|render\(|classify\(|reserveBeforeCall\(' src/main/kotlin src/test/kotlin`로 jobId-only runtime call이 남지 않음을 확인한다.
-- [ ] **Step 6: 커밋.** `feature(server): 분석 중간 결과에도 실행 claim 적용` / `추출과 AI 및 예산 경로의 오래된 실행 쓰기를 차단한다.`
+- [x] **Step 1: 실패할 stale 중간 쓰기 테스트 작성.** extract/gateway 진행 중 latch로 멈추고 claim token 회전 또는 item generation/version/manual 상태를 변경한다. resume 뒤 pending metadata/assignment/failure/candidate snapshot 불변, outcome Stale를 assert한다. 만료 claim의 새 예산 reserve도 Stale이고 LLM gateway 호출 0건이어야 한다.
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.extraction.GeneralExtractionProcessorTest --tests app.browser.BrowserRenderProcessorTest --tests app.ai.AiClassificationServiceTest --tests app.budget.LlmBudgetServiceTest` — token 보호 없이 stale UPDATE 또는 reserve가 수행돼 실패.
+- [x] **Step 3: 인터페이스와 모든 호출자 변경.** guard로 source URL 읽기/중간 쓰기를 보호한다. budget reserve의 잠금 순서는 item→job→예산 window(기존 고정 순서)이고 정산은 item/job를 뒤늦게 잠그지 않는다. gateway 호출 전 claim을 다시 확인하며 검사 후 무효화와의 좁은 race는 결과 쓰기에서 차단한다.
+- [x] **Step 4: 비용 정산 검증.** gateway가 유효 usage를 반환한 뒤 claim이 stale여도 reservation SETTLED·실제 비용 유지, 상품/임시 결과는 불변이어야 한다. usage 누락 시 기존 maximum settlement/lease reconciliation 정책을 유지한다.
+- [x] **Step 5: GREEN 및 caller 검증.** 위 명령과 `./gradlew compileKotlin compileTestKotlin` PASS. `rg 'process\(|render\(|classify\(|reserveBeforeCall\(' src/main/kotlin src/test/kotlin`로 jobId-only runtime call이 남지 않음을 확인한다.
+- [x] **Step 6: 커밋.** `feature(server): 분석 중간 결과에도 실행 claim 적용` / `추출과 AI 및 예산 경로의 오래된 실행 쓰기를 차단한다.`
 
 ### Task 6: 일반·browser의 최종 결과를 같은 보호 조건으로 반영한다
 

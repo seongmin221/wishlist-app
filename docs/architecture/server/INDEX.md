@@ -9,4 +9,4 @@
 | API 37개 구현 묶음·실행 순서·선행 조건·통과 기준 | [mvp-api-implementation-order.md](mvp-api-implementation-order.md) |
 | B0 상세 구현 계획·변경 파일·실패/통과 검증 | [B0 구현 계획](../../superpowers/plans/2026-10-04-b0-server-foundation.md) |
 | 상품 상태·허용 행동·공통 DTO·공개 오류 계약 | [wishlist-item-state-api.md](../wishlist-item-state-api.md) |
-| 상품 상태·generation·lease 저장·원자 claim·쓰기 보호 | [wishlist-state-persistence.md](wishlist-state-persistence.md) |
+| 상품 상태·claim·중간 쓰기 보호·AI 예산 경계 | [wishlist-state-persistence.md](wishlist-state-persistence.md) |

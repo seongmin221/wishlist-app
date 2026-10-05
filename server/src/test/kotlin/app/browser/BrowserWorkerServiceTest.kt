@@ -63,7 +63,7 @@ class BrowserWorkerServiceTest {
         val browser = BrowserWorkerService(source,
             { Metadata("Rendered product", null, null, "https://example.com/item") },
             { id, _ ->
-                source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+                source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
                 ProcessingOutcome.Complete
             })
         assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
@@ -97,7 +97,7 @@ class BrowserWorkerServiceTest {
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
         val browser = BrowserWorkerService(source,
             { id ->
-                source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='CANCELLED' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+                source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='CANCELLED' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
                 Metadata("Stale product", null, null, "https://example.com/item")
             },
             { _, _ -> ProcessingOutcome.Complete })

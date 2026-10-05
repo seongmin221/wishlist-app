@@ -1,5 +1,7 @@
 package app.budget
 
+import app.analysis.AnalysisClaim
+import app.analysis.AnalysisWriteGuard
 import java.sql.Connection
 import java.sql.Timestamp
 import java.time.Instant
@@ -11,6 +13,7 @@ enum class ReservationState { RESERVED, IN_FLIGHT, SETTLED, RELEASED }
 data class BudgetReservation(val id: UUID, val requestId: UUID, val maximumMicrousd: Long)
 sealed interface ReserveResult {
     data class Reserved(val reservation: BudgetReservation) : ReserveResult
+    data object Stale : ReserveResult
     data object Exceeded : ReserveResult
 }
 data class WindowTotals(val reserved: Long, val settled: Long)
@@ -26,15 +29,15 @@ class LlmBudgetService(
 ) {
     init { require(modelSnapshot.isNotBlank() && (allowLocalAlias || modelSnapshot != "gpt-5.6-luna")) }
 
-    fun reserveBeforeCall(jobId: UUID, generation: Int, requestId: UUID): ReserveResult = transaction { c ->
-        c.prepareStatement("select id, maximum_microusd, state from llm_budget_reservations where request_id=?").use { s ->
+    fun reserveBeforeCall(claim: AnalysisClaim, requestId: UUID): ReserveResult = transaction { c ->
+        if (!AnalysisWriteGuard.lockCurrent(c, claim)) return@transaction ReserveResult.Stale
+        c.prepareStatement("select id, maximum_microusd, analysis_job_id, generation from llm_budget_reservations where request_id=?").use { s ->
             s.setObject(1, requestId)
-            s.executeQuery().use { r -> if (r.next()) return@transaction ReserveResult.Reserved(BudgetReservation(r.getObject(1, UUID::class.java), requestId, r.getLong(2))) }
+            s.executeQuery().use { r -> if (r.next()) {
+                require(r.getObject(3, UUID::class.java) == claim.jobId && r.getInt(4) == claim.generation) { "Reservation belongs to another analysis job" }
+                return@transaction ReserveResult.Reserved(BudgetReservation(r.getObject(1, UUID::class.java), requestId, r.getLong(2)))
+            } }
         }
-        val valid = c.prepareStatement("select 1 from analysis_jobs j join wishlist_items i on i.id=j.wishlist_item_id where j.id=? and j.generation=? and i.lifecycle_status='ACTIVE' and j.stage in ('GENERAL_RUNNING','BROWSER_RUNNING','CLASSIFICATION_RUNNING')").use { s ->
-            s.setObject(1, jobId); s.setInt(2, generation); s.executeQuery().use { it.next() }
-        }
-        require(valid) { "Inactive or unclaimed analysis job" }
         val now = Instant.now()
         val windows = windows(now)
         val maximum = price.maximumMicrousd()
@@ -49,6 +52,7 @@ class LlmBudgetService(
             }
             if (!allowed) return@transaction ReserveResult.Exceeded
         }
+        if (!AnalysisWriteGuard.lockCurrent(c, claim)) return@transaction ReserveResult.Stale
         windows.forEach { (type, start, ceiling) ->
             c.adjustWindow(type, start, maximum, 0)
             val total = c.prepareStatement("select reserved_microusd+settled_microusd from llm_budget_windows where window_type=? and window_start=?").use { s ->
@@ -60,7 +64,7 @@ class LlmBudgetService(
         }
         val id = UUID.randomUUID()
         c.prepareStatement("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,model_snapshot,state,maximum_microusd,lease_until) values(?,?,?,?,?,?,'RESERVED',?,?)").use { s ->
-            s.setObject(1, id); s.setObject(2, requestId); s.setObject(3, jobId); s.setInt(4, generation)
+            s.setObject(1, id); s.setObject(2, requestId); s.setObject(3, claim.jobId); s.setInt(4, claim.generation)
             s.setString(5, price.version); s.setString(6, modelSnapshot); s.setLong(7, maximum); s.setTimestamp(8, Timestamp.from(now.plusSeconds(120))); s.executeUpdate()
         }
         ReserveResult.Reserved(BudgetReservation(id, requestId, maximum))

@@ -84,7 +84,7 @@ class GeneralWorkerServiceTest {
     fun `claim revoked during processing cannot mark item ready`() = withJob { database, jobId, _ ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         val worker = GeneralWorkerService(source) { id ->
-            source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='CANCELLED' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+            source.connection.use { c -> c.prepareStatement("update analysis_jobs set stage='CANCELLED' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
             ProcessingOutcome.Complete
         }
         assertEquals(WorkerDisposition.ACKNOWLEDGE, worker.runGeneral(jobId, 1))
