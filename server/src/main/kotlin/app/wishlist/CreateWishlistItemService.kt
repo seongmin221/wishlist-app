@@ -89,7 +89,7 @@ class CreateWishlistItemService(
 
     private fun Connection.insertWishlistItem(itemId: UUID, ownerId: UUID, key: UUID, sourceUrl: String): Boolean {
         prepareStatement(
-            "insert into wishlist_items (id, owner_id, client_submission_id, source_url, analysis_status, lifecycle_status) values (?, ?, ?, ?, 'PROCESSING', 'ACTIVE') on conflict (owner_id, client_submission_id) do nothing",
+            "insert into wishlist_items (id, owner_id, client_submission_id, source_url, analysis_status, lifecycle_status, current_generation, category_missing_reason) values (?, ?, ?, ?, 'PROCESSING', 'ACTIVE', 1, 'EXTRACTION_UNRESOLVED') on conflict (owner_id, client_submission_id) do nothing",
         ).use { statement ->
             statement.setObject(1, itemId)
             statement.setObject(2, ownerId)

@@ -139,11 +139,11 @@ allowedActions: ACTIVE 비PROCESSING은 EDIT/DELETE, 수동 미완료 PARTIAL/�
 
 **V9 job 필드:** `execution_token uuid`, `lease_until timestamptz`, `claimed_item_version integer`. running stage의 legacy row는 token/claimed version null, lease는 migration 시각으로 만료 처리한다. 이를 기존 실행으로 이어받지 않고 Task 7에서 복구한다. `(stage, lease_until, id)` 복구 index를 추가하고 기존 unique(item,generation)를 유지한다.
 
-- [ ] **Step 1: 실패할 empty/upgrade·owner 테스트 작성.** Flyway target 7로 생성한 fixture에 READY/PARTIAL/실패·여러 generation·RUNNING·job 없는 item·DELETED를 넣은 뒤 최신 migrate한다. 필드 backfill 값과 원본 UUID/owner/key/version/timestamps·metadata·예산 rows 보존을 assert한다. owner A 조회 성공, owner B는 null, invalid enum/금지 override SQL은 constraint 실패여야 한다.
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.DatabaseMigrationTest --tests app.wishlist.WishlistItemStateRepositoryTest --tests app.wishlist.CreateWishlistItemServiceTest` — 신규 column/repository 부재로 실패.
-- [ ] **Step 3: migration·repository 구현.** 기존 7건 고정 검사를 V1~V9의 실제 version과 필요한 constraint/backfill assertions로 변경한다. 생성은 currentGeneration=1과 job generation=1을 원자 저장한다.
-- [ ] **Step 4: GREEN 확인.** 같은 명령 PASS, Flyway validate 재실행도 PASS. schema 적용 실패를 테스트 skip으로 숨기지 않는다.
-- [ ] **Step 5: 커밋.** `feature(server): 상품 상태와 분석 실행 스키마 확장` / `기존 데이터를 보존하며 상태와 generation 및 실행 claim 필드를 추가한다.`
+- [x] **Step 1: 실패할 empty/upgrade·owner 테스트 작성.** Flyway target 7로 생성한 fixture에 READY/PARTIAL/실패·여러 generation·RUNNING·job 없는 item·DELETED를 넣은 뒤 최신 migrate한다. 필드 backfill 값과 원본 UUID/owner/key/version/timestamps·metadata·예산 rows 보존을 assert한다. owner A 조회 성공, owner B는 null, invalid enum/금지 override SQL은 constraint 실패여야 한다.
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.DatabaseMigrationTest --tests app.wishlist.WishlistItemStateRepositoryTest --tests app.wishlist.CreateWishlistItemServiceTest` — 신규 column/repository 부재로 실패.
+- [x] **Step 3: migration·repository 구현.** 기존 7건 고정 검사를 V1~V9의 실제 version과 필요한 constraint/backfill assertions로 변경한다. 생성은 currentGeneration=1과 job generation=1을 원자 저장한다.
+- [x] **Step 4: GREEN 확인.** 같은 명령 PASS, Flyway validate 재실행도 PASS. schema 적용 실패를 테스트 skip으로 숨기지 않는다.
+- [x] **Step 5: 커밋.** `feature(server): 상품 상태와 분석 실행 스키마 확장` / `기존 데이터를 보존하며 상태와 generation 및 실행 claim 필드를 추가한다.`
 
 ### Task 4: 원자 claim과 공통 쓰기 보호를 만든다
 

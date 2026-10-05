@@ -63,3 +63,5 @@
 - [DB 테스트 호스트 준비 대기](db-test-host-readiness-2026-10-05.md) — 기존 연결 실패 해소·공통 fixture·전체 회귀
 
 - [B0 Task 2 공통 API 응답 구현](b0-task-2-api-contract-2026-10-05.md) — 요청 ID·공개 오류·DTO·가격 정밀도
+
+- [B0 Task 3 상태·실행 스키마 구현](b0-task-3-state-schema-2026-10-05.md) — V7 업그레이드·데이터 보존·사용자 범위 조회
