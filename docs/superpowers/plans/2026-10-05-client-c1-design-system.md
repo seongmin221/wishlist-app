@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 브랜치는 `client/c1-design-system`이고 `client/initial-setup`(d78d1c1 이후)에서 만든다. `client/initial-setup`이 main에 병합되기 전까지 기준이 main이 아니다.
+- 브랜치는 `client/c1-design-system`이고 `origin/develop`에서 만들며 PR 대상은 `develop`이다.
 - 값의 원본: 색·모서리·간격·서체는 [디자인 결정](../../design/decisions.md), 모션은 [`tokens.json`](../../../design/handoff/interactions/tokens.json)·[`motion.md`](../../../design/handoff/interactions/motion.md). 생성된 상수 파일을 손으로 고치지 않는다.
 - 라이트: 바탕 #F8F8F8, 카드 #FFFFFF, 시트·확인창 #FFFFFF, 칩 #FFFFFF, 아이콘 타일 #F0F0F0, 사진 자리 #EEEEEE, 선 #E2E2E2, 글자 #1D1D1D, 보조 글자 #5E5E5E, 탭 바 #1D1D1D, 밑줄 #BDBDBD.
 - 다크: 바탕 #1D1D1D, 카드 #312F30, 시트·확인창 #2A2A2A, 아이콘 타일 #1D1D1D(시트 위 입력·묶음 면 #3A3939), 칩·사진 자리 #3A3939, 선 #3A3939, 글자 #F4F3F0, 보조 글자 #A9A7A2, 탭 바 #312F30, 밑줄 #5A5958.
