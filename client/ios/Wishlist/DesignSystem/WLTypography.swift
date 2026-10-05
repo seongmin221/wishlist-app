@@ -117,28 +117,36 @@ struct WLTextStyle {
 
 private struct WLTextModifier: ViewModifier {
     let style: WLTextStyle
+    /// true면 한 줄 입력칸(TextField)용: 줄 높이 배수가 TextField에 먹지 않으므로 위아래 패딩(음수 가능)으로 한 줄 상자만 맞춘다.
+    let field: Bool
     // Font.custom(size:)이 Dynamic Type으로 커지는 것과 같은 곡선으로 크기를 얻는다.
     @ScaledMetric(relativeTo: .body) private var scaledSize: CGFloat = 1
 
-    init(style: WLTextStyle) {
+    init(style: WLTextStyle, field: Bool) {
         self.style = style
+        self.field = field
         _scaledSize = ScaledMetric(wrappedValue: style.size, relativeTo: .body)
     }
 
     func body(content: Content) -> some View {
         let scale = scaledSize / style.size
         let natural = UIFont(name: style.postScriptName, size: scaledSize)?.lineHeight ?? scaledSize
-        // SwiftUI Text 상자는 글꼴 자체 줄 높이라 한 줄 높이를 직접 못 정한다. 목표와의 차이(extra)를
-        // 줄 사이 간격(lineSpacing)과 위아래 패딩(extra/2씩, 음수 허용)으로 나눠 N줄 높이가 정확히 N×lineHeight가 되게 한다.
+        // 목표 줄 높이와 글꼴 자체 줄 높이의 차이. Plex는 글꼴 줄 높이(1.5em)가 목표보다 커서 음수다.
         let extra = style.lineHeight * scale - natural
-        let styled = content
-            .font(style.font)
-            .lineSpacing(extra)
-            .padding(.vertical, extra / 2)
-        if style.tabular {
-            styled.monospacedDigit()
+        if field {
+            let styled = content.font(style.font).padding(.vertical, extra / 2)
+            if style.tabular { styled.monospacedDigit() } else { styled }
         } else {
-            styled
+            // Text: 줄 높이 배수(`_lineHeightMultiple`)로 모든 줄을 정확히 lineHeight로 만든다. `lineSpacing`은 음수를
+            // 0으로 잘라 Plex 여러 줄이 줄마다 약 2pt씩 커졌다(C1 최종 리뷰, iOS 17.5·26.5에서 잼). 배수를 쓰면 줄 상자는
+            // 맞지만 글자가 줄 안에서 extra/2만큼 위(줄이면)·아래(늘이면)로 치우치므로 offset으로 CSS처럼 가운데에 되돌린다
+            // (offset은 레이아웃을 바꾸지 않는다). iOS 26 `.lineHeight(.exact)`는 글자 위치가 스타일마다 달라 쓰지 않는다.
+            // `WLTypographyTests`가 한 줄·세 줄 상자 높이를 지킨다.
+            let styled = content
+                .font(style.font)
+                .environment(\._lineHeightMultiple, style.lineHeight * scale / natural)
+                .offset(y: -extra / 2)
+            if style.tabular { styled.monospacedDigit() } else { styled }
         }
     }
 }
@@ -167,9 +175,14 @@ private struct WLUnderlineModifier: ViewModifier {
 }
 
 extension View {
-    /// 글꼴, 줄 높이, tabular 숫자를 한 번에 적용한다.
+    /// 글꼴, 줄 높이, tabular 숫자를 한 번에 적용한다(`Text`용, 여러 줄도 N × 줄 높이).
     func wlText(_ style: WLTextStyle) -> some View {
-        modifier(WLTextModifier(style: style))
+        modifier(WLTextModifier(style: style, field: false))
+    }
+
+    /// 한 줄 `TextField`용 `wlText`. 상자 높이를 줄 높이에 맞춘다(`WLUnderlineField`가 쓴다).
+    func wlFieldText(_ style: WLTextStyle) -> some View {
+        modifier(WLTextModifier(style: style, field: true))
     }
 
     /// `wlText(style)` 뒤에 붙인다. 한글 아래 끝에서 3px 아래에 `thickness`(기본 1) 밑줄을 그린다.

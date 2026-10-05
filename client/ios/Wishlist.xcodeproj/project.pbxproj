@@ -35,6 +35,7 @@
         A10000000000000000000116 /* WLConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000116 /* WLConfirmDialog.swift */; };
         A10000000000000000000117 /* WLMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000117 /* WLMenu.swift */; };
         A10000000000000000000033 /* WLNavigatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* WLNavigatorTests.swift */; };
+        A10000000000000000000034 /* WLTypographyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* WLTypographyTests.swift */; };
         A10000000000000000000201 /* WLRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000201 /* WLRoute.swift */; };
         A10000000000000000000202 /* WLNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000202 /* WLNavigator.swift */; };
         A10000000000000000000203 /* WLNavHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000203 /* WLNavHost.swift */; };
@@ -83,6 +84,7 @@
         A20000000000000000000116 /* WLConfirmDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLConfirmDialog.swift; sourceTree = "<group>"; };
         A20000000000000000000117 /* WLMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLMenu.swift; sourceTree = "<group>"; };
         A20000000000000000000033 /* WLNavigatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavigatorTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000034 /* WLTypographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTypographyTests.swift; sourceTree = "<group>"; };
         A20000000000000000000201 /* WLRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLRoute.swift; sourceTree = "<group>"; };
         A20000000000000000000202 /* WLNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavigator.swift; sourceTree = "<group>"; };
         A20000000000000000000203 /* WLNavHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavHost.swift; sourceTree = "<group>"; };
@@ -146,7 +148,7 @@
         };
         A40000000000000000000020 /* WishlistTests */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */);
+            children = (A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */);
             path = WishlistTests;
             sourceTree = "<group>";
         };
@@ -260,7 +262,7 @@
         A60000000000000000000003 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */);
+            files = (A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXSourcesBuildPhase section */
