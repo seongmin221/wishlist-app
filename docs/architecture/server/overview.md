@@ -109,6 +109,8 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 
 ## 기술 미결정 사항
 
+와이어프레임에 필요한 상품 조회·사용자 변경·카테고리·목적·아카이브의 추가 설계는 [MVP 제품 API 설계 제안](mvp-product-api-design.md)에 정리한다. 이 제안은 현재 구현이나 확정된 상태/API 계약을 자동으로 대체하지 않는다. 코드와 화면의 차이 및 실제 검증 범위는 [2026-10-04 서버 정밀 검토](../../history/architecture/server/technical-design-checkpoint-2026-10-04.md)를 따른다.
+
 - Worker request timeout, Cloud Tasks task deadline, 비용 alert의 정확한 기준
 - 실제 부하·비용 측정에 따른 초기 resource와 queue 용량 조정
 - browser Worker의 CPU·memory·concurrency·maximum instance, browser Queue dispatch rate와 비용

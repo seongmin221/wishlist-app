@@ -49,8 +49,11 @@
 
 ## 기술 설계 체크포인트
 
+- [2026-10-04 와이어프레임 기준 서버 정밀 검토](technical-design-checkpoint-2026-10-04.md) — 검토 완료 · 설계 제안
 - [2026-09-19 인프라 설계 체크포인트](technical-design-checkpoint-2026-09-19.md) — 진행 중
 - [2026-09-15 인프라 설계 체크포인트](technical-design-checkpoint-2026-09-15.md) — 대체됨
 - [2026-09-13 기술 설계 체크포인트](technical-design-checkpoint-2026-09-13.md) — 대체됨
 
 추가 결정은 `ADR-번호-제목.md` 형식으로 이 폴더에 기록한다.
+
+- [MVP API 구현 순서 결정](api-implementation-sequencing-2026-10-04.md) — 37개 API 최초 배정·자원 의존 순서·단계 통과 조건

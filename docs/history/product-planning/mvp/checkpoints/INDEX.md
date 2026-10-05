@@ -6,3 +6,4 @@ MVP 기획의 진행 상태와 다음 재개 지점을 시간 순서로 보존�
 2. [목적 점검](purpose-review.md) — 대체됨 · 2026-08-29
 3. [taxonomy와 목적](taxonomy-and-purpose.md) — 대체됨 · 2026-09-04
 4. [정책 구체화](policy-completion.md) — 대체됨 · 2026-09-05
+5. [와이어프레임과 서버 작업 연결](design-server-handoff.md) — 전달 자료 검토 완료 · 2026-10-04

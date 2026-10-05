@@ -4,3 +4,7 @@
 | --- | --- |
 | modular monolith, API, Worker 경계 | [overview.md](overview.md) |
 | Product metadata extraction pipeline | [extraction-pipeline.md](extraction-pipeline.md) |
+| 와이어프레임 기반 제품 API·데이터 모델·구현 순서 제안 | [mvp-product-api-design.md](mvp-product-api-design.md) |
+| 전체 화면·행동과 API 37개 대응, 최소 입출력·현재 구현 상태 | [mvp-api-inventory.md](mvp-api-inventory.md) |
+| API 37개 구현 묶음·실행 순서·선행 조건·통과 기준 | [mvp-api-implementation-order.md](mvp-api-implementation-order.md) |
+| B0 상세 구현 계획·변경 파일·실패/통과 검증 | [B0 구현 계획](../../superpowers/plans/2026-10-04-b0-server-foundation.md) |
