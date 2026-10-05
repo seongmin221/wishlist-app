@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>다크 로그인 안내</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&amp;family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#F4F3F0;text-decoration:none}a:hover{color:#A9A7A2}
+input::placeholder{color:#A9A7A2}
+input.ed:focus{border-bottom-color:currentColor !important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #1D1D1D; color: #F4F3F0; font-family: 'IBM Plex Sans KR', sans-serif">
+<div style="position: absolute; inset: 0; padding: 0 24px 40px; display: flex; flex-direction: column">
+<div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; gap: 24px">
+<span style="width: 64px; height: 64px; border-radius: 20px; background: #F96857; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"></path></svg></span>
+<h1 style="margin: 0; font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 28px; line-height: 1.2">사고 싶은 상품을<br>링크 하나로 모아 두세요</h1>
+<ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; font-size: 15px; line-height: 1.5"><li style="display: flex; align-items: center; gap: 12px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; background: #F96857; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12l5 5L20 7"></path></svg></span><span style="word-break: keep-all">공유하면 바로 저장돼요</span></li><li style="display: flex; align-items: center; gap: 12px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; background: #F96857; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12l5 5L20 7"></path></svg></span><span style="word-break: keep-all">로그인하면 상품 정보를 알아서 가져와요</span></li><li style="display: flex; align-items: center; gap: 12px"><span style="width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; background: #F96857; color: #1D1D1D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12l5 5L20 7"></path></svg></span><span style="word-break: keep-all">다른 기기에서도 같은 목록을 볼 수 있어요</span></li></ul>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<a href="FHomeD.dc.html" style="height: 56px; border-radius: 28px; background: #F4F3F0; color: #1D1D1D; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700">Apple로 계속하기</a>
+<a href="FHomeD.dc.html" style="height: 56px; border-radius: 28px; background: #312F30; color: #F4F3F0; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500">Google로 계속하기</a>
+<a href="FHomeLoggedOutD.dc.html" style="min-height: 48px; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #A9A7A2">나중에 하기</a>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

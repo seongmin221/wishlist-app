@@ -1,0 +1,514 @@
+{
+  "source": "https://claude.ai/artifact/DDuoeFQ7k7i9yBqY2H9qDK",
+  "page": "와이어프레임",
+  "boards": [
+    {
+      "file": "Home.dc.html",
+      "title": "홈",
+      "group": "홈 · 처리 영역은 연속 처리",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "HomeFillFlow.dc.html",
+        "HomeReviewFlow.dc.html",
+        "PurposeDetail.dc.html",
+        "PurposeHome.dc.html",
+        "Settings.dc.html"
+      ]
+    },
+    {
+      "file": "HomeReviewFlow.dc.html",
+      "title": "홈 · 분류·목적 확인 연속 처리",
+      "group": "홈 · 처리 영역은 연속 처리",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html"
+      ]
+    },
+    {
+      "file": "HomeFillFlow.dc.html",
+      "title": "홈 · 정보 보완 연속 처리",
+      "group": "홈 · 처리 영역은 연속 처리",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html"
+      ]
+    },
+    {
+      "file": "DuplicateCompare.dc.html",
+      "title": "홈 · 중복 후보 비교 시트",
+      "group": "홈 · 처리 영역은 연속 처리",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html"
+      ]
+    },
+    {
+      "file": "DuplicateConfirmBoth.dc.html",
+      "title": "홈 · 중복 · 둘 다 두기 확인",
+      "group": "홈 · 처리 영역은 연속 처리",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html"
+      ]
+    },
+    {
+      "file": "DuplicateConfirmNew.dc.html",
+      "title": "홈 · 중복 · 새 항목 지우기 확인",
+      "group": "홈 · 처리 영역은 연속 처리",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html"
+      ]
+    },
+    {
+      "file": "DuplicateConfirmOld.dc.html",
+      "title": "홈 · 중복 · 기존 항목 지우기 확인",
+      "group": "홈 · 처리 영역은 연속 처리",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryHome.dc.html",
+      "title": "카테고리 · 첫 화면",
+      "group": "카테고리 탭",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryList.dc.html",
+      "title": "카테고리 · 세부 유형 목록",
+      "group": "카테고리 탭",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryListCustom.dc.html",
+      "title": "카테고리 · 직접 만든 카테고리 목록 (⋯ 편집·삭제)",
+      "group": "카테고리 탭",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryListCustomEmpty.dc.html",
+      "title": "카테고리 · 직접 만든 카테고리 (상품 없음)",
+      "group": "카테고리 탭",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryEditSheet.dc.html",
+      "title": "카테고리 · 편집 시트",
+      "group": "카테고리 탭",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryDeleteConfirm.dc.html",
+      "title": "카테고리 · 삭제 확인",
+      "group": "카테고리 탭",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryAddSheet.dc.html",
+      "title": "카테고리 · + 추가 시트",
+      "group": "카테고리 탭",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeHome.dc.html",
+      "title": "목적 · 첫 화면",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ArchiveList.dc.html",
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "PurposeDetail.dc.html",
+        "PurposeDetailEmpty.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeDetail.dc.html",
+      "title": "목적 · 상세 (비교 끝내기 포함, 스크롤·손잡이로 헤더 접힘)",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeCreate.dc.html",
+      "title": "목적 · 새 목적 만들기 시트",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ArchiveList.dc.html",
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "PurposeDetail.dc.html",
+        "PurposeDetailEmpty.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeDetailEmpty.dc.html",
+      "title": "목적 · 빈 목적 상세",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeEditInPlace.dc.html",
+      "title": "목적 · 그 자리에서 편집",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeAddCandidates.dc.html",
+      "title": "목적 · 후보 추가 시트",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeDeleteConfirm.dc.html",
+      "title": "목적 · 삭제 확인",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "PurposeAddCategoryFilter.dc.html",
+      "title": "목적 · 후보 추가 · 카테고리로 거르기",
+      "group": "목적 탭 · 만들기·편집·후보 추가",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "ProductDetail.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "ProductDetail.dc.html",
+      "title": "상품 · 상세 (⋯ → 편집하면 그 자리에서 편집 상태)",
+      "group": "상품 상세·편집",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryList.dc.html",
+        "WebView.dc.html"
+      ]
+    },
+    {
+      "file": "ProductDetailFill.dc.html",
+      "title": "상품 · 정보 보완 필요 상태",
+      "group": "상품 상세·편집",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryList.dc.html",
+        "WebView.dc.html"
+      ]
+    },
+    {
+      "file": "ProductDetailProcessing.dc.html",
+      "title": "상품 · 분석 중 상태",
+      "group": "상품 상세·편집",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryList.dc.html",
+        "WebView.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryPicker.dc.html",
+      "title": "카테고리 선택 · 바텀시트",
+      "group": "카테고리 선택",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryList.dc.html",
+        "WebView.dc.html"
+      ]
+    },
+    {
+      "file": "CategoryCreate.dc.html",
+      "title": "카테고리 선택 · 새 세부 카테고리",
+      "group": "카테고리 선택",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryList.dc.html",
+        "WebView.dc.html"
+      ]
+    },
+    {
+      "file": "WebView.dc.html",
+      "title": "웹뷰 · 원본 링크",
+      "group": "원본 링크 웹뷰",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ProductDetail.dc.html"
+      ]
+    },
+    {
+      "file": "WebViewShare.dc.html",
+      "title": "웹뷰 · 공유 시트",
+      "group": "원본 링크 웹뷰",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ProductDetail.dc.html"
+      ]
+    },
+    {
+      "file": "WebViewExternal.dc.html",
+      "title": "웹뷰 · 외부 앱 열기 확인",
+      "group": "원본 링크 웹뷰",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ProductDetail.dc.html"
+      ]
+    },
+    {
+      "file": "ArchiveList.dc.html",
+      "title": "아카이브 · 끝난 비교 목록",
+      "group": "아카이브 (끝난 비교)",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ArchiveDetail.dc.html",
+        "ArchiveDetailNoPurchase.dc.html",
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "ArchiveDetail.dc.html",
+      "title": "아카이브 · 상세 (구매 있음, ⋯ 메뉴, 스크롤·손잡이로 헤더 접힘)",
+      "group": "아카이브 (끝난 비교)",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ArchiveList.dc.html",
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "ArchiveDetailNoPurchase.dc.html",
+      "title": "아카이브 · 상세 (구매 없음)",
+      "group": "아카이브 (끝난 비교)",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ArchiveList.dc.html",
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "ArchiveRestoreConfirm.dc.html",
+      "title": "아카이브 · 비교 다시 열기 확인",
+      "group": "아카이브 (끝난 비교)",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ArchiveList.dc.html",
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "ArchiveDeleteConfirm.dc.html",
+      "title": "아카이브 · 기록 삭제 확인",
+      "group": "아카이브 (끝난 비교)",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "ArchiveList.dc.html",
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "PurposeHome.dc.html"
+      ]
+    },
+    {
+      "file": "Login.dc.html",
+      "title": "로그인 안내 (첫 실행)",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html",
+        "HomeLoggedOut.dc.html"
+      ]
+    },
+    {
+      "file": "HomeLoggedOut.dc.html",
+      "title": "홈 · 로그인 전",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "CategoryHome.dc.html",
+        "Home.dc.html",
+        "Login.dc.html",
+        "PurposeHome.dc.html",
+        "SettingsLoggedOut.dc.html"
+      ]
+    },
+    {
+      "file": "Settings.dc.html",
+      "title": "설정",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html",
+        "Login.dc.html"
+      ]
+    },
+    {
+      "file": "SettingsLogout.dc.html",
+      "title": "설정 · 로그아웃 확인",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html",
+        "Login.dc.html"
+      ]
+    },
+    {
+      "file": "SettingsLoggedOut.dc.html",
+      "title": "설정 · 로그인 전",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": [
+        "Home.dc.html",
+        "Login.dc.html"
+      ]
+    },
+    {
+      "file": "ShareSaved.dc.html",
+      "title": "공유 수신 · 저장 완료",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": []
+    },
+    {
+      "file": "ShareSavedLocal.dc.html",
+      "title": "공유 수신 · 로그인 전",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": []
+    },
+    {
+      "file": "ShareSavedOffline.dc.html",
+      "title": "공유 수신 · 오프라인",
+      "group": "로그인 · 설정 · 공유 수신",
+      "width": 390,
+      "height": 844,
+      "links": []
+    }
+  ],
+  "flowMap": {
+    "file": "FlowMap.dc.html",
+    "title": "화면 흐름도",
+    "width": 1648,
+    "height": 3304
+  }
+}

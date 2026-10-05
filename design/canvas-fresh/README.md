@@ -13,6 +13,7 @@
 | `gen_infocolor.py` | `검토 · 정보 아이콘 색` 페이지의 후보 보드(`PickInfo*`) |
 | `gen_motion.py` | `검토 · 화면 전환 모션` 페이지의 후보 보드(`Motion*`). 상태별 화면 캡처(`motion/*.png`)를 겹쳐 CSS 애니메이션으로 반복 재생한다 |
 | `capture_motion_states.py` | `gen_motion.py`가 쓰는 상태별 화면을 핸드오프 보드에서 2배 해상도로 찍는다 |
+| `capture_motion_strips.py` | 핸드오프 `interactions/reference/boards/`의 모션 보드에서 주요 시점 프레임을 찍어 `reference/strips/*.png`를 만든다 |
 | `gen_vis.py` | `시각 방향 · 대표 화면`의 목적 보드(`VisPurpose*`). 전체 화면 목적 보드에서 연결만 바꾼다 |
 
 ## 만들기

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>라이트 중복 후보 새 항목 지우기 확인</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&amp;family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1D1D1D;text-decoration:none}a:hover{color:#5E5E5E}
+input::placeholder{color:#5E5E5E}
+input.ed:focus{border-bottom-color:currentColor !important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F8F8F8; color: #1D1D1D; font-family: 'IBM Plex Sans KR', sans-serif; display: flex; flex-direction: column">
+<header style="padding: 52px 16px 8px; display: flex; align-items: center; gap: 8px">
+<a href="FHomeL.dc.html" aria-label="닫기" style="width: 44px; height: 44px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+<div style="flex-grow: 1; text-align: center; font-size: 16px; font-weight: 700">분류·목적 확인</div>
+<sc-if value="{{notDone}}" hint-placeholder-val="{{true}}"><div style="width: 44px; text-align: right; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 14px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">{{pos}}</div></sc-if>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}"><div style="width: 44px"></div></sc-if>
+</header>
+<sc-if value="{{notDone}}" hint-placeholder-val="{{true}}">
+<div style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 20px 36px">
+<div style="position: relative; height: 574px; flex-shrink: 0">
+<sc-if value="{{hasBack2}}" hint-placeholder-val="{{true}}"><div style="position: absolute; inset: 14px 6px -6px; border-radius: 28px; background: #E4E4E4; transform: rotate(3deg)"></div></sc-if>
+<sc-if value="{{hasBack1}}" hint-placeholder-val="{{true}}"><div style="position: absolute; inset: 8px 2px -2px; border-radius: 28px; background: #EEEEEE; transform: rotate(-2.5deg)"></div></sc-if>
+<article style="position: absolute; inset: 0; box-sizing: border-box; padding: 12px; border-radius: 28px; background: #FFFFFF; border: 1.5px solid #E2E2E2; display: flex; flex-direction: column; gap: 12px">
+<div style="aspect-ratio: 1 / 1; flex-shrink: 0; box-sizing: border-box; padding: 32px; border-radius: 20px; background: {{cur.ph}}; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="100%" height="100%" viewBox="0 0 48 48" fill="none" stroke="{{cur.phS}}" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="{{cur.phF}}"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="{{cur.phF}}"></rect></svg></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 0 4px">
+<div style="font-size: 18px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{cur.name}}</div>
+<div style="font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;">{{cur.price}}</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px 0 14px; border-radius: 14px; background: #F0F0F0">
+<span style="min-width: 52px; white-space: nowrap; font-size: 13px; color: #5E5E5E">카테고리</span>
+<span style="flex-grow: 1; min-width: 0; font-size: 15px; font-weight: 700">{{cur.cat}}</span>
+<button type="button" style="all: unset; cursor: pointer; min-height: 44px; padding: 0 12px; font-size: 14px; color: #5E5E5E">변경</button>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px 0 14px; border-radius: 14px; background: #F0F0F0">
+<span style="min-width: 52px; white-space: nowrap; font-size: 13px; color: #5E5E5E">목적</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 8px"><sc-if value="{{cur.hasDot}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="width: 10px; height: 10px; flex-shrink: 0; box-sizing: border-box; border-radius: 5px; {{cur.dotStyle}}"></span></sc-if><span style="font-size: 15px; font-weight: 700; color: {{cur.purposeColor}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{cur.purpose}}</span></span>
+<button type="button" style="all: unset; cursor: pointer; min-height: 44px; padding: 0 12px; font-size: 14px; color: #5E5E5E">변경</button>
+</div>
+</div>
+<div style="height: 44px; flex-shrink: 0; display: flex; align-items: center">
+<sc-if value="{{whyNotice}}" hint-placeholder-val="{{true}}"><div style="padding: 0 4px; font-size: 13px; line-height: 1.4; word-break: keep-all; color: #5E5E5E">{{cur.why}}</div></sc-if>
+<sc-if value="{{dupOpenNotice}}" hint-placeholder-val="{{false}}"><div style="flex-grow: 1; box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 2px 0 12px; border-radius: 14px; border: 1.5px dashed #BDBDBD">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"></path></svg>
+<span style="flex-grow: 1; font-size: 13px; word-break: keep-all">같은 상품으로 보이는 항목이 있어요</span>
+<button type="button" onClick="{{openDup}}" style="all: unset; cursor: pointer; min-height: 40px; padding: 0 12px; font-size: 14px; font-weight: 700">비교</button>
+</div></sc-if>
+<sc-if value="{{dupDoneNotice}}" hint-placeholder-val="{{false}}"><div style="flex-grow: 1; box-sizing: border-box; height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 14px; background: #F0F0F0; font-size: 13px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"></path></svg>{{dupDoneText}}</div></sc-if>
+</div>
+</article>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="padding-bottom: 12px; text-align: center; font-size: 13px; color: #5E5E5E">오른쪽으로 밀면 확정, 왼쪽으로 밀면 보류</div>
+<div style="display: flex; gap: 10px">
+<button type="button" onClick="{{hold}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: #FFFFFF; color: #1D1D1D; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 500"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>보류</button>
+<button type="button" onClick="{{confirm}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: #1D1D1D; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">확정<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+<div style="flex-grow: 1; padding: 0 24px 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center">
+<span style="width: 64px; height: 64px; border-radius: 28px; background: #DCF1E4; color: #1F7A4D; display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"></path></svg></span>
+<h2 style="margin: 0; font-size: 24px; font-weight: 700">다 확인했어요</h2>
+<p style="margin: 0; font-size: 15px; color: #5E5E5E">{{summary}}</p>
+<a href="FHomeL.dc.html" style="margin-top: 12px; height: 52px; padding: 0 28px; border-radius: 26px; background: #1D1D1D; color: #FFFFFF; display: flex; align-items: center; font-size: 16px; font-weight: 700">홈으로</a>
+<button type="button" onClick="{{restart}}" style="all: unset; cursor: pointer; min-height: 44px; font-size: 14px; color: #5E5E5E">처음부터 다시 보기</button>
+</div>
+</sc-if>
+<sc-if value="{{dupOpen}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; max-height: calc(100% - 64px); z-index: 11; border-radius: 36px 36px 0 0; background: #FFFFFF; display: flex; flex-direction: column">
+<div style="align-self: center; width: 40px; height: 5px; margin-top: 10px; border-radius: 3px; background: #DCDCDC"></div>
+<div style="padding: 8px 12px 0 20px; display: flex; align-items: flex-start; gap: 8px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; padding-top: 6px"><h2 style="margin: 0; font-size: 20px; font-weight: 700">같은 상품일까요?</h2><p style="margin: 0; font-size: 14px; color: #5E5E5E">같은 상품으로 보이는 항목이 이미 있어요</p></div>
+<button type="button" onClick="{{closeDup}}" aria-label="닫기" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+<div style="min-height: 0; overflow-y: auto; padding: 16px 20px 36px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 10px">
+<div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 28px; border: 2px solid #1D1D1D">
+<span style="align-self: flex-start; height: 26px; padding: 0 10px; border-radius: 13px; background: #1D1D1D; color: #FFFFFF; display: flex; align-items: center; font-size: 12px; font-weight: 700">새로 저장</span>
+<div style="aspect-ratio: 1 / 1; box-sizing: border-box; padding: 16px; border-radius: 20px; background: #E9E8E4; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="80%" height="80%" viewBox="0 0 48 48" fill="none" stroke="#7C7B77" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="#BDBCB7"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="#BDBCB7"></rect></svg></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 0 2px">
+<div style="font-size: 15px; font-weight: 700; line-height: 1.35; word-break: keep-all">호카 스피드고트 6</div>
+<div style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;">KRW 209,000</div>
+</div>
+<dl style="margin: 0; padding: 0 2px; display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 6px; font-size: 13px; line-height: 1.4">
+<dt style="color: #5E5E5E; white-space: nowrap">저장</dt><dd style="margin: 0; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; font-weight: 500; white-space: nowrap; color: #1D1D1D;">오늘</dd>
+<dt style="color: #5E5E5E; white-space: nowrap">목적</dt><dd style="margin: 0; word-break: keep-all"><span style="display: inline-flex; align-items: center; gap: 6px; vertical-align: top"><span aria-hidden="true" style="width: 8px; height: 8px; flex-shrink: 0; box-sizing: border-box; border-radius: 4px; background: #F9CD61; border: 1px solid #B38107;"></span></span> 가을 트레일 러닝<span style="display: block; margin-top: 2px; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 11px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">AI 연결</span></dd>
+<dt style="color: #5E5E5E; white-space: nowrap">카테고리</dt><dd style="margin: 0">신발</dd>
+<dt style="color: #5E5E5E; white-space: nowrap">판매처</dt><dd style="margin: 0; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; font-weight: 500; white-space: nowrap; color: #1D1D1D; overflow: hidden; text-overflow: ellipsis;">musinsa.com</dd>
+</dl>
+</div>
+<div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 28px; border: 1.5px solid #E2E2E2">
+<span style="align-self: flex-start; height: 26px; padding: 0 10px; border-radius: 13px; background: #F0F0F0; display: flex; align-items: center; font-size: 12px; font-weight: 700">이미 있던 상품</span>
+<div style="aspect-ratio: 1 / 1; box-sizing: border-box; padding: 16px; border-radius: 20px; background: #7A6B5B; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="80%" height="80%" viewBox="0 0 48 48" fill="none" stroke="#E9DFD2" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="#A99683"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="#A99683"></rect></svg></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 0 2px">
+<div style="font-size: 15px; font-weight: 700; line-height: 1.35; word-break: keep-all">호카 스피드고트 6</div>
+<div style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;">KRW 199,000</div>
+</div>
+<dl style="margin: 0; padding: 0 2px; display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 6px; font-size: 13px; line-height: 1.4">
+<dt style="color: #5E5E5E; white-space: nowrap">저장</dt><dd style="margin: 0; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; font-weight: 500; white-space: nowrap; color: #1D1D1D;">3주 전</dd>
+<dt style="color: #5E5E5E; white-space: nowrap">목적</dt><dd style="margin: 0; word-break: keep-all"><span style="display: inline-flex; align-items: center; gap: 6px; vertical-align: top"><span aria-hidden="true" style="width: 8px; height: 8px; flex-shrink: 0; box-sizing: border-box; border-radius: 4px; background: #F9CD61; border: 1px solid #B38107;"></span></span> 가을 트레일 러닝</dd>
+<dt style="color: #5E5E5E; white-space: nowrap">카테고리</dt><dd style="margin: 0">신발</dd>
+<dt style="color: #5E5E5E; white-space: nowrap">판매처</dt><dd style="margin: 0; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; font-weight: 500; white-space: nowrap; color: #1D1D1D; overflow: hidden; text-overflow: ellipsis;">hoka.com</dd>
+</dl>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex"><button type="button" onClick="{{askBoth}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1D1D1D; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700">둘 다 두기</button></div>
+<div style="display: flex; gap: 8px"><button type="button" onClick="{{askNew}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #F0F0F0; color: #1D1D1D; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 500">새 항목 지우기</button><button type="button" onClick="{{askOld}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #F0F0F0; color: #1D1D1D; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 500">기존 항목 지우기</button></div>
+<p style="margin: 4px 0 0; font-size: 13px; line-height: 1.5; word-break: keep-all; color: #5E5E5E">어느 쪽도 자동으로 합치지 않아요. 고르지 않고 닫아도 두 항목 모두 남아요.</p>
+</div>
+</div>
+</div></sc-if>
+<sc-if value="{{confirmBoth}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></div>
+<div role="dialog" aria-label="둘 다 둘까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 36px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700; word-break: keep-all">둘 다 둘까요?</h2>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 20px; background: #F0F0F0"><span style="width: 44px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 4px; border-radius: 10px; background: #E9E8E4; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="80%" height="80%" viewBox="0 0 48 48" fill="none" stroke="#7C7B77" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="#BDBCB7"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="#BDBCB7"></rect></svg></span><span style="min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">새로 저장 · 오늘 · musinsa.com</span></span></div><div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 20px; background: #F0F0F0"><span style="width: 44px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 4px; border-radius: 10px; background: #7A6B5B; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="80%" height="80%" viewBox="0 0 48 48" fill="none" stroke="#E9DFD2" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="#A99683"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="#A99683"></rect></svg></span><span style="min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">이미 있던 상품 · 3주 전 · hoka.com</span></span></div>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; word-break: keep-all; display: flex; flex-direction: column; gap: 2px"><li>같은 상품이 목록과 목적에 두 번 보여요</li><li>나중에 상세에서 하나를 지울 수 있어요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{cancelConfirm}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #F0F0F0; color: #1D1D1D; font-size: 16px; font-weight: 500">취소</button><button type="button" onClick="{{keepBoth}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1D1D1D; color: #FFFFFF; font-size: 16px; font-weight: 700">둘 다 두기</button></div>
+</div></sc-if><sc-if value="{{confirmNew}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></div>
+<div role="dialog" aria-label="새 항목을 지울까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 36px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700; word-break: keep-all">새 항목을 지울까요?</h2>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 20px; background: #F0F0F0"><span style="width: 44px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 4px; border-radius: 10px; background: #E9E8E4; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="80%" height="80%" viewBox="0 0 48 48" fill="none" stroke="#7C7B77" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="#BDBCB7"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="#BDBCB7"></rect></svg></span><span style="min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">새로 저장 · 오늘 · musinsa.com</span></span></div>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; word-break: keep-all; display: flex; flex-direction: column; gap: 2px"><li>새 항목과 이 확인 카드가 사라져요</li><li>이미 있던 상품은 그대로 남아요</li><li>되돌릴 수 없어요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{cancelConfirm}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #F0F0F0; color: #1D1D1D; font-size: 16px; font-weight: 500">취소</button><button type="button" onClick="{{delNew}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #C62828; color: #FFFFFF; font-size: 16px; font-weight: 700">새 항목 지우기</button></div>
+</div></sc-if><sc-if value="{{confirmOld}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></div>
+<div role="dialog" aria-label="이미 있던 상품을 지울까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 36px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700; word-break: keep-all">이미 있던 상품을 지울까요?</h2>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 20px; background: #F0F0F0"><span style="width: 44px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 4px; border-radius: 10px; background: #7A6B5B; display: flex; align-items: center; justify-content: center; overflow: hidden"><svg aria-hidden="true" width="80%" height="80%" viewBox="0 0 48 48" fill="none" stroke="#E9DFD2" stroke-width="3" stroke-linecap="round"><path d="M10 30v-6a14 14 0 0 1 28 0v6"></path><rect x="7" y="28" width="8" height="12" rx="3" fill="#A99683"></rect><rect x="33" y="28" width="8" height="12" rx="3" fill="#A99683"></rect></svg></span><span style="min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">이미 있던 상품 · 3주 전 · hoka.com</span></span></div>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; word-break: keep-all; display: flex; flex-direction: column; gap: 2px"><li>‘가을 트레일 러닝’ 후보에서 빠져요</li><li>새 항목은 그대로 남아요</li><li>되돌릴 수 없어요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{cancelConfirm}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #F0F0F0; color: #1D1D1D; font-size: 16px; font-weight: 500">취소</button><button type="button" onClick="{{delOld}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #C62828; color: #FFFFFF; font-size: 16px; font-weight: 700">기존 항목 지우기</button></div>
+</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = Object.assign({ i: 0, ok: 0, later: 0, dup: false, confirm: null, dupDone: null }, { i: 1, dup: true, confirm: 'new' }); }
+renderVals() {
+const items = [{"name": "마샬 MAJOR V", "price": "KRW 229,000", "cat": "헤드폰", "purpose": "출퇴근 헤드폰", "hasDot": true, "dotStyle": "background: #F96857; border: 1px solid #F84D39;", "purposeColor": "#1D1D1D", "ph": "#FFFFFF", "phS": "#9A9A96", "phF": "#D8D8D4", "hasDup": false, "why": "AI가 카테고리와 목적을 연결했어요"}, {"name": "호카 스피드고트 6", "price": "KRW 209,000", "cat": "신발", "purpose": "가을 트레일 러닝", "hasDot": true, "dotStyle": "background: #F9CD61; border: 1px solid #B38107;", "purposeColor": "#1D1D1D", "ph": "#E9E8E4", "phS": "#7C7B77", "phF": "#BDBCB7", "hasDup": true, "why": "AI가 카테고리와 목적을 연결했어요"}, {"name": "발뮤다 더 토스터", "price": "KRW 349,000", "cat": "주방 가전", "purpose": "목적 미지정", "hasDot": false, "dotStyle": "background: ;", "purposeColor": "#5E5E5E", "ph": "#7A6B5B", "phS": "#E9DFD2", "phF": "#A99683", "hasDup": false, "why": "AI가 카테고리를 정했어요. 맞는 목적은 찾지 못했어요"}];
+const s = this.state;
+const done = s.i >= items.length;
+const cur = done ? items[items.length - 1] : items[s.i];
+const left = done ? 0 : items.length - s.i - 1;
+return {
+cur: cur, done: done, notDone: !done,
+pos: (Math.min(s.i, items.length - 1) + 1) + ' / ' + items.length,
+hasBack1: left >= 1, hasBack2: left >= 2,
+summary: '확정 ' + s.ok + ' · 보류 ' + s.later,
+confirm: () => this.setState({ i: s.i + 1, ok: s.ok + 1, dupDone: null }),
+hold: () => this.setState({ i: s.i + 1, later: s.later + 1, dupDone: null }),
+restart: () => this.setState({ i: 0, ok: 0, later: 0, dupDone: null }),
+whyNotice: !cur.hasDup,
+dupOpenNotice: !!cur.hasDup && !s.dupDone, dupDoneNotice: !!cur.hasDup && !!s.dupDone,
+dupDoneText: s.dupDone === 'both' ? '둘 다 두기로 했어요' : '이미 있던 상품을 지웠어요',
+dupOpen: s.dup, openDup: () => this.setState({ dup: true, confirm: null }), closeDup: () => this.setState({ dup: false }),
+askBoth: () => this.setState({ confirm: 'both' }), askNew: () => this.setState({ confirm: 'new' }), askOld: () => this.setState({ confirm: 'old' }),
+confirmBoth: s.confirm === 'both', confirmNew: s.confirm === 'new', confirmOld: s.confirm === 'old', cancelConfirm: () => this.setState({ confirm: null }),
+keepBoth: () => this.setState({ dup: false, confirm: null, dupDone: 'both' }),
+delNew: () => this.setState({ dup: false, confirm: null, i: s.i + 1 }),
+delOld: () => this.setState({ dup: false, confirm: null, dupDone: 'old' })
+};
+}
+}
+</script>
+</body>
+</html>
