@@ -10,6 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "..", "handoff", "screens", "boards")
 WORK = os.path.abspath("motion-work"); OUT = os.path.abspath("motion-img")
 HIDE_NAV = 'nav[aria-label="하단 탭"]{visibility:hidden}'
+HIDE_FILL = 'div[style*="padding: 12px 20px 140px"]{visibility:hidden}'
 HIDE_STACK = 'div[style*="height: 574px"]{visibility:hidden}'
 JOBS = {
     "rf0": ("FHomeReviewFlowL", None, ""),
@@ -25,6 +26,11 @@ JOBS = {
     "cat": ("FCategoryHomeL", None, HIDE_NAV),
     "purpose": ("FPurposeHomeL", None, HIDE_NAV),
     "catnav": ("FCategoryHomeL", None, ""),
+    "fl0": ("FHomeFillFlowL", None, ""),
+    "fl1": ("FHomeFillFlowL", ("{ i: 0,", "{ i: 1,"), ""),
+    "fl2": ("FHomeFillFlowL", ("{ i: 0,", "{ i: 2,"), ""),
+    "flbg1": ("FHomeFillFlowL", ("{ i: 0,", "{ i: 1,"), HIDE_FILL),
+    "flbg2": ("FHomeFillFlowL", ("{ i: 0,", "{ i: 2,"), HIDE_FILL),
 }
 
 class Q(SimpleHTTPRequestHandler):

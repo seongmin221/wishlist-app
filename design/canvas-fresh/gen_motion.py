@@ -369,6 +369,65 @@ def share_board(key):
 </div>'''
     return T, "".join(css), body
 
+# ---------- 6. 정보 보완 연속 처리 넘김 (저장하고 다음, 건너뛰기) ----------
+FILL = "inset(100px 0 104px 0)"
+
+
+def fill_board(key):
+    T = 6000
+    a1, a2, reset = 1100, 3300, 5300
+    t1, e1 = tap("t1", T, a1 - 140, 258, 780)
+    t2, e2 = tap("t2", T, a2 - 140, 78, 780)
+    css = [t1, t2]
+    on = "opacity:1;transform:none"
+    if key == "A":
+        d = 320
+        outs = lambda sgn: (f"opacity:1;transform:translateX(-{W}px)", IOS)
+        ins = lambda sgn: (f"opacity:1;transform:translateX({W}px)", IOS, 0, d)
+    elif key == "B":
+        d = 280
+        outs = lambda sgn: (f"opacity:1;transform:translateX({sgn * 420}px)", "cubic-bezier(.5,0,.9,.5)")
+        ins = lambda sgn: ("opacity:1;transform:scale(.94) translateY(14px)", DECEL, 40, 300)
+    else:
+        d = 180
+        outs = lambda sgn: ("opacity:0;transform:translateY(-24px)", "cubic-bezier(.4,0,1,1)")
+        ins = lambda sgn: ("opacity:0;transform:translateY(24px)", DECEL, 180, 260)
+
+    def out_kf(name, at, sgn):
+        to, ease = outs(sgn)
+        return kf(name, T, [(0, "opacity:0;transform:none", None), (at - 1, "opacity:0;transform:none", None),
+                            (at, on, ease), (at + d, to, None), (at + d + 1, "opacity:0;transform:none", None), (T, "opacity:0;transform:none", None)])
+
+    def in_kf(name, at, sgn, until):
+        frm, ease, delay, dur = ins(sgn)
+        st = [(0, "opacity:0;transform:none", None), (at - 1, "opacity:0;transform:none", None), (at, frm, None),
+              (at + delay, frm, ease), (at + delay + dur, on, None)]
+        if until:
+            st += [(until, on, None), (until + 1, "opacity:0;transform:none", None), (T, "opacity:0;transform:none", None)]
+        else:
+            st.append((T, on, None))
+        return kf(name, T, st)
+
+    def vis_kf(name, at, until):
+        st = [(0, "opacity:0", None), (at - 1, "opacity:0", None), (at, "opacity:1", None)]
+        st += [(until, "opacity:1", None), (until + 1, "opacity:0", None), (T, "opacity:0", None)] if until else [(T, "opacity:1", None)]
+        return kf(name, T, st)
+
+    css += [out_kf("o0", a1, 1), out_kf("o1", a2, -1), in_kf("i1", a1, 1, a2), in_kf("i2", a2, -1, None),
+            vis_kf("b1", a1, a2), vis_kf("b2", a2, None),
+            kf("r0", T, [(0, "opacity:1", None), (a1 - 1, "opacity:1", None), (a1, "opacity:0", None), (reset, "opacity:0", "ease-out"),
+                         (reset + 400, "opacity:1", None), (T, "opacity:1", None)])]
+    body = f'''{img("flbg1", anim("b1", T))}{img("flbg2", anim("b2", T))}
+<div style="position: absolute; inset: 0; clip-path: {FILL}">
+{img("fl1", f"transform-origin: 50% 40%; {anim('i1', T)}")}
+{img("fl2", f"transform-origin: 50% 40%; {anim('i2', T)}")}
+{img("fl0", anim("o0", T))}
+{img("fl1", anim("o1", T))}
+</div>
+{img("fl0", anim("r0", T))}
+{e1}{e2}'''
+    return T, "".join(css), body
+
 
 GROUPS = [
     ("Sheet", sheet_board, {"A": "부드러운 감속", "B": "살짝 튀는 스프링", "C": "뒤 화면 물러남"}),
@@ -376,6 +435,7 @@ GROUPS = [
     ("Tab", tab_board, {"A": "크로스페이드", "B": "탭 방향으로 밀기", "C": "페이드 스루"}),
     ("Card", card_board, {"A": "기울며 날아감", "B": "가로로 빠짐", "C": "짧게 밀리며 사라짐"}),
     ("Share", share_board, {"A": "아래에서 올라옴", "B": "제자리 페이드", "C": "올라오며 체크 그리기"}),
+    ("Fill", fill_board, {"A": "앞으로 밀기", "B": "저장 오른쪽 · 건너뛰기 왼쪽", "C": "위로 넘김"}),
 ]
 
 
