@@ -52,10 +52,12 @@ Android launcher는 핸드오프의 코랄 면·먹색 체크를 native vector/a
 - Gradle wrapper checksum을 고정한다.
 - Android debug APK, lint와 shared Android compilation으로 공통 연결을 검증한다.
 - Xcode project와 scheme을 구조 검사하고 Xcode가 있는 환경에서 simulator build를 수행한다.
-- 현재 기기는 JDK 17, Android SDK 36이 있지만 full Xcode는 없다. iOS 링크·실행 검증을 했다고 보고하지 않는다.
+- 초기 검증 시 full Xcode가 없어 구조 검사만 했다. 후속 설치 후 Xcode 26.6 / iOS SDK 26.5로 simulator 링크·실행과 unsigned device build를 확인했다. 시스템 기본 `xcode-select`는 Command Line Tools이므로 CLI 검증에는 `DEVELOPER_DIR`를 지정했다.
+- Android Studio는 AGP 9.0을 지원하는 Otter 3 Feature Drop 2025.2.3 이상이 필요하다. 초기 CLI 검증에는 IDE sync가 포함되지 않았다. 후속 오류 보고에서 이 기기의 설치본이 Narwhal 2025.1.1(AGP 지원 상한 8.11)임을 확인했다. CLI build 성공은 설치된 Studio의 호환성까지 보장하지 않는다.
+- Studio를 2026.1.3으로 업데이트한 뒤 원본 로컬 저장소 `/Users/user/Desktop/personal/wishlist-app/client`의 Gradle Sync가 `onSuccess`·`onImportFinished`로 완료된 것을 IDE 로그에서 확인했다. AGP 9.0.0을 유지하며 APK·lint와 API 36 emulator 실행을 다시 검증했다.
 - 초기 화면·상수와 설정을 그대로 복제하는 단위 테스트는 만들지 않는다. 공통 비즈니스 규칙을 추가할 때 `commonTest`에서 검증하고 Android host/iOS simulator에서 실행한다.
 
-Xcode build script는 공백 포함 임시 경로와 Gradle stub으로 호출 위치·task 이름·JDK 17 fallback·IDE 중복 실행 방지 guard를 확인했다. 이 검증은 실제 Xcode framework 빌드의 대체물이 아니다. full Xcode 환경에서 Debug/Release 및 simulator/device 연결을 확인하는 일이 남아 있다.
+Xcode build script는 공백 포함 임시 경로와 Gradle stub으로 호출 위치·task 이름·JDK 17 fallback·IDE 중복 실행 방지 guard를 확인했다. 후속 실제 Xcode 검증에서는 arm64 framework에 x86_64 앱을 함께 링크하려는 오류가 재현됐다. Debug/Release의 `EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64`를 설정해 문서의 Apple Silicon 지원 범위와 맞췄다. iPad의 전체 방향 지원 경고도 기본 네 방향 지원으로 정리했다.
 
 2026-10-05 확인 결과:
 
@@ -63,10 +65,20 @@ Xcode build script는 공백 포함 임시 경로와 Gradle stub으로 호출 �
 | --- | --- |
 | Android clean debug build | `BUILD SUCCESSFUL`, APK 생성 |
 | Android lint | 오류 0, dependency 새 버전 알림 7개 |
+| Android Studio 2026.1.3 IDE sync | 로컬 `client/` 프로젝트 import 성공, 기존 AGP 호환 오류 해소 |
+| API 36 Android emulator 실행 | APK 설치·activity launch 성공, 라이트·다크 공통 문구 확인 |
 | shared Android compilation | 성공 |
 | shared Android host test | `NO-SOURCE` — 아직 테스트 없음 |
 | Xcode project·scheme·source 참조, Swift parse, shell syntax | 통과, 링크·실행 검증과 구분 |
+| iOS Debug / Release simulator build | `BUILD SUCCEEDED`, Swift→Shared 실제 링크 확인 |
+| iOS Release device build | `BUILD SUCCEEDED`, arm64, 서명 없이 검증 |
+| iPhone 17 Pro / iOS 26.5 simulator 실행 | Debug 앱 설치·launch 성공, 라이트·다크 공통 문구 확인 |
+| shared iOS simulator test | compile/link `NO-SOURCE`, 실행 `SKIPPED` — 아직 테스트 없음 |
 | 서버 변경 | 없음 |
+
+실제 기기 설치·실행과 archive 배포 서명은 개인 Team·기기가 필요한 후속 검증이다. Kotlin 2.3.21의 공식 호환 표는 Xcode 26.0을 기준으로 한다. Xcode 26.6에서 이번 초기 화면 검증이 성공한 결과와 모든 Kotlin/Native 기능의 공식 호환 보장은 구분한다.
+
+Android 실행 확인은 `Medium_Phone_API_36.0`의 `emulator-5554`에서 수행했다. UI hierarchy와 화면 캡처에서 `위시리스트` 표시를 확인했고 실행 중인 앱 PID의 AndroidRuntime 로그에는 fatal exception이 없었다. API 26 기기 실행과 실제 Android 기기 실행은 이번 검증 범위에 포함하지 않았다.
 
 ## 후속 설계
 

@@ -55,4 +55,6 @@
 - 아이콘 리소스 경로를 정리하는 동안 incremental resource merge가 기존 출력과 충돌했다. Android clean build로 리소스를 다시 생성한 뒤 APK와 lint를 재검증했다.
 - Xcode project 구문·전체 object/source/scheme 참조와 Swift 구문을 검사했다. Gradle stub으로 build script의 공백 경로·JDK fallback·IDE guard를 확인했다.
 - 별도 읽기 전용 리뷰에서 큰 결함은 발견되지 않았다. 아이콘·backup rule 보완도 추가 검토했다.
-- iOS 링크·실행·서명은 full Xcode 환경에서 후속 검증한다.
+- Xcode 설치 후 26.6 / iOS SDK 26.5에서 후속 검증했다. x86_64 추가 링크 오류를 simulator architecture 제외 설정으로 수정했다. Debug/Release simulator 및 unsigned Release device build와 Debug 앱의 라이트·다크 실행을 확인했다. iPad 기본 방향 경고도 정리했다.
+- 실제 기기 실행과 배포 서명은 검증하지 않았다. shared iOS test는 아직 테스트가 없어 compile/link `NO-SOURCE`, 실행 `SKIPPED`다.
+- Studio 업데이트 후 2026.1.3의 IDE 로그에서 원본 로컬 저장소 client Gradle Sync 완료를 확인했다. APK·lint 재검증과 API 36 emulator 설치·실행, 라이트·다크 공통 문구 표시를 확인했다. Android 소스·AGP 버전 변경은 필요하지 않았다.
