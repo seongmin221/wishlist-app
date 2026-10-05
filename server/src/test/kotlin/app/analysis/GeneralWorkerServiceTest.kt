@@ -154,7 +154,7 @@ class GeneralWorkerServiceTest {
     @Test
     fun `expired running job is requeued with a new outbox task`() = withJob { database, jobId, _ ->
         database.createConnection("").use { connection ->
-            connection.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING', attempt_count=1, first_attempt_at=now()-interval '2 minutes', updated_at=now()-interval '121 seconds' where id=?").use {
+            connection.prepareStatement("update analysis_jobs set stage='GENERAL_RUNNING', attempt_count=1, first_attempt_at=now()-interval '2 minutes', lease_until=clock_timestamp()-interval '1 second' where id=?").use {
                 it.setObject(1, jobId)
                 it.executeUpdate()
             }

@@ -44,9 +44,9 @@ internal data class LockedAnalysisJob(
     val claimedItemVersion: Int?,
 )
 
-internal fun Connection.lockAnalysisItem(itemId: UUID): LockedAnalysisItem? = prepareStatement("""
+internal fun Connection.lockAnalysisItem(itemId: UUID, skipLocked: Boolean = false): LockedAnalysisItem? = prepareStatement("""
     select owner_id,version,current_generation,lifecycle_status,analysis_status,manual_completion_at
-    from wishlist_items where id=? for update
+    from wishlist_items where id=? for update ${if (skipLocked) "skip locked" else ""}
 """.trimIndent()).use { statement ->
     statement.setObject(1, itemId)
     statement.executeQuery().use { rows ->
@@ -57,10 +57,10 @@ internal fun Connection.lockAnalysisItem(itemId: UUID): LockedAnalysisItem? = pr
     }
 }
 
-internal fun Connection.lockAnalysisJob(jobId: UUID): LockedAnalysisJob? = prepareStatement("""
+internal fun Connection.lockAnalysisJob(jobId: UUID, skipLocked: Boolean = false): LockedAnalysisJob? = prepareStatement("""
     select wishlist_item_id,generation,stage,attempt_count,first_attempt_at,browser_attempt_count,
            first_browser_attempt_at,browser_attempted,execution_token,lease_until,claimed_item_version
-    from analysis_jobs where id=? for update
+    from analysis_jobs where id=? for update ${if (skipLocked) "skip locked" else ""}
 """.trimIndent()).use { statement ->
     statement.setObject(1, jobId)
     statement.executeQuery().use { rows ->

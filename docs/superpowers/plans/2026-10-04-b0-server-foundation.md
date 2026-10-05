@@ -223,11 +223,11 @@ NeedsBrowser는 stage/flag/token 해제+browser outbox가 한 transaction이다.
 
 **Interfaces:** 기존 `AnalysisJobReconciler.reconcileExpired(): Int` 유지. 결과는 실제 복구/취소/한도 실패로 전이한 job 수다.
 
-- [ ] **Step 1: 실패할 recovery 테스트 작성.** 만료 lease의 RUNNING claim을 복구 후 다시 claim하면 새 token이어야 한다. 옛 token의 Task 5/6 쓰기는 모두 무효, 새 실행은 정상 반영해야 한다. ACTIVE 아닌 item·currentGeneration/version/manual이 다른 job은 CANCELLED·token 해제, item 실패 반영/outbox 생성 없음. V7 legacy RUNNING의 null token도 재처리 가능해야 한다.
-- [ ] **Step 2: RED 확인.** `./gradlew test --tests app.analysis.AnalysisJobReconcilerTest --tests app.browser.BrowserWorkerServiceTest` — updated_at 기반·item generation 무검증 복구 때문에 실패.
-- [ ] **Step 3: recovery 구현.** lease<=DB clock_timestamp()인 RUNNING 후보를 읽고 item→job 순서로 lock/recheck한다. SKIP LOCKED는 이 순서를 깨지 않게 사용한다. 만료 token을 비운 뒤 lane PENDING+새 recovery outbox 또는 한도 소진 FAILED를 같은 transaction으로 저장한다. 현재 실행·lease가 바뀌었으면 건너뛴다. job 먼저 잠그고 item으로 진행하는 기존 query는 제거한다.
-- [ ] **Step 4: GREEN 확인.** 같은 명령 PASS. reconciler 두 개의 동시 실행과 정상 finish 경합에서도 recovery outbox 1건·고유 task_name, 중복 item version 증가 없음, 기존 예산 reservation 정산 불변을 검증한다. 복구된 job의 attempt_count는 새 claim에서만 증가한다.
-- [ ] **Step 5: 커밋.** `feature(server): lease 기반 분석 작업 복구 정리` / `만료 실행을 폐기하고 현재 generation만 원자적으로 재예약한다.`
+- [x] **Step 1: 실패할 recovery 테스트 작성.** 만료 lease의 RUNNING claim을 복구 후 다시 claim하면 새 token이어야 한다. 옛 token의 Task 5/6 쓰기는 모두 무효, 새 실행은 정상 반영해야 한다. ACTIVE 아닌 item·currentGeneration/version/manual이 다른 job은 CANCELLED·token 해제, item 실패 반영/outbox 생성 없음. V7 legacy RUNNING의 null token도 재처리 가능해야 한다.
+- [x] **Step 2: RED 확인.** `./gradlew test --tests app.analysis.AnalysisJobReconcilerTest --tests app.browser.BrowserWorkerServiceTest` — updated_at 기반·item generation 무검증 복구 때문에 실패.
+- [x] **Step 3: recovery 구현.** lease<=DB clock_timestamp()인 RUNNING 후보를 읽고 item→job 순서로 lock/recheck한다. SKIP LOCKED는 이 순서를 깨지 않게 사용한다. 만료 token을 비운 뒤 lane PENDING+새 recovery outbox 또는 한도 소진 FAILED를 같은 transaction으로 저장한다. 현재 실행·lease가 바뀌었으면 건너뛴다. job 먼저 잠그고 item으로 진행하는 기존 query는 제거한다.
+- [x] **Step 4: GREEN 확인.** 같은 명령 PASS. reconciler 두 개의 동시 실행과 정상 finish 경합에서도 recovery outbox 1건·고유 task_name, 중복 item version 증가 없음, 기존 예산 reservation 정산 불변을 검증한다. 복구된 job의 attempt_count는 새 claim에서만 증가한다.
+- [x] **Step 5: 커밋.** `feature(server): lease 기반 분석 작업 복구 정리` / `만료 실행을 폐기하고 현재 generation만 원자적으로 재예약한다.`
 
 ### Task 8: IO 경계와 제한된 pool·자원 종료를 연결한다
 

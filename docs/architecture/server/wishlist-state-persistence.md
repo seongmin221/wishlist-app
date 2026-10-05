@@ -1,6 +1,6 @@
 # 상품 상태 저장 기반
 
-> 구현 범위: B0 Task 3~6 · V8/V9 migration·claim·쓰기 guard · 공개 조회 연결은 B1
+> 구현 범위: B0 Task 3~7 · V8/V9 migration·claim·쓰기 guard · 공개 조회 연결은 B1
 
 ## 상품 상태와 출처
 
@@ -22,7 +22,7 @@ analysis/review/lifecycle와 값 출처는 enum 허용 목록으로 제한하고
 
 V9는 analysis job에 execution token, lease 만료 시각, claim 당시 상품 version을 추가한다. job generation은 양수여야 하며 기존 `(wishlist_item_id, generation)` uniqueness를 유지한다. `(stage, lease_until, id)` index는 만료 실행 복구 조회를 준비한다.
 
-legacy GENERAL_RUNNING/BROWSER_RUNNING은 execution token과 claimed version을 null로 두고 lease를 migration 시각으로 만료시킨다. 기존 실행을 유효한 claim으로 취급하지 않는다. 실제 claim과 쓰기 guard는 Task 4에서 구현했고 중간 결과와 Worker의 claim 전달은 Task 5에서 연결했고 최종 상태 정책은 Task 6, 만료 실행 복구는 Task 7에서 진행한다.
+legacy GENERAL_RUNNING/BROWSER_RUNNING은 execution token과 claimed version을 null로 두고 lease를 migration 시각으로 만료시킨다. 기존 실행을 유효한 claim으로 취급하지 않는다. 실제 claim과 쓰기 guard는 Task 4에서 구현했고 중간 결과와 Worker의 claim 전달은 Task 5에서 연결했고 최종 상태 정책은 Task 6, 만료 실행 복구는 Task 7에서 구현했다.
 
 ## 사용자 범위 조회
 
@@ -66,3 +66,14 @@ NAME/IMAGE/CATEGORY/PURPOSE는 USER 출처 또는 userOverrideFields 중 하나�
 CONFIRMED/DEFERRED는 유지한다. 사용 가능한 이름·category가 있고 실제 미확정 AI category 또는 nonnull AI purpose 연결이 있으면 PENDING이다. USER category를 유지하고 목적만 AI로 연결해도 검토 대상이다. 연결되지 않은 AI 예측 진단만으로 PENDING을 만들지 않는다.
 
 일반 NeedsBrowser는 BROWSER_PENDING, fallback flag, token 해제, browser outbox 1건을 원자적으로 저장한다. 양쪽 Worker의 infrastructure exception은 Retryable로 처리한다. 현재 실행이 한도 안이면 lane PENDING으로 token을 해제하고 RETRY/HTTP 503을 반환한다. 한도 소진은 FAILED_RETRYABLE로 최종 반영한다. stale·완료는 ACK/HTTP 204다. CancellationException은 다시 던지고 남은 RUNNING lease의 복구는 Task 7에서 처리한다.
+
+
+## 만료 실행 복구
+
+AnalysisJobReconciler.reconcileExpired는 updated_at 대신 DB clock_timestamp와 lease_until을 비교한다. RUNNING 후보를 잠금 없이 발견한 뒤 각 후보를 별도 transaction에서 item→job 순서로 SKIP LOCKED한다. 두 잠금을 얻은 뒤 발견 당시의 관계·generation·stage·token·lease·claimed version을 재검증하고 DB 시각으로 만료를 다시 확인한다. 실행이 바뀌거나 행이 사용 중이면 이번 스캔에서 건너뛴다. 반환값은 commit한 복구·취소·한도 실패 전이 수다.
+
+ACTIVE·PROCESSING·현재 generation·수동 미완료·claimed version 일치인 실행만 재시도하거나 한도 실패로 반영한다. 그 외에는 CANCELLED로 token/lease/claimed version을 해제하며 상품과 outbox는 유지한다. browser는 기존 fallback flag도 필요하다. V9가 만료시킨 legacy RUNNING은 token/claimed version이 null이므로 기존 version 검증을 우회하고 재claim에서 새 identity를 받는다. identity와 lease가 모두 null인 중단된 legacy도 복구한다.
+
+한도 내 복구는 lane PENDING, 실행 identity 해제, recovery outbox 1건을 한 transaction으로 저장한다. task_name에는 generation·시도 횟수·옛 token(legacy는 새 UUID)을 넣는다. 복구에서는 attempt나 item version을 올리지 않으며 다음 claim에서 해당 lane attempt가 증가한다. 재claim 이후 옛 token의 중간/최종 쓰기는 모두 무효다.
+
+lane별 3회 또는 첫 시도에서 30분을 소진하면 job FAILED와 identity 해제, 현재 상품 FAILED_RETRYABLE 및 version +1을 함께 저장한다. 다음 스캔은 이미 전이된 job을 처리하지 않는다. 정상 finish가 먼저 commit하면 복구는 건너뛰고, 복구가 먼저 commit하면 옛 finish는 stale ACK다. 이 경로는 AI budget reservation/window를 수정하지 않으며 실제 사용량 정산은 별도 책임으로 유지한다.
