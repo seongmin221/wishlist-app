@@ -4,11 +4,33 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import androidx.compose.ui.unit.dp
 
 class SheetDragDecisionTest {
     @Test fun dismissesAtQuarterOfHeight() = assertTrue(shouldDismissSheet(100f, 400f, 0f))
     @Test fun keepsBelowThresholds() = assertFalse(shouldDismissSheet(99f, 400f, 999f))
     @Test fun dismissesOnFastFling() = assertTrue(shouldDismissSheet(10f, 400f, 1000f))
+}
+
+class SheetVelocityUnitTest {
+    // Compose draggable은 px/s를 준다. 토큰 1000은 dp/s다.
+    @Test fun pxVelocityIsConvertedToDpBeforeDeciding() {
+        // 1500px/s @ 2.75x = 약 545dp/s: 느리다.
+        assertEquals(SheetDragEnd.SnapBack, sheetDragEndPx(OverlayPhase.Open, 10f, 1100f, 1500f, 2.75f))
+        // 3000px/s @ 2.75x = 약 1091dp/s: 빠르다.
+        assertEquals(SheetDragEnd.Dismiss, sheetDragEndPx(OverlayPhase.Open, 10f, 1100f, 3000f, 2.75f))
+        // 1x에서는 px = dp.
+        assertEquals(SheetDragEnd.Dismiss, sheetDragEndPx(OverlayPhase.Open, 10f, 400f, 1000f, 1f))
+    }
+
+    @Test fun distanceStaysInPx() =
+        assertEquals(SheetDragEnd.Dismiss, sheetDragEndPx(OverlayPhase.Open, 275f, 1100f, 0f, 2.75f))
+}
+
+class SheetMaxHeightTest {
+    @Test fun capsAt760OnTallScreens() = assertEquals(760.dp, sheetMaxHeight(1000.dp, 40.dp))
+    @Test fun leavesTopInsetAndMarginOnShortScreens() = assertEquals(600.dp - 40.dp - 24.dp, sheetMaxHeight(600.dp, 40.dp))
+    @Test fun neverNegative() = assertEquals(0.dp, sheetMaxHeight(10.dp, 40.dp))
 }
 
 class SheetDragEndTest {

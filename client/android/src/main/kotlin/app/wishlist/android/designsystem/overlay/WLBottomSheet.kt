@@ -11,6 +11,12 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +48,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -59,13 +68,23 @@ import kotlinx.coroutines.launch
 /** 시트 제목·확인창 제목 20/700(`WLType.title`에서 크기만 줄임). */
 val WLSheetTitleStyle: TextStyle = WLType.title.copy(fontSize = 20.sp)
 
-/** 시트 최대 높이(내용 높이만큼만 올라온다). */
+/** 시트 최대 높이(내용 높이만큼만 올라온다). 화면이 더 작으면 `sheetMaxHeight`로 줄이고 내용을 스크롤한다. */
 private val SheetMaxHeight = 760.dp
+
+/** 시트 위 끝과 상태 표시줄 사이에 항상 남기는 간격(구현 기본값, 디자인 값 아님). */
+private val SheetTopMargin = WishlistTokens.Space.s24
+
+/** 시트 높이 상한: min(760, 쓸 수 있는 높이 − 위 안전 영역 − 위 간격). 키보드가 올라오면 쓸 수 있는 높이가 줄어든다. */
+internal fun sheetMaxHeight(available: Dp, topInset: Dp): Dp =
+    minOf(SheetMaxHeight, (available - topInset - SheetTopMargin).coerceAtLeast(0.dp))
 
 /** 열 때 지나치는 거리 동안 빈 곳이 보이지 않게 시트 면을 화면 아래로 더 그리는 길이(motion.md). */
 private val OvershootPadding = 80.dp
 
-/** 시트 끌어내려 닫기 판정(구현 기본값): 시트 높이의 25% 이상 끌었거나 아래로 1000/s 이상이면 닫는다. */
+/**
+ * 시트 끌어내려 닫기 판정(구현 기본값): 시트 높이의 25% 이상 끌었거나 아래로 1000dp/s 이상이면 닫는다.
+ * `velocity`는 **dp/s**다(속도 토큰은 dp·pt 기준). Compose `draggable`이 주는 px/s는 `sheetDragEndPx`로 바꿔 넘긴다.
+ */
 fun shouldDismissSheet(dragDistance: Float, sheetHeight: Float, velocity: Float): Boolean =
     dragDistance >= sheetHeight * WishlistTokens.Motion.sheetDragDismissDistanceRatio ||
         velocity >= WishlistTokens.Motion.sheetDragDismissVelocity
@@ -81,6 +100,10 @@ internal fun sheetDragEnd(phase: OverlayPhase, dragDistance: Float, sheetHeight:
     shouldDismissSheet(dragDistance, sheetHeight, velocity) -> SheetDragEnd.Dismiss
     else -> SheetDragEnd.SnapBack
 }
+
+/** `draggable`의 px 단위 값(거리 px, 속도 px/s)으로 결정한다. 속도는 `density`로 나눠 dp/s로 바꾼 뒤 판정한다. */
+internal fun sheetDragEndPx(phase: OverlayPhase, dragDistancePx: Float, sheetHeightPx: Float, velocityPxPerSecond: Float, density: Float): SheetDragEnd =
+    sheetDragEnd(phase, dragDistancePx, sheetHeightPx, velocityPxPerSecond / density)
 
 /** 시트 머리: 제목(20/700) + 닫기 44 원형 버튼. */
 @Composable
@@ -148,12 +171,15 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
         }
     }
     val extra = OvershootPadding
+    val density = LocalDensity.current
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    Box(Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.BottomCenter) {
+    BoxWithConstraints(Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.BottomCenter) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = SheetMaxHeight)
+                .heightIn(max = sheetMaxHeight(maxHeight, topInset))
+                .semantics { paneTitle = "시트" }
                 .graphicsLayer {
                     if (heightPx != size.height) heightPx = size.height
                     translationY = (1f - p.value) * size.height
@@ -179,7 +205,7 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                             enabled = entry.phase == OverlayPhase.Open,
                             onDragStopped = { velocity ->
                                 val distance = (1f - p.value) * heightPx
-                                when (sheetDragEnd(entry.phase, distance, heightPx, velocity)) {
+                                when (sheetDragEndPx(entry.phase, distance, heightPx, velocity, density.density)) {
                                     SheetDragEnd.Dismiss -> if (!state.requestDismiss(entry.id)) scope.launch { snapBack(p) }
                                     SheetDragEnd.SnapBack -> scope.launch { snapBack(p) }
                                     SheetDragEnd.Ignore -> Unit
@@ -193,8 +219,11 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
             } else {
                 Box(Modifier.height(WishlistTokens.Space.s20))
             }
+            // 상한보다 긴 내용(큰 글자·키보드)은 시트 안에서 스크롤한다. 짧으면 내용 높이만큼만 차지한다.
             Box(
                 Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = WishlistTokens.Space.screenMargin)
                     .padding(bottom = WishlistTokens.Space.s16)
                     .navigationBarsPadding(),

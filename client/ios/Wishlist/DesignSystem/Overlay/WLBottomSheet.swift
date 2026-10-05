@@ -3,13 +3,22 @@ import SwiftUI
 /// 시트 제목·확인창 제목 20/700(`WLTextStyle.title`에서 크기만 줄임).
 let wlSheetTitleStyle = WLTextStyle.title.resized(20)
 
-/// 시트 최대 높이(내용 높이만큼만 올라온다).
-private let sheetMaxHeight: CGFloat = 760
+/// 시트 최대 높이(내용 높이만큼만 올라온다). 화면이 더 작으면 `sheetMaxHeight(available:)`로 줄이고 내용을 스크롤한다.
+private let sheetMaxHeightCap: CGFloat = 760
+
+/// 시트 위 끝과 상태 표시줄(위 안전 영역) 사이에 항상 남기는 간격(구현 기본값, 디자인 값 아님).
+private let sheetTopMargin: CGFloat = WishlistTokens.Space.s24
+
+/// 시트 높이 상한: min(760, 위 안전 영역 아래부터 화면 아래(키보드가 있으면 키보드 위)까지 − 위 간격).
+func sheetMaxHeight(available: CGFloat) -> CGFloat {
+    min(sheetMaxHeightCap, max(0, available - sheetTopMargin))
+}
 
 /// 열 때 지나치는 거리 동안 빈 곳이 보이지 않게 시트 면을 화면 아래로 더 그리는 길이(motion.md).
 private let overshootPadding: CGFloat = 80
 
-/// 시트 끌어내려 닫기 판정(구현 기본값): 시트 높이의 25% 이상 끌었거나 아래로 1000/s 이상이면 닫는다.
+/// 시트 끌어내려 닫기 판정(구현 기본값): 시트 높이의 25% 이상 끌었거나 아래로 1000pt/s 이상이면 닫는다.
+/// `velocity`는 pt/s다(속도 토큰은 dp·pt 기준, `DragGesture.velocity`가 pt/s).
 func shouldDismissSheet(dragDistance: CGFloat, sheetHeight: CGFloat, velocity: CGFloat) -> Bool {
     dragDistance >= sheetHeight * CGFloat(WishlistTokens.Motion.sheetDragDismissDistanceRatio)
         || velocity >= CGFloat(WishlistTokens.Motion.sheetDragDismissVelocity)
@@ -53,6 +62,11 @@ struct WLSheetHeader: View {
     }
 }
 
+private struct SheetContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 private struct SheetHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
@@ -72,19 +86,34 @@ struct SheetLayer: View {
     @State private var progress: CGFloat = 0
     @State private var dragOffset: CGFloat = 0
     @State private var height: CGFloat = 0
+    @State private var contentHeight: CGFloat = 0
+
+    private var handleHeight: CGFloat { draggable ? 28 : WishlistTokens.Space.s20 }
 
     var body: some View {
+        // 바깥 outer는 모든 안전 영역을 지킨다(아래 inset = 홈 표시줄 또는 키보드). 안쪽 geo는 아래 홈 표시줄만 무시하고
+        // 키보드 영역은 지킨다: 키보드가 올라오면 시트가 키보드 위로 올라간다. geo는 위 안전 영역 아래부터 화면 아래
+        // (키보드가 있으면 키보드 위)까지이고 geo의 아래 inset은 키보드 높이(없으면 0)다. 둘의 차이가 시트 안에 남길
+        // 홈 표시줄 높이다(키보드가 있으면 0).
+        GeometryReader { outer in
         GeometryReader { geo in
+            let homeInset = max(0, outer.safeAreaInsets.bottom - geo.safeAreaInsets.bottom)
+            let maxContent = max(0, sheetMaxHeight(available: geo.size.height) - handleHeight)
             VStack(spacing: 0) {
                 handleRow
-                content()
-                    .wlOnSheet()
-                    .padding(.horizontal, WishlistTokens.Space.screenMargin)
-                    .padding(.bottom, WishlistTokens.Space.s16 + geo.safeAreaInsets.bottom)
+                // 내용이 상한보다 길면(큰 글자·키보드) 시트 안에서 스크롤한다. 짧으면 내용 높이만큼만 차지한다.
+                ScrollView {
+                    content()
+                        .wlOnSheet()
+                        .padding(.horizontal, WishlistTokens.Space.screenMargin)
+                        .padding(.bottom, WishlistTokens.Space.s16 + homeInset)
+                        .background(GeometryReader { Color.clear.preference(key: SheetContentHeightKey.self, value: $0.size.height) })
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: min(contentHeight, maxContent))
             }
+            .onPreferenceChange(SheetContentHeightKey.self) { contentHeight = $0 }
             .frame(maxWidth: .infinity)
-            .frame(maxHeight: sheetMaxHeight, alignment: .top)
-            .fixedSize(horizontal: false, vertical: true)
             .background(alignment: .bottom) {
                 // 면: 위 모서리 36 + 열 때 지나치는 동안 보이는 아래쪽 80pt.
                 ZStack(alignment: .bottom) {
@@ -102,7 +131,8 @@ struct SheetLayer: View {
             .offset(y: (1 - progress) * height + dragOffset)
             .opacity(height > 0 ? 1 : 0)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .ignoresSafeArea(.all, edges: .bottom)
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
         }
         .task(id: entry.phase) { await run(entry.phase) }
     }
@@ -144,7 +174,7 @@ struct SheetLayer: View {
         switch phase {
         case .opening:
             // 높이가 재어지기 전에 움직이면 첫 프레임이 튄다(재어질 때까지 한 프레임씩 기다린다. 뷰가 사라지면 취소).
-            while height == 0 && !Task.isCancelled { await overlaySleep(ms: 16) }
+            while (height == 0 || contentHeight == 0) && !Task.isCancelled { await overlaySleep(ms: 16) }
             if Task.isCancelled { return }
             withAnimation(WishlistTokens.Curve.springSheet.animation(ms: WishlistTokens.Motion.sheetOpen)) { progress = 1 }
             await overlaySleep(ms: WishlistTokens.Motion.sheetOpen)

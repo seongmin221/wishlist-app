@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -111,8 +112,8 @@ private fun surfacePhaseSpec(expanding: Boolean): FiniteAnimationSpec<Float> =
     }
 
 @Composable
-private fun Transition<EnterExitState>.surfacePhase(restValue: Float, awayValue: Float): Float {
-    val s by animateFloat(
+private fun Transition<EnterExitState>.surfacePhase(restValue: Float, awayValue: Float): State<Float> =
+    animateFloat(
         transitionSpec = {
             val from = if (initialState == EnterExitState.Visible) restValue else awayValue
             val to = if (targetState == EnterExitState.Visible) restValue else awayValue
@@ -120,12 +121,19 @@ private fun Transition<EnterExitState>.surfacePhase(restValue: Float, awayValue:
         },
         label = "surfacePhase",
     ) { if (it == EnterExitState.Visible) restValue else awayValue }
-    return s
-}
 
-/** `s`에 따른 면 그리기(색·모서리·떠오름 그림자). 글자·아이콘은 싣지 않는다. */
+/**
+ * `s`에 따른 면 그리기(색·모서리·떠오름 그림자). 글자·아이콘은 싣지 않는다.
+ * `active = false`면 아무것도 그리지 않고 `s`도 읽지 않는다(공유 요소 자리만 둔다). 그래서 전환에 참여하지 않는 면은
+ * 전환 동안 다시 그려지지도(recomposition), 그림자를 드리우지도 않는다.
+ */
 @Composable
-private fun SurfacePlaceholder(modifier: Modifier, s: Float, from: WLSurfaceSpec, to: WLSurfaceSpec) {
+private fun SurfacePlaceholder(modifier: Modifier, s: State<Float>, from: WLSurfaceSpec, to: WLSurfaceSpec, active: Boolean = true) {
+    if (!active) {
+        Box(modifier)
+        return
+    }
+    val s = s.value
     val e = (s - 1f).coerceIn(0f, 1f)
     val radius = lerp(from.radius, to.radius, e)
     val shape = RoundedCornerShape(radius)
@@ -184,20 +192,19 @@ fun WLSharedSurfaceSource(
             val density = LocalDensity.current
             val bounds = remember(density) { surfaceBounds(density) }
             val bg = LocalWLColors.current.background
-            // 이 면이 보이는(되돌아오는) 쪽일 때만 그린다: 뒤로 끝에 화면 전체 → 원래 요소로 내려앉는다.
             val s = scope.transition.surfacePhase(restValue = 0f, awayValue = 2f)
             with(shared) {
+                val state = rememberSharedContentState(SharedTransitionKeys.surface(sourceKey))
+                // 누른 요소(다음 화면과 키가 맞은 면)만 그린다. 같은 화면의 다른 칩·카드도 같은 칸 전환(push·pop)을 타지만
+                // 짝이 없으니 그리지 않는다. 짝이 맞으면 면은 공유 범위의 overlay에서 떠올라 화면 전체로 커진다.
                 SurfacePlaceholder(
                     Modifier
                         .matchParentSize()
-                        .sharedElement(
-                            rememberSharedContentState(SharedTransitionKeys.surface(sourceKey)),
-                            animatedVisibilityScope = scope,
-                            boundsTransform = bounds,
-                        ),
+                        .sharedElement(state, animatedVisibilityScope = scope, boundsTransform = bounds),
                     s = s,
                     from = spec,
                     to = WLSurfaceSpec(bg, 0.dp),
+                    active = state.isMatchFound,
                 )
             }
         }

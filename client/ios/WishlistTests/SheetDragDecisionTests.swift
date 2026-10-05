@@ -16,6 +16,12 @@ final class SheetDragDecisionTests: XCTestCase {
     }
 }
 
+final class SheetMaxHeightTests: XCTestCase {
+    func testCapsAt760OnTallScreens() { XCTAssertEqual(sheetMaxHeight(available: 1000), 760) }
+    func testLeavesTopMarginOnShortScreens() { XCTAssertEqual(sheetMaxHeight(available: 500), 500 - 24) }
+    func testNeverNegative() { XCTAssertEqual(sheetMaxHeight(available: 10), 0) }
+}
+
 final class SheetDragEndTests: XCTestCase {
     func testDismissThenCancelledDragDoesNothing() {
         // 끄는 중 뒤로로 닫기가 시작되면 끌기가 속도 0으로 끝난다. 이때 되돌림이 나가면 안 된다.
