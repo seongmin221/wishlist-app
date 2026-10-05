@@ -90,6 +90,18 @@ struct WLTextStyle {
     static let price = WLTextStyle(.wlPrice, WLFontName.plexBold, 18, lineHeight: 18, tabular: true, metrics: .plexBold)
     /// 줄 높이 1.25는 보드에 없어 고른 값이다.
     static let button = WLTextStyle(.wlButton, WLFontName.plexBold, 16, lineHeight: 16 * 1.25, metrics: .plexBold)
+    /// 보조 버튼용 Plex 500 16(Android `WLType.button.copy(fontWeight = Medium)`).
+    static let buttonMedium = WLTextStyle(Font.custom(WLFontName.plexMedium, size: 16), WLFontName.plexMedium, 16, lineHeight: 16 * 1.25, metrics: .plexMedium)
+    /// 선택된 칩 글자 Plex 700 14(Android `WLType.body.copy(fontWeight = Bold)`).
+    static let bodyBold = WLTextStyle(Font.custom(WLFontName.plexBold, size: 14), WLFontName.plexBold, 14, lineHeight: 14 * 1.35, metrics: .plexBold)
+    /// 입력칸 안내 글자 Plex 400 16(Android `WLType.button.copy(fontWeight = Normal)`).
+    static let buttonRegular = WLTextStyle(Font.custom(WLFontName.plexRegular, size: 16), WLFontName.plexRegular, 16, lineHeight: 16 * 1.25, metrics: .plexRegular)
+
+    /// 같은 글꼴에서 크기만 바꾼 스타일(Android `copy(fontSize=)`). 줄 높이를 안 주면 줄 높이 배수를 그대로 둔다.
+    func resized(_ newSize: CGFloat, lineHeight newLineHeight: CGFloat? = nil) -> WLTextStyle {
+        WLTextStyle(Font.custom(postScriptName, size: newSize), postScriptName, newSize,
+                    lineHeight: newLineHeight ?? lineHeight * newSize / size, tabular: tabular, metrics: metrics)
+    }
 
     /// 한글 아래 끝에서 줄 상자 아래까지의 거리(pt). 줄 높이가 글꼴 내용 높이(ascent+descent)보다 작거나 크면
     /// 남는 높이의 절반이 위아래로 나뉜다(CSS half-leading, Compose Alignment.Center와 같은 모델).
