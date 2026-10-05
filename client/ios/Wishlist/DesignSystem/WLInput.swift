@@ -24,7 +24,9 @@ struct WLInput: View {
         VStack(alignment: .leading, spacing: WishlistTokens.Space.s8) {
             if label != nil || hint != nil {
                 HStack {
+                    // 입력칸이 같은 라벨을 읽으므로 보이는 라벨은 접근성에서 뺀다(두 번 읽지 않게).
                     WLText(label ?? "", WLTextStyle.body.resized(13), color: c.textSecondary)
+                        .accessibilityHidden(true)
                     Spacer(minLength: 0)
                     WLText(hint ?? "", .label, color: c.textSecondary)
                 }
@@ -36,6 +38,8 @@ struct WLInput: View {
                     .tint(c.text)
                     .keyboardType(keyboard)
                     .accessibilityLabel(label ?? placeholder)
+                    // 라벨이 따로 있으면 안내 글자(placeholder)는 힌트로 읽는다. 라벨이 없으면 라벨이 곧 안내 글자다.
+                    .accessibilityHint(label != nil ? placeholder : "")
             }
             .padding(.horizontal, 18)
             .padding(.vertical, singleLine ? 0 : 16)

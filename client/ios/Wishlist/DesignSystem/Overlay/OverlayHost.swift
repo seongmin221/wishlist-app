@@ -145,11 +145,14 @@ extension EnvironmentValues {
 }
 
 extension View {
-    /// 가려진 층을 접근성에서 뺀다. `.accessibilityHidden(false)`를 조상에 걸면 후손의 `.accessibilityHidden(true)`까지 취소되므로
-    /// (Task 5 spike) `false`를 절대 넘기지 않고, 같은 modifier의 값만 바꾼다: 가려지면 `.ignore`(라벨 없는 한 덩어리 = 읽을 것 없음),
-    /// 아니면 `.contain`(후손의 숨김·라벨을 그대로 둔다). 뷰 정체성(상태)은 바뀌지 않는다.
+    /// 가려진 층을 접근성에서 뺀다. 같은 modifier의 값만 바꿔 뷰 정체성(상태)은 바뀌지 않는다.
+    /// - 가려짐: `.ignore` + `accessibilityHidden(true)`. 층 전체가 트리에서 빠진다(`.ignore`만 쓰면 라벨 없는 빈 요소가 남았다).
+    /// - 보임: `.contain` + `accessibilityHidden(false)`. 맨 조상에 그냥 `accessibilityHidden(false)`를 걸면 후손의
+    ///   `accessibilityHidden(true)`까지 취소되지만(Task 5 spike), `.contain` 컨테이너 뒤에 걸면 후손의 숨김이 그대로 남는다
+    ///   (Task 7에서 serve-sim `/ax`로 iOS 26.5·17.5 확인).
     func wlAccessibilityCovered(_ covered: Bool) -> some View {
         accessibilityElement(children: covered ? .ignore : .contain)
+            .accessibilityHidden(covered)
     }
 }
 
@@ -157,16 +160,12 @@ func overlaySleep(ms: Int) async {
     try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
 }
 
-private struct AnchorKey: PreferenceKey {
-    static let defaultValue = CGRect.zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
-}
-
 extension View {
-    /// 메뉴를 띄우는 버튼에 붙여 `showMenu`의 anchor(전역 좌표)를 얻는다.
+    /// 메뉴를 띄우는 버튼에 붙여 `showMenu`의 anchor(전역 좌표)를 얻는다. 위치가 바뀔 때마다(스크롤 포함) 알린다
+    /// (Android `onGloballyPositioned`와 같다). PreferenceKey 방식은 탭 셸 안(ScrollView·층 modifier 아래)에서 늘 `.zero`가
+    /// 와서(Task 7에서 확인) `onGeometryChange`로 바꿨다.
     func wlAnchor(_ onFrame: @escaping (CGRect) -> Void) -> some View {
-        background(GeometryReader { Color.clear.preference(key: AnchorKey.self, value: $0.frame(in: .global)) })
-            .onPreferenceChange(AnchorKey.self, perform: onFrame)
+        onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { onFrame($0) }
     }
 }
 
@@ -217,9 +216,10 @@ struct OverlayHost<Content: View>: View {
                 MenuLayer(entry: entry, state: state, anchor: anchor, items: items)
             }
         }
-        // 가장 위가 아닌 overlay(확인창 아래의 시트)도 가려진 층이다. 가장 위는 .contain(안쪽 숨김 보존).
+        // 가장 위가 아닌 overlay(확인창 아래의 시트)도 가려진 층이다(트리에서 빠진다). 가장 위는 .contain(안쪽 숨김 보존).
+        // escape는 층 컨테이너에 건다(VoiceOver는 초점 요소에서 컨테이너를 따라 올라가며 escape를 보낸다). 가장 위 층만 닫는다.
         .wlAccessibilityCovered(!isTop)
-        .accessibilityAction(.escape) { state.dismiss() }
+        .accessibilityAction(.escape) { if isTop { state.dismiss() } }
     }
 
     /// 막: 열 때 400 ease-out, 닫을 때 260 ease-in. 닫기 모션이 끝날 때까지 막(과 입력 차단)을 남긴다.
