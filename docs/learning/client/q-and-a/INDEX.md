@@ -11,3 +11,4 @@
 | QA-CLI-005 | Compose 한 줄 글자의 줄 높이가 줄지 않는 이유와 Android 14 글자 배율은? | [QA-CLI-005](QA-CLI-005-line-height-and-font-scale.md) |
 | QA-CLI-006 | SwiftUI에서 가려진 화면을 VoiceOver에서 빼는 방법은? | [QA-CLI-006](QA-CLI-006-swiftui-accessibility-hiding.md) |
 | QA-CLI-007 | 가장자리 끌어 뒤로를 window 수준 UIKit pan으로 만든 이유는? | [QA-CLI-007](QA-CLI-007-swiftui-gesture-vs-scrollview.md) |
+| QA-CLI-008 | SwiftUI에서 글꼴보다 작은 줄 높이를 여러 줄에 주는 방법은? | [QA-CLI-008](QA-CLI-008-swiftui-line-height-below-font.md) |
