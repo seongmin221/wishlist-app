@@ -52,6 +52,9 @@ enum DemoContent {
                     purpose: purposes[1], tint: .mustard, photoRatio: 1.25),
         DemoProduct(id: "p4", brand: "헬리녹스", name: "체어 원 라이트", price: 139_000, currency: "KRW", category: "캠핑 의자",
                     purpose: purposes[6], tint: .mint, photoRatio: 1),
+        // 가장 긴 가격(보드 FPurposeAddCategoryFilterL). 가장 좁은 상품 카드에서도 한 줄이어야 한다(디자인 결정 2026-10-04).
+        DemoProduct(id: "p5", brand: "뱅앤올룹슨", name: "Beoplay H95", price: 1_190_000, currency: "KRW", category: "헤드폰",
+                    purpose: purposes[0], tint: .pink, photoRatio: 1.25),
     ]
 
     static let railCategories = ["패션·잡화", "뷰티·퍼스널케어", "디지털·IT", "가구·인테리어", "생활·주방·가전", "스포츠·아웃도어·여행"]
