@@ -6,6 +6,19 @@ struct ContentView: View {
     private let appInfo = AppInfo()
 
     var body: some View {
+        #if DEBUG
+        // Task 5 iOS 라우터 spike 진입점. Task 7에서 Spike/와 함께 지운다.
+        if ProcessInfo.processInfo.arguments.contains("-RouterSpike") {
+            RouterSpikeView()
+        } else {
+            placeholder
+        }
+        #else
+        placeholder
+        #endif
+    }
+
+    private var placeholder: some View {
         ZStack {
             background.ignoresSafeArea()
             Text(appInfo.displayName)

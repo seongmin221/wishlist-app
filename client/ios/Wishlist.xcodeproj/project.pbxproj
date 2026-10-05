@@ -14,6 +14,7 @@
         A10000000000000000000007 /* ibm_plex_sans_kr_medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* ibm_plex_sans_kr_medium.ttf */; };
         A10000000000000000000008 /* ibm_plex_sans_kr_bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* ibm_plex_sans_kr_bold.ttf */; };
         A10000000000000000000009 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* OFL.txt */; };
+        A10000000000000000000010 /* RouterSpikeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* RouterSpikeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
         A20000000000000000000009 /* ibm_plex_sans_kr_bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = ibm_plex_sans_kr_bold.ttf; sourceTree = "<group>"; };
         A20000000000000000000010 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = OFL.txt; sourceTree = "<group>"; };
         A20000000000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+        A20000000000000000000012 /* RouterSpikeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouterSpikeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,7 +44,7 @@
         };
         A40000000000000000000002 /* Wishlist */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000002 /* ContentView.swift */, A40000000000000000000004 /* DesignSystem */, A40000000000000000000005 /* Resources */, A20000000000000000000011 /* Info.plist */);
+            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000002 /* ContentView.swift */, A40000000000000000000004 /* DesignSystem */, A40000000000000000000007 /* Navigation */, A40000000000000000000005 /* Resources */, A20000000000000000000011 /* Info.plist */);
             path = Wishlist;
             sourceTree = "<group>";
         };
@@ -68,6 +70,18 @@
             isa = PBXGroup;
             children = (A20000000000000000000006 /* do_hyeon.ttf */, A20000000000000000000007 /* ibm_plex_sans_kr_regular.ttf */, A20000000000000000000008 /* ibm_plex_sans_kr_medium.ttf */, A20000000000000000000009 /* ibm_plex_sans_kr_bold.ttf */, A20000000000000000000010 /* OFL.txt */);
             path = Fonts;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000007 /* Navigation */ = {
+            isa = PBXGroup;
+            children = (A40000000000000000000008 /* Spike */);
+            path = Navigation;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000008 /* Spike */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000012 /* RouterSpikeView.swift */);
+            path = Spike;
             sourceTree = "<group>";
         };
 /* End PBXGroup section */
@@ -126,7 +140,7 @@
         A60000000000000000000001 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */, A10000000000000000000004 /* WLTypography.swift in Sources */);
+            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */, A10000000000000000000004 /* WLTypography.swift in Sources */, A10000000000000000000010 /* RouterSpikeView.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXSourcesBuildPhase section */
