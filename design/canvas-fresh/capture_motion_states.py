@@ -24,6 +24,7 @@ JOBS = {
     "home": ("FHomeL", None, HIDE_NAV),
     "cat": ("FCategoryHomeL", None, HIDE_NAV),
     "purpose": ("FPurposeHomeL", None, HIDE_NAV),
+    "catnav": ("FCategoryHomeL", None, ""),
 }
 
 class Q(SimpleHTTPRequestHandler):

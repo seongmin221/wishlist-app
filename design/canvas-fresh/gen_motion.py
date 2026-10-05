@@ -165,6 +165,34 @@ def push_board(key):
     return T, "".join(css), body + e1 + e2
 
 
+CHIP = (132, 186, 81, 40, 20)  # 카테고리 첫 화면 `헤드폰 8` 칩 x, y, 폭, 높이, 모서리
+
+
+def push_placeholder_board():
+    """사진이 없는 이동: 누른 칩의 면이 빈 자리 표시로 떠올라 다음 화면 크기로 커진다."""
+    T = 5200
+    p, b = 700, 3100
+    d, bd = 420, 360
+    x, y, w, h, r = CHIP
+    t1, e1 = tap("t1", T, p - 120, x + w // 2, y + h // 2)
+    t2, e2 = tap("t2", T, b - 120, 38, 74)
+    small = f"left:{x}px;top:{y}px;width:{w}px;height:{h}px;border-radius:{r}px;background:#FFFFFF;box-shadow:0 0 0 rgba(0,0,0,0)"
+    lift = f"left:{x - 3}px;top:{y - 3}px;width:{w + 6}px;height:{h + 6}px;border-radius:{r}px;background:#FFFFFF;box-shadow:0 8px 24px rgba(0,0,0,0.14)"
+    full = f"left:0px;top:0px;width:{W}px;height:{H}px;border-radius:0px;background:{BG};box-shadow:0 0 0 rgba(0,0,0,0)"
+    css = [t1, t2,
+           kf("ph", T, [(0, "opacity:0;" + small, None), (p - 1, "opacity:0;" + small, None), (p, "opacity:1;" + small, "ease-out"),
+                        (p + 80, "opacity:1;" + lift, DECEL), (p + 80 + d, "opacity:1;" + full, None),
+                        (b, "opacity:1;" + full, DECEL), (b + bd, "opacity:1;" + lift, "ease-in"), (b + bd + 80, "opacity:1;" + small, None),
+                        (b + bd + 81, "opacity:0;" + small, None), (T, "opacity:0;" + small, None)]),
+           kf("lst", T, [(0, "opacity:0", None), (p + 80 + d * 0.45, "opacity:0", "ease-out"), (p + 80 + d, "opacity:1", None),
+                         (b, "opacity:1", "ease-in"), (b + bd * 0.5, "opacity:0", None), (T, "opacity:0", None)])]
+    body = f'''{img("catnav")}
+<div style="position: absolute; {anim("ph", T)}"></div>
+<div style="position: absolute; inset: 0; {anim("lst", T)}">{img("list")}</div>
+{e1}{e2}'''
+    return T, "".join(css), body
+
+
 # ---------- 3. 탭 전환 (홈 → 카테고리 → 목적 → 홈) ----------
 TABS = [("home", "홈", '<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path>'),
         ("cat", "카테고리", '<rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect>'),
@@ -355,6 +383,10 @@ def main():
     out = os.path.join(sys.argv[1], "project")
     os.makedirs(out, exist_ok=True)
     names = []
+    T, css, body = push_placeholder_board()
+    with open(os.path.join(out, "MotionPushPlaceholder.dc.html"), "w") as f:
+        f.write(board("MotionPushPlaceholder 사진 없는 이동", T, css, body))
+    names.append("MotionPushPlaceholder")
     for g, fn, labels in GROUPS:
         for k, label in labels.items():
             T, css, body = fn(k)
