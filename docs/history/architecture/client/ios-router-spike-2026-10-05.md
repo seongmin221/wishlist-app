@@ -97,3 +97,13 @@ Task 7 구현 규칙:
 - iOS 17에서는 공유 요소 없이 페이드만 남는다.
 - 끌어서 뒤로는 시스템 zoom 제스처가 되어 50% 확정 기준을 정할 수 없다.
 - 탭 바·탭별 스택은 `NavigationStack`을 탭마다 두어 유지할 수 있다.
+
+## Task 7 구현에서 보탠 사실 (2026-10-06)
+
+Task 7 실제 라우터를 만들며 iOS 17.5·26.5 시뮬레이터에서 serve-sim `/ax`와 escape 흉내로 확인했다.
+
+- **숨김 규칙 보완:** 조상에 그냥 `accessibilityHidden(false)`를 걸면 후손의 숨김이 취소되는 것은 그대로다. 그러나 `.accessibilityElement(children: .contain)` 뒤에 건 `accessibilityHidden(false)`는 후손의 `accessibilityHidden(true)`를 취소하지 않았다. 가려진 층은 `.ignore` + `accessibilityHidden(true)`로 빼면 라벨 없는 빈 요소도 남지 않는다(`.ignore`만 쓰면 빈 요소가 남았다). 그래서 위 "조상에 `accessibilityHidden(false)`를 두지 않는다" 규칙은 "`.contain` 컨테이너 뒤에서만 쓴다"로 고친다(`wlAccessibilityCovered`).
+- **escape 전달 경로:** 자식이 하나뿐인 `ZStack`에 건 `.contain` 컨테이너는 트리에서 접혀, 거기 건 escape 동작이 전달 경로에서 빠졌다(상세 안 글자에서 8단계 올라가도 처리 안 됨). 칸마다 보이지 않는 형제를 하나 두자 3단계(글자 → 스크롤 → 칸 컨테이너)에서 처리됐다. 흉내는 UIView에도 `superview`보다 `accessibilityContainer`를 먼저 따라가야 VoiceOver 순서와 맞다.
+- **깊이 2:** 모든 칸을 살려 두는 방식으로 깊이 2의 push·pop·끌어서 뒤로가 두 OS에서 통과했다.
+- **실기기 VoiceOver:** 여전히 미검증이다(연결된 기기 없음). `.screenChanged` 보완은 코드에 넣지 않았다.
+
