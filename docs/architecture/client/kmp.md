@@ -21,3 +21,13 @@
 ## 선택 이유
 
 동일한 동기화·상태 규칙을 두 번 구현하는 비용을 줄이면서도, iOS와 Android의 native UI 품질과 플랫폼 관례를 유지한다.
+
+## 초기 구현
+
+- 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared` 모듈로 시작한다.
+- shared target은 Android, `iosArm64`, `iosSimulatorArm64`다. Android는 공식 KMP library plugin, iOS는 static `Shared.framework` direct integration을 사용한다.
+- 지원 하한은 Android 8(API 26), iOS 17이다.
+- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`뿐이다. 위 공유 대상의 비즈니스 기능은 아직 구현하지 않았다.
+- DB·HTTP·인증·DI와 Swift 비동기 연결 방식은 기능 도입 시 결정한다.
+
+빌드 명령과 검증 제한은 [client 실행 가이드](../../../client/README.md), 상세 근거와 핸드오프 검토는 [초기 셋업](initial-setup.md)에 정리한다.
