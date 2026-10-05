@@ -28,6 +28,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,10 +42,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import app.wishlist.android.designsystem.LocalWLColors
+import app.wishlist.android.designsystem.overlay.LocalOverlayHostState
 import app.wishlist.android.designsystem.WishlistTokens.Curve
 import app.wishlist.android.designsystem.WishlistTokens.Motion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** 화면이 `push`·`pop`을 부르기 위한 접근. */
@@ -77,11 +80,24 @@ fun WLNavHost(
     val tabBarAlpha = remember { mutableStateOf<State<Float>?>(null) }
 
     val tabTransition = updateTransition(currentTab, label = "tab")
-    LaunchedEffect(tabTransition, navigator) {
-        snapshotFlow { tabTransition.currentState == tabTransition.targetState && tabTransition.currentState == navigator.currentTab.value }
-            .collect { settled ->
-                if (settled && navigator.activeTransition is WLNavTransition.Tab) navigator.finishTransition()
-            }
+    LaunchedEffect(currentTab) {
+        // push·pop과 같은 방식: 탭이 바뀔 때마다 자기 탭 전환만 끝낸다. 애니메이션 배율 0처럼 전환이 같은 프레임에 끝나
+        // "덜 끝남" 상태를 한 번도 볼 수 없어도 첫 검사에서 바로 끝내고, 끊겨도 finally에서 반드시 끝낸다.
+        val tab = currentTab
+        val mine = navigator.activeTransition?.takeIf { it is WLNavTransition.Tab && it.tab == tab }
+        try {
+            snapshotFlow { tabTransition.currentState == tab && tabTransition.targetState == tab && !tabTransition.isRunning }
+                .first { it }
+        } finally {
+            if (mine != null && navigator.activeTransition === mine) navigator.finishTransition()
+        }
+    }
+    // 탭 바 투명도는 매 프레임 바뀌므로 그리기 단계(graphicsLayer)에서만 읽는다. 보일지 여부만 derivedStateOf로 다시 그린다.
+    val tabBarAlphaNow = {
+        tabBarAlpha.value?.value ?: if (navigator.entries(currentTab).last().route.showsTabBar) 1f else 0f
+    }
+    val tabBarVisible by remember(navigator) {
+        derivedStateOf { navigator.entries(currentTab).last().route.showsTabBar || tabBarAlphaNow() > 0f }
     }
 
     CompositionLocalProvider(LocalWLNavigator provides navigator, LocalWLSurfaceRegistry provides registry) {
@@ -96,14 +112,12 @@ fun WLNavHost(
                         TabStack(tab, isCurrent = tab == currentTab, navigator, tabBarAlpha, content)
                     }
                 }
-                val top = navigator.entries(currentTab).last()
-                val alpha = tabBarAlpha.value?.value ?: if (top.route.showsTabBar) 1f else 0f
-                if (top.route.showsTabBar || alpha > 0f) {
+                if (tabBarVisible) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
                         WLTabBar(
                             current = currentTab,
                             onSelect = { navigator.selectTab(it) },
-                            modifier = Modifier.graphicsLayer { this.alpha = alpha },
+                            modifier = Modifier.graphicsLayer { this.alpha = tabBarAlphaNow() },
                         )
                     }
                 }
@@ -203,7 +217,10 @@ private fun SharedTransitionScope.TabStack(
     ) { if (it.route.showsTabBar) 1f else 0f }
     if (isCurrent) SideEffect { tabBarAlpha.value = alpha }
 
-    PredictiveBackHandler(enabled = isCurrent && (navigator.canPop() || navigator.isTransitioning)) { events ->
+    // overlay가 떠 있는 동안에는 끈다. overlay의 BackHandler와 등록 순서를 다투지 않는다(overlay 아래에서 이 탭 스택이
+    // 새로 그려져 나중에 등록되어도 뒤로가 overlay를 건너뛰고 화면을 pop하지 않는다).
+    val overlayShowing = LocalOverlayHostState.current?.isShowing == true
+    PredictiveBackHandler(enabled = navBackEnabled(isCurrent, overlayShowing, navigator.canPop(), navigator.isTransitioning)) { events ->
         if (!navigator.beginBackGesture()) {
             // 전환 중 뒤로: 받아서 버린다.
             events.collect { }
@@ -263,7 +280,9 @@ private suspend fun revert(
             coroutineScope {
                 val a = Animatable(progress)
                 val follower = launch { snapshotFlow { a.value }.collect { seek.seekTo(it.coerceIn(0f, 1f), to) } }
-                val ms = (Motion.pushPhotoBack * progress).toInt().coerceAtLeast(RevertMinMillis)
+                // 되돌림 길이 = 그 화면 종류(사진·면)의 뒤로 시간 × 남은 비율.
+                val back = if (from.route.pushStyle == WLPushStyle.Surface) Motion.pushSurfaceBack else Motion.pushPhotoBack
+                val ms = (back * progress).toInt().coerceAtLeast(RevertMinMillis)
                 a.animateTo(0f, tween(ms, easing = Curve.emphasized))
                 follower.cancel()
             }
@@ -274,6 +293,10 @@ private suspend fun revert(
         navigator.cancelBackGesture()
     }
 }
+
+/** 라우터의 뒤로 처리를 켤지. 현재 탭이고, overlay가 없고, pop할 칸이 있거나 전환 중(받아서 버림)일 때만. */
+internal fun navBackEnabled(isCurrent: Boolean, overlayShowing: Boolean, canPop: Boolean, transitioning: Boolean): Boolean =
+    isCurrent && !overlayShowing && (canPop || transitioning)
 
 /** 되돌림 최소 시간. 거의 끌지 않았을 때 튀어 보이지 않게 하는 구현 기본값(디자인 값 아님). */
 private const val RevertMinMillis = 120

@@ -151,4 +151,15 @@ class WLNavigatorTest {
         assertTrue(WLRoute.TabRoot(WLTab.Home).showsTabBar)
         assertFalse(detail.showsTabBar)
     }
+
+    @Test
+    fun navBackIsDisabledWhileOverlayIsShowing() {
+        assertTrue(navBackEnabled(isCurrent = true, overlayShowing = false, canPop = true, transitioning = false))
+        assertTrue(navBackEnabled(isCurrent = true, overlayShowing = false, canPop = false, transitioning = true))
+        // overlay가 있으면 등록 순서와 상관없이 라우터는 뒤로를 받지 않는다(overlay의 BackHandler가 받는다).
+        assertFalse(navBackEnabled(isCurrent = true, overlayShowing = true, canPop = true, transitioning = false))
+        assertFalse(navBackEnabled(isCurrent = true, overlayShowing = true, canPop = true, transitioning = true))
+        assertFalse(navBackEnabled(isCurrent = false, overlayShowing = false, canPop = true, transitioning = false))
+        assertFalse(navBackEnabled(isCurrent = true, overlayShowing = false, canPop = false, transitioning = false))
+    }
 }

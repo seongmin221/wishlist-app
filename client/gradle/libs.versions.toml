@@ -4,6 +4,7 @@ agp = "9.0.0"
 compose-bom = "2026.02.01"
 activity-compose = "1.12.4"
 junit = "4.13.2"
+# Compose BOM이 실제로 끌어오는 kotlinx-coroutines-core와 같은 버전(debugRuntimeClasspath에서 1.9.0 확인)
 coroutines = "1.9.0"
 
 [libraries]
