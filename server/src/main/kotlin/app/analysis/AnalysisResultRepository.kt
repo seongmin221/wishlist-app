@@ -6,12 +6,20 @@ import javax.sql.DataSource
 
 class AnalysisResultRepository(private val dataSource: DataSource) {
     fun finish(claim: AnalysisClaim, outcome: ProcessingOutcome): WorkerDisposition {
-        if (outcome == ProcessingOutcome.Stale) return WorkerDisposition.ACKNOWLEDGE
         return dataSource.connection.use { c ->
             c.autoCommit = false
             try {
-                val job = AnalysisWriteGuard.lockCurrentJob(c, claim)
-                val result = if (job != null) finishLocked(c, claim, outcome, job) else WorkerDisposition.ACKNOWLEDGE
+                val execution = AnalysisWriteGuard.lockExecution(c, claim)
+                val result = when {
+                    execution == null || !execution.item.canAnalyze(claim.generation) -> WorkerDisposition.ACKNOWLEDGE
+                    execution.item.version != claim.expectedItemVersion -> {
+                        c.transitionAnalysisJob(claim.jobId, "CANCELLED")
+                        c.failRetryableItem(claim.itemId)
+                        WorkerDisposition.ACKNOWLEDGE
+                    }
+                    outcome == ProcessingOutcome.Stale || execution.job.leaseUntil?.isAfter(c.analysisDatabaseTime()) != true -> WorkerDisposition.ACKNOWLEDGE
+                    else -> finishLocked(c, claim, outcome, execution.job)
+                }
                 c.commit()
                 result
             } catch (cause: Throwable) { c.rollback(); throw cause }
@@ -20,7 +28,7 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
 
     private fun finishLocked(c: Connection, claim: AnalysisClaim, outcome: ProcessingOutcome, job: LockedAnalysisJob): WorkerDisposition {
         if (outcome == ProcessingOutcome.NeedsBrowser && claim.lane == AnalysisLane.GENERAL && !job.browserAttempted) {
-            transitionJob(c, claim.jobId, "BROWSER_PENDING", fallback = true)
+            c.transitionAnalysisJob(claim.jobId, "BROWSER_PENDING", fallback = true)
             c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,'BROWSER_ANALYSIS',?)").use { s ->
                 s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
                 s.setString(3, "browser-${claim.jobId}-${claim.generation}"); check(s.executeUpdate() == 1)
@@ -28,10 +36,8 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             return WorkerDisposition.ACKNOWLEDGE
         }
         if (outcome == ProcessingOutcome.Retryable) {
-            val attempts = if (claim.lane == AnalysisLane.GENERAL) job.attempts else job.browserAttempts
-            val first = if (claim.lane == AnalysisLane.GENERAL) job.firstAttemptAt else job.firstBrowserAttemptAt
-            if (attempts < 3 && first?.plusSeconds(1800)?.isAfter(c.analysisDatabaseTime()) != false) {
-                transitionJob(c, claim.jobId, "${claim.lane.name}_PENDING")
+            if (job.hasRetryBudget(claim.lane, c.analysisDatabaseTime())) {
+                c.transitionAnalysisJob(claim.jobId, "${claim.lane.name}_PENDING")
                 c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,?,?)").use { s ->
                     s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
                     s.setString(3, if (claim.lane == AnalysisLane.GENERAL) "GENERAL_ANALYSIS" else "BROWSER_ANALYSIS")
@@ -55,7 +61,11 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             else -> "PARTIAL"
         }
         val complete = status == "READY"
-        val failure = if (complete) null else if (outcome == ProcessingOutcome.Complete) "AI_INVALID_CANDIDATE" else pending.failure
+        val failure = when {
+            complete || (assigned && item.protects("CATEGORY", item.categorySource)) -> null
+            outcome == ProcessingOutcome.Complete -> "AI_INVALID_CANDIDATE"
+            else -> pending.failure
+        }
         val name = mergedMetadata(item.name, pending.name, complete, item.protects("NAME", item.nameSource))
         val image = mergedMetadata(item.image, pending.image, complete, item.protects("IMAGE", item.imageSource))
         val nameSource = mergedSource(item.name, pending.name, item.nameSource, complete, item.protects("NAME", item.nameSource))
@@ -95,7 +105,7 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             values.values.forEach { s.setString(parameter++, it) }
             s.setBoolean(parameter++, assigned); s.setObject(parameter, claim.itemId); check(s.executeUpdate() == 1)
         }
-        transitionJob(c, claim.jobId, when (status) { "READY" -> "COMPLETE"; "PARTIAL" -> "PARTIAL"; else -> "FAILED" })
+        c.transitionAnalysisJob(claim.jobId, when (status) { "READY" -> "COMPLETE"; "PARTIAL" -> "PARTIAL"; else -> "FAILED" })
         return WorkerDisposition.ACKNOWLEDGE
     }
 
@@ -104,13 +114,6 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
 
     private fun mergedSource(existing: String?, pending: String?, source: String?, complete: Boolean, protected: Boolean): String? =
         if (!protected && pending != null && (complete || existing == null)) "AI" else source
-
-    private fun transitionJob(c: Connection, jobId: UUID, stage: String, fallback: Boolean = false) {
-        c.prepareStatement("""update analysis_jobs set stage=?,execution_token=null,lease_until=null,claimed_item_version=null,
-            browser_attempted=browser_attempted or ?,updated_at=clock_timestamp() where id=?""").use { s ->
-            s.setString(1, stage); s.setBoolean(2, fallback); s.setObject(3, jobId); check(s.executeUpdate() == 1)
-        }
-    }
 
     private data class Item(
         val name: String?, val description: String?, val image: String?, val canonical: String?,

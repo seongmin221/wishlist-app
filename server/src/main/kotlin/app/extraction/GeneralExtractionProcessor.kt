@@ -15,15 +15,16 @@ class GeneralExtractionProcessor(
     fun process(claim: AnalysisClaim): ProcessingOutcome {
         val sourceUrl = pending.sourceUrl(claim) ?: return ProcessingOutcome.Stale
         val result = try { extract(sourceUrl) } catch (_: UnsafeUrlException) {
-            return if (pending.isCurrent(claim)) ProcessingOutcome.Terminal else ProcessingOutcome.Stale
+            return ProcessingOutcome.Terminal
         }
         return when (result) {
             is ExtractionResult.Complete -> {
                 if (!pending.saveMetadata(claim, result.metadata)) ProcessingOutcome.Stale
                 else classify(claim, result.metadata)
             }
-            ExtractionResult.NeedsBrowser -> if (pending.isCurrent(claim)) ProcessingOutcome.NeedsBrowser else ProcessingOutcome.Stale
-            ExtractionResult.Partial -> if (pending.isCurrent(claim)) ProcessingOutcome.Partial else ProcessingOutcome.Stale
+            // These are provisional outcomes with no DB write; finish owns the final guard.
+            ExtractionResult.NeedsBrowser -> ProcessingOutcome.NeedsBrowser
+            ExtractionResult.Partial -> ProcessingOutcome.Partial
         }
     }
 }

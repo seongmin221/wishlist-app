@@ -67,19 +67,20 @@ class AnalysisJobReconciler(
         val browser = job.stage == "BROWSER_RUNNING"
         if (!item.canAnalyze(job.generation) || (!legacy && job.claimedItemVersion != item.version) ||
             (browser && !job.browserAttempted)) {
-            transition(connection, candidate.id, "CANCELLED")
+            connection.transitionAnalysisJob(candidate.id, "CANCELLED")
+            if (item.canAnalyze(job.generation)) {
+                // The current processing item has lost its execution; preserve edited data.
+                connection.failRetryableItem(candidate.itemId)
+            }
             return true
         }
-        val attempts = if (browser) job.browserAttempts else job.attempts
-        val first = if (browser) job.firstBrowserAttemptAt else job.firstAttemptAt
-        if (attempts >= 3 || first?.plusSeconds(1800)?.isAfter(now) == false) {
-            transition(connection, candidate.id, "FAILED")
-            connection.prepareStatement("""update wishlist_items set analysis_status='FAILED_RETRYABLE',version=version+1,
-                updated_at=clock_timestamp() where id=?""").use { statement ->
-                statement.setObject(1, candidate.itemId); check(statement.executeUpdate() == 1)
-            }
+        val lane = if (browser) AnalysisLane.BROWSER else AnalysisLane.GENERAL
+        val attempts = job.attemptsFor(lane)
+        if (!job.hasRetryBudget(lane, now)) {
+            connection.transitionAnalysisJob(candidate.id, "FAILED")
+            connection.failRetryableItem(candidate.itemId)
         } else {
-            transition(connection, candidate.id, if (browser) "BROWSER_PENDING" else "GENERAL_PENDING")
+            connection.transitionAnalysisJob(candidate.id, if (browser) "BROWSER_PENDING" else "GENERAL_PENDING")
             connection.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,?,?)").use { statement ->
                 statement.setObject(1, UUID.randomUUID()); statement.setObject(2, candidate.id)
                 statement.setString(3, if (browser) "BROWSER_ANALYSIS" else "GENERAL_ANALYSIS")
@@ -88,13 +89,6 @@ class AnalysisJobReconciler(
             }
         }
         return true
-    }
-
-    private fun transition(connection: Connection, jobId: UUID, stage: String) {
-        connection.prepareStatement("""update analysis_jobs set stage=?,execution_token=null,lease_until=null,claimed_item_version=null,
-            updated_at=clock_timestamp() where id=?""").use { statement ->
-            statement.setString(1, stage); statement.setObject(2, jobId); check(statement.executeUpdate() == 1)
-        }
     }
 
     private data class Candidate(val id: UUID, val itemId: UUID, val generation: Int, val stage: String,

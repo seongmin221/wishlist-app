@@ -72,20 +72,25 @@ class ClassificationGatewayTest {
         server.start()
         try {
             val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna-2026-09-01", "secret"), baseUri = URI("http://127.0.0.1:${server.address.port}/v1"))
-            assertEquals(ClassificationResult.Unusable("input_too_large"), gateway.classify("Lamp", candidates).classification)
+            assertEquals(ClassificationResult.Unusable("input_too_large"), gateway.classify("Lamp", candidates) {
+                error("oversized preflight must not enter paid flight")
+            }.classification)
             assertEquals(0, responses)
         } finally { server.stop(0) }
     }
 
     @Test fun `token preflight allows classification and preserves response usage`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val phases = java.util.concurrent.CopyOnWriteArrayList<String>()
         server.createContext("/v1/responses/input_tokens") { exchange ->
+            phases.add("token_count")
             exchange.requestBody.readAllBytes()
             val bytes = """{"input_tokens":1200}""".toByteArray()
             exchange.sendResponseHeaders(200, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
         }
         server.createContext("/v1/responses") { exchange ->
+            phases.add("paid_request")
             exchange.requestBody.readAllBytes()
             val bytes = """{"status":"completed","usage":{"input_tokens":1200,"output_tokens":34},"output":[{"content":[{"type":"output_text","text":"{\"category_status\":\"ASSIGNED\",\"category_id\":\"CAT_HOME\",\"purpose_status\":\"UNASSIGNED\",\"purpose_id\":null}"}]}]}""".toByteArray()
             exchange.sendResponseHeaders(200, bytes.size.toLong())
@@ -94,9 +99,10 @@ class ClassificationGatewayTest {
         server.start()
         try {
             val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna-2026-09-01", "secret"), baseUri = URI("http://127.0.0.1:${server.address.port}/v1"))
-            val result = gateway.classify("Lamp", candidates)
+            val result = gateway.classify("Lamp", candidates) { phases.add("in_flight") }
             assertEquals(ClassificationResult.Assigned("CAT_HOME", null), result.classification)
             assertEquals(1200, result.inputTokens)
+            assertEquals(listOf("token_count", "in_flight", "paid_request"), phases.toList())
         } finally { server.stop(0) }
     }
 }

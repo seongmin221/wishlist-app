@@ -24,7 +24,7 @@ class PlaywrightGateway(private val safety: UrlSafetyPolicy) {
                             if (canRequest(route.request().url())) route.resume() else route.abort()
                         }
                         val page = context.newPage()
-                        page.navigate(url, com.microsoft.playwright.Page.NavigateOptions().setTimeout(WorkerExecution.remaining(Duration.ofSeconds(30)).toMillis().toDouble().coerceAtLeast(1.0)))
+                        page.navigate(url, com.microsoft.playwright.Page.NavigateOptions().setTimeout(WorkerExecution.remaining(Duration.ofSeconds(30)).toMillis().toDouble()))
                         val finalUrl = page.url()
                         safety.validate(finalUrl)
                         val html = page.content()

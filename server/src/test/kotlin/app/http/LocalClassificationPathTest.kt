@@ -41,7 +41,7 @@ class LocalClassificationPathTest {
             var observed: GatewayResponse? = null
             val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = "gpt-5.6-luna", allowLocalAlias = true),
                 { catalog.snapshot(catalog.categories.map { it.id }.toSet()) },
-                { metadata, candidates -> gateway.classify(metadata, candidates).also { observed = it } })
+                { metadata, candidates, beforeSend -> gateway.classify(metadata, candidates, beforeSend).also { observed = it } })
             val processor = GeneralExtractionProcessor(source,
                 { url -> ExtractionResult.Complete(Metadata("CAYL cap", null, null, url)) }, classifier::classify)
             testApplication {

@@ -27,7 +27,7 @@ class WorkerExecution(
         val future = try {
             executor.submit<WorkerDisposition> {
                 deadline.set(started + TimeUnit.MILLISECONDS.toNanos(processingMillis))
-                try { action() } finally { deadline.remove() }
+                try { if (expired()) WorkerDisposition.RETRY else action() } finally { deadline.remove() }
             }
         } catch (_: RejectedExecutionException) { return WorkerDisposition.RETRY }
         return try {
@@ -56,11 +56,12 @@ class WorkerExecution(
         private val deadline = ThreadLocal<Long>()
 
         fun remaining(maximum: Duration): Duration {
-            val end = deadline.get() ?: return maximum
-            val nanos = end - System.nanoTime()
-            if (nanos <= 0 || Thread.currentThread().isInterrupted) throw ProcessingDeadlineExceeded()
-            return Duration.ofNanos(minOf(nanos, maximum.toNanos()))
+            val nanos = minOf(deadline.get()?.let { it - System.nanoTime() } ?: maximum.toNanos(), maximum.toNanos())
+            // Millisecond-based SDKs interpret a truncated zero timeout as unlimited.
+            if (nanos < TimeUnit.MILLISECONDS.toNanos(1) || Thread.currentThread().isInterrupted) throw ProcessingDeadlineExceeded()
+            return Duration.ofNanos(nanos)
         }
-        fun expired(): Boolean = deadline.get()?.let { it <= System.nanoTime() } == true
+        fun expired(): Boolean = Thread.currentThread().isInterrupted ||
+            deadline.get()?.let { it - System.nanoTime() < TimeUnit.MILLISECONDS.toNanos(1) } == true
     }
 }

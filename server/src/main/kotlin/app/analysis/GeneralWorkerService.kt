@@ -19,7 +19,10 @@ class GeneralWorkerService(
     fun runGeneral(jobId: UUID, generation: Int): WorkerDisposition = execution.run { runClaimed(jobId, generation) }
 
     private fun runClaimed(jobId: UUID, generation: Int): WorkerDisposition {
-        val claim = when (val result = claims.claim(jobId, generation, AnalysisLane.GENERAL)) {
+        if (WorkerExecution.expired()) return WorkerDisposition.RETRY
+        val claimResult = try { claims.claim(jobId, generation, AnalysisLane.GENERAL) }
+            catch (_: ProcessingDeadlineExceeded) { return WorkerDisposition.RETRY }
+        val claim = when (val result = claimResult) {
             is ClaimResult.Claimed -> result.claim
             ClaimResult.Ignored, ClaimResult.Exhausted -> return WorkerDisposition.ACKNOWLEDGE
         }

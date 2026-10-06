@@ -146,7 +146,7 @@ class GeneralWorkerServiceTest {
         assertPurposeOnlyReview(source)
     }
 
-    @Test fun `all general final outcomes ignore stale claims without mutating rows`() = withAnalysisDatabase { source ->
+    @Test fun `general stale claims preserve fields and cancel version-invalid current executions`() = withAnalysisDatabase { source ->
         assertStaleFinishMatrix(source, AnalysisLane.GENERAL)
     }
 

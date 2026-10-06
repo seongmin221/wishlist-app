@@ -1,6 +1,7 @@
 package app.ai
 
 import app.analysis.WorkerExecution
+import app.analysis.ProcessingDeadlineExceeded
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -19,6 +20,9 @@ data class OpenAiConfig(val modelSnapshot: String, val apiKey: String, val allow
 }
 
 data class GatewayResponse(val classification: ClassificationResult, val inputTokens: Int?, val outputTokens: Int?)
+
+/** Only raised before client.send: the in-flight reservation is safe to release. */
+class LlmRequestNotSent(cause: ProcessingDeadlineExceeded) : RuntimeException("Paid request not sent before deadline", cause)
 
 class OpenAiResponsesGateway(
     private val config: OpenAiConfig,
@@ -44,16 +48,16 @@ class OpenAiResponsesGateway(
             if (group.isEmpty()) values else "$group[$values]"
         }
 
-    fun classify(metadata: String, candidates: CandidateSnapshot): GatewayResponse {
+    fun classify(metadata: String, candidates: CandidateSnapshot, beforeSend: () -> Unit = {}): GatewayResponse {
         val body = requestBody(metadata, candidates).toString()
         val responseBody = Json.parseToJsonElement(body).jsonObject
         val countBody = JsonObject(responseBody.filterKeys { it in setOf("model", "input", "text") }).toString()
-        val countRequest = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses/input_tokens"))
+        val countRequest = try { HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses/input_tokens"))
             .timeout(WorkerExecution.remaining(Duration.ofSeconds(20)))
             .header("Authorization", "Bearer ${config.apiKey}")
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(countBody))
-            .build()
+            .build() } catch (_: ProcessingDeadlineExceeded) { return GatewayResponse(ClassificationResult.Retryable, null, null) }
         val countResponse = try { client.send(countRequest, HttpResponse.BodyHandlers.ofString()) }
             catch (_: Exception) { return GatewayResponse(ClassificationResult.Retryable, null, null) }
         if (countResponse.statusCode() == 429 || countResponse.statusCode() >= 500) return GatewayResponse(ClassificationResult.Retryable, null, null)
@@ -62,12 +66,14 @@ class OpenAiResponsesGateway(
             ?: return GatewayResponse(ClassificationResult.Unusable("invalid_token_count"), null, null)
         if (count < 0) return GatewayResponse(ClassificationResult.Unusable("invalid_token_count"), null, null)
         if (count > 2000) return GatewayResponse(ClassificationResult.Unusable("input_too_large"), null, null)
-        val request = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses"))
-            .timeout(WorkerExecution.remaining(Duration.ofSeconds(70)))
+        val requestBuilder = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses"))
             .header("Authorization", "Bearer ${config.apiKey}")
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body))
-            .build()
+        beforeSend()
+        // Include all connection-pool/transaction waits in the remaining HTTP budget.
+        val request = try { requestBuilder.timeout(WorkerExecution.remaining(Duration.ofSeconds(70))).build() }
+            catch (cause: ProcessingDeadlineExceeded) { throw LlmRequestNotSent(cause) }
         val response = try { client.send(request, HttpResponse.BodyHandlers.ofString()) }
             catch (_: Exception) { return GatewayResponse(ClassificationResult.Retryable, null, null) }
         if (response.statusCode() == 429 || response.statusCode() >= 500) return GatewayResponse(ClassificationResult.Retryable, null, null)

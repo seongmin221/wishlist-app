@@ -13,6 +13,20 @@ import javax.sql.DataSource
 import kotlin.test.*
 
 class AnalysisJobReconcilerTest {
+    @Test fun `version mismatch stops current processing without overwriting edited fields`() = withAnalysisDatabase { source ->
+        for (lane in AnalysisLane.entries) {
+            val claim = newAnalysisClaim(source, lane)
+            expire(source, claim)
+            analysisSql(source, "update wishlist_items set version=version+1,product_name='Edited',name_source='USER' where id='${claim.itemId}'")
+            assertEquals(1, AnalysisJobReconciler(source).reconcileExpired())
+            assertCleared(source, claim, "CANCELLED")
+            assertEquals("FAILED_RETRYABLE", scalar(source, claim, "analysis_status", item = true))
+            assertEquals("3", scalar(source, claim, "version", item = true))
+            assertEquals("Edited", scalar(source, claim, "product_name", item = true))
+            assertEquals("0", analysisScalar(source, "select count(*) from outbox_events where analysis_job_id='${claim.jobId}' and task_name like '%-recovery-%'"))
+            assertEquals(0, AnalysisJobReconciler(source).reconcileExpired())
+        }
+    }
     @Test fun `recovery bounds discovery and resumes remaining candidates on later scans`() = withAnalysisDatabase { source ->
         repeat(3) { expire(source, newAnalysisClaim(source)) }
         val reconciler = AnalysisJobReconciler(source, batchSize = 2)
@@ -67,7 +81,7 @@ class AnalysisJobReconcilerTest {
     }
 
     @Test fun `invalid item cancels expired execution without changing item or creating outbox`() = withAnalysisDatabase { source ->
-        for (lane in AnalysisLane.entries) for (change in listOf("lifecycle_status='ARCHIVED'", "lifecycle_status='DELETED'", "current_generation=2", "version=version+1", "manual_completion_at=clock_timestamp()", "analysis_status='READY'")) {
+        for (lane in AnalysisLane.entries) for (change in listOf("lifecycle_status='ARCHIVED'", "lifecycle_status='DELETED'", "current_generation=2", "manual_completion_at=clock_timestamp()", "analysis_status='READY'")) {
             val claim = newAnalysisClaim(source, lane)
             expire(source, claim)
             analysisSql(source, "update wishlist_items set $change where id='${claim.itemId}'")

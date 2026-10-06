@@ -14,3 +14,4 @@
 | B0 전체 회귀·쓰기 감사·legacy rollout·B1 인계 | [완료 기록](../../history/architecture/server/b0-foundation-implementation.md) |
 | B5 오래된 PENDING·queue 소진·미발행 outbox 복구 설계 | [analysis-pending-recovery.md](analysis-pending-recovery.md) |
 | B0 외부 리뷰의 실행 시간·동시 발행·오류·복구 보완 | [보완 기록](../../history/architecture/server/b0-review-hardening-2026-10-05.md) |
+| B0 후속 리뷰의 queue claim·LLM 예산/마감·최종 version 복구·DB 시각 | [후속 기록](../../history/architecture/server/b0-followup-review-2026-10-06.md) |

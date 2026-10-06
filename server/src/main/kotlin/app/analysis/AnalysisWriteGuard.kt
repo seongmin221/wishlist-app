@@ -9,16 +9,24 @@ object AnalysisWriteGuard {
     fun lockCurrent(connection: Connection, claim: AnalysisClaim): Boolean = lockCurrentJob(connection, claim) != null
 
     internal fun lockCurrentJob(connection: Connection, claim: AnalysisClaim): LockedAnalysisJob? {
+        val execution = lockExecution(connection, claim) ?: return null
+        if (!execution.item.canAnalyze(claim.generation) || execution.item.version != claim.expectedItemVersion) return null
+        // Read the clock after both lock acquisitions: waiting for a lock can expire a lease.
+        return execution.job.takeIf { it.leaseUntil?.isAfter(connection.analysisDatabaseTime()) == true }
+    }
+
+    internal fun lockExecution(connection: Connection, claim: AnalysisClaim): LockedAnalysisExecution? {
         require(!connection.autoCommit) { "Analysis writes require an explicit transaction" }
         val item = connection.lockAnalysisItem(claim.itemId) ?: return null
-        if (!item.canAnalyze(claim.generation) || item.ownerId != claim.ownerId || item.version != claim.expectedItemVersion) return null
+        if (item.ownerId != claim.ownerId) return null
         val job = connection.lockAnalysisJob(claim.jobId) ?: return null
         if (job.itemId != claim.itemId || job.generation != claim.generation || job.stage != "${claim.lane.name}_RUNNING" ||
-            job.executionToken != claim.executionToken || job.claimedItemVersion != item.version) return null
-        // Read the clock after both lock acquisitions: waiting for a lock can expire a lease.
-        return job.takeIf { it.leaseUntil?.isAfter(connection.analysisDatabaseTime()) == true }
+            job.executionToken != claim.executionToken || job.claimedItemVersion != claim.expectedItemVersion) return null
+        return LockedAnalysisExecution(item, job)
     }
 }
+
+internal data class LockedAnalysisExecution(val item: LockedAnalysisItem, val job: LockedAnalysisJob)
 
 internal data class LockedAnalysisItem(
     val ownerId: UUID,

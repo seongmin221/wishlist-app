@@ -94,6 +94,8 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 
 **내부 순서:** owner-scoped 상세 조회 → ITEM-03 route → 생성 DTO·clientCreatedAt 보관 → ITEM-01/replay mapper 교체. metadata를 상수 null로 만드는 현재 문자열 응답을 제거한다. 공유 시각은 서버 정렬 시각과 분리한다.
 
+생성 응답 작업에서 outbox event ID 지정 발행도 연결한다. 기존 `dispatchPending(1)`이 오래된 retry event를 먼저 골라 신규 상품 발행을 밀어내는 문제는 B5까지 미루지 않는다. backlog와 신규 event를 함께 둔 회귀를 B1 통과 조건에 포함한다. Scheduler·오래된 PENDING 복구는 B5 범위를 유지한다.
+
 **통과:** 생성 201/Location, replay 200/표시 header, 같은 key 다른 URL 409, 다른 owner GET 404, READY/PARTIAL/실패 표현, DELETED 일반 GET 404·생성 replay에는 기존 tombstone. 중복 key 재전송은 item/job/outbox를 늘리지 않는다. deletionImpact의 목적 정보는 B3/B8에서 실제 연결 데이터와 함께 확장한다.
 
 **주요 테스트:** 기존 `CreateWishlistItemServiceTest`, `WishlistRoutesTest`, `DatabaseMigrationTest`; 신규 `GetWishlistItemServiceTest`와 mapper 상태표 테스트.

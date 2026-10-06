@@ -10,7 +10,7 @@ class BrowserRenderProcessor(dataSource: DataSource, private val gateway: (Strin
 
     fun render(claim: AnalysisClaim): Metadata? {
         val sourceUrl = pending.sourceUrl(claim) ?: return null
-        val metadata = gateway(sourceUrl) ?: return null
-        return if (pending.saveMetadata(claim, metadata)) metadata else null
+        // The worker performs the sole guarded metadata write before classification.
+        return gateway(sourceUrl)
     }
 }

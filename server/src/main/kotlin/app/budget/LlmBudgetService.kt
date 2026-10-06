@@ -82,6 +82,21 @@ class LlmBudgetService(
 
     fun settleMaximum(id: UUID) = finalize(id, price.maximumMicrousd(), false)
 
+    fun releaseReserved(id: UUID) = releaseUnsent(id, ReservationState.RESERVED)
+
+    /** Caller must prove client.send was never entered; transport failures are not proof. */
+    fun releaseUnsentInFlight(id: UUID) = releaseUnsent(id, ReservationState.IN_FLIGHT)
+
+    private fun releaseUnsent(id: UUID, expected: ReservationState) = transaction { c ->
+        val state = c.prepareStatement("select state from llm_budget_reservations where id=? for update").use { s ->
+            s.setObject(1, id); s.executeQuery().use { r -> check(r.next()); ReservationState.valueOf(r.getString(1)) }
+        }
+        // Reconciliation may already have released this unsent reservation.
+        if (state == ReservationState.RELEASED) return@transaction
+        check(state == expected) { "Unexpected reservation state for unsent release" }
+        c.finalizeLocked(id, 0, true)
+    }
+
     fun reconcileExpired(now: Instant? = null): Int = transaction { c ->
         val databaseNow = now ?: c.analysisDatabaseTime()
         val expired = c.prepareStatement("select id,state,maximum_microusd from llm_budget_reservations where state in ('RESERVED','IN_FLIGHT') and lease_until<? for update skip locked").use { s ->

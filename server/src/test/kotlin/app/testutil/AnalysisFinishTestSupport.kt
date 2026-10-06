@@ -8,6 +8,8 @@ import app.wishlist.CreateWishlistItemService
 import java.util.UUID
 import javax.sql.DataSource
 import kotlin.test.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 
 data class FinishJob(val itemId: UUID, val jobId: UUID)
 
@@ -60,7 +62,18 @@ fun assertStaleFinishMatrix(source: DataSource, lane: AnalysisLane) {
             expected = finishSnapshot(source, job)
         })
         assertEquals(WorkerDisposition.ACKNOWLEDGE, result, "$lane $outcome $change")
-        assertEquals(expected, finishSnapshot(source, job), "$lane $outcome $change")
+        val after = finishSnapshot(source, job)
+        if (change == "version") {
+            val preserved = setOf("analysis_status", "version", "updated_at")
+            assertEquals(Json.parseToJsonElement(expected[0]!!).jsonObject.filterKeys { it !in preserved },
+                Json.parseToJsonElement(after[0]!!).jsonObject.filterKeys { it !in preserved })
+            assertEquals("FAILED_RETRYABLE", analysisScalar(source, "select analysis_status from wishlist_items where id='${job.itemId}'"))
+            assertEquals("3", analysisScalar(source, "select version from wishlist_items where id='${job.itemId}'"))
+            assertEquals("CANCELLED", analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
+            for (column in listOf("execution_token", "lease_until", "claimed_item_version"))
+                assertNull(analysisScalar(source, "select $column from analysis_jobs where id='${job.jobId}'"))
+            assertEquals(expected[2], after[2])
+        } else assertEquals(expected, after, "$lane $outcome $change")
     }
 }
 

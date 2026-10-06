@@ -13,7 +13,7 @@ import app.analysis.*
 import kotlin.test.assertNull
 
 class BrowserRenderProcessorTest {
-    @Test fun `render finishing after token rotation cannot save pending metadata`() = withAnalysisDatabase { source ->
+    @Test fun `render returns data without saving metadata even after token rotation`() = withAnalysisDatabase { source ->
         val claim = newAnalysisClaim(source, AnalysisLane.BROWSER)
         var expected: String? = null
         val rendered = pausedAnalysisCall({ pause ->
@@ -22,7 +22,7 @@ class BrowserRenderProcessorTest {
             analysisSql(source, "update analysis_jobs set execution_token='${UUID.randomUUID()}' where id='${claim.jobId}'")
             expected = pendingSnapshot(source, claim)
         })
-        assertNull(rendered)
+        assertEquals("stale render", rendered?.title)
         assertEquals(expected, pendingSnapshot(source, claim))
         var calls = 0
         assertNull(BrowserRenderProcessor(source) { calls++; null }.render(claim))
@@ -54,6 +54,7 @@ class BrowserRenderProcessorTest {
 
             assertEquals("Rendered", processor.render(claim)?.title)
             assertEquals("https://example.com/item", renderedUrl)
+            assertNull(analysisScalar(source, "select pending_product_name from analysis_jobs where id='$jobId'"))
         }
     }
 }

@@ -1,14 +1,14 @@
 package app
 
-enum class RuntimeRole { LOCAL_HEALTH, API, GENERAL_WORKER }
+enum class RuntimeRole(val defaultPoolSize: Int) { LOCAL_HEALTH(5), API(5), GENERAL_WORKER(2) }
 
-data class RuntimeConfig(val role: RuntimeRole, val databasePool: DatabasePoolConfig = DatabasePoolConfig(if (role == RuntimeRole.GENERAL_WORKER) 2 else 5)) {
+data class RuntimeConfig(val role: RuntimeRole, val databasePool: DatabasePoolConfig = DatabasePoolConfig(role.defaultPoolSize)) {
     companion object {
         fun fromEnvironment(env: Map<String,String>): RuntimeConfig {
             val override = env["DB_POOL_MAX_SIZE"]?.let {
                 requireNotNull(it.toIntOrNull()?.takeIf { value -> value > 0 }) { "Invalid DB_POOL_MAX_SIZE" }
             }
-            fun configured(role: RuntimeRole) = RuntimeConfig(role, DatabasePoolConfig(override ?: if (role == RuntimeRole.GENERAL_WORKER) 2 else 5))
+            fun configured(role: RuntimeRole) = RuntimeConfig(role, DatabasePoolConfig(override ?: role.defaultPoolSize))
             val environment = env["APP_ENV"] ?: "local"
             require(environment in setOf("local","production")) { "Unsupported APP_ENV" }
             val requestedRole = env["APP_ROLE"] ?: "api"

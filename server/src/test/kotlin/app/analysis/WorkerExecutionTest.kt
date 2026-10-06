@@ -6,6 +6,12 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.*
 
 class WorkerExecutionTest {
+    @Test fun `sub millisecond network budget cannot become unlimited timeout`() {
+        assertFailsWith<ProcessingDeadlineExceeded> {
+            WorkerExecution.remaining(Duration.ofNanos(999_999))
+        }
+        assertEquals(Duration.ofMillis(1), WorkerExecution.remaining(Duration.ofMillis(1)))
+    }
     @Test fun `worker response deadline precedes task deadline and lease`() {
         assertTrue(AnalysisTiming.PROCESSING_SECONDS < AnalysisTiming.WORKER_SECONDS)
         assertTrue(AnalysisTiming.WORKER_SECONDS < AnalysisTiming.TASK_SECONDS)

@@ -27,24 +27,18 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
         val job = connection.lockAnalysisJob(jobId) ?: return ClaimResult.Ignored
         if (job.itemId == itemId && job.generation == generation && job.stage == "${lane.name}_PENDING" &&
             item.lifecycleStatus == "DELETED") {
-            connection.prepareStatement("update analysis_jobs set stage='CANCELLED',execution_token=null,lease_until=null,claimed_item_version=null,updated_at=clock_timestamp() where id=?").use {
-                it.setObject(1, jobId); check(it.executeUpdate() == 1)
-            }
+            connection.transitionAnalysisJob(jobId, "CANCELLED")
             return ClaimResult.Ignored
         }
         if (!item.canAnalyze(generation) || job.itemId != itemId || job.generation != generation ||
             job.stage != "${lane.name}_PENDING" || (lane == AnalysisLane.BROWSER && !job.browserAttempted)) return ClaimResult.Ignored
 
-        val attempts = if (lane == AnalysisLane.GENERAL) job.attempts else job.browserAttempts
-        val firstAttempt = if (lane == AnalysisLane.GENERAL) job.firstAttemptAt else job.firstBrowserAttemptAt
         val now = connection.analysisDatabaseTime()
-        if (attempts >= 3 || firstAttempt?.plusSeconds(1800)?.isAfter(now) == false) {
-            connection.prepareStatement("update analysis_jobs set stage='FAILED',execution_token=null,lease_until=null,claimed_item_version=null,updated_at=clock_timestamp() where id=?").use {
-                it.setObject(1, jobId); check(it.executeUpdate() == 1)
-            }
-            connection.prepareStatement("update wishlist_items set analysis_status='FAILED_RETRYABLE',version=version+1,updated_at=clock_timestamp() where id=?").use {
-                it.setObject(1, itemId); check(it.executeUpdate() == 1)
-            }
+        // Connection-pool and item/job lock waits also consume the processing budget.
+        if (WorkerExecution.expired()) throw ProcessingDeadlineExceeded()
+        if (!job.hasRetryBudget(lane, now)) {
+            connection.transitionAnalysisJob(jobId, "FAILED")
+            connection.failRetryableItem(itemId)
             return ClaimResult.Exhausted
         }
 

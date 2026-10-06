@@ -5,7 +5,6 @@ import app.analysis.AnalysisClaim
 import app.DatabaseFactory
 import app.wishlist.CreateResult
 import app.wishlist.CreateWishlistItemService
-import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
@@ -73,11 +72,14 @@ class LlmBudgetServiceTest {
         } finally { executor.shutdownNow() }
     }
 
-    @Test fun `expired reserved releases while in flight settles maximum`() = withBudget { service, claim ->
+    @Test fun `expired reserved releases while in flight settles maximum`() = withAnalysisDatabase { source ->
+        val service = LlmBudgetService(source)
+        val claim = newAnalysisClaim(source)
         val before = assertIs<ReserveResult.Reserved>(service.reserveBeforeCall(claim, UUID.randomUUID()))
         val sent = assertIs<ReserveResult.Reserved>(service.reserveBeforeCall(claim, UUID.randomUUID()))
         service.markInFlight(sent.reservation.id)
-        service.reconcileExpired(Instant.now().plusSeconds(121))
+        analysisSql(source, "update llm_budget_reservations set lease_until=clock_timestamp()-interval '1 second'")
+        assertEquals(2, service.reconcileExpired())
         assertEquals(496L, service.windowTotals("DAILY").settled)
         assertEquals(0L, service.windowTotals("DAILY").reserved)
         assertEquals(ReservationState.RELEASED, service.state(before.reservation.id))

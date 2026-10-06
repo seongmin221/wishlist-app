@@ -29,6 +29,8 @@ pool config는 양의 크기와 250ms 이상의 획득 timeout을 요구한다. 
 
 일반 발행 오류는 생성 성공을 취소하지 않고 scheduler가 durable outbox를 재처리한다. CancellationException은 실제 dispatcher가 outbox lease를 해제한 뒤 다시 던지고 생성 service도 전파한다. 이미 commit한 상품은 replay 가능하며 동일 key로 job/outbox를 추가하지 않는다.
 
+outbox 발견의 lease 만료 비교와 새 120초 lease 저장은 모두 DB clock_timestamp를 사용한다. JVM Instant.now와 DB 시각을 섞지 않는다. 테스트에서는 DB clock을 호스트보다 30초 앞당겨 같은 event의 lease 기간과 중복 발행 차단을 검증한다.
+
 ## 자원 등록과 종료
 
 RuntimeResources.own은 동일 object identity를 한 번 등록한다. close는 등록 역순으로 한 번씩 닫는다. 하나가 실패해도 나머지를 닫고 나머지 예외를 suppressed로 보존한다. 중복 close는 안전하며, 종료 후 새 등록은 자원을 닫고 거부한다. 이미 등록된 자원은 다시 닫지 않는다.
@@ -48,6 +50,10 @@ fetch는 call을 lock 아래 등록한 뒤 외부 IO를 수행한다. close는 �
 ## 분석 전체 시간 제한
 
 `AnalysisTiming`의 처리 80초 < Worker 응답 90초 < Cloud Tasks dispatch 105초 < DB lease 120초를 테스트로 고정한다. WorkerExecution은 claim·처리·finish를 bounded executor에서 실행하고 queue 대기까지 포함해 90초가 지나면 요청에 RETRY를 반환하고 작업 interrupt를 시도한다. redirect HTTP·token 계산·LLM·browser launch/navigation은 같은 단조 시계의 남은 80초 예산을 사용한다. 처리 예산을 넘긴 결과는 성공으로 반영하지 않고 guarded retry로 전환한다.
+
+executor queue에서 꺼낼 때와 양 lane의 claim 전에 남은 예산을 확인한다. 이미 마감된 전달은 RETRY만 반환하고 DB claim·attempt·outbox를 변경하지 않는다. claim의 pool/item/job 잠금 대기로 마감될 수도 있으므로 두 잠금과 DB 시각을 얻은 뒤, 한도 실패 또는 attempt 증가 전에 다시 확인해 transaction을 rollback한다. SDK의 밀리초 timeout으로 변환하기 전 1ms 미만이면 마감 예외를 던져 무제한 timeout 0을 만들지 않는다.
+
+유료 LLM timeout은 예산 markInFlight의 DB 작업이 끝난 뒤 계산한다. 이 지점에서 마감됐으면 미전송임을 명시하고 예약을 해제한다. 실제 client.send에 들어간 이후의 timeout/통신 오류는 사용량 불명확 비용 정산 정책을 따른다.
 
 JVM interrupt가 모든 JDBC/SDK 호출을 즉시 멈추는 것은 아니다. 반환하지 않는 작업은 executor의 제한된 slot을 계속 사용하되 요청 응답은 기다리지 않는다. 늦게 끝난 retry는 PENDING+새 outbox를 원자 저장하고, 끝나지 않은 RUNNING은 120초 lease로 복구한다. 사용량이 도착한 실제 AI 비용 정산은 stale 결과 폐기와 별도로 유지한다. lease heartbeat를 추가하지 않는다.
 
