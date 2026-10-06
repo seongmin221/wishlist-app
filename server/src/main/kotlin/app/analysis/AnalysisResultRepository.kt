@@ -1,5 +1,7 @@
 package app.analysis
 
+import app.wishlist.AnalysisFailureCode
+import app.wishlist.CategoryMissingReason
 import java.sql.Connection
 import java.util.UUID
 import javax.sql.DataSource
@@ -63,7 +65,7 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
         val complete = status == "READY"
         val failure = when {
             complete || (assigned && item.protects("CATEGORY", item.categorySource)) -> null
-            outcome == ProcessingOutcome.Complete -> "AI_INVALID_CANDIDATE"
+            outcome == ProcessingOutcome.Complete -> AnalysisFailureCode.AI_INVALID_CANDIDATE.name
             else -> pending.failure
         }
         val name = mergedMetadata(item.name, pending.name, complete, item.protects("NAME", item.nameSource))
@@ -76,9 +78,7 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
         val reason = when {
             category != null -> null
             item.protects("CATEGORY", item.categorySource) && item.missingReason != null -> item.missingReason
-            failure == "AI_ABSTAINED" -> "AI_ABSTAINED"
-            failure in setOf("AI_UNUSABLE_RESPONSE", "AI_INVALID_CANDIDATE", "AI_USAGE_OUT_OF_RANGE") -> "AI_RESPONSE_UNUSABLE"
-            else -> "EXTRACTION_UNRESOLVED"
+            else -> (AnalysisFailureCode.fromStored(failure)?.categoryMissingReason ?: CategoryMissingReason.EXTRACTION_UNRESOLVED).name
         }
         val unconfirmedAiCategory = categorySource == "AI" && (applyCategory || item.review == "PENDING")
         val unconfirmedAiPurpose = purposeSource == "AI" && !purpose.isNullOrBlank() && (applyPurpose || item.review == "PENDING")

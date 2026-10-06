@@ -116,7 +116,7 @@ class GeneralWorkerServiceTest {
             "AI_INVALID_CANDIDATE" to "AI_RESPONSE_UNUSABLE", "AI_USAGE_OUT_OF_RANGE" to "AI_RESPONSE_UNUSABLE", "ACCESS_DENIED" to "EXTRACTION_UNRESOLVED")) {
             val job = newFinishJob(source, AnalysisLane.GENERAL)
             GeneralWorkerService(source) { claim ->
-                AnalysisPendingResultRepository(source).saveFailure(claim, code)
+                AnalysisPendingResultRepository(source).saveFailure(claim, app.wishlist.AnalysisFailureCode.valueOf(code))
                 ProcessingOutcome.Partial
             }.runGeneral(job.jobId, 1)
             assertEquals(reason, analysisScalar(source, "select category_missing_reason from wishlist_items where id='${job.itemId}'"))

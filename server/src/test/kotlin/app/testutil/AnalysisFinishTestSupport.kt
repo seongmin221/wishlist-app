@@ -24,7 +24,7 @@ fun seedFinishResult(source: DataSource, claim: AnalysisClaim) {
     val pending = AnalysisPendingResultRepository(source)
     check(pending.saveMetadata(claim, Metadata("AI name", "AI description", "https://example.com/ai-image", "https://example.com/canonical")))
     check(pending.saveAssignment(claim, ClassificationResult.Assigned("C026", "AI_PURPOSE")))
-    check(pending.saveFailure(claim, "AI_ABSTAINED"))
+    check(pending.saveFailure(claim, app.wishlist.AnalysisFailureCode.AI_ABSTAINED))
 }
 
 fun finishSnapshot(source: DataSource, job: FinishJob): List<String?> = listOf(
