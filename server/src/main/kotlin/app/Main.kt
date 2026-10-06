@@ -74,8 +74,8 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val client = resources.own(CloudTasksClient.create(CloudTasksGateway.clientSettings()))
         OutboxDispatcher(source, CloudTasksGateway(client, config))
     } else null
-    val service = CreateWishlistItemService(source) {
-        resources.runIfOpen { dispatcher?.dispatchPending(1) }
+    val service = CreateWishlistItemService(source) { eventId ->
+        resources.runIfOpen { dispatcher?.dispatchEvent(eventId) }
     }
     routing {
         get("/health") { call.respondText("ok") }

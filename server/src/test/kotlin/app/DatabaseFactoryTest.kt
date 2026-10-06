@@ -14,7 +14,7 @@ class DatabaseFactoryTest {
                 val dispatcher = app.tasks.OutboxDispatcher(pool, app.tasks.TaskGateway { published.add(it.name) })
                 val owner = java.util.UUID.randomUUID()
                 val key = java.util.UUID.randomUUID()
-                val service = app.wishlist.CreateWishlistItemService(pool) { dispatcher.dispatchPending(1) }
+                val service = app.wishlist.CreateWishlistItemService(pool) { eventId -> dispatcher.dispatchEvent(eventId) }
                 val created = service.create(owner, key, "https://example.com/item")
                 assertIs<app.wishlist.CreateResult.Created>(created)
                 assertEquals(1, published.size, "dispatch must borrow from the same max=1 pool after creation released it")
