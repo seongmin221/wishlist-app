@@ -4,7 +4,6 @@ import app.wishlist.CreateResult
 import app.wishlist.CreateWishlistItemService
 import app.wishlist.GetWishlistItemService
 import app.wishlist.WishlistItem
-import app.wishlist.WishlistItemViewMapper
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -14,31 +13,26 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
 import java.time.Instant
-import java.time.OffsetDateTime
-import java.time.DateTimeException
 import java.util.UUID
 
 fun Route.wishlistRoutes(
     service: CreateWishlistItemService,
+    detailService: GetWishlistItemService,
     ownerResolver: suspend (ApplicationCall) -> UUID?,
-) = wishlistRoutes(service::create, GetWishlistItemService(service.items)::get, ownerResolver)
+) = wishlistRoutes(service::create, detailService::get, ownerResolver)
 
 fun Route.wishlistRoutes(
     create: (UUID, UUID, String, Instant?) -> CreateResult,
-    getItem: (UUID, UUID) -> WishlistItem? = { _, _ -> null },
+    getItem: (UUID, UUID) -> WishlistItem?,
     ownerResolver: suspend (ApplicationCall) -> UUID?,
 ) {
     get("/v1/wishlist-items/{id}") {
         val owner = ownerResolver(call) ?: return@get call.respondApiError(HttpStatusCode.Unauthorized, "UNAUTHORIZED")
-        val rawId = call.parameters["id"]
-        val itemId = rawId?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-            ?.takeIf { it.toString().equals(rawId, ignoreCase = true) }
+        val itemId = parseCanonicalUuid(call.parameters["id"])
             ?: return@get call.respondApiError(HttpStatusCode.BadRequest, "INVALID_WISHLIST_ITEM_ID")
         val item = withContext(Dispatchers.IO) { getItem(owner, itemId) }
             ?: return@get call.respondApiError(HttpStatusCode.NotFound, "WISHLIST_ITEM_NOT_FOUND")
@@ -47,29 +41,13 @@ fun Route.wishlistRoutes(
 
     post("/v1/wishlist-items") {
         val owner = ownerResolver(call) ?: return@post call.respondApiError(HttpStatusCode.Unauthorized, "UNAUTHORIZED")
-        val key = call.request.headers["Idempotency-Key"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+        val key = parseCanonicalUuid(call.request.headers["Idempotency-Key"])
             ?: return@post call.respondApiError(HttpStatusCode.BadRequest, "INVALID_IDEMPOTENCY_KEY")
-        val body = try {
-            Json.parseToJsonElement(call.receiveText()) as? JsonObject
-        } catch (cause: Exception) {
-            if (cause is CancellationException) throw cause
-            null
+        val request = when (val parsed = parseCreateRequest(call.receiveText())) {
+            is CreateRequestParseResult.Valid -> parsed
+            is CreateRequestParseResult.Invalid -> return@post call.respondApiError(HttpStatusCode.UnprocessableEntity, parsed.code.name)
         }
-        val sourceUrl = (body?.get("sourceUrl") as? JsonPrimitive)?.takeIf { it.isString }?.content
-            ?: return@post call.respondApiError(HttpStatusCode.UnprocessableEntity, "INVALID_URL")
-        val timeValue = body["clientCreatedAt"]
-        val clientCreatedAt = if (timeValue == null || timeValue == JsonNull) null else {
-            val rawTime = (timeValue as? JsonPrimitive)?.takeIf { it.isString }?.content
-                ?: return@post call.respondApiError(HttpStatusCode.UnprocessableEntity, "INVALID_CLIENT_CREATED_AT")
-            try {
-                OffsetDateTime.parse(rawTime).also { require(it.year in 1..9999) }.toInstant()
-            } catch (_: DateTimeException) {
-                return@post call.respondApiError(HttpStatusCode.UnprocessableEntity, "INVALID_CLIENT_CREATED_AT")
-            } catch (_: IllegalArgumentException) {
-                return@post call.respondApiError(HttpStatusCode.UnprocessableEntity, "INVALID_CLIENT_CREATED_AT")
-            }
-        }
-        when (val result = withContext(Dispatchers.IO) { create(owner, key, sourceUrl, clientCreatedAt) }) {
+        when (val result = withContext(Dispatchers.IO) { create(owner, key, request.sourceUrl, request.clientCreatedAt) }) {
             is CreateResult.Created -> {
                 call.response.headers.append(HttpHeaders.Location, "/v1/wishlist-items/${result.itemId}")
                 call.respondText(ApiJson.encodeToString(WishlistItemViewMapper.map(result.item)), ContentType.Application.Json, HttpStatusCode.Created)

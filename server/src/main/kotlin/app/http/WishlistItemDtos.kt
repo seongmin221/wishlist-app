@@ -1,5 +1,6 @@
 package app.http
 
+import app.wishlist.AnalysisFailureCode
 import app.wishlist.AnalysisStatus
 import app.wishlist.CategoryMissingReason
 import app.wishlist.ItemAction
@@ -58,4 +59,4 @@ data class PurposeDto(
 )
 
 @Serializable
-data class AnalysisDto(val status: AnalysisStatus, val failureCode: String? = null)
+data class AnalysisDto(val status: AnalysisStatus, val failureCode: AnalysisFailureCode? = null)

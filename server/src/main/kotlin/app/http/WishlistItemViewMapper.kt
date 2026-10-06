@@ -1,10 +1,6 @@
-package app.wishlist
+package app.http
 
-import app.http.AnalysisDto
-import app.http.CategoryDto
-import app.http.ProductDto
-import app.http.PurposeDto
-import app.http.WishlistItemDto
+import app.wishlist.*
 
 object WishlistItemViewMapper {
     fun map(item: WishlistItem): WishlistItemDto {
@@ -26,16 +22,14 @@ object WishlistItemViewMapper {
         )
     }
 
-    private val publicFailureCodes = setOf(
-        "BLOCKED_ADDRESS", "UNSUPPORTED_CONTENT", "ACCESS_DENIED", "AI_ABSTAINED", "AI_UNUSABLE_RESPONSE",
-        "AI_INVALID_CANDIDATE", "AI_USAGE_OUT_OF_RANGE", "AI_BUDGET_EXCEEDED", "AI_CONFIGURATION_ERROR",
-    )
-
-    private fun publicFailureCode(status: AnalysisStatus, code: String?): String? = when {
-        status == AnalysisStatus.PROCESSING || status == AnalysisStatus.READY -> null
-        code in publicFailureCodes -> code
-        status == AnalysisStatus.FAILED_RETRYABLE -> "ANALYSIS_RETRYABLE_FAILURE"
-        status == AnalysisStatus.FAILED_TERMINAL || code != null -> "ANALYSIS_FAILED"
-        else -> null
+    private fun publicFailureCode(status: AnalysisStatus, code: String?): AnalysisFailureCode? {
+        val known = AnalysisFailureCode.fromStored(code)
+        return when {
+            status == AnalysisStatus.PROCESSING || status == AnalysisStatus.READY -> null
+            known?.isPublic == true -> known
+            status == AnalysisStatus.FAILED_RETRYABLE -> AnalysisFailureCode.ANALYSIS_RETRYABLE_FAILURE
+            status == AnalysisStatus.FAILED_TERMINAL || code != null -> AnalysisFailureCode.ANALYSIS_FAILED
+            else -> null
+        }
     }
 }

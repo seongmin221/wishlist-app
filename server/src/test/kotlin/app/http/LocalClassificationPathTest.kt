@@ -46,7 +46,7 @@ class LocalClassificationPathTest {
                 { url -> ExtractionResult.Complete(Metadata("CAYL cap", null, null, url)) }, classifier::classify)
             testApplication {
                 application { routing {
-                    wishlistRoutes(CreateWishlistItemService(source)) { UUID.fromString("00000000-0000-0000-0000-000000000001") }
+                    wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { UUID.fromString("00000000-0000-0000-0000-000000000001") }
                     workerRoutes(GeneralWorkerService(source, processor::process))
                 } }
                 val created = client.post("/v1/wishlist-items") {
@@ -104,7 +104,7 @@ class LocalClassificationPathTest {
 
                 testApplication {
                     application { routing {
-                        wishlistRoutes(CreateWishlistItemService(source)) { owner }
+                        wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner }
                         workerRoutes(worker)
                     } }
                     val created = client.post("/v1/wishlist-items") {

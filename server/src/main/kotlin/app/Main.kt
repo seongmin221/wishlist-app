@@ -77,8 +77,9 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
     val service = CreateWishlistItemService(source) { eventId ->
         resources.runIfOpen { dispatcher?.dispatchEvent(eventId) }
     }
+    val detailService = app.wishlist.GetWishlistItemService(source)
     routing {
         get("/health") { call.respondText("ok") }
-        wishlistRoutes(service) { resolver.resolve(it) }
+        wishlistRoutes(service, detailService) { resolver.resolve(it) }
     }
 }

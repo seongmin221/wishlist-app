@@ -65,6 +65,9 @@ class ApiErrorTest {
     @Test fun `malformed key keeps bad request code and trace`() =
         assertCreateError(HttpStatusCode.BadRequest, "INVALID_IDEMPOTENCY_KEY", "{}", key = "bad")
 
+    @Test fun `non canonical submission key is rejected before database access`() =
+        assertCreateError(HttpStatusCode.BadRequest, "INVALID_IDEMPOTENCY_KEY", "{\"sourceUrl\":\"https://example.com/item\"}", key = "1-1-1-1-1")
+
     @Test fun `malformed and missing URL retain unprocessable status`() {
         for (body in listOf("{", "{}", "{\"sourceUrl\":null}", "{\"sourceUrl\":{}}")) {
             assertCreateError(HttpStatusCode.UnprocessableEntity, "INVALID_URL", body)
@@ -172,7 +175,7 @@ class ApiErrorTest {
         val source = DatabaseFactory.dataSource("jdbc:postgresql://127.0.0.1:1/not_used", "test", "test")
         application {
             installApiHttpSupport()
-            routing { wishlistRoutes(CreateWishlistItemService(source)) { if (authenticated) UUID.randomUUID() else null } }
+            routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { if (authenticated) UUID.randomUUID() else null } }
         }
         val response = client.post("/v1/wishlist-items") {
             header("Idempotency-Key", key)

@@ -3,11 +3,11 @@ package app.wishlist
 import java.util.UUID
 import javax.sql.DataSource
 
-class GetWishlistItemService(private val repository: WishlistItemStateRepository) {
-    constructor(dataSource: DataSource) : this(WishlistItemStateRepository(dataSource))
+class GetWishlistItemService(private val repository: WishlistItemRepository) {
+    constructor(dataSource: DataSource) : this(WishlistItemRepository(dataSource))
 
     fun get(ownerId: UUID, itemId: UUID): WishlistItem? =
-        repository.findViewOwned(ownerId, itemId)?.takeUnless {
+        repository.findOwned(ownerId, itemId)?.takeUnless {
             it.storedState.state.lifecycleStatus == LifecycleStatus.DELETED
         }
 }

@@ -10,18 +10,30 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 class CreateWishlistItemServiceTest {
-    @Test fun `create response reads the committed current item after post commit dispatch`() = app.testutil.withAnalysisDatabase { source ->
-        val owner = UUID.randomUUID()
-        val service = CreateWishlistItemService(source) { eventId ->
-            app.testutil.analysisSql(source, """update wishlist_items set product_name='분석 완료', name_source='AI',
-                category_id='C026', category_source='AI', category_missing_reason=null,
-                analysis_status='READY', review_status='PENDING', version=version+1
-                where id=(select j.wishlist_item_id from outbox_events e join analysis_jobs j on j.id=e.analysis_job_id where e.id='$eventId')""")
+    @Test fun `committed creation returns its snapshot even if further database connections fail`() = app.testutil.withAnalysisDatabase { source ->
+        var committed = false
+        val observed = object : javax.sql.DataSource by source {
+            override fun getConnection(): java.sql.Connection {
+                if (committed) throw java.sql.SQLException("pool unavailable after commit")
+                return source.connection
+            }
         }
-        val created = assertIs<CreateResult.Created>(service.create(owner, UUID.randomUUID(), "https://example.com/item"))
-        assertEquals("분석 완료", created.item.storedState.state.productName)
-        assertEquals(AnalysisStatus.READY, created.item.storedState.state.analysisStatus)
-        assertEquals(2, created.item.version)
+        val service = CreateWishlistItemService(observed) { committed = true }
+        val created = assertIs<CreateResult.Created>(service.create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item"))
+        assertEquals(AnalysisStatus.PROCESSING, created.item.storedState.state.analysisStatus)
+        assertEquals(1, created.item.version)
+        assertEquals("1", app.testutil.analysisScalar(source, "select count(*) from wishlist_items"))
+        assertEquals("1", app.testutil.analysisScalar(source, "select count(*) from outbox_events"))
+    }
+
+    @Test fun `sharing time before Gregorian cutover is stored without a calendar shift`() = app.testutil.withAnalysisDatabase { source ->
+        val time = java.time.Instant.parse("1500-01-02T10:00:00Z")
+        val created = assertIs<CreateResult.Created>(CreateWishlistItemService(source).create(
+            UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item", time,
+        ))
+        assertEquals(time, created.item.clientCreatedAt)
+        assertEquals("1500-01-02 10:00:00", app.testutil.analysisScalar(source,
+            "select (client_created_at at time zone 'UTC')::text from wishlist_items where id='${created.itemId}'"))
     }
 
     @Test

@@ -38,13 +38,13 @@ class WishlistRoutesTest {
     }
 
     @Test fun `blocking creation runs outside the route executor`() {
-        app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }) { UUID.randomUUID() } }, {
+        app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }, { _, _ -> null }) { UUID.randomUUID() } }, {
             post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
         })
     }
 
     @Test fun `creation cancellation propagates to the request pipeline`() {
-        app.testutil.assertRouteCancellation({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }) { UUID.randomUUID() } }, {
+        app.testutil.assertRouteCancellation({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }, { _, _ -> null }) { UUID.randomUUID() } }, {
             post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
         })
     }
@@ -54,12 +54,13 @@ class WishlistRoutesTest {
         PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
-            val service = CreateWishlistItemService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password))
+            val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+            val service = CreateWishlistItemService(source)
             val owner = UUID.randomUUID()
             val key = UUID.randomUUID()
 
             testApplication {
-                application { installApiHttpSupport(); routing { wishlistRoutes(service) { owner } } }
+                application { installApiHttpSupport(); routing { wishlistRoutes(service, app.wishlist.GetWishlistItemService(source)) { owner } } }
                 suspend fun submit(url: String) = client.post("/v1/wishlist-items") {
                     header("Idempotency-Key", key.toString())
                     contentType(ContentType.Application.Json)

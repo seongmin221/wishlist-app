@@ -18,7 +18,7 @@ class WishlistDetailRoutesTest {
         val source = app.DatabaseFactory.dataSource("jdbc:postgresql://127.0.0.1:1/not_used", "test", "test")
         application {
             installApiHttpSupport()
-            routing { wishlistRoutes(CreateWishlistItemService(source)) { call ->
+            routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { call ->
                 if (call.request.headers["Test-Authenticated"] == "true") UUID.randomUUID() else null
             } }
         }
@@ -38,7 +38,7 @@ class WishlistDetailRoutesTest {
         val owner = UUID.randomUUID()
         val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").itemId
         testApplication {
-            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source)) { owner } } }
+            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner } } }
             val cases = listOf(
                 Triple("PARTIAL", "AI_ABSTAINED", "AI_ABSTAINED"),
                 Triple("PARTIAL", "AI_UNUSABLE_RESPONSE", "AI_UNUSABLE_RESPONSE"),
@@ -80,7 +80,7 @@ class WishlistDetailRoutesTest {
             name_source='USER', image_source='AI', category_id='C026', category_source='AI', category_missing_reason=null,
             analysis_status='READY', review_status='PENDING', version=7 where id='$item'""")
         testApplication {
-            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source)) { owner } } }
+            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner } } }
             val detail = client.get("/v1/wishlist-items/$item")
             assertEquals(HttpStatusCode.OK, detail.status)
             val body = Json.parseToJsonElement(detail.bodyAsText()).jsonObject
@@ -110,7 +110,7 @@ class WishlistDetailRoutesTest {
         testApplication {
             application {
                 installApiHttpSupport()
-                routing { wishlistRoutes(CreateWishlistItemService(source)) { call ->
+                routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { call ->
                     if (call.request.headers["Test-Owner"] == "other") UUID.randomUUID() else owner
                 } }
             }
@@ -120,6 +120,14 @@ class WishlistDetailRoutesTest {
                 assertEquals(ContentType.Application.Json, response.contentType()?.withoutParameters())
                 assertEquals("WISHLIST_ITEM_NOT_FOUND", Json.parseToJsonElement(response.bodyAsText()).jsonObject.getValue("error").jsonObject.getValue("code").jsonPrimitive.content)
             }
+            analysisSql(source, "update wishlist_items set lifecycle_status='ARCHIVED' where id='$item'")
+            val archived = client.get("/v1/wishlist-items/${item.toString().uppercase()}")
+            assertEquals(HttpStatusCode.OK, archived.status)
+            val archivedBody = Json.parseToJsonElement(archived.bodyAsText()).jsonObject
+            assertEquals(item.toString(), archivedBody.getValue("id").jsonPrimitive.content)
+            assertEquals("ARCHIVED", archivedBody.getValue("lifecycleStatus").jsonPrimitive.content)
+            assertEquals("NONE", archivedBody.getValue("requiredAction").jsonPrimitive.content)
+            assertEquals(JsonArray(emptyList()), archivedBody.getValue("allowedActions"))
             analysisSql(source, "update wishlist_items set lifecycle_status='DELETED' where id='$item'")
             assertEquals(HttpStatusCode.NotFound, client.get("/v1/wishlist-items/$item").status)
             val replay = client.post("/v1/wishlist-items") {
@@ -141,7 +149,7 @@ class WishlistDetailRoutesTest {
         val owner = UUID.randomUUID()
         val key = UUID.randomUUID()
         testApplication {
-            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source)) { owner } } }
+            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner } } }
             suspend fun submit(time: String?) = client.post("/v1/wishlist-items") {
                 header("Idempotency-Key", key.toString())
                 setBody("""{"sourceUrl":"https://example.com/item","clientCreatedAt":${time?.let { JsonPrimitive(it) } ?: JsonNull}}""")
@@ -161,10 +169,34 @@ class WishlistDetailRoutesTest {
         }
     }
 
+    @Test fun `initially absent sharing time stays null when replay supplies one`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        testApplication {
+            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner } } }
+            for (initialTime in listOf("", ",\"clientCreatedAt\":null")) {
+                val key = UUID.randomUUID().toString().uppercase()
+                val created = client.post("/v1/wishlist-items") {
+                    header("Idempotency-Key", key); setBody("""{"sourceUrl":"https://example.com/item"$initialTime}""")
+                }
+                assertEquals(HttpStatusCode.Created, created.status)
+                val original = Json.parseToJsonElement(created.bodyAsText()).jsonObject
+                assertEquals(JsonNull, original.getValue("clientCreatedAt"))
+                val replay = client.post("/v1/wishlist-items") {
+                    header("Idempotency-Key", key.lowercase())
+                    setBody("""{"sourceUrl":"https://example.com/item","clientCreatedAt":"2026-10-06T00:00:00Z"}""")
+                }
+                assertEquals(HttpStatusCode.OK, replay.status)
+                assertEquals(original, Json.parseToJsonElement(replay.bodyAsText()))
+            }
+        }
+    }
+
     @Test fun `invalid client time is rejected before writes with safe traced error`() = withAnalysisDatabase { source ->
         testApplication {
-            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source)) { UUID.randomUUID() } } }
-            for (time in listOf("\"2026-09-13T10:00:00\"", "\"bad-secret\"", "42", "{}", "true", "\"\"")) {
+            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { UUID.randomUUID() } } }
+            for (time in listOf("\"2026-09-13T10:00:00\"", "\"bad-secret\"", "42", "{}", "true", "\"\"",
+                "\"9999-12-31T23:59:00-18:00\"", "\"0001-01-01T00:00:00+18:00\"",
+                "\"0000-01-01T00:00:00Z\"", "\"+10000-01-01T00:00:00Z\"")) {
                 val response = client.post("/v1/wishlist-items") {
                     header("Idempotency-Key", UUID.randomUUID().toString())
                     setBody("""{"sourceUrl":"https://example.com/item","clientCreatedAt":$time}""")
