@@ -27,6 +27,7 @@ data class WishlistItemDto(
     val updatedAt: String,
     val manualCompletionAt: String? = null,
     val allowedActions: Set<ItemAction> = emptySet(),
+    val clientCreatedAt: String? = null,
 )
 
 @Serializable
@@ -39,6 +40,8 @@ data class ProductDto(
     val brand: String? = null,
     val merchant: String? = null,
     val metadataCheckedAt: String? = null,
+    val nameSource: ValueSource? = null,
+    val imageSource: ValueSource? = null,
 )
 
 @Serializable

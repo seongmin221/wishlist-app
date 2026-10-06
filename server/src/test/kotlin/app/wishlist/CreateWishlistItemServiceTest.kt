@@ -10,6 +10,20 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 class CreateWishlistItemServiceTest {
+    @Test fun `create response reads the committed current item after post commit dispatch`() = app.testutil.withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val service = CreateWishlistItemService(source) { eventId ->
+            app.testutil.analysisSql(source, """update wishlist_items set product_name='분석 완료', name_source='AI',
+                category_id='C026', category_source='AI', category_missing_reason=null,
+                analysis_status='READY', review_status='PENDING', version=version+1
+                where id=(select j.wishlist_item_id from outbox_events e join analysis_jobs j on j.id=e.analysis_job_id where e.id='$eventId')""")
+        }
+        val created = assertIs<CreateResult.Created>(service.create(owner, UUID.randomUUID(), "https://example.com/item"))
+        assertEquals("분석 완료", created.item.storedState.state.productName)
+        assertEquals(AnalysisStatus.READY, created.item.storedState.state.analysisStatus)
+        assertEquals(2, created.item.version)
+    }
+
     @Test
     fun `same owner and key returns original item without a second job`() {
         PostgresTestContainer().use { database ->

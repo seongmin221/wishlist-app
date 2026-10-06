@@ -4,12 +4,15 @@ import java.time.Instant
 import java.util.UUID
 
 data class WishlistItem(
-    val id: UUID,
+    val storedState: StoredWishlistItemState,
     val clientSubmissionId: UUID,
     val sourceUrl: String,
-    val version: Int,
-    val analysisStatus: String,
-    val lifecycleStatus: String,
+    val productImageUrl: String?,
+    val analysisFailureCode: String?,
+    val clientCreatedAt: Instant?,
     val createdAt: Instant,
     val updatedAt: Instant,
-)
+) {
+    val id: UUID get() = storedState.id
+    val version: Int get() = storedState.version
+}

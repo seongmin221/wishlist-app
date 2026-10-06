@@ -14,6 +14,31 @@ import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
 
 class DatabaseMigrationTest {
+    @Test fun `V10 upgrade adds nullable sharing time without changing V9 item job and outbox snapshots`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("9").load().migrate()
+            database.createConnection("").use { connection ->
+                val itemId = UUID.randomUUID()
+                val jobId = UUID.randomUUID()
+                connection.createStatement().use { s ->
+                    s.executeUpdate("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,
+                        product_name,product_image_url,version,created_at,updated_at) values ('$itemId','${UUID.randomUUID()}','${UUID.randomUUID()}',
+                        'https://example.com/item','PARTIAL','ACTIVE','기존 상품','https://example.com/image',7,'2026-10-05T01:00:00Z','2026-10-05T02:00:00Z')""")
+                    s.executeUpdate("insert into analysis_jobs(id,wishlist_item_id,generation,stage) values ('$jobId','$itemId',1,'PARTIAL')")
+                    s.executeUpdate("insert into outbox_events(id,analysis_job_id,event_type,task_name) values ('${UUID.randomUUID()}','$jobId','GENERAL_ANALYSIS','upgrade-task')")
+                }
+                val before = listOf("wishlist_items", "analysis_jobs", "outbox_events").associateWith { snapshot(connection, it, emptyList()) }
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, if (table == "wishlist_items") listOf("client_created_at") else emptyList())) }
+                connection.createStatement().use { s -> s.executeQuery("select client_created_at from wishlist_items").use { r ->
+                    assertTrue(r.next()); assertNull(r.getObject(1))
+                } }
+                Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
     @Test
     fun `all Flyway migrations apply to an empty postgres database`() {
         PostgresTestContainer().use { database ->
@@ -27,7 +52,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"), versions)
                     }
                 }
             }
@@ -73,7 +98,7 @@ class DatabaseMigrationTest {
                     s.executeUpdate("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,state,maximum_microusd,actual_microusd,lease_until) values ('${UUID.randomUUID()}','${UUID.randomUUID()}','$general',1,'v1','RESERVED',100,30,'2026-09-04T00:00:00Z')")
                     s.executeUpdate("insert into llm_budget_alerts(id,window_type,window_start,threshold_percent) values ('${UUID.randomUUID()}','MONTH','2026-09-01T00:00:00Z',80)")
                 }
-                val itemFields = "review_status,manual_completion_at,category_id,category_source,category_missing_reason,purpose_id,purpose_source,name_source,image_source,user_override_fields,current_generation".split(",")
+                val itemFields = "review_status,manual_completion_at,category_id,category_source,category_missing_reason,purpose_id,purpose_source,name_source,image_source,user_override_fields,current_generation,client_created_at".split(",")
                 val jobFields = listOf("execution_token", "lease_until", "claimed_item_version")
                 val queries = mapOf(
                     "wishlist_items" to itemFields, "analysis_jobs" to jobFields, "outbox_events" to emptyList(),
