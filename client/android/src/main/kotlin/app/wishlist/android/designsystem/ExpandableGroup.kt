@@ -24,7 +24,11 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.stringResource
+import app.wishlist.android.R
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 
 /** 펼치기 화살표(아래 방향 V). 펼치면 180도 뒤집힌다(200 ease). */
@@ -57,12 +61,14 @@ fun ExpandableGroup(
     header: @Composable RowScope.() -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val description = stringResource(if (expanded) R.string.wl_expanded else R.string.wl_collapsed)
     WLCard(modifier.fillMaxWidth(), radius = WishlistTokens.Radius.m) {
         Column {
             Row(
                 Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = WishlistTokens.Space.minTouch)
+                    .semantics { stateDescription = description }
                     .clickable(role = Role.Button) { onExpandedChange(!expanded) }
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,

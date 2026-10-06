@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -50,7 +51,7 @@ internal sealed class OverlayEntry(val id: Long) {
     abstract val needsScrim: Boolean
 }
 
-internal class SheetEntry(id: Long, val draggable: Boolean, val content: @Composable () -> Unit) : OverlayEntry(id) {
+internal class SheetEntry(id: Long, val draggable: Boolean, val title: String?, val content: @Composable () -> Unit) : OverlayEntry(id) {
     override val needsScrim get() = true
 }
 
@@ -88,8 +89,8 @@ class OverlayHostState {
     /** overlay가 하나라도 있는지(닫히는 중 포함). 뒤 화면을 접근성에서 숨기고 라우터의 뒤로를 끈다. */
     val isShowing: Boolean get() = entries.isNotEmpty()
 
-    fun showSheet(draggable: Boolean = true, content: @Composable () -> Unit): Boolean =
-        push { SheetEntry(it, draggable, content) }
+    fun showSheet(draggable: Boolean = true, title: String? = null, content: @Composable () -> Unit): Boolean =
+        push { SheetEntry(it, draggable, title, content) }
 
     fun showDialog(spec: WLDialogSpec): Boolean = push { DialogEntry(it, spec) }
 
@@ -168,11 +169,19 @@ class OverlayHostState {
 fun rememberOverlayHostState(): OverlayHostState = remember { OverlayHostState() }
 
 /** 시트·메뉴·확인창 안쪽에서 `dismiss()`를 부르기 위한 접근. */
-val LocalOverlayHostState = compositionLocalOf<OverlayHostState?> { null }
+val LocalOverlayHostState = compositionLocalOf<OverlayHostState> { error("OverlayHost is required") }
 
 /** 메뉴를 띄우는 버튼에 붙여 `showMenu`의 anchor를 얻는다. */
-fun Modifier.wlAnchor(onBounds: (Rect) -> Unit): Modifier =
-    onGloballyPositioned { onBounds(it.boundsInWindow()) }
+class WLMenuAnchor {
+    internal var coordinates: LayoutCoordinates? = null
+    fun boundsInWindow(): Rect? = coordinates?.takeIf { it.isAttached }?.boundsInWindow()
+}
+
+@Composable
+fun rememberWLMenuAnchor(): WLMenuAnchor = remember { WLMenuAnchor() }
+
+fun Modifier.wlAnchor(anchor: WLMenuAnchor): Modifier =
+    onGloballyPositioned { anchor.coordinates = it }
 
 /**
  * 화면 루트에 한 번 둔다. 시스템 Dialog·ModalBottomSheet·Popup을 쓰지 않고 같은 창 안에서 직접 그린다.
@@ -238,7 +247,7 @@ internal fun Modifier.wlAccessibilityCovered(covered: Boolean): Modifier =
     if (covered) this.clearAndSetSemantics { } else this
 
 @Composable
-private fun InputBlocker() {
+internal fun InputBlocker() {
     Box(
         Modifier.fillMaxSize().pointerInput(Unit) {
             awaitPointerEventScope {

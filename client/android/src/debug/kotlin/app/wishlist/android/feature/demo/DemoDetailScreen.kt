@@ -39,6 +39,7 @@ import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
 import app.wishlist.android.designsystem.overlay.LocalOverlayHostState
 import app.wishlist.android.designsystem.overlay.wlAnchor
+import app.wishlist.android.designsystem.overlay.rememberWLMenuAnchor
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLRoute
 import app.wishlist.android.navigation.WLSurfaceScreen
@@ -46,7 +47,7 @@ import app.wishlist.android.navigation.wlSharedPhoto
 
 /** 데모 상세(debug 빌드에서만 진입). `id` 앞머리로 상품(사진)·칩 목록·목적 상세를 고른다. */
 @Composable
-fun DemoDetailScreen(route: WLRoute.DemoDetail, sourceKey: String?) {
+internal fun DemoDetailScreen(route: DemoRoute.Detail, sourceKey: String?) {
     val kind = route.id.substringBefore(':')
     val ref = route.id.substringAfter(':')
     when {
@@ -61,7 +62,7 @@ fun DemoDetailScreen(route: WLRoute.DemoDetail, sourceKey: String?) {
 private fun DemoTopBar(withMenu: Boolean) {
     val nav = LocalWLNavigator.current
     val overlay = LocalOverlayHostState.current
-    var anchor by remember { mutableStateOf(Rect.Zero) }
+    val anchor = rememberWLMenuAnchor()
     Row(
         Modifier.fillMaxWidth().statusBarsPadding().padding(vertical = WishlistTokens.Space.s8),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -72,8 +73,8 @@ private fun DemoTopBar(withMenu: Boolean) {
         if (withMenu) {
             DemoCircleButton(
                 "더 보기",
-                onClick = { overlay?.showMenu(anchor, demoMenuItems(overlay)) },
-                modifier = Modifier.wlAnchor { anchor = it },
+                onClick = { anchor.boundsInWindow()?.let { overlay.showMenu(it, demoMenuItems(overlay)) } },
+                modifier = Modifier.wlAnchor(anchor),
             ) { MoreDots() }
         }
     }

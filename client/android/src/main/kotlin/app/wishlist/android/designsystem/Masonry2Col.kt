@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -22,6 +23,7 @@ fun Masonry2Col(
     content: @Composable () -> Unit,
 ) {
     Layout(content = content, modifier = modifier.fillMaxWidth()) { measurables, constraints ->
+        require(constraints.hasBoundedWidth) { "Masonry2Col requires a finite width; constrain it with width() in horizontal scrolling containers." }
         val gapPx = gap.roundToPx()
         val colWidth = ((constraints.maxWidth - gapPx) / 2).coerceAtLeast(0)
         val childConstraints = constraints.copy(minWidth = colWidth, maxWidth = colWidth, minHeight = 0)
@@ -34,7 +36,7 @@ fun Masonry2Col(
             Triple(p, col, y)
         }
         val h = (maxOf(heights[0], heights[1]) - gapPx).coerceAtLeast(0)
-        layout(constraints.maxWidth, h) {
+        layout(constraints.maxWidth, constraints.constrainHeight(h)) {
             placed.forEach { (p, col, y) -> p.place(col * (colWidth + gapPx), y) }
         }
     }

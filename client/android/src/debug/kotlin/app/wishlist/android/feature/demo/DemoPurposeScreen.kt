@@ -52,7 +52,7 @@ fun DemoPurposeScreen() {
                     WLCard(
                         Modifier.fillMaxWidth(),
                         radius = WishlistTokens.Radius.xl,
-                        onClick = { nav.push(WLRoute.DemoDetail(DemoIds.purpose(p.id), hasPhoto = false), key) },
+                        onClick = { nav.push(DemoRoute.Detail(DemoIds.purpose(p.id), hasPhoto = false), key) },
                     ) {
                         Row(
                             Modifier

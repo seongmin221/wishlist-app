@@ -12,13 +12,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import java.util.regex.Pattern
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,8 +31,7 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 fun WLInput(
-    value: String,
-    onValueChange: (String) -> Unit,
+    state: TextFieldState,
     modifier: Modifier = Modifier,
     label: String? = null,
     hint: String? = null,
@@ -40,27 +41,33 @@ fun WLInput(
     maxLength: Int = Int.MAX_VALUE,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
+    require(maxLength >= 0) { "maxLength must be non-negative" }
+    // InputTransformation cannot inspect the incoming composing range (buffer API is internal).
+    // Observe the single field state after framework edits, and leave every IME composition intact.
+    LaunchedEffect(state, maxLength) {
+        snapshotFlow { state.text.toString() to state.composition }.collect {
+            enforceCommittedInputLimit(state, maxLength)
+        }
+    }
     val c = LocalWLColors.current
     val face = if (LocalWLOnSheet.current) c.sheetField else c.card
     Column(modifier, verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
         if (label != null || hint != null) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                // 입력칸이 같은 라벨을 읽으므로 보이는 라벨은 접근성에서 뺀다(두 번 읽지 않게, iOS와 같음).
-                WLText(label.orEmpty(), WLType.body.copy(fontSize = 13.sp), Modifier.clearAndSetSemantics { }, color = c.textSecondary)
+                // 라벨은 접근성에서 따로 읽고, 입력칸의 editableText 의미를 그대로 유지한다.
+                WLText(label.orEmpty(), WLType.body.copy(fontSize = 13.sp), color = c.textSecondary)
                 WLText(hint.orEmpty(), WLType.label, color = c.textSecondary)
             }
         }
         BasicTextField(
-            value = value,
-            onValueChange = { if (it.length <= maxLength) onValueChange(it) },
-            singleLine = singleLine,
-            minLines = if (singleLine) 1 else minLines,
+            state = state,
+            lineLimits = if (singleLine) TextFieldLineLimits.SingleLine else TextFieldLineLimits.MultiLine(minHeightInLines = minLines),
             textStyle = WLType.button.copy(color = c.text),
             cursorBrush = SolidColor(c.text),
             keyboardOptions = keyboardOptions,
-            // 칸의 이름은 라벨(없으면 안내 글자). TalkBack이 라벨과 칸을 따로 읽지 않는다.
-            modifier = Modifier.fillMaxWidth().semantics { contentDescription = label ?: placeholder },
-            decorationBox = { inner ->
+            // Do not override contentDescription: TalkBack must announce editable text and selection.
+            modifier = Modifier.fillMaxWidth(),
+            decorator = { inner ->
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -70,12 +77,12 @@ fun WLInput(
                         .padding(horizontal = 18.dp, vertical = if (singleLine) 0.dp else 16.dp),
                     contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart,
                 ) {
-                    if (value.isEmpty() && placeholder.isNotEmpty()) {
-                        // 라벨이 있으면 안내 글자는 칸 이름 뒤에 읽힌다(iOS 힌트). 라벨이 없으면 칸 이름이 곧 안내 글자라 뺀다.
+                    if (state.text.isEmpty() && placeholder.isNotEmpty()) {
+                        // Preserve the visible placeholder announcement when the field is empty.
                         WLText(
                             placeholder,
                             WLType.button.copy(fontWeight = FontWeight.Normal),
-                            if (label == null) Modifier.clearAndSetSemantics { } else Modifier,
+                            Modifier,
                             color = c.textSecondary,
                         )
                     }
@@ -83,5 +90,30 @@ fun WLInput(
                 }
             },
         )
+    }
+}
+
+private val GraphemePattern = Pattern.compile("\\X")
+
+/** Returns a UTF-16 boundary after at most [maxLength] extended grapheme clusters. */
+internal fun graphemeLimitEnd(text: CharSequence, maxLength: Int): Int {
+    require(maxLength >= 0)
+    if (maxLength == Int.MAX_VALUE) return text.length
+    val matcher = GraphemePattern.matcher(text)
+    var end = 0
+    var count = 0
+    while (count < maxLength && matcher.find()) {
+        end = matcher.end()
+        count++
+    }
+    return end
+}
+
+/** Programmatic edits, paste, and limit changes share the same committed-state normalization. */
+internal fun enforceCommittedInputLimit(state: TextFieldState, maxLength: Int) {
+    if (state.composition != null) return
+    state.edit {
+        val end = graphemeLimitEnd(asCharSequence(), maxLength)
+        if (end < length) replace(end, length, "")
     }
 }

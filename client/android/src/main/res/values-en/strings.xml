@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Wishlist</string>
+    <string name="wl_close">Close</string>
+    <string name="wl_sheet">Sheet</string>
+    <string name="wl_expanded">Expanded</string>
+    <string name="wl_collapsed">Collapsed</string>
+    <string name="wl_menu">Menu</string>
+    <string name="wl_tab_home">Home</string>
+    <string name="wl_tab_category">Category</string>
+    <string name="wl_tab_purpose">Purpose</string>
+</resources>

@@ -27,21 +27,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import app.wishlist.android.designsystem.LocalWLColors
+import app.wishlist.android.designsystem.overlay.InputBlocker
 import app.wishlist.android.designsystem.overlay.LocalOverlayHostState
 import app.wishlist.android.designsystem.WishlistTokens.Curve
 import app.wishlist.android.designsystem.WishlistTokens.Motion
@@ -70,13 +70,12 @@ typealias WLRouteContent = @Composable (route: WLRoute, sourceKey: String?) -> U
 @Composable
 fun WLNavHost(
     modifier: Modifier = Modifier,
-    navigator: WLNavigator = remember { WLNavigator() },
+    navigator: WLNavigator = LocalWLNavigator.current,
     content: WLRouteContent,
 ) {
     val c = LocalWLColors.current
-    val currentTab by navigator.currentTab.collectAsState()
+    val currentTab = navigator.currentTab
     val tabHolder = rememberSaveableStateHolder()
-    val registry = remember { WLSurfaceRegistry() }
     val tabBarAlpha = remember { mutableStateOf<State<Float>?>(null) }
 
     val tabTransition = updateTransition(currentTab, label = "tab")
@@ -94,13 +93,13 @@ fun WLNavHost(
     }
     // 탭 바 투명도는 매 프레임 바뀌므로 그리기 단계(graphicsLayer)에서만 읽는다. 보일지 여부만 derivedStateOf로 다시 그린다.
     val tabBarAlphaNow = {
-        tabBarAlpha.value?.value ?: if (navigator.entries(currentTab).last().route.showsTabBar) 1f else 0f
+        tabBarAlpha.value?.value ?: if (navigator.entries(navigator.currentTab).last().route.showsTabBar) 1f else 0f
     }
     val tabBarVisible by remember(navigator) {
-        derivedStateOf { navigator.entries(currentTab).last().route.showsTabBar || tabBarAlphaNow() > 0f }
+        tabBarVisibility(navigator, tabBarAlpha)
     }
 
-    CompositionLocalProvider(LocalWLNavigator provides navigator, LocalWLSurfaceRegistry provides registry) {
+    CompositionLocalProvider(LocalWLNavigator provides navigator) {
         SharedTransitionLayout(modifier.fillMaxSize().background(c.background)) {
             CompositionLocalProvider(LocalWLSharedScope provides this) {
                 tabTransition.AnimatedContent(
@@ -194,7 +193,7 @@ private fun SharedTransitionScope.TabStack(
     val transition = rememberTransition(seek, label = "stack-$tab")
     val holder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
-    val known = remember { mutableSetOf<Long>() }
+    var known by rememberSaveable { mutableStateOf(listOf<Long>()) }
 
     LaunchedEffect(top) {
         // 이 효과가 맡은 전환(이 탭의 Push·Pop)만 끝낸다. 애니메이션이 끊겨도(취소·예외) finally에서 반드시 끝내
@@ -208,7 +207,7 @@ private fun SharedTransitionScope.TabStack(
         // pop된 칸의 저장 상태를 지운다.
         val alive = navigator.entries(tab).map { it.id }.toSet()
         (known - alive).forEach { holder.removeState(it) }
-        known.retainAll(alive)
+        known = known.filter { it in alive }
     }
 
     val alpha = transition.animateFloat(
@@ -219,7 +218,7 @@ private fun SharedTransitionScope.TabStack(
 
     // overlay가 떠 있는 동안에는 끈다. overlay의 BackHandler와 등록 순서를 다투지 않는다(overlay 아래에서 이 탭 스택이
     // 새로 그려져 나중에 등록되어도 뒤로가 overlay를 건너뛰고 화면을 pop하지 않는다).
-    val overlayShowing = LocalOverlayHostState.current?.isShowing == true
+    val overlayShowing = LocalOverlayHostState.current.isShowing
     PredictiveBackHandler(enabled = navBackEnabled(isCurrent, overlayShowing, navigator.canPop(), navigator.isTransitioning)) { events ->
         if (!navigator.beginBackGesture()) {
             // 전환 중 뒤로: 받아서 버린다.
@@ -258,7 +257,7 @@ private fun SharedTransitionScope.TabStack(
         contentKey = { it.id },
         modifier = Modifier.fillMaxSize(),
     ) { entry ->
-        SideEffect { known += entry.id }
+        SideEffect { if (entry.id !in known) known = known + entry.id }
         holder.SaveableStateProvider(entry.id) {
             CompositionLocalProvider(LocalWLStackScope provides this) {
                 content(entry.route, entry.sourceKey)
@@ -301,13 +300,9 @@ internal fun navBackEnabled(isCurrent: Boolean, overlayShowing: Boolean, canPop:
 /** 되돌림 최소 시간. 거의 끌지 않았을 때 튀어 보이지 않게 하는 구현 기본값(디자인 값 아님). */
 private const val RevertMinMillis = 120
 
-@Composable
-private fun InputBlocker() {
-    Box(
-        Modifier.fillMaxSize().pointerInput(Unit) {
-            awaitPointerEventScope {
-                while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
-            }
-        },
-    )
-}
+/** Reads the current tab from snapshot state inside the retained derived calculation. */
+internal fun tabBarVisibility(navigator: WLNavigator, alpha: State<State<Float>?>): State<Boolean> =
+    derivedStateOf {
+        val shows = navigator.entries(navigator.currentTab).last().route.showsTabBar
+        shows || (alpha.value?.value ?: if (shows) 1f else 0f) > 0f
+    }

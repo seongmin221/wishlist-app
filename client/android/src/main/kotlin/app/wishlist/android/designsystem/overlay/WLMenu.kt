@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.res.stringResource
+import app.wishlist.android.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -80,6 +82,7 @@ fun WLMenuCard(items: List<WLMenuItem>, onItemClick: (WLMenuItem) -> Unit, modif
  */
 @Composable
 internal fun MenuLayer(entry: MenuEntry, state: OverlayHostState) {
+    val menuTitle = stringResource(R.string.wl_menu)
     val q = remember { Animatable(0f) }
     LaunchedEffect(entry.phase) {
         val spec = tween<Float>(WishlistTokens.Motion.overflowMenu, easing = WishlistTokens.Curve.easeOut)
@@ -113,7 +116,7 @@ internal fun MenuLayer(entry: MenuEntry, state: OverlayHostState) {
             onItemClick = { item -> if (state.requestDismiss(entry.id)) item.onClick() },
             modifier = Modifier
                 .offset { IntOffset(clampedX.roundToInt(), y.roundToInt()) }
-                .semantics { paneTitle = "메뉴" }
+                .semantics { paneTitle = menuTitle }
                 .graphicsLayer {
                     alpha = q.value
                     val s = 0.96f + 0.04f * q.value

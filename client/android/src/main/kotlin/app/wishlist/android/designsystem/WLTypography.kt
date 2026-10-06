@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -85,7 +86,7 @@ object WLType {
     /**
      * 도현 28 · 그 자리 편집 칸 전용. 한글 아래 끝 ↔ 밑줄 3px 규칙(디자인 결정 2026-10-04)에 따라
      * 도현 28의 한글 아래 여백 5px를 줄여 줄 높이를 24sp로 둔다. 편집 칸은 한 줄이므로 `display28`과 위치가 같다.
-     * (아래 패딩 보정은 Task의 편집 칸 컴포넌트에서 한다.)
+     * (아래 패딩 보정은 편집 칸 컴포넌트에서 한다.)
      */
     val display28Edit = display28.copy(lineHeight = 24.sp)
 
@@ -170,7 +171,7 @@ fun TextStyle.hangulBottomGapPx(density: Density): Float {
 fun Modifier.wlLineBox(style: TextStyle): Modifier = layout { measurable, constraints ->
     val placeable = measurable.measure(constraints)
     val extra = (style.lineHeightPx(this) - style.naturalHeightPx(this)).roundToInt()
-    layout(placeable.width, (placeable.height + extra).coerceAtLeast(0)) {
+    layout(placeable.width, constraints.constrainHeight((placeable.height + extra).coerceAtLeast(0))) {
         placeable.place(0, extra shr 1)
     }
 }

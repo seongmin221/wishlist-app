@@ -5,6 +5,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PriceFormatTest {
+    @Test fun normalizedAndUnknownCurrencyNeverCrashRendering() {
+        assertEquals("JPY 1,000", formatPrice(BigDecimal("999.99"), " jpy "))
+        assertEquals("POINT 1.25", formatPrice(BigDecimal("1.25"), " point "))
+        assertEquals("XXX 1.25", formatPrice(BigDecimal("1.25"), "XXX"))
+    }
+
+    @Test fun isoMinorUnitsIncludeZeroAndThreeDigits() {
+        assertEquals("JPY 1,000", formatPrice(BigDecimal("999.99"), "JPY"))
+        assertEquals("KWD 1.235", formatPrice(BigDecimal("1.2346"), "KWD"))
+    }
+
     @Test fun krwGroupsThousands() {
         assertEquals("KRW 549,000", formatPrice(BigDecimal("549000"), "KRW"))
         assertEquals("KRW 1,190,000", formatPrice(BigDecimal("1190000"), "KRW"))

@@ -2,6 +2,7 @@ package app.wishlist.android.designsystem
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
@@ -42,14 +43,14 @@ fun WLChip(
             .defaultMinSize(minHeight = 40.dp)
             .clip(RoundedCornerShape(WishlistTokens.Radius.pill))
             .background(bg)
-            .clickable(role = Role.Button, onClick = onClick)
+            .selectable(selected = selected, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        WLText(text, if (selected) WLType.body.copy(fontWeight = FontWeight.Bold) else WLType.body, color = fg)
+        WLText(text, if (selected) WLType.body.copy(fontWeight = FontWeight.Bold) else WLType.body, color = fg, maxLines = 1)
         if (count != null) {
-            WLText(count.toString(), WLType.price.copy(fontSize = WLType.body.fontSize), color = if (selected) fg else c.textSecondary)
+            WLText(count.toString(), WLType.price.copy(fontSize = WLType.body.fontSize), color = if (selected) fg else c.textSecondary, maxLines = 1)
         }
     }
 }
@@ -78,7 +79,7 @@ fun WLAddChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        WLText("+", WLType.body, color = color)
-        WLText(text, WLType.body, color = color)
+        WLText("+", WLType.body, color = color, maxLines = 1)
+        WLText(text, WLType.body, color = color, maxLines = 1)
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,7 @@ import app.wishlist.android.designsystem.overlay.WLDialogSpec
 import app.wishlist.android.designsystem.overlay.WLMenuItem
 import app.wishlist.android.designsystem.overlay.WLSheetHeader
 import app.wishlist.android.designsystem.overlay.wlAnchor
+import app.wishlist.android.designsystem.overlay.rememberWLMenuAnchor
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLRoute
 import app.wishlist.android.navigation.WLScrollToTopEffect
@@ -56,7 +58,7 @@ fun DemoHomeScreen() {
     val overlay = LocalOverlayHostState.current
     val scroll = rememberScrollState()
     WLScrollToTopEffect(WLTab.Home, scroll)
-    var menuAnchor by remember { mutableStateOf(Rect.Zero) }
+    val menuAnchor = rememberWLMenuAnchor()
 
     Column(
         Modifier
@@ -68,15 +70,15 @@ fun DemoHomeScreen() {
         DemoTabHeader("홈", "데모 · 화면 이동과 overlay") {
             DemoCircleButton(
                 "더 보기",
-                onClick = { overlay?.showMenu(menuAnchor, demoMenuItems(overlay)) },
-                modifier = Modifier.wlAnchor { menuAnchor = it },
+                onClick = { menuAnchor.boundsInWindow()?.let { overlay.showMenu(it, demoMenuItems(overlay)) } },
+                modifier = Modifier.wlAnchor(menuAnchor),
             ) { MoreDots() }
         }
 
         DemoSectionLabel("overlay")
         Row(horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12)) {
-            WLButton("시트 열기", WLButtonKind.Secondary, { overlay?.showSheet { DemoSheet(overlay) } }, Modifier.weight(1f))
-            WLButton("확인창 열기", WLButtonKind.Primary, { overlay?.showDialog(demoDeleteDialog()) }, Modifier.weight(1f))
+            WLButton("시트 열기", WLButtonKind.Secondary, { overlay.showSheet(title = "시트 데모") { DemoSheet(overlay) } }, Modifier.weight(1f))
+            WLButton("확인창 열기", WLButtonKind.Primary, { overlay.showDialog(demoDeleteDialog()) }, Modifier.weight(1f))
         }
 
         DemoSectionLabel("사진 카드 → 상세 (사진이 커짐)")
@@ -102,7 +104,7 @@ fun DemoHomeScreen() {
             DemoContent.purposes.filter { it.id in setOf("commute", "trail", "longest") }.forEach { p ->
                 val key = "home/purpose/${p.id}"
                 WLSharedSurfaceSource(key, p.color.face, WishlistTokens.Radius.xl, Modifier.fillMaxWidth()) {
-                    DemoPurposeRow(p) { nav.push(WLRoute.DemoDetail(DemoIds.purpose(p.id), hasPhoto = false), key) }
+                    DemoPurposeRow(p) { nav.push(DemoRoute.Detail(DemoIds.purpose(p.id), hasPhoto = false), key) }
                 }
             }
         }
@@ -130,7 +132,7 @@ internal fun DemoProductCard(product: DemoProduct, sourceKey: String) {
         WLCard(
             Modifier.fillMaxWidth(),
             radius = WishlistTokens.Radius.m,
-            onClick = { nav.push(WLRoute.DemoDetail(DemoIds.product(product.id), hasPhoto = true), sourceKey) },
+            onClick = { nav.push(DemoRoute.Detail(DemoIds.product(product.id), hasPhoto = true), sourceKey) },
         ) {
             DemoPhoto(product.tint, Modifier.fillMaxWidth().aspectRatio(1f / product.photoRatio).wlSharedPhoto(sourceKey))
         }
@@ -145,7 +147,7 @@ internal fun DemoProductCard(product: DemoProduct, sourceKey: String) {
 internal fun DemoSurfaceChip(chip: DemoChip, sourceKey: String) {
     val nav = LocalWLNavigator.current
     WLSharedSurfaceSource(sourceKey, LocalWLColors.current.chip, 20.dp) {
-        WLChip(chip.name, onClick = { nav.push(WLRoute.DemoDetail(DemoIds.chip(chip.id), hasPhoto = false), sourceKey) }, count = chip.count)
+        WLChip(chip.name, onClick = { nav.push(DemoRoute.Detail(DemoIds.chip(chip.id), hasPhoto = false), sourceKey) }, count = chip.count)
     }
 }
 
@@ -171,10 +173,10 @@ private fun DemoPurposeRow(p: DemoPurpose, onClick: () -> Unit) {
 
 @Composable
 private fun DemoSheet(overlay: OverlayHostState) {
-    var name by rememberSaveable { mutableStateOf("") }
+    val name = rememberTextFieldState()
     Column(verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s20)) {
         WLSheetHeader("시트 데모", onClose = { overlay.dismiss() })
-        WLInput(name, { name = it }, label = "이름", placeholder = DemoContent.LONGEST_PURPOSE_NAME, maxLength = 40)
+        WLInput(name, label = "이름", placeholder = DemoContent.LONGEST_PURPOSE_NAME, maxLength = 40)
         // 확인창의 확인이 아래 시트까지 닫는 경로(dismissAll).
         WLButton(
             "삭제(시트까지 닫기)",

@@ -48,7 +48,7 @@ fun WLButton(
             .padding(horizontal = WishlistTokens.Space.s20, vertical = WishlistTokens.Space.s12),
         contentAlignment = Alignment.Center,
     ) {
-        WLText(text, style, color = fg, textAlign = TextAlign.Center)
+        WLText(text, style, color = fg, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
 

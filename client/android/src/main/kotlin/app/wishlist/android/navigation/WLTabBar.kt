@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import app.wishlist.android.R
 import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLText
 import app.wishlist.android.designsystem.WLType
@@ -48,11 +50,11 @@ import app.wishlist.android.designsystem.WishlistTokens
 import kotlinx.coroutines.delay
 
 internal val WLTab.label: String
-    get() = when (this) {
-        WLTab.Home -> "홈"
-        WLTab.Category -> "카테고리"
-        WLTab.Purpose -> "목적"
-    }
+    @Composable get() = stringResource(when (this) {
+        WLTab.Home -> R.string.wl_tab_home
+        WLTab.Category -> R.string.wl_tab_category
+        WLTab.Purpose -> R.string.wl_tab_purpose
+    })
 
 /** 탭 바 높이(64)와 아래 여백(24). 탭 첫 화면이 내용 끝에 이만큼 비워 둔다. */
 internal val WLTabBarHeight = 64.dp
@@ -86,7 +88,7 @@ fun WLTabBar(current: WLTab, onSelect: (WLTab) -> Unit, modifier: Modifier = Mod
         }
     }
     val density = LocalDensity.current
-    val capped = Density(density.density, density.fontScale.coerceAtMost(TabLabelMaxFontScale))
+    val capped = remember(density) { Density(density.density, density.fontScale.coerceAtMost(TabLabelMaxFontScale)) }
     Row(
         modifier
             .padding(horizontal = WishlistTokens.Space.s16)

@@ -46,10 +46,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import app.wishlist.android.R
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -109,6 +112,7 @@ internal fun sheetDragEndPx(phase: OverlayPhase, dragDistancePx: Float, sheetHei
 @Composable
 fun WLSheetHeader(title: String, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalWLColors.current
+    val closeLabel = stringResource(R.string.wl_close)
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         WLText(title, WLSheetTitleStyle, Modifier.weight(1f), color = c.text)
         Box(
@@ -116,7 +120,7 @@ fun WLSheetHeader(title: String, onClose: () -> Unit, modifier: Modifier = Modif
                 .size(WishlistTokens.Space.minTouch)
                 .clip(CircleShape)
                 .background(c.sheetField)
-                .semantics { contentDescription = "닫기" }
+                .semantics { contentDescription = closeLabel }
                 .clickable(role = Role.Button, onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {
@@ -140,8 +144,10 @@ fun WLSheetHeader(title: String, onClose: () -> Unit, modifier: Modifier = Modif
 @Composable
 internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
     val c = LocalWLColors.current
+    val sheetTitle = entry.title ?: stringResource(R.string.wl_sheet)
     val p = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    var dragFraction by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(entry.phase) {
         when (entry.phase) {
@@ -150,6 +156,8 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                 state.onOpened(entry.id)
             }
             OverlayPhase.Closing -> {
+                p.snapTo((p.value - dragFraction).coerceIn(0f, 1f))
+                dragFraction = 0f
                 // 다른 곳이 p를 건드려 이 애니메이션이 끊겨도(CancellationException) 이 효과가 살아 있으면 다시 시작해 반드시 끝낸다.
                 while (p.value > 0f) {
                     try {
@@ -167,7 +175,7 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
     var heightPx by remember { mutableFloatStateOf(0f) }
     val dragState = rememberDraggableState { delta ->
         if (entry.phase == OverlayPhase.Open && heightPx > 0f) {
-            scope.launch { p.snapTo((p.value - delta / heightPx).coerceIn(0f, 1f)) }
+            dragFraction = (dragFraction + delta / heightPx).coerceIn(p.value - 1f, p.value)
         }
     }
     val extra = OvershootPadding
@@ -179,10 +187,10 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = sheetMaxHeight(maxHeight, topInset))
-                .semantics { paneTitle = "시트" }
+                .semantics { paneTitle = sheetTitle }
+                .onSizeChanged { heightPx = it.height.toFloat() }
                 .graphicsLayer {
-                    if (heightPx != size.height) heightPx = size.height
-                    translationY = (1f - p.value) * size.height
+                    translationY = (1f - p.value + dragFraction) * size.height
                 }
                 .drawBehind {
                     drawRect(
@@ -203,11 +211,20 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                             state = dragState,
                             orientation = Orientation.Vertical,
                             enabled = entry.phase == OverlayPhase.Open,
+                            onDragStarted = { p.stop() },
                             onDragStopped = { velocity ->
-                                val distance = (1f - p.value) * heightPx
+                                val distance = (1f - p.value + dragFraction) * heightPx
                                 when (sheetDragEndPx(entry.phase, distance, heightPx, velocity, density.density)) {
-                                    SheetDragEnd.Dismiss -> if (!state.requestDismiss(entry.id)) scope.launch { snapBack(p) }
-                                    SheetDragEnd.SnapBack -> scope.launch { snapBack(p) }
+                                    SheetDragEnd.Dismiss -> if (!state.requestDismiss(entry.id)) scope.launch {
+                                        p.snapTo((p.value - dragFraction).coerceIn(0f, 1f))
+                                        dragFraction = 0f
+                                        snapBack(p)
+                                    }
+                                    SheetDragEnd.SnapBack -> scope.launch {
+                                        p.snapTo((p.value - dragFraction).coerceIn(0f, 1f))
+                                        dragFraction = 0f
+                                        snapBack(p)
+                                    }
                                     SheetDragEnd.Ignore -> Unit
                                 }
                             },

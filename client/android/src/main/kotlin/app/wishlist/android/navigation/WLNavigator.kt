@@ -1,16 +1,17 @@
 package app.wishlist.android.navigation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /** 스택의 한 칸. `id`는 앱 안에서 유일하고 늘어나기만 한다(화면 상태 저장 키, push·pop 방향 판단에 쓴다). */
 internal data class WLBackStackEntry(val id: Long, val route: WLRoute, val sourceKey: String?)
@@ -28,7 +29,7 @@ internal sealed interface WLNavTransition {
 }
 
 /**
- * 탭별로 독립된 화면 스택과 현재 탭을 가진다. Compose에 묶이지 않은 상태 기계라 단위 테스트로 검증한다.
+ * 탭별로 독립된 화면 스택과 현재 탭을 가진다. Compose snapshot 상태를 사용하며 단위 테스트로 전환 규칙을 검증한다.
  *
  * 전환 규칙(motion.md 구현 기본값 "전환 중 입력"):
  * - `push`·`pop`·`selectTab`(다른 탭)은 전환을 시작하고(`isTransitioning = true`) 바로 상태를 바꾼다.
@@ -43,8 +44,8 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
     private val stacks: Map<WLTab, MutableList<WLBackStackEntry>> =
         WLTab.entries.associateWith { mutableStateListOf(WLBackStackEntry(nextId++, WLRoute.TabRoot(it), null)) }
 
-    private val _currentTab = MutableStateFlow(initialTab)
-    val currentTab: StateFlow<WLTab> = _currentTab.asStateFlow()
+    var currentTab: WLTab by mutableStateOf(initialTab)
+        private set
 
     private val _scrollToTop = MutableSharedFlow<WLTab>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -62,19 +63,19 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
 
     fun selectTab(tab: WLTab): Boolean {
         if (isTransitioning) return false
-        if (tab == _currentTab.value) {
+        if (tab == currentTab) {
             _scrollToTop.tryEmit(tab)
             return true
         }
-        activeTransition = WLNavTransition.Tab(_currentTab.value, tab)
-        _currentTab.value = tab
+        activeTransition = WLNavTransition.Tab(currentTab, tab)
+        currentTab = tab
         return true
     }
 
     /** `sourceKey`는 누른 요소의 공유 요소 키(`SharedTransitionKeys`). 다음 화면이 같은 키로 이어 받는다. */
     fun push(route: WLRoute, sourceKey: String): Boolean {
         if (isTransitioning) return false
-        val tab = _currentTab.value
+        val tab = currentTab
         activeTransition = WLNavTransition.Push(tab)
         stacks.getValue(tab).add(WLBackStackEntry(nextId++, route, sourceKey))
         return true
@@ -83,22 +84,60 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
     /** 맨 위 화면을 닫는다. 탭 첫 화면이거나 전환 중이면 false(첫 화면이면 뒤로를 시스템에 넘긴다). */
     fun pop(): Boolean {
         if (isTransitioning) return false
-        val stack = stacks.getValue(_currentTab.value)
+        val stack = stacks.getValue(currentTab)
         if (stack.size <= 1) return false
-        activeTransition = WLNavTransition.Pop(_currentTab.value)
+        activeTransition = WLNavTransition.Pop(currentTab)
         stack.removeAt(stack.lastIndex)
         return true
     }
 
-    fun finishTransition() {
+    internal fun finishTransition() {
         activeTransition = null
     }
 
-    internal fun canPop(): Boolean = stacks.getValue(_currentTab.value).size > 1
+    /** Only settled navigation identity is saved; animation and surface probes are transient. */
+    internal fun save(codec: WLRouteCodec): ArrayList<Any> = arrayListOf(
+        currentTab.name,
+        nextId,
+        ArrayList(WLTab.entries.map { tab ->
+            ArrayList(stacks.getValue(tab).map { entry ->
+                val tokens = if (entry.route is WLRoute.TabRoot) {
+                    listOf("root", entry.route.tab.name)
+                } else {
+                    checkNotNull(codec.encode(entry.route)) { "Route codec missing for ${entry.route}" }
+                }
+                arrayListOf<Any>(entry.id, entry.sourceKey.orEmpty(), ArrayList(tokens))
+            })
+        }),
+    )
+
+    companion object {
+        internal fun restore(saved: List<Any>, codec: WLRouteCodec): WLNavigator {
+            val navigator = WLNavigator(WLTab.valueOf(saved[0] as String))
+            val encodedStacks = saved[2] as List<*>
+            WLTab.entries.forEachIndexed { index, tab ->
+                val entries = encodedStacks[index] as List<*>
+                val restored = entries.map { encoded ->
+                    val row = encoded as List<*>
+                    val tokens = (row[2] as List<*>).map { it as String }
+                    val route = if (tokens.firstOrNull() == "root") WLRoute.TabRoot(WLTab.valueOf(tokens[1]))
+                    else checkNotNull(codec.decode(tokens)) { "Cannot restore route $tokens" }
+                    WLBackStackEntry((row[0] as Number).toLong(), route, (row[1] as String).takeIf { it.isNotEmpty() })
+                }
+                require(restored.firstOrNull()?.route == WLRoute.TabRoot(tab)) { "Missing tab root" }
+                navigator.stacks.getValue(tab).apply { clear(); addAll(restored) }
+            }
+            val highestId = navigator.stacks.values.flatten().maxOf { it.id }
+            navigator.nextId = maxOf((saved[1] as Number).toLong(), highestId + 1)
+            return navigator
+        }
+    }
+
+    internal fun canPop(): Boolean = stacks.getValue(currentTab).size > 1
 
     internal fun beginBackGesture(): Boolean {
         if (isTransitioning || !canPop()) return false
-        activeTransition = WLNavTransition.BackGesture(_currentTab.value)
+        activeTransition = WLNavTransition.BackGesture(currentTab)
         return true
     }
 
@@ -114,4 +153,12 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
     internal fun cancelBackGesture() {
         if (activeTransition is WLNavTransition.BackGesture) activeTransition = null
     }
+}
+
+@Composable
+fun rememberWLNavigator(codec: WLRouteCodec): WLNavigator {
+    val saver = remember(codec) {
+        Saver<WLNavigator, ArrayList<Any>>(save = { it.save(codec) }, restore = { WLNavigator.restore(it, codec) })
+    }
+    return rememberSaveable(saver = saver) { WLNavigator() }
 }

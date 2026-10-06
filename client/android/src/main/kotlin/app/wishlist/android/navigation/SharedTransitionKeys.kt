@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -24,14 +25,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.dropShadow
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.DropShadowPainter
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -60,9 +68,29 @@ internal data class WLSurfaceSpec(val color: Color, val radius: Dp)
 
 internal class WLSurfaceRegistry {
     val specs = mutableStateMapOf<String, WLSurfaceSpec>()
+    private val registrations = mutableMapOf<String, LinkedHashMap<Any, WLSurfaceSpec>>()
+
+    fun register(key: String, owner: Any, spec: WLSurfaceSpec) {
+        val sources = registrations.getOrPut(key) { linkedMapOf() }
+        sources[owner] = spec
+        val visible = sources.values.last()
+        if (specs[key] != visible) specs[key] = visible
+    }
+
+    fun unregister(key: String, owner: Any) {
+        val sources = registrations[key] ?: return
+        sources.remove(owner)
+        if (sources.isEmpty()) {
+            registrations.remove(key)
+            specs.remove(key)
+        } else {
+            val visible = sources.values.last()
+            if (specs[key] != visible) specs[key] = visible
+        }
+    }
 }
 
-internal val LocalWLSurfaceRegistry = staticCompositionLocalOf { WLSurfaceRegistry() }
+internal val LocalWLSurfaceRegistry = staticCompositionLocalOf<WLSurfaceRegistry> { error("WLNavHost is required") }
 
 private val PhotoShape = RoundedCornerShape(WishlistTokens.Radius.m)
 
@@ -133,21 +161,32 @@ private fun SurfacePlaceholder(modifier: Modifier, s: State<Float>, from: WLSurf
         Box(modifier)
         return
     }
-    val s = s.value
-    val e = (s - 1f).coerceIn(0f, 1f)
-    val radius = lerp(from.radius, to.radius, e)
-    val shape = RoundedCornerShape(radius)
-    val shadowAlpha = Motion.pushSurfaceLiftShadowAlpha * if (s <= 1f) s else (2f - s)
-    Box(
-        modifier
-            .dropShadow(shape) {
-                this.radius = Motion.pushSurfaceLiftShadowBlur.dp.toPx()
-                offset = Offset(0f, Motion.pushSurfaceLiftShadowY.dp.toPx())
-                color = Color.Black
-                alpha = shadowAlpha.coerceIn(0f, 1f)
+    // The public constructor owns no platform shape-key cache and evaluates the outline every draw.
+    val painter = remember(s, from.radius, to.radius) {
+        val shape = object : Shape {
+            override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+                val expansion = (s.value - 1f).coerceIn(0f, 1f)
+                return RoundedCornerShape(lerp(from.radius, to.radius, expansion)).createOutline(size, layoutDirection, density)
             }
-            .background(lerp(from.color, to.color, e), shape),
-    )
+        }
+        DropShadowPainter(
+            shape,
+            Shadow(
+                radius = Motion.pushSurfaceLiftShadowBlur.dp,
+                color = Color.Black,
+                offset = DpOffset(0.dp, Motion.pushSurfaceLiftShadowY.dp),
+            ),
+        )
+    }
+    Box(modifier.drawBehind {
+        val phase = s.value
+        val expansion = (phase - 1f).coerceIn(0f, 1f)
+        val radius = lerp(from.radius, to.radius, expansion)
+        val shadowAlpha = Motion.pushSurfaceLiftShadowAlpha *
+            (if (phase <= 1f) phase else 2f - phase).coerceIn(0f, 1f)
+        if (shadowAlpha > 0f) with(painter) { draw(size, alpha = shadowAlpha) }
+        drawRoundRect(lerp(from.color, to.color, expansion), cornerRadius = CornerRadius(radius.toPx()))
+    })
 }
 
 /**
@@ -186,26 +225,30 @@ fun WLSharedSurfaceSource(
     val scope = LocalWLStackScope.current
     val registry = LocalWLSurfaceRegistry.current
     val spec = WLSurfaceSpec(color, radius)
-    SideEffect { registry.specs[sourceKey] = spec }
+    val owner = remember(registry, sourceKey) { Any() }
+    SideEffect { registry.register(sourceKey, owner, spec) }
+    DisposableEffect(registry, sourceKey, owner) {
+        onDispose { registry.unregister(sourceKey, owner) }
+    }
     Box(modifier) {
         if (shared != null && scope != null) {
             val density = LocalDensity.current
             val bounds = remember(density) { surfaceBounds(density) }
             val bg = LocalWLColors.current.background
-            val s = scope.transition.surfacePhase(restValue = 0f, awayValue = 2f)
             with(shared) {
                 val state = rememberSharedContentState(SharedTransitionKeys.surface(sourceKey))
                 // 누른 요소(다음 화면과 키가 맞은 면)만 그린다. 같은 화면의 다른 칩·카드도 같은 칸 전환(push·pop)을 타지만
                 // 짝이 없으니 그리지 않는다. 짝이 맞으면 면은 공유 범위의 overlay에서 떠올라 화면 전체로 커진다.
-                SurfacePlaceholder(
-                    Modifier
-                        .matchParentSize()
-                        .sharedElement(state, animatedVisibilityScope = scope, boundsTransform = bounds),
-                    s = s,
-                    from = spec,
-                    to = WLSurfaceSpec(bg, 0.dp),
-                    active = state.isMatchFound,
-                )
+                val sharedModifier = Modifier
+                    .matchParentSize()
+                    .sharedElement(state, animatedVisibilityScope = scope, boundsTransform = bounds)
+                if (state.isMatchFound) {
+                    val phase = scope.transition.surfacePhase(restValue = 0f, awayValue = 2f)
+                    SurfacePlaceholder(sharedModifier, phase, from = spec, to = WLSurfaceSpec(bg, 0.dp))
+                } else {
+                    // Keep only the matching probe; unrelated cards have no animated float or painter.
+                    Box(sharedModifier)
+                }
             }
         }
         content()
@@ -226,7 +269,9 @@ fun WLSurfaceScreen(sourceKey: String?, modifier: Modifier = Modifier, content: 
         return
     }
     val registry = LocalWLSurfaceRegistry.current
-    val from = registry.specs[sourceKey] ?: WLSurfaceSpec(c.card, WishlistTokens.Radius.l)
+    val registered = registry.specs[sourceKey]
+    val retained = remember(sourceKey) { SurfaceSpecFallback() }
+    val from = retained.resolve(registered, WLSurfaceSpec(c.card, WishlistTokens.Radius.l))
     val density = LocalDensity.current
     val bounds = remember(density) { surfaceBounds(density) }
     val s = scope.transition.surfacePhase(restValue = 2f, awayValue = 0f)
@@ -262,5 +307,15 @@ fun WLSurfaceScreen(sourceKey: String?, modifier: Modifier = Modifier, content: 
                 content = content,
             )
         }
+    }
+}
+
+/** Keep the most recent live source appearance when its composition leaves during a transition. */
+internal class SurfaceSpecFallback {
+    private var last: WLSurfaceSpec? = null
+
+    fun resolve(registered: WLSurfaceSpec?, fallback: WLSurfaceSpec): WLSurfaceSpec {
+        if (registered != null) last = registered
+        return registered ?: last ?: fallback
     }
 }

@@ -1,5 +1,7 @@
 package app.wishlist.android.navigation
 
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -10,12 +12,73 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WLNavigatorTest {
-    private val detail = WLRoute.DemoDetail(id = "p1", hasPhoto = true)
+    private data class TestDetail(val id: String, val hasPhoto: Boolean) : WLRoute {
+        override val showsTabBar = false
+        override val pushStyle get() = if (hasPhoto) WLPushStyle.Photo else WLPushStyle.Surface
+    }
+
+    private val codec = object : WLRouteCodec {
+        override fun encode(route: WLRoute): List<String>? = (route as? TestDetail)?.let { listOf(it.id, it.hasPhoto.toString()) }
+        override fun decode(tokens: List<String>): WLRoute? = TestDetail(tokens[0], tokens[1].toBooleanStrict())
+    }
+
+    @Test fun restorationPreservesTabsEntriesAndNextIdWithoutTransitionLock() {
+        val original = WLNavigator()
+        original.push(TestDetail("removed", true), "home/removed")
+        val removedId = original.entries(WLTab.Home).last().id
+        original.finishTransition()
+        original.pop()
+        original.finishTransition()
+        original.selectTab(WLTab.Purpose)
+        original.finishTransition()
+        original.push(TestDetail("saved", false), "purpose/saved")
+        val savedId = original.entries(WLTab.Purpose).last().id
+
+        val restored = WLNavigator.restore(original.save(codec), codec)
+        assertEquals(WLTab.Purpose, restored.currentTab)
+        assertEquals(original.entries(WLTab.Purpose).toList(), restored.entries(WLTab.Purpose).toList())
+        assertFalse(restored.isTransitioning)
+        restored.push(TestDetail("new", true), "purpose/new")
+        assertTrue(restored.entries(WLTab.Purpose).last().id > maxOf(savedId, removedId))
+    }
+
+    @Test fun poppedIdsAreNeverReusedAfterRestoringRootsOnly() {
+        val original = WLNavigator()
+        original.push(TestDetail("removed", true), "home/removed")
+        val removedId = original.entries(WLTab.Home).last().id
+        original.finishTransition()
+        original.pop()
+        original.finishTransition()
+        val restored = WLNavigator.restore(original.save(codec), codec)
+        restored.push(TestDetail("new", true), "home/new")
+        assertTrue(restored.entries(WLTab.Home).last().id > removedId)
+    }
+
+    private val detail = TestDetail(id = "p1", hasPhoto = true)
+
+    @Test
+    fun tabBarVisibilityFollowsCurrentTabAfterSwitchAndPush() {
+        val nav = WLNavigator()
+        val alpha = mutableStateOf<State<Float>?>(null)
+        val visible = tabBarVisibility(nav, alpha)
+        assertTrue(visible.value)
+
+        nav.selectTab(WLTab.Purpose)
+        nav.finishTransition()
+        nav.push(detail, "purpose/p1")
+        nav.finishTransition()
+        alpha.value = mutableStateOf(0f)
+        assertFalse(visible.value)
+
+        nav.selectTab(WLTab.Home)
+        nav.finishTransition()
+        assertTrue(visible.value)
+    }
 
     @Test
     fun startsOnHomeWithOneRootPerTab() {
         val nav = WLNavigator()
-        assertEquals(WLTab.Home, nav.currentTab.value)
+        assertEquals(WLTab.Home, nav.currentTab)
         WLTab.entries.forEach { assertEquals(listOf(WLRoute.TabRoot(it)), nav.stack(it)) }
         assertFalse(nav.isTransitioning)
     }
@@ -28,7 +91,7 @@ class WLNavigatorTest {
 
         assertTrue(nav.selectTab(WLTab.Category))
         nav.finishTransition()
-        assertEquals(WLTab.Category, nav.currentTab.value)
+        assertEquals(WLTab.Category, nav.currentTab)
         assertEquals(listOf(WLRoute.TabRoot(WLTab.Category)), nav.stack(WLTab.Category))
 
         assertTrue(nav.selectTab(WLTab.Home))
@@ -75,7 +138,7 @@ class WLNavigatorTest {
 
         assertEquals(listOf(WLTab.Home), events)
         assertFalse(nav.isTransitioning)
-        assertEquals(WLTab.Home, nav.currentTab.value)
+        assertEquals(WLTab.Home, nav.currentTab)
     }
 
     @Test
@@ -84,11 +147,11 @@ class WLNavigatorTest {
         assertTrue(nav.push(detail, "home/p1"))
         assertTrue(nav.isTransitioning)
 
-        assertFalse(nav.push(WLRoute.DemoDetail("p2", hasPhoto = false), "home/p2"))
+        assertFalse(nav.push(TestDetail("p2", hasPhoto = false), "home/p2"))
         assertFalse(nav.selectTab(WLTab.Purpose))
         assertFalse(nav.pop())
 
-        assertEquals(WLTab.Home, nav.currentTab.value)
+        assertEquals(WLTab.Home, nav.currentTab)
         assertEquals(listOf(WLRoute.TabRoot(WLTab.Home), detail), nav.stack(WLTab.Home))
     }
 

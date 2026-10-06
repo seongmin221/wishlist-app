@@ -11,6 +11,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 
 /** 빈 상태: 아이콘 타일(56·모서리 m 20) + 제목(18/700) + 설명, 가운데 정렬. 목록 영역 가운데에 놓는 것은 호출하는 쪽(`Modifier.fillMaxSize()` + 이 컴포넌트). */
 @Composable
@@ -28,6 +29,6 @@ fun EmptyState(
     ) {
         WLIconTile(size = 56.dp, radius = WishlistTokens.Radius.m, color = c.card, icon = icon)
         WLText(title, WLType.title.copy(fontSize = 18.sp), color = c.text, textAlign = TextAlign.Center)
-        WLText(description, WLType.body.copy(lineHeight = 1.5f.times(14).sp), color = c.textSecondary, textAlign = TextAlign.Center)
+        WLText(description, WLType.body.copy(lineHeight = 1.5.em), color = c.textSecondary, textAlign = TextAlign.Center)
     }
 }
