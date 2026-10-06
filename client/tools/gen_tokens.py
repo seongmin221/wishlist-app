@@ -7,6 +7,7 @@
 """
 import json
 import os
+import re
 import sys
 
 MOTION_IN = "design/handoff/interactions/tokens.json"
@@ -92,7 +93,10 @@ def num(value):
 
 
 def hex_int(color):
-    return color.lstrip("#").upper()
+    # Swift의 UInt32 RGB와 Android의 불투명 ARGB가 같은 색을 내도록 형식을 고정한다.
+    if not isinstance(color, str) or re.fullmatch(r"#[0-9a-fA-F]{6}", color) is None:
+        raise ValueError("color must be #RRGGBB, got %r" % (color,))
+    return color[1:].upper()
 
 
 def vals(section):

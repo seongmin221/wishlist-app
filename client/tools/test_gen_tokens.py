@@ -24,6 +24,14 @@ def purpose_keys(text, pattern):
 
 
 class GenTokensTest(unittest.TestCase):
+    def test_color_requires_six_digit_rgb(self):
+        for color in ("#FFF", "#FFFFFFFF", "123456", "##123456", "#12GG56", "#123456\n", None, 123456):
+            with self.subTest(color=color), self.assertRaisesRegex(ValueError, "#RRGGBB"):
+                gen_tokens.hex_int(color)
+
+    def test_color_normalizes_valid_rgb(self):
+        self.assertEqual(gen_tokens.hex_int("#aB12ef"), "AB12EF")
+
     @classmethod
     def setUpClass(cls):
         cls.outputs = gen_tokens.generate(REPO)
