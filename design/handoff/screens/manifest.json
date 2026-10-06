@@ -1,0 +1,1325 @@
+{
+ "source": "https://claude.ai/artifact/DDuoeFQ7k7i9yBqY2H9qDK",
+ "pages": {
+  "fullL": "전체 화면 · 라이트",
+  "fullD": "전체 화면 · 다크"
+ },
+ "boards": [
+  {
+   "file": "FHomeD.dc.html",
+   "title": "홈 · 할 일 접고 펼치기",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeFillFlowD.dc.html",
+    "FHomeReviewFlowD.dc.html",
+    "FPurposeDetailD.dc.html",
+    "FPurposeHomeD.dc.html",
+    "FSettingsD.dc.html"
+   ]
+  },
+  {
+   "file": "FHomeReviewFlowD.dc.html",
+   "title": "홈 · 분류·목적 확인 연속 처리",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FHomeFillFlowD.dc.html",
+   "title": "홈 · 정보 보완 연속 처리",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateCompareD.dc.html",
+   "title": "홈 · 중복 후보 비교 시트",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateConfirmBothD.dc.html",
+   "title": "홈 · 중복 · 둘 다 두기 확인",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateConfirmNewD.dc.html",
+   "title": "홈 · 중복 · 새 항목 지우기 확인",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateConfirmOldD.dc.html",
+   "title": "홈 · 중복 · 기존 항목 지우기 확인",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryHomeD.dc.html",
+   "title": "카테고리 · 첫 화면",
+   "group": "카테고리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryAddSheetD.dc.html",
+   "title": "카테고리 · + 추가 시트",
+   "group": "카테고리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryListD.dc.html",
+   "title": "카테고리 · 세부 유형 목록",
+   "group": "카테고리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryListCustomD.dc.html",
+   "title": "카테고리 · 직접 만든 카테고리 목록 (⋯ 편집·삭제)",
+   "group": "카테고리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryListCustomEmptyD.dc.html",
+   "title": "카테고리 · 직접 만든 카테고리 (상품 없음)",
+   "group": "카테고리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryEditSheetD.dc.html",
+   "title": "카테고리 · 편집 시트",
+   "group": "카테고리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryDeleteConfirmD.dc.html",
+   "title": "카테고리 · 삭제 확인",
+   "group": "카테고리",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeHomeD.dc.html",
+   "title": "목적 · 첫 화면",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeDetailD.dc.html",
+    "FPurposeDetailEmptyD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeCreateD.dc.html",
+   "title": "목적 · 새 목적 만들기 시트",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeDetailD.dc.html",
+    "FPurposeDetailEmptyD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeDetailD.dc.html",
+   "title": "목적 · 상세",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeDetailEmptyD.dc.html",
+   "title": "목적 · 빈 목적 상세",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeEditInPlaceD.dc.html",
+   "title": "목적 · 그 자리에서 편집",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeDeleteConfirmD.dc.html",
+   "title": "목적 · 삭제 확인",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeAddCandidatesD.dc.html",
+   "title": "목적 · 후보 추가 시트",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeAddCategoryFilterD.dc.html",
+   "title": "목적 · 후보 추가 · 카테고리로 거르기",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeFinishPickD.dc.html",
+   "title": "목적 · 비교 끝내기 · 구매 상품 고르기",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeFinishConfirmD.dc.html",
+   "title": "목적 · 비교 끝내기 · 아카이브 확인",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeFinishDoneD.dc.html",
+   "title": "목적 · 비교 끝내기 · 완료",
+   "group": "목적",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FProductDetailD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductDetailD.dc.html",
+   "title": "상품 · 상세",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductEditD.dc.html",
+   "title": "상품 · 그 자리에서 편집",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductPurposeSheetD.dc.html",
+   "title": "상품 · 편집 · 목적 선택 시트",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductCategoryPickerD.dc.html",
+   "title": "상품 · 편집 · 카테고리 선택 시트",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductCategoryCreateD.dc.html",
+   "title": "상품 · 편집 · 새 세부 카테고리",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductDeleteConfirmD.dc.html",
+   "title": "상품 · 삭제 확인 (도움말 펼침)",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductFillD.dc.html",
+   "title": "상품 · 정보 보완 필요",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductFillEditD.dc.html",
+   "title": "상품 · 정보 보완 필요 · 편집",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FProductProcessingD.dc.html",
+   "title": "상품 · 분석 중",
+   "group": "상품",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html",
+    "FWebViewD.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveListD.dc.html",
+   "title": "아카이브 · 끝난 비교 목록",
+   "group": "아카이브",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveDetailD.dc.html",
+    "FArchiveDetailNoPurchaseD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveDetailD.dc.html",
+   "title": "아카이브 · 상세 (구매 있음)",
+   "group": "아카이브",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveDetailNoPurchaseD.dc.html",
+   "title": "아카이브 · 상세 (구매 없음)",
+   "group": "아카이브",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveEditD.dc.html",
+   "title": "아카이브 · 제목 수정",
+   "group": "아카이브",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveRestoreConfirmD.dc.html",
+   "title": "아카이브 · 비교 다시 열기 확인",
+   "group": "아카이브",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveDeleteConfirmD.dc.html",
+   "title": "아카이브 · 기록 삭제 확인",
+   "group": "아카이브",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListD.dc.html",
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FPurposeHomeD.dc.html"
+   ]
+  },
+  {
+   "file": "FLoginD.dc.html",
+   "title": "로그인 안내 (첫 실행)",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeD.dc.html",
+    "FHomeLoggedOutD.dc.html"
+   ]
+  },
+  {
+   "file": "FHomeLoggedOutD.dc.html",
+   "title": "홈 · 로그인 전",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeD.dc.html",
+    "FHomeD.dc.html",
+    "FLoginD.dc.html",
+    "FPurposeHomeD.dc.html",
+    "FSettingsLoggedOutD.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsD.dc.html",
+   "title": "설정",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginD.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsLoggedOutD.dc.html",
+   "title": "설정 · 로그인 전",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginD.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsLogoutD.dc.html",
+   "title": "설정 · 로그아웃 확인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginD.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsWebviewClearD.dc.html",
+   "title": "설정 · 웹뷰 데이터 삭제 확인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginD.dc.html"
+   ]
+  },
+  {
+   "file": "FShareSavedD.dc.html",
+   "title": "공유 수신 · 저장 완료",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": []
+  },
+  {
+   "file": "FShareSavedLocalD.dc.html",
+   "title": "공유 수신 · 로그인 전",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": []
+  },
+  {
+   "file": "FShareSavedOfflineD.dc.html",
+   "title": "공유 수신 · 오프라인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": []
+  },
+  {
+   "file": "FWebViewD.dc.html",
+   "title": "웹뷰 · 원본 링크",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FProductDetailD.dc.html"
+   ]
+  },
+  {
+   "file": "FWebViewShareD.dc.html",
+   "title": "웹뷰 · 공유 시트",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FProductDetailD.dc.html"
+   ]
+  },
+  {
+   "file": "FWebViewExternalD.dc.html",
+   "title": "웹뷰 · 외부 앱 열기 확인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "dark",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FProductDetailD.dc.html"
+   ]
+  },
+  {
+   "file": "FHomeL.dc.html",
+   "title": "홈 · 할 일 접고 펼치기",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeFillFlowL.dc.html",
+    "FHomeReviewFlowL.dc.html",
+    "FPurposeDetailL.dc.html",
+    "FPurposeHomeL.dc.html",
+    "FSettingsL.dc.html"
+   ]
+  },
+  {
+   "file": "FHomeReviewFlowL.dc.html",
+   "title": "홈 · 분류·목적 확인 연속 처리",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FHomeFillFlowL.dc.html",
+   "title": "홈 · 정보 보완 연속 처리",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateCompareL.dc.html",
+   "title": "홈 · 중복 후보 비교 시트",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateConfirmBothL.dc.html",
+   "title": "홈 · 중복 · 둘 다 두기 확인",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateConfirmNewL.dc.html",
+   "title": "홈 · 중복 · 새 항목 지우기 확인",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FDuplicateConfirmOldL.dc.html",
+   "title": "홈 · 중복 · 기존 항목 지우기 확인",
+   "group": "홈 · 처리 영역은 연속 처리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryHomeL.dc.html",
+   "title": "카테고리 · 첫 화면",
+   "group": "카테고리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryAddSheetL.dc.html",
+   "title": "카테고리 · + 추가 시트",
+   "group": "카테고리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryListL.dc.html",
+   "title": "카테고리 · 세부 유형 목록",
+   "group": "카테고리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryListCustomL.dc.html",
+   "title": "카테고리 · 직접 만든 카테고리 목록 (⋯ 편집·삭제)",
+   "group": "카테고리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryListCustomEmptyL.dc.html",
+   "title": "카테고리 · 직접 만든 카테고리 (상품 없음)",
+   "group": "카테고리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryEditSheetL.dc.html",
+   "title": "카테고리 · 편집 시트",
+   "group": "카테고리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FCategoryDeleteConfirmL.dc.html",
+   "title": "카테고리 · 삭제 확인",
+   "group": "카테고리",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeHomeL.dc.html",
+   "title": "목적 · 첫 화면",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeDetailEmptyL.dc.html",
+    "FPurposeDetailL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeCreateL.dc.html",
+   "title": "목적 · 새 목적 만들기 시트",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeDetailEmptyL.dc.html",
+    "FPurposeDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeDetailL.dc.html",
+   "title": "목적 · 상세",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeDetailEmptyL.dc.html",
+   "title": "목적 · 빈 목적 상세",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeEditInPlaceL.dc.html",
+   "title": "목적 · 그 자리에서 편집",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeDeleteConfirmL.dc.html",
+   "title": "목적 · 삭제 확인",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeAddCandidatesL.dc.html",
+   "title": "목적 · 후보 추가 시트",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeAddCategoryFilterL.dc.html",
+   "title": "목적 · 후보 추가 · 카테고리로 거르기",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeFinishPickL.dc.html",
+   "title": "목적 · 비교 끝내기 · 구매 상품 고르기",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeFinishConfirmL.dc.html",
+   "title": "목적 · 비교 끝내기 · 아카이브 확인",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FPurposeFinishDoneL.dc.html",
+   "title": "목적 · 비교 끝내기 · 완료",
+   "group": "목적",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FProductDetailL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductDetailL.dc.html",
+   "title": "상품 · 상세",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductEditL.dc.html",
+   "title": "상품 · 그 자리에서 편집",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductPurposeSheetL.dc.html",
+   "title": "상품 · 편집 · 목적 선택 시트",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductCategoryPickerL.dc.html",
+   "title": "상품 · 편집 · 카테고리 선택 시트",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductCategoryCreateL.dc.html",
+   "title": "상품 · 편집 · 새 세부 카테고리",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductDeleteConfirmL.dc.html",
+   "title": "상품 · 삭제 확인 (도움말 펼침)",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryListL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductFillL.dc.html",
+   "title": "상품 · 정보 보완 필요",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductFillEditL.dc.html",
+   "title": "상품 · 정보 보완 필요 · 편집",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FProductProcessingL.dc.html",
+   "title": "상품 · 분석 중",
+   "group": "상품",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html",
+    "FWebViewL.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveListL.dc.html",
+   "title": "아카이브 · 끝난 비교 목록",
+   "group": "아카이브",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveDetailL.dc.html",
+    "FArchiveDetailNoPurchaseL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveDetailL.dc.html",
+   "title": "아카이브 · 상세 (구매 있음)",
+   "group": "아카이브",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveDetailNoPurchaseL.dc.html",
+   "title": "아카이브 · 상세 (구매 없음)",
+   "group": "아카이브",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveEditL.dc.html",
+   "title": "아카이브 · 제목 수정",
+   "group": "아카이브",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveRestoreConfirmL.dc.html",
+   "title": "아카이브 · 비교 다시 열기 확인",
+   "group": "아카이브",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FArchiveDeleteConfirmL.dc.html",
+   "title": "아카이브 · 기록 삭제 확인",
+   "group": "아카이브",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FArchiveListL.dc.html",
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FPurposeHomeL.dc.html"
+   ]
+  },
+  {
+   "file": "FLoginL.dc.html",
+   "title": "로그인 안내 (첫 실행)",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FHomeL.dc.html",
+    "FHomeLoggedOutL.dc.html"
+   ]
+  },
+  {
+   "file": "FHomeLoggedOutL.dc.html",
+   "title": "홈 · 로그인 전",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FCategoryHomeL.dc.html",
+    "FHomeL.dc.html",
+    "FLoginL.dc.html",
+    "FPurposeHomeL.dc.html",
+    "FSettingsLoggedOutL.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsL.dc.html",
+   "title": "설정",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginL.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsLoggedOutL.dc.html",
+   "title": "설정 · 로그인 전",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginL.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsLogoutL.dc.html",
+   "title": "설정 · 로그아웃 확인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginL.dc.html"
+   ]
+  },
+  {
+   "file": "FSettingsWebviewClearL.dc.html",
+   "title": "설정 · 웹뷰 데이터 삭제 확인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FLoginL.dc.html"
+   ]
+  },
+  {
+   "file": "FShareSavedL.dc.html",
+   "title": "공유 수신 · 저장 완료",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": []
+  },
+  {
+   "file": "FShareSavedLocalL.dc.html",
+   "title": "공유 수신 · 로그인 전",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": []
+  },
+  {
+   "file": "FShareSavedOfflineL.dc.html",
+   "title": "공유 수신 · 오프라인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": []
+  },
+  {
+   "file": "FWebViewL.dc.html",
+   "title": "웹뷰 · 원본 링크",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FProductDetailL.dc.html"
+   ]
+  },
+  {
+   "file": "FWebViewShareL.dc.html",
+   "title": "웹뷰 · 공유 시트",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FProductDetailL.dc.html"
+   ]
+  },
+  {
+   "file": "FWebViewExternalL.dc.html",
+   "title": "웹뷰 · 외부 앱 열기 확인",
+   "group": "로그인 · 설정 · 공유 수신 · 웹뷰",
+   "theme": "light",
+   "width": 390,
+   "height": 844,
+   "links": [
+    "FProductDetailL.dc.html"
+   ]
+  }
+ ]
+}

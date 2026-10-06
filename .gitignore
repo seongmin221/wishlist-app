@@ -3,3 +3,15 @@
 server/.gradle/
 server/build/
 server/.kotlin/
+
+# Client build outputs and machine-specific IDE configuration
+client/.gradle/
+client/.kotlin/
+client/**/build/
+client/local.properties
+client/.idea/
+client/**/*.iml
+client/ios/DerivedData/
+client/ios/**/xcuserdata/
+client/ios/**/*.xcuserstate
+.DS_Store

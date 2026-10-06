@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>라이트 세부 카테고리 추가</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&amp;family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1D1D1D;text-decoration:none}a:hover{color:#5E5E5E}
+input::placeholder{color:#5E5E5E}
+input.ed:focus{border-bottom-color:currentColor !important}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F8F8F8; color: #1D1D1D; font-family: 'IBM Plex Sans KR', sans-serif">
+<div style="position: absolute; inset: 0; display: flex; flex-direction: column">
+<header style="padding: 56px 20px 16px; display: flex; flex-direction: column; gap: 6px"><h1 style="margin: 0; font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 28px; line-height: 1.0">카테고리</h1><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">상품 69개</span></header>
+<div style="flex-grow: 1; min-height: 0; display: flex; border-top: 1px solid #E2E2E2">
+<nav aria-label="상위 카테고리" style="width: 124px; flex-shrink: 0; padding: 8px 0 120px; display: flex; flex-direction: column; overflow-y: auto"><sc-for list="{{rail}}" as="r" hint-placeholder-count="8"><sc-if value="{{r.on}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{r.pick}}" aria-current="true" style="all: unset; cursor: pointer; box-sizing: border-box; min-height: 52px; border-left: 3px solid #1D1D1D; padding: 8px 10px 8px 17px; font-weight: 700; display: flex; align-items: center; font-size: 15px; line-height: 1.3; word-break: keep-all">{{r.label}}</button></sc-if><sc-if value="{{r.off}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{r.pick}}" style="all: unset; cursor: pointer; box-sizing: border-box; min-height: 52px; padding: 8px 10px 8px 20px; color: #5E5E5E; display: flex; align-items: center; font-size: 15px; line-height: 1.3; word-break: keep-all">{{r.label}}</button></sc-if></sc-for></nav>
+<section style="flex-grow: 1; min-width: 0; padding: 8px 16px 120px 8px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto"><h2 style="margin: 0; min-height: 44px; display: flex; align-items: center; font-size: 13px; font-weight: 500; color: #5E5E5E">{{curName}}</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{chips}}" as="ty" hint-placeholder-count="6"><a href="{{ty.href}}" style="box-sizing: border-box; height: 40px; padding: 0 14px; border-radius: 20px; display: flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 14px; background: #FFFFFF; color: #1D1D1D"><span>{{ty.name}}</span><span style="font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: #5E5E5E">{{ty.count}}</span></a></sc-for>
+<button type="button" onClick="{{addChip}}" style="all: unset; cursor: pointer; box-sizing: border-box; height: 40px; padding: 0 14px; border-radius: 20px; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 14px; border: 1.5px dashed #5E5E5E; color: #5E5E5E"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>추가</button></div>
+</section>
+</div>
+</div>
+<nav aria-label="하단 탭" style="position: absolute; left: 16px; right: 16px; bottom: 24px; z-index: 5; height: 64px; box-sizing: border-box; padding: 8px; border-radius: 32px; background: #1D1D1D; display: flex; align-items: center; justify-content: space-between"><a href="FHomeL.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>홈</a><a href="FCategoryHomeL.dc.html" aria-current="page" style="flex-grow: 1; height: 48px; border-radius: 24px; background: #FFFFFF; color: #1D1D1D; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="2"></rect><rect x="13" y="4" width="7" height="7" rx="2"></rect><rect x="4" y="13" width="7" height="7" rx="2"></rect><rect x="13" y="13" width="7" height="7" rx="2"></rect></svg>카테고리</a><a href="FPurposeHomeL.dc.html" style="flex-grow: 1; height: 48px; border-radius: 24px; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; text-decoration: none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="8" width="16" height="12" rx="3"></rect><path d="M7 5h10"></path></svg>목적</a></nav>
+<sc-if value="{{sheetOpen}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></div>
+<div style="position: absolute; left: 0; right: 0; top: 96px; bottom: 0; z-index: 11; border-radius: 36px 36px 0 0; background: #FFFFFF; display: flex; flex-direction: column">
+<div style="align-self: center; width: 40px; height: 5px; margin-top: 10px; border-radius: 3px; background: #DCDCDC"></div>
+<div style="padding: 8px 12px 0 20px; display: flex; align-items: center; gap: 8px"><h2 style="flex-grow: 1; margin: 0; font-size: 20px; font-weight: 700"><sc-if value="{{isCreate}}" hint-placeholder-val="{{false}}">신규 카테고리</sc-if></h2><button type="button" onClick="{{closeSheet}}" aria-label="닫기" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 120px; display: flex; flex-direction: column; gap: 20px">
+<sc-if value="{{isCreate}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #5E5E5E"><span>상위 카테고리 · 필수</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;"></span></span><div style="display: flex; flex-wrap: wrap; gap: 8px"><sc-for list="{{tops}}" as="t" hint-placeholder-count="11"><sc-if value="{{t.on}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{t.pick}}" style="all: unset; cursor: pointer; box-sizing: border-box; height: 40px; padding: 0 16px; border-radius: 20px; display: flex; align-items: center; font-size: 14px; white-space: nowrap; background: #1D1D1D; color: #FFFFFF; font-weight: 700">{{t.name}}</button></sc-if><sc-if value="{{t.off}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{t.pick}}" style="all: unset; cursor: pointer; box-sizing: border-box; height: 40px; padding: 0 16px; border-radius: 20px; display: flex; align-items: center; font-size: 14px; white-space: nowrap; background: #F0F0F0; color: #1D1D1D">{{t.name}}</button></sc-if></sc-for></div></div>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #5E5E5E"><span>이름 · 필수</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">최대 40자</span></span><input type="text" maxLength="40" placeholder="예: 오디오 케이블·DAC" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; height: 56px; padding: 0 18px; border-radius: 20px; border: none; background: #F0F0F0; font: inherit; font-size: 16px; color: inherit; outline: none"></label>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #5E5E5E"><span>설명 · 선택</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">최대 200자</span></span><textarea maxLength="200" rows="2" placeholder="어떤 상품을 넣을지 적어 두면 AI 분류에 참고해요" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; padding: 16px 18px; border-radius: 20px; border: none; background: #F0F0F0; font: inherit; font-size: 16px; line-height: 1.5; color: inherit; outline: none; resize: none"></textarea></label>
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="display: flex; justify-content: space-between; font-size: 13px; color: #5E5E5E"><span>포함 예시 · 선택</span><span style="font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; font-weight: 500; white-space: nowrap; color: #5E5E5E;">최대 5개</span></span><input type="text" maxLength="60" placeholder="예시를 입력하고 추가" onInput="{{markDirty}}" style="box-sizing: border-box; width: 100%; height: 56px; padding: 0 18px; border-radius: 20px; border: none; background: #F0F0F0; font: inherit; font-size: 16px; color: inherit; outline: none"></div>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; word-break: keep-all; color: #5E5E5E">공용 카테고리는 바뀌지 않고, 나만 쓰는 세부 카테고리로 추가돼요.</p></sc-if>
+</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 20px 36px; background: #FFFFFF; display: flex; gap: 10px">
+<button type="button" onClick="{{closeSheet}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: #F0F0F0; color: #1D1D1D; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 500">취소</button>
+<button type="button" onClick="{{save}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: #1D1D1D; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 700; flex-grow: 2"><sc-if value="{{isCreate}}" hint-placeholder-val="{{false}}">만들기</sc-if></button>
+</div>
+</div></sc-if><sc-if value="{{isDiscard}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,0.24); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px)"></div>
+<div role="dialog" aria-label="변경 사항을 버릴까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 36px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">변경 사항을 버릴까요?</h2><ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6"><li>편집한 내용이 저장되지 않아요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{keepEditing}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #F0F0F0; color: #1D1D1D; font-size: 16px; font-weight: 500">계속 편집</button><button type="button" onClick="{{discardAll}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1D1D1D; color: #FFFFFF; font-size: 16px; font-weight: 700">버리기</button></div>
+</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = Object.assign({ sel: '디지털·IT', sheet: null, newTop: '디지털·IT', dirty: false, discard: false }, { sheet: 'create' }); }
+renderVals() {
+const s = this.state;
+const home = [{"name": "패션·잡화", "types": [{"name": "신발", "count": 5, "href": "#", "custom": false}, {"name": "아우터", "count": 3, "href": "#", "custom": false}, {"name": "가방", "count": 3, "href": "#", "custom": false}, {"name": "상의", "count": 2, "href": "#", "custom": false}, {"name": "패션 소품", "count": 2, "href": "#", "custom": false}], "label": "패션·​잡화"}, {"name": "뷰티·퍼스널케어", "types": [{"name": "스킨케어", "count": 2, "href": "#", "custom": false}, {"name": "향수", "count": 2, "href": "#", "custom": false}], "label": "뷰티·​퍼스널케어"}, {"name": "디지털·IT", "types": [{"name": "헤드폰", "count": 8, "href": "FCategoryListL.dc.html", "custom": false}, {"name": "키보드", "count": 3, "href": "#", "custom": false}, {"name": "카메라·액션캠", "count": 3, "href": "#", "custom": false}, {"name": "모니터", "count": 2, "href": "#", "custom": false}, {"name": "마우스·트랙패드", "count": 2, "href": "#", "custom": false}, {"name": "웨어러블 기기", "count": 2, "href": "#", "custom": false}, {"name": "이어폰", "count": 1, "href": "#", "custom": false}, {"name": "태블릿", "count": 1, "href": "#", "custom": false}, {"name": "오디오 케이블·DAC", "count": 2, "href": "FCategoryListCustomL.dc.html", "custom": true}], "label": "디지털·​IT"}, {"name": "가구·인테리어", "types": [{"name": "조명", "count": 3, "href": "#", "custom": false}, {"name": "의자", "count": 2, "href": "#", "custom": false}, {"name": "책상·테이블", "count": 2, "href": "#", "custom": false}], "label": "가구·​인테리어"}, {"name": "생활·주방·가전", "types": [{"name": "주방 가전", "count": 3, "href": "#", "custom": false}, {"name": "공기·온습도 관리", "count": 2, "href": "#", "custom": false}, {"name": "조리 도구", "count": 1, "href": "#", "custom": false}], "label": "생활·​주방·​가전"}, {"name": "스포츠·아웃도어·여행", "types": [{"name": "캠핑 용품", "count": 4, "href": "#", "custom": false}, {"name": "러닝 용품", "count": 2, "href": "#", "custom": false}, {"name": "여행 가방·캐리어", "count": 2, "href": "#", "custom": false}, {"name": "백패킹 소품", "count": 1, "href": "#", "custom": true}], "label": "스포츠·​아웃도어·​여행"}, {"name": "취미·문화·컬렉터블", "types": [{"name": "피규어·컬렉터블", "count": 2, "href": "#", "custom": false}, {"name": "보드게임·퍼즐", "count": 1, "href": "#", "custom": false}, {"name": "레고", "count": 0, "href": "FCategoryListCustomEmptyL.dc.html", "custom": true}], "label": "취미·​문화·​컬렉터블"}, {"name": "건강·웰빙", "types": [{"name": "수면·회복 용품", "count": 1, "href": "#", "custom": false}], "label": "건강·​웰빙"}];
+const tops = ["패션·잡화", "뷰티·퍼스널케어", "디지털·IT", "가구·인테리어", "생활·주방·가전", "스포츠·아웃도어·여행", "취미·문화·컬렉터블", "유아·키즈", "반려동물", "자동차·모빌리티", "건강·웰빙"];
+const cur = home.find((t) => t.name === s.sel) || home[0];
+return {
+rail: home.map((t) => ({ label: t.label, on: t.name === cur.name, off: t.name !== cur.name, pick: () => this.setState({ sel: t.name }) })),
+curName: cur.name, chips: cur.types,
+addChip: () => this.setState({ sheet: 'create', newTop: cur.name, dirty: false }),
+isEdit: false, isCreate: s.sheet === 'create', sheetOpen: !!s.sheet,
+closeSheet: () => s.dirty ? this.setState({ discard: true }) : this.setState({ sheet: null }),
+markDirty: () => { if (!s.dirty) this.setState({ dirty: true }); },
+isDiscard: s.discard, keepEditing: () => this.setState({ discard: false }), discardAll: () => this.setState({ discard: false, sheet: null, dirty: false }),
+save: () => this.setState({ sheet: null, dirty: false }),
+tops: tops.map((n) => ({ name: n, on: s.newTop === n, off: s.newTop !== n, pick: () => this.setState({ newTop: n }) }))
+};
+}
+}
+</script>
+</body>
+</html>

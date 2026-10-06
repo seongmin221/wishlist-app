@@ -10,7 +10,11 @@
 | Android | Kotlin, Jetpack Compose, `ACTION_SEND` 수신, Android 보안 저장소·알림·앱 생명주기 |
 | KMP | Domain model, Repository, UseCase, API client, local DB/cache, sync, URL normalization |
 
-공유 계층은 UI 프레임워크를 알지 않아야 한다. SwiftUI와 Compose는 각 플랫폼의 화면 상태와 사용자 상호작용만 담당하고, 저장·동기화 결과는 공통 UseCase를 통해 받는다.
+공유 계층은 UI 프레임워크를 알지 않아야 한다. 화면의 비즈니스 상태(데이터, 로딩·오류, 편집 초안, 연속 처리 진행, 충돌 복구)는 KMP Presenter가 소유한다. SwiftUI와 Compose는 Presenter를 감싼 얇은 래퍼(Android `ViewModel`, iOS `@Observable`)로 그 상태를 그리고, 시트 열림·애니메이션·스크롤 측정 같은 순수 UI 상태와 내비게이션·공유 요소 전환만 직접 다룬다.
+
+## 구현 진행 방식
+
+서버 API가 묶음 순서로 늘어나는 동안 클라이언트는 서버 계약을 먼저 옮겨 쓰고 KMP fake로 화면을 완성한다. 서버 묶음이 끝나면 실제 API로 바꾼다. 기능 단계마다 KMP → Android → iOS를 함께 끝낸다. 단계 구성과 완료 기준은 [구현 로드맵 설계](../../superpowers/specs/2026-10-05-client-implementation-roadmap-design.md), 결정 근거는 [ADR-027](../../history/architecture/client/ADR-027-client-implementation-strategy.md)을 따른다.
 
 ## 공통 웹뷰 구현 책임
 

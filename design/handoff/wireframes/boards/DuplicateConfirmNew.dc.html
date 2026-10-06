@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>중복 후보 새 항목 지우기 확인</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1A1A1A;text-decoration:none}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; color: #1A1A1A; font-family: 'IBM Plex Sans KR', sans-serif; display: flex; flex-direction: column">
+<header style="padding: 52px 16px 8px; display: flex; align-items: center; gap: 8px">
+<a href="Home.dc.html" aria-label="닫기" style="width: 44px; height: 44px; border-radius: 22px; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+<div style="flex-grow: 1; text-align: center; font-size: 16px; font-weight: 700">분류·목적 확인</div>
+<sc-if value="{{notDone}}" hint-placeholder-val="{{true}}"><div style="width: 44px; text-align: right; font-size: 15px; color: #6B6B6B">{{pos}}</div></sc-if>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}"><div style="width: 44px"></div></sc-if>
+</header>
+<sc-if value="{{notDone}}" hint-placeholder-val="{{true}}">
+<div style="flex-grow: 1; display: flex; flex-direction: column; padding: 12px 20px 120px; gap: 16px">
+<div style="position: relative; flex-grow: 1">
+<sc-if value="{{hasBack2}}" hint-placeholder-val="{{true}}"><div style="position: absolute; inset: 14px 6px -6px; border-radius: 28px; background: #E2E2E2; transform: rotate(3deg)"></div></sc-if>
+<sc-if value="{{hasBack1}}" hint-placeholder-val="{{true}}"><div style="position: absolute; inset: 8px 2px -2px; border-radius: 28px; background: #EBEBEB; transform: rotate(-2.5deg)"></div></sc-if>
+<article style="position: absolute; inset: 0; box-sizing: border-box; padding: 14px; border-radius: 28px; background: #FFFFFF; border: 1.5px solid #D6D6D6; display: flex; flex-direction: column; gap: 12px">
+<div style="height: 190px; flex-shrink: 0; border-radius: 18px; background: #C9C9C9"></div>
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 0 4px">
+<div style="font-size: 18px; font-weight: 700">{{cur.name}}</div>
+<div style="font-size: 16px">{{cur.price}}</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 4px 0 14px; border-radius: 14px; background: #F4F4F4">
+<span style="width: 44px; font-size: 13px; color: #6B6B6B">카테고리</span>
+<span style="flex-grow: 1; font-size: 15px; font-weight: 700">{{cur.cat}}</span>
+<button type="button" style="all: unset; cursor: pointer; min-height: 44px; padding: 0 12px; font-size: 14px; color: #6B6B6B">변경</button>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 4px 0 14px; border-radius: 14px; background: #F4F4F4">
+<span style="width: 44px; font-size: 13px; color: #6B6B6B">목적</span>
+<span style="flex-grow: 1; font-size: 15px; font-weight: 700">{{cur.purpose}}</span>
+<button type="button" style="all: unset; cursor: pointer; min-height: 44px; padding: 0 12px; font-size: 14px; color: #6B6B6B">변경</button>
+</div>
+</div>
+<div style="font-size: 13px; color: #6B6B6B; padding: 0 4px">{{cur.why}}</div>
+<sc-if value="{{dupOpenNotice}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 12px; border-radius: 14px; border: 1.5px dashed #BDBDBD">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"></path></svg>
+<span style="flex-grow: 1; font-size: 13px; line-height: 1.4">같은 상품으로 보이는 항목이 있어요</span>
+<button type="button" onClick="{{openDup}}" style="all: unset; cursor: pointer; min-height: 44px; padding: 0 10px; font-size: 14px; font-weight: 700">비교</button>
+</div>
+</sc-if>
+<sc-if value="{{dupDoneNotice}}" hint-placeholder-val="{{false}}"><div style="display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 14px; background: #F4F4F4; font-size: 13px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"></path></svg>{{dupDoneText}}</div></sc-if>
+</article>
+</div>
+<div style="text-align: center; font-size: 13px; color: #6B6B6B">오른쪽으로 밀면 확정, 왼쪽으로 밀면 보류</div>
+<div style="display: flex; gap: 10px">
+<button type="button" onClick="{{hold}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: 1.5px solid #1A1A1A; background: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>보류</button>
+<button type="button" onClick="{{confirm}}" style="flex: 1 1 0; height: 56px; border-radius: 28px; border: none; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px">확정<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+<div style="flex-grow: 1; padding: 0 24px 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center">
+<span style="width: 64px; height: 64px; border-radius: 20px; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"></path></svg></span>
+<h2 style="margin: 0; font-size: 24px; font-weight: 700">다 확인했어요</h2>
+<p style="margin: 0; font-size: 15px; color: #6B6B6B">{{summary}}</p>
+<a href="Home.dc.html" style="margin-top: 12px; height: 52px; padding: 0 28px; border-radius: 26px; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; font-size: 16px">홈으로</a>
+<button type="button" onClick="{{restart}}" style="all: unset; cursor: pointer; min-height: 44px; font-size: 14px; color: #6B6B6B">처음부터 다시 보기</button>
+</div>
+</sc-if>
+<sc-if value="{{dupOpen}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 10; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div style="position: absolute; left: 0; right: 0; top: 64px; bottom: 0; z-index: 11; border-radius: 28px 28px 0 0; background: #FFFFFF; display: flex; flex-direction: column">
+<div style="align-self: center; width: 40px; height: 5px; margin-top: 10px; border-radius: 3px; background: #D0D0D0"></div>
+<div style="padding: 8px 12px 0 20px; display: flex; align-items: flex-start; gap: 8px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px; padding-top: 6px"><h2 style="margin: 0; font-size: 20px; font-weight: 700">같은 상품일까요?</h2><p style="margin: 0; font-size: 14px; color: #6B6B6B">같은 상품으로 보이는 항목이 이미 있어요</p></div>
+<button type="button" onClick="{{closeDup}}" aria-label="닫기" style="width: 44px; height: 44px; border-radius: 22px; border: none; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 10px">
+<div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 20px; border: 2px solid #1A1A1A">
+<span style="align-self: flex-start; height: 26px; padding: 0 10px; border-radius: 8px; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; font-size: 12px; font-weight: 700">새로 저장</span>
+<div style="aspect-ratio: 1 / 1; border-radius: 14px; background: #C9C9C9"></div>
+<div style="font-size: 15px; font-weight: 700; line-height: 1.35">호카 스피드고트 6</div>
+<div style="font-size: 16px; font-weight: 700">₩209,000</div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">저장</span><span style="font-size: 14px">오늘</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">목적</span><span style="font-size: 14px">가을 트레일 러닝 (AI 연결)</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">카테고리</span><span style="font-size: 14px">신발</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">판매처</span><span style="font-size: 14px">musinsa.com</span></div>
+</div>
+<div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 20px; border: 1.5px solid #D6D6D6">
+<span style="align-self: flex-start; height: 26px; padding: 0 10px; border-radius: 8px; background: #F0F0F0; display: flex; align-items: center; font-size: 12px; font-weight: 700">이미 있던 상품</span>
+<div style="aspect-ratio: 1 / 1; border-radius: 14px; background: #C9C9C9"></div>
+<div style="font-size: 15px; font-weight: 700; line-height: 1.35">호카 스피드고트 6</div>
+<div style="font-size: 16px; font-weight: 700">₩199,000</div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">저장</span><span style="font-size: 14px">3주 전</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">목적</span><span style="font-size: 14px">가을 트레일 러닝</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">카테고리</span><span style="font-size: 14px">신발</span></div><div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #6B6B6B">판매처</span><span style="font-size: 14px">hoka.com</span></div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<button type="button" onClick="{{askBoth}}" style="height: 52px; border-radius: 26px; font-size: 16px; border: none; background: #1A1A1A; color: #FFFFFF">둘 다 두기</button>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{askNew}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: 1.5px solid #1A1A1A; background: #FFFFFF">새 항목 지우기</button>
+<button type="button" onClick="{{askOld}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: 1.5px solid #1A1A1A; background: #FFFFFF">기존 항목 지우기</button>
+</div>
+<p style="margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: #6B6B6B">어느 쪽도 자동으로 합치지 않아요. 고르지 않고 닫아도 두 항목 모두 남아요.</p>
+</div>
+</div>
+</div></sc-if>
+<sc-if value="{{confirmBoth}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="둘 다 둘까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">둘 다 둘까요?</h2>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; background: #F4F4F4"><span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; background: #C9C9C9"></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-size: 13px; color: #6B6B6B">새로 저장 · 오늘 · musinsa.com</span></span></div><div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; background: #F4F4F4"><span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; background: #C9C9C9"></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-size: 13px; color: #6B6B6B">이미 있던 상품 · 3주 전 · hoka.com</span></span></div>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>같은 상품이 목록과 목적에 두 번 보여요</li><li>나중에 상세에서 하나를 지울 수 있어요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{cancelConfirm}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: 1.5px solid #1A1A1A; background: #FFFFFF">취소</button><button type="button" onClick="{{keepBoth}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: none; background: #1A1A1A; color: #FFFFFF">둘 다 두기</button></div>
+</div></sc-if><sc-if value="{{confirmNew}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="새 항목을 지울까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">새 항목을 지울까요?</h2>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; background: #F4F4F4"><span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; background: #C9C9C9"></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-size: 13px; color: #6B6B6B">새로 저장 · 오늘 · musinsa.com</span></span></div>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>새 항목과 이 확인 카드가 사라져요</li><li>이미 있던 상품은 그대로 남아요</li><li>되돌릴 수 없어요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{cancelConfirm}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: 1.5px solid #1A1A1A; background: #FFFFFF">취소</button><button type="button" onClick="{{delNew}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: none; background: #1A1A1A; color: #FFFFFF">새 항목 지우기</button></div>
+</div></sc-if><sc-if value="{{confirmOld}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="이미 있던 상품을 지울까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">이미 있던 상품을 지울까요?</h2>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 14px; background: #F4F4F4"><span style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 10px; background: #C9C9C9"></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">호카 스피드고트 6</span><span style="font-size: 13px; color: #6B6B6B">이미 있던 상품 · 3주 전 · hoka.com</span></span></div>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>‘가을 트레일 러닝’ 후보에서 빠져요</li><li>새 항목은 그대로 남아요</li><li>되돌릴 수 없어요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{cancelConfirm}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: 1.5px solid #1A1A1A; background: #FFFFFF">취소</button><button type="button" onClick="{{delOld}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; font-size: 16px; border: none; background: #1A1A1A; color: #FFFFFF">기존 항목 지우기</button></div>
+</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = Object.assign({ i: 0, ok: 0, later: 0, dup: false, confirm: null, dupDone: null }, { i: 1, dup: true, confirm: 'new' }); }
+renderVals() {
+const items = [{"name": "마샬 MAJOR V", "price": "₩229,000", "cat": "헤드폰", "purpose": "출퇴근 헤드폰", "hasDup": false, "why": "AI가 카테고리와 목적을 연결했어요"}, {"name": "호카 스피드고트 6", "price": "₩209,000", "cat": "신발", "purpose": "가을 트레일 러닝", "hasDup": true, "why": "AI가 카테고리와 목적을 연결했어요"}, {"name": "발뮤다 더 토스터", "price": "₩349,000", "cat": "주방 가전", "purpose": "목적 미지정", "hasDup": false, "why": "AI가 카테고리를 정했어요. 맞는 목적은 찾지 못했어요"}];
+const s = this.state;
+const done = s.i >= items.length;
+const cur = done ? items[items.length - 1] : items[s.i];
+const left = done ? 0 : items.length - s.i - 1;
+return {
+cur: cur, done: done, notDone: !done,
+pos: (Math.min(s.i, items.length - 1) + 1) + ' / ' + items.length,
+hasBack1: left >= 1, hasBack2: left >= 2,
+summary: '확정 ' + s.ok + ' · 보류 ' + s.later,
+confirm: () => this.setState({ i: s.i + 1, ok: s.ok + 1 }),
+hold: () => this.setState({ i: s.i + 1, later: s.later + 1 }),
+restart: () => this.setState({ i: 0, ok: 0, later: 0, dupDone: null }),
+dupOpenNotice: !!cur.hasDup && !s.dupDone, dupDoneNotice: !!cur.hasDup && !!s.dupDone,
+dupDoneText: s.dupDone === 'both' ? '둘 다 두기로 했어요' : '이미 있던 상품을 지웠어요',
+dupOpen: s.dup, openDup: () => this.setState({ dup: true, confirm: null }), closeDup: () => this.setState({ dup: false }),
+askBoth: () => this.setState({ confirm: 'both' }), askNew: () => this.setState({ confirm: 'new' }), askOld: () => this.setState({ confirm: 'old' }), askConfirm: true,
+confirmBoth: s.confirm === 'both', confirmNew: s.confirm === 'new', confirmOld: s.confirm === 'old', cancelConfirm: () => this.setState({ confirm: null }),
+keepBoth: () => this.setState({ dup: false, confirm: null, dupDone: 'both' }),
+delNew: () => this.setState({ dup: false, confirm: null, i: s.i + 1 }),
+delOld: () => this.setState({ dup: false, confirm: null, dupDone: 'old' })
+};
+}
+}
+</script>
+</body>
+</html>

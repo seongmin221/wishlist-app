@@ -24,6 +24,10 @@ RECORDS = {
 FACE = {"L": "#E8E8E8", "D": "#3A3939"}  # 아카이브 상세의 위 면은 무채색
 
 
+def icon_svg(key, size):
+    return f'<svg aria-hidden="true" width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">{ICONS[key][1]}</svg>'
+
+
 def list_board(theme):
     T = THEMES[theme]
     cards = []
@@ -42,7 +46,7 @@ def list_board(theme):
         cards.append(f"""<a href="{href}" style="box-sizing: border-box; padding: 16px; border-radius: 28px; background: [[card]]; display: flex; flex-direction: column; gap: 12px">
 <div style="display: flex; align-items: center; gap: 14px">
 <div style="display: flex; flex-shrink: 0">{stack}</div>
-<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px"><span style="font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 20px; line-height: 1.0">{r['title']}</span><span style="[[lbl12:sub]]">후보 {r['count']} · {r['ended']}</span></div>[[RIGHT]]
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px"><span style="display: flex; align-items: center; gap: 8px"><span style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 10px; background: [[icon_tile]]; color: [[text]]; display: flex; align-items: center; justify-content: center">{icon_svg(r['icon'], 16)}</span><span style="min-width: 0; font-family: 'Do Hyeon', sans-serif; font-weight: 400; font-size: 20px; line-height: 1.0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{r['title']}</span></span><span style="[[lbl12:sub]]">후보 {r['count']} · {r['ended']}</span></div>[[RIGHT]]
 </div>{buy}</a>""")
     tpl = f"""<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: [[bg]]; color: [[text]]; font-family: 'IBM Plex Sans KR', sans-serif">
 <div style="position: absolute; inset: 0; overflow-y: auto">

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>설정 로그인 전</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+button{font:inherit;color:inherit}
+a{color:#1A1A1A;text-decoration:none}a:hover{color:#444444}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFFFF; color: #1A1A1A; font-family: 'IBM Plex Sans KR', sans-serif">
+<div style="position: absolute; inset: 0; overflow-y: auto">
+<div style="height: 44px"></div>
+<header style="position: sticky; top: 0; z-index: 1; background: #FFFFFF; padding: 12px 20px 14px; display: flex; align-items: center; gap: 12px">
+<a href="Home.dc.html" aria-label="뒤로" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 22px; background: #F0F0F0; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<h1 style="margin: 0; font-size: 22px; font-weight: 700">설정</h1>
+</header>
+<div style="padding: 8px 20px 60px; display: flex; flex-direction: column; gap: 24px">
+<section style="display: flex; flex-direction: column; gap: 8px"><h2 style="margin: 0; font-size: 13px; font-weight: 500; color: #6B6B6B">계정</h2><div style="border-radius: 18px; background: #F4F4F4; padding: 4px 0; display: flex; flex-direction: column"><sc-if value="{{logged}}" hint-placeholder-val="{{true}}"><div style="min-height: 72px; padding: 8px 16px; display: flex; align-items: center; gap: 12px"><span style="width: 44px; height: 44px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg></span><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px; font-weight: 700">user@example.com</span><span style="font-size: 13px; color: #6B6B6B">Google로 로그인됨</span></span></div>
+<button type="button" onClick="{{openOut}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 56px; padding: 8px 12px 8px 16px; display: flex; align-items: center; gap: 12px; color: #1A1A1A"><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px">로그아웃</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"></path></svg></button></sc-if><sc-if value="{{loggedOut}}" hint-placeholder-val="{{false}}"><div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px"><span style="font-size: 15px; line-height: 1.5">로그인하면 저장한 상품의 정보를 가져오고 다른 기기에서도 볼 수 있어요</span><a href="Login.dc.html" style="height: 48px; border-radius: 24px; background: #1A1A1A; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 15px">로그인</a></div></sc-if></div></section>
+<section style="display: flex; flex-direction: column; gap: 8px"><h2 style="margin: 0; font-size: 13px; font-weight: 500; color: #6B6B6B">원본 링크</h2><div style="border-radius: 18px; background: #F4F4F4; padding: 4px 0; display: flex; flex-direction: column"><button type="button" onClick="{{openWv}}" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 56px; padding: 8px 12px 8px 16px; display: flex; align-items: center; gap: 12px; color: #1A1A1A"><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px">웹뷰 데이터 삭제</span><span style="font-size: 13px; color: #6B6B6B">{{wvSub}}</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"></path></svg></button></div></section>
+<section style="display: flex; flex-direction: column; gap: 8px"><h2 style="margin: 0; font-size: 13px; font-weight: 500; color: #6B6B6B">앱 정보</h2><div style="border-radius: 18px; background: #F4F4F4; padding: 4px 0; display: flex; flex-direction: column"><button type="button" style="all: unset; cursor: pointer; box-sizing: border-box; width: 100%; min-height: 56px; padding: 8px 12px 8px 16px; display: flex; align-items: center; gap: 12px; color: #1A1A1A"><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px">버전</span></span><span style="font-size: 14px; color: #6B6B6B">1.0.0</span></button><a href="#" style="min-height: 56px; padding: 8px 12px 8px 16px; display: flex; align-items: center; gap: 12px; color: #1A1A1A"><span style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 16px">오픈소스 라이선스</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"></path></svg></a></div></section>
+</div>
+</div>
+<sc-if value="{{isOut}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="로그아웃할까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">로그아웃할까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>이 기기의 로그인만 풀려요</li><li>저장한 상품은 계정에 남아요</li><li>다시 로그인하면 이어서 볼 수 있어요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{closeOut}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font-size: 16px">취소</button><button type="button" onClick="{{doOut}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1A1A1A; color: #FFFFFF; font-size: 16px">로그아웃</button></div>
+</div></sc-if>
+<sc-if value="{{isWv}}" hint-placeholder-val="{{false}}"><div style="position: absolute; inset: 0; z-index: 20; background: rgba(26,26,26,0.28); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px)"></div>
+<div role="dialog" aria-label="웹뷰 데이터를 삭제할까요?" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); z-index: 21; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 26px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-size: 20px; font-weight: 700">웹뷰 데이터를 삭제할까요?</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6; display: flex; flex-direction: column; gap: 2px"><li>쇼핑몰 로그인이 풀려요</li><li>방문 기록과 쿠키가 지워져요</li><li>저장한 상품은 그대로예요</li></ul>
+<div style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{closeWv}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: 1.5px solid #1A1A1A; background: #FFFFFF; font-size: 16px">취소</button><button type="button" onClick="{{doWv}}" style="flex: 1 1 0; height: 52px; border-radius: 26px; border: none; background: #1A1A1A; color: #FFFFFF; font-size: 16px">삭제</button></div>
+</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+constructor(props) { super(props); this.state = Object.assign({ logged: true, out: false, wv: false, wvDone: false }, { logged: false }); }
+renderVals() {
+const s = this.state;
+return {
+logged: s.logged, loggedOut: !s.logged,
+isOut: s.out, openOut: () => this.setState({ out: true }), closeOut: () => this.setState({ out: false }), doOut: () => this.setState({ out: false, logged: false }),
+login: () => this.setState({ logged: true }),
+isWv: s.wv, openWv: () => this.setState({ wv: true }), closeWv: () => this.setState({ wv: false }), doWv: () => this.setState({ wv: false, wvDone: true }),
+wvDone: s.wvDone, wvSub: s.wvDone ? '방금 삭제했어요' : '쇼핑몰 로그인과 방문 기록'
+};
+}
+}
+</script>
+</body>
+</html>
