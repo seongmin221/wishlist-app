@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Observation
 
 // 공유 요소 전환의 원래 쪽·다음 화면 쪽 표시와 전환 중 그리기.
 //
@@ -44,6 +45,9 @@ struct WLSurfaceSpec {
 }
 
 /// 원래 요소·상세 자리의 탐침과 사진 그리기·면 모양. 관찰하지 않는 저장소다(값이 바뀌어도 화면을 다시 그리지 않는다).
+@Observable
+final class WLSourceVisibility { var hidden = false }
+
 final class WLSharedRegistry {
     private final class WeakView {
         weak var view: UIView?
@@ -53,13 +57,29 @@ final class WLSharedRegistry {
     private var probes: [String: WeakView] = [:]
     private var photos: [String: () -> AnyView] = [:]
     private var surfaces: [String: WLSurfaceSpec] = [:]
+    private var visibility: [String: WLSourceVisibility] = [:]
+
+    func sourceVisibility(_ key: String) -> WLSourceVisibility {
+        if let state = visibility[key] { return state }
+        let state = WLSourceVisibility()
+        visibility[key] = state
+        return state
+    }
+
+    func setHidden(_ key: String, _ hidden: Bool) { visibility[key]?.hidden = hidden }
 
     static func targetKey(_ entryID: Int) -> String { "target:\(entryID)" }
 
     func register(_ key: String, view: UIView) { probes[key] = WeakView(view) }
 
-    func unregister(_ key: String, view: UIView) {
-        if probes[key]?.view === view { probes[key] = nil }
+    func unregister(_ key: String, view: UIView, releaseVisibility: Bool = false) {
+        if probes[key]?.view === view {
+            probes[key] = nil
+            photos[key] = nil
+            surfaces[key] = nil
+        }
+        // window에서 잠깐 빠져도 같은 probe의 관찰 객체는 유지한다. 최종 해제만 관찰 객체를 버린다.
+        if releaseVisibility, probes[key]?.view == nil { visibility[key] = nil }
     }
 
     /// window 좌표 사각형. 아직 window에 없거나 크기가 0이면 nil.
@@ -80,6 +100,8 @@ final class WLSharedRegistry {
 struct WLFrameProbe: UIViewRepresentable {
     let key: String
     let registry: WLSharedRegistry?
+    var photo: (() -> AnyView)? = nil
+    var surface: WLSurfaceSpec? = nil
 
     func makeUIView(context: Context) -> ProbeView {
         let view = ProbeView()
@@ -88,24 +110,31 @@ struct WLFrameProbe: UIViewRepresentable {
         view.accessibilityElementsHidden = true
         view.key = key
         view.registry = registry
+        view.photo = photo
+        view.surface = surface
         return view
     }
 
     func updateUIView(_ view: ProbeView, context: Context) {
-        if view.key != key {
-            if let old = view.key { view.registry?.unregister(old, view: view) }
-            view.key = key
-            view.attach()
+        if view.key != key || view.registry !== registry {
+            if let old = view.key { view.registry?.unregister(old, view: view, releaseVisibility: true) }
         }
+        view.key = key
+        view.registry = registry
+        view.photo = photo
+        view.surface = surface
+        view.attach()
     }
 
     static func dismantleUIView(_ view: ProbeView, coordinator: ()) {
-        if let key = view.key { view.registry?.unregister(key, view: view) }
+        if let key = view.key { view.registry?.unregister(key, view: view, releaseVisibility: true) }
     }
 
     final class ProbeView: UIView {
         var key: String?
         weak var registry: WLSharedRegistry?
+        var photo: (() -> AnyView)?
+        var surface: WLSurfaceSpec?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -114,7 +143,11 @@ struct WLFrameProbe: UIViewRepresentable {
 
         func attach() {
             guard let key else { return }
-            if window != nil { registry?.register(key, view: self) } else { registry?.unregister(key, view: self) }
+            if window != nil {
+                registry?.register(key, view: self)
+                if let photo { registry?.setPhoto(key, photo) }
+                if let surface { registry?.setSurface(key, surface) }
+            } else { registry?.unregister(key, view: self) }
         }
     }
 }
@@ -128,9 +161,18 @@ private struct WLEntryIDKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    var wlNavMotion: WLNavMotion? {
+    /// 앱 루트가 motion을 넣는 자리. key path 쓰기는 getter를 먼저 부르므로 넣는 쪽은 optional이어야 한다.
+    var wlNavMotionStorage: WLNavMotion? {
         get { self[WLNavMotionKey.self] }
         set { self[WLNavMotionKey.self] = newValue }
+    }
+
+    /// 화면이 읽는 motion(읽기 전용). 앱 루트가 넣지 않았으면 바로 실패한다.
+    var wlNavMotion: WLNavMotion {
+        guard let motion = self[WLNavMotionKey.self] else {
+            preconditionFailure("Inject wlNavMotion above OverlayHost at the app root.")
+        }
+        return motion
     }
 
     /// 지금 그리는 스택 칸의 id(`WLNavHost`가 칸마다 넣는다).
@@ -150,12 +192,11 @@ struct WLSharedPhotoSource<Content: View>: View {
     @Environment(\.wlNavMotion) private var motion
 
     var body: some View {
-        let hidden = motion?.hiddenSources.contains(key) ?? false
+        let hidden = motion.registry.sourceVisibility(key).hidden
         content()
             .clipShape(photoShape)
             .opacity(hidden ? 0 : 1)
-            .background(WLFrameProbe(key: key, registry: motion?.registry))
-            .onAppear { motion?.registry.setPhoto(key) { AnyView(content()) } }
+            .background(WLFrameProbe(key: key, registry: motion.registry, photo: { AnyView(content()) }))
     }
 }
 
@@ -167,12 +208,12 @@ struct WLSharedPhotoTarget<Content: View>: View {
     @Environment(\.wlEntryID) private var entryID
 
     var body: some View {
-        let animating = entryID.flatMap { motion?.channels($0).animating } ?? false
+        let animating = entryID.map { motion.channels($0).animating } ?? false
         content()
             .clipShape(photoShape)
             .opacity(animating ? 0 : 1)
             .background {
-                if let entryID { WLFrameProbe(key: WLSharedRegistry.targetKey(entryID), registry: motion?.registry) }
+                if let entryID { WLFrameProbe(key: WLSharedRegistry.targetKey(entryID), registry: motion.registry) }
             }
     }
 }
@@ -188,8 +229,7 @@ struct WLSharedSurfaceSource<Content: View>: View {
 
     var body: some View {
         content()
-            .background(WLFrameProbe(key: key, registry: motion?.registry))
-            .onAppear { motion?.registry.setSurface(key, WLSurfaceSpec(fill: fill, radius: radius)) }
+            .background(WLFrameProbe(key: key, registry: motion.registry, surface: WLSurfaceSpec(fill: fill, radius: radius)))
     }
 }
 
@@ -202,10 +242,14 @@ private func lerp(_ a: CGRect, _ b: CGRect, _ t: Double) -> CGRect {
 }
 
 private func mix(_ a: Color, _ b: Color, _ t: Double) -> Color {
-    let ra = UIColor(a).cgColor.components ?? [0, 0, 0, 1]
-    let rb = UIColor(b).cgColor.components ?? [0, 0, 0, 1]
-    func ch(_ i: Int) -> Double { Double(lerp(ra[min(i, ra.count - 1)], rb[min(i, rb.count - 1)], t)) }
-    return Color(.sRGB, red: ch(0), green: ch(1), blue: ch(2), opacity: 1)
+    func rgba(_ color: Color) -> (CGFloat, CGFloat, CGFloat, CGFloat) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, alpha: CGFloat = 1
+        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &alpha)
+        return (r, g, b, alpha)
+    }
+    let ra = rgba(a), rb = rgba(b)
+    return Color(.sRGB, red: Double(lerp(ra.0, rb.0, t)), green: Double(lerp(ra.1, rb.1, t)),
+                 blue: Double(lerp(ra.2, rb.2, t)), opacity: Double(lerp(ra.3, rb.3, t)))
 }
 
 /// 날아가는 사진(window 좌표 사각형을 phase로 보간). 모서리 20 유지.

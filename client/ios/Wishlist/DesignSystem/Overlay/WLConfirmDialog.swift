@@ -47,6 +47,7 @@ struct DialogLayer: View {
     let dimBelow: Bool
 
     @Environment(\.wlColors) private var c
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var alpha = 0.0
     @State private var scale = 0.96
 
@@ -59,7 +60,7 @@ struct DialogLayer: View {
                                 onConfirm: { state.confirm(entry.id) })
                 .frame(maxWidth: 480)
                 .padding(.horizontal, WishlistTokens.Space.s24)
-                .scaleEffect(scale)
+                .scaleEffect(reduceMotion ? 1 : scale)
                 .opacity(alpha)
         }
         .task(id: entry.phase) { await run(entry.phase) }
@@ -68,15 +69,13 @@ struct DialogLayer: View {
     private func run(_ phase: OverlayPhase) async {
         switch phase {
         case .opening:
-            withAnimation(WishlistTokens.Curve.fadeIn.animation(ms: WishlistTokens.Motion.dialogIn)) {
+            await overlayAnimate(reduceMotion ? nil : WishlistTokens.Curve.fadeIn.animation(ms: WishlistTokens.Motion.dialogIn)) {
                 alpha = 1
                 scale = 1
             }
-            await overlaySleep(ms: WishlistTokens.Motion.dialogIn)
             if !Task.isCancelled { state.onOpened(entry.id) }
         case .closing:
-            withAnimation(WishlistTokens.Curve.easeIn.animation(ms: WishlistTokens.Motion.dialogOut)) { alpha = 0 }
-            await overlaySleep(ms: WishlistTokens.Motion.dialogOut)
+            await overlayAnimate(reduceMotion ? nil : WishlistTokens.Curve.easeIn.animation(ms: WishlistTokens.Motion.dialogOut)) { alpha = 0 }
             if !Task.isCancelled { state.onClosed(entry.id) }
         case .open:
             break

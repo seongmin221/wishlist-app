@@ -1,5 +1,7 @@
 import SwiftUI
 
+#if DEBUG
+
 // C1 데모 화면(debug 빌드의 탭 첫 화면에서만 보인다). 내용은 Android `feature/demo`와 같다.
 
 struct DemoPurpose {
@@ -73,10 +75,8 @@ enum DemoContent {
 }
 
 /// 데모 상세 id 규칙: `product:p1`, `chip:headphone`, `purpose:commute`.
-enum DemoIds {
-    static func product(_ id: String) -> String { "product:\(id)" }
-    static func chip(_ id: String) -> String { "chip:\(id)" }
-    static func purpose(_ id: String) -> String { "purpose:\(id)" }
+enum DemoDestination: Hashable {
+    case product(String), chip(String), purpose(String)
 }
 
 /// 사진 대신 쓰는 면(목적 색 + 헤드폰 선). 목적 색은 두 테마 같다. 그림이라 접근성 요소가 없다.
@@ -257,8 +257,10 @@ struct DemoSurfaceChip: View {
     var body: some View {
         WLSharedSurfaceSource(key: sourceKey, fill: .chip, radius: .pill) {
             WLChip(text: chip.name, count: chip.count) {
-                nav?.push(.demoDetail(id: DemoIds.chip(chip.id), hasPhoto: false), sourceKey: sourceKey)
+                nav.push(.init(destination: DemoDestination.chip(chip.id), pushStyle: .surface), sourceKey: sourceKey)
             }
         }
     }
 }
+
+#endif

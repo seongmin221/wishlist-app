@@ -28,9 +28,17 @@ struct WLMenuItem {
 enum OverlayPhase { case opening, open, closing }
 
 enum OverlayKind {
-    case sheet(draggable: Bool, content: () -> AnyView)
+    case sheet(title: String, draggable: Bool, content: () -> AnyView)
     case dialog(WLDialogSpec)
     case menu(anchor: CGRect, items: [WLMenuItem])
+
+    var accessibilityTitle: String {
+        switch self {
+        case .sheet(let title, _, _): title
+        case .dialog(let spec): spec.title
+        case .menu: String(localized: "wl.menu")
+        }
+    }
 
     /// 뒤 화면을 흐리고 어둡게 하는 overlay(시트·확인창)인지. 메뉴는 아니다.
     var needsScrim: Bool {
@@ -74,8 +82,8 @@ final class OverlayHostState {
     var isAnimating: Bool { entries.contains { $0.phase != .open } }
 
     @discardableResult
-    func showSheet<V: View>(draggable: Bool = true, @ViewBuilder _ content: @escaping () -> V) -> Bool {
-        push { .sheet(draggable: draggable, content: { AnyView(content()) }) }
+    func showSheet<V: View>(title: String = String(localized: "wl.sheet"), draggable: Bool = true, @ViewBuilder _ content: @escaping () -> V) -> Bool {
+        push { .sheet(title: title, draggable: draggable, content: { AnyView(content()) }) }
     }
 
     @discardableResult
@@ -179,8 +187,13 @@ extension View {
     }
 }
 
-func overlaySleep(ms: Int) async {
-    try? await Task.sleep(nanoseconds: UInt64(ms) * 1_000_000)
+@MainActor
+func overlayAnimate(_ animation: Animation?, changes: () -> Void) async {
+    await withCheckedContinuation { continuation in
+        withAnimation(animation, completionCriteria: .removed, changes) {
+            continuation.resume()
+        }
+    }
 }
 
 /// 메뉴를 띄우는 버튼의 자리. 버튼 뒤에 둔 보이지 않는 UIKit 뷰를 약하게 들고, 누른 순간에만 window 좌표를 읽는다
@@ -225,6 +238,7 @@ struct OverlayHost<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     @Environment(\.wlColors) private var colors
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scrimProgress = 0.0
     @State private var scrimMounted = false
 
@@ -257,7 +271,7 @@ struct OverlayHost<Content: View>: View {
     private func layer(_ entry: OverlayEntry, isTop: Bool, hasBelow: Bool) -> some View {
         Group {
             switch entry.kind {
-            case .sheet(let draggable, let content):
+            case .sheet(_, let draggable, let content):
                 SheetLayer(entry: entry, state: state, draggable: draggable, content: content)
             case .dialog(let spec):
                 DialogLayer(entry: entry, state: state, spec: spec, dimBelow: hasBelow)
@@ -267,7 +281,8 @@ struct OverlayHost<Content: View>: View {
         }
         // 가장 위가 아닌 overlay(확인창 아래의 시트)도 가려진 층이다(트리에서 빠진다). 가장 위는 .contain(안쪽 숨김 보존).
         // escape는 층 컨테이너에 건다(VoiceOver는 초점 요소에서 컨테이너를 따라 올라가며 escape를 보낸다). 가장 위 층만 닫는다.
-        .wlAccessibilityCovered(!isTop)
+        .wlAccessibilityCovered(!isTop || entry.phase != .open)
+        .accessibilityLabel(entry.kind.accessibilityTitle)
         .accessibilityAction(.escape) { if isTop { state.dismiss() } }
     }
 
@@ -275,11 +290,10 @@ struct OverlayHost<Content: View>: View {
     private func runScrim(wanted: Bool) async {
         if wanted {
             scrimMounted = true
-            withAnimation(WishlistTokens.Curve.easeOut.animation(ms: WishlistTokens.Motion.scrimIn)) { scrimProgress = 1 }
+            withAnimation(reduceMotion ? nil : WishlistTokens.Curve.easeOut.animation(ms: WishlistTokens.Motion.scrimIn)) { scrimProgress = 1 }
         } else {
             guard scrimMounted else { return }
-            withAnimation(WishlistTokens.Curve.easeIn.animation(ms: WishlistTokens.Motion.scrimOut)) { scrimProgress = 0 }
-            await overlaySleep(ms: WishlistTokens.Motion.scrimOut)
+            await overlayAnimate(reduceMotion ? nil : WishlistTokens.Curve.easeIn.animation(ms: WishlistTokens.Motion.scrimOut)) { scrimProgress = 0 }
             if !Task.isCancelled { scrimMounted = false }
         }
     }

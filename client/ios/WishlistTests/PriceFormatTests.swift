@@ -4,6 +4,19 @@ import XCTest
 final class PriceFormatTests: XCTestCase {
     private func d(_ s: String) -> Decimal { Decimal(string: s, locale: Locale(identifier: "en_US_POSIX"))! }
 
+    func testCurrencyCodeNormalizationAndUnknownFallback() {
+        XCTAssertEqual(formatPrice(d("19.5"), currency: "  jpy "), "JPY 20")
+        XCTAssertEqual(formatPrice(d("1.234"), currency: " ??? "), "??? 1.23")
+        XCTAssertEqual(formatPrice(d("1.2"), currency: ""), " 1.20")
+    }
+
+    func testIsoCurrencyMinorUnits() {
+        XCTAssertEqual(formatPrice(d("19.5"), currency: "JPY"), "JPY 20")
+        XCTAssertEqual(formatPrice(d("1.2345"), currency: "KWD"), "KWD 1.235")
+        XCTAssertEqual(formatPrice(d("1.2"), currency: "KWD"), "KWD 1.200")
+        XCTAssertEqual(formatPrice(d("1.23456"), currency: "CLF"), "CLF 1.2346")
+    }
+
     func testKrwGroupsThousands() {
         XCTAssertEqual(formatPrice(d("549000"), currency: "KRW"), "KRW 549,000")
         XCTAssertEqual(formatPrice(d("1190000"), currency: "KRW"), "KRW 1,190,000")

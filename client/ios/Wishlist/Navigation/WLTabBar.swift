@@ -12,11 +12,12 @@ struct WLTabBar: View {
     let current: WLTab
     let onSelect: (WLTab) -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.wlColors) private var c
     @State private var labelTab: WLTab?
 
     var body: some View {
-        let shown = labelTab ?? current
+        let shown = reduceMotion ? current : labelTab ?? current
         HStack(spacing: 0) {
             ForEach(WLTab.allCases) { tab in
                 let selected = tab == shown
@@ -24,7 +25,7 @@ struct WLTabBar: View {
                 Button { onSelect(tab) } label: {
                     HStack(spacing: 6) {
                         WLTabIcon(tab: tab, color: color)
-                        WLText(tab.label, selected ? WLTextStyle.bodyBold.resized(15) : WLTextStyle.body.resized(15), color: color)
+                        WLText(tab.label, selected ? WLTextStyle.bodyBold.resized(15) : WLTextStyle.body.resized(15), color: color, maxLines: 1)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, minHeight: 48)
@@ -42,7 +43,7 @@ struct WLTabBar: View {
                     .fill(c.tabPill)
                     .frame(width: w, height: proxy.size.height)
                     .offset(x: CGFloat(WLTab.allCases.firstIndex(of: current) ?? 0) * w)
-                    .animation(WishlistTokens.Curve.standard.animation(ms: WishlistTokens.Motion.tabPill), value: current)
+                    .animation(reduceMotion ? nil : WishlistTokens.Curve.standard.animation(ms: WishlistTokens.Motion.tabPill), value: current)
             }
         }
         .padding(WishlistTokens.Space.s8)
@@ -52,7 +53,7 @@ struct WLTabBar: View {
         .padding(.bottom, wlTabBarBottomGap)
         .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .task(id: current) {
-            guard labelTab != nil, labelTab != current else {
+            guard !reduceMotion, labelTab != nil, labelTab != current else {
                 labelTab = current
                 return
             }

@@ -3,7 +3,7 @@ import XCTest
 
 /// Android `WLNavigatorTest`와 같은 12개 사례 + iOS 쪽 화면 유지(`exiting`)·전환 식별 사례.
 final class WLNavigatorTests: XCTestCase {
-    private let detail = WLRoute.demoDetail(id: "p1", hasPhoto: true)
+    private let detail = WLRoute(destination: "p1", pushStyle: .photo)
 
     func testStartsOnHomeWithOneRootPerTab() {
         let nav = WLNavigator()
@@ -69,7 +69,7 @@ final class WLNavigatorTests: XCTestCase {
         XCTAssertTrue(nav.push(detail, sourceKey: "home/p1"))
         XCTAssertTrue(nav.isTransitioning)
 
-        XCTAssertFalse(nav.push(.demoDetail(id: "p2", hasPhoto: false), sourceKey: "home/p2"))
+        XCTAssertFalse(nav.push(.init(destination: "p2", pushStyle: .surface), sourceKey: "home/p2"))
         XCTAssertFalse(nav.selectTab(.purpose))
         XCTAssertFalse(nav.pop())
 
@@ -177,7 +177,7 @@ final class WLNavigatorTests: XCTestCase {
 
     func testDepthTwoPushAndPopKeepLowerEntries() {
         let nav = WLNavigator()
-        let list = WLRoute.demoDetail(id: "chip:headphone", hasPhoto: false)
+        let list = WLRoute.init(destination: "chip:headphone", pushStyle: .surface)
         nav.push(list, sourceKey: "home/chip/headphone")
         nav.finishTransition()
         nav.push(detail, sourceKey: "home/chiplist/headphone/p1")

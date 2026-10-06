@@ -5,10 +5,18 @@ private struct WLNavigatorKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    /// 화면이 `push`·`pop`을 부르기 위한 접근(`WLNavHost`가 넣는다).
-    var wlNavigator: WLNavigator? {
+    /// 앱 루트가 navigator를 넣는 자리. key path 쓰기는 getter를 먼저 부르므로 넣는 쪽은 optional이어야 한다.
+    var wlNavigatorStorage: WLNavigator? {
         get { self[WLNavigatorKey.self] }
         set { self[WLNavigatorKey.self] = newValue }
+    }
+
+    /// 화면이 `push`·`pop`을 부르기 위한 접근(읽기 전용). 앱 루트가 넣지 않았으면 바로 실패한다.
+    var wlNavigator: WLNavigator {
+        guard let navigator = self[WLNavigatorKey.self] else {
+            preconditionFailure("Inject wlNavigator above OverlayHost at the app root.")
+        }
+        return navigator
     }
 }
 
@@ -25,16 +33,17 @@ extension EnvironmentValues {
 /// - 접근성: 가려진 칸·다른 탭·숨은 탭 바는 층마다 `wlAccessibilityCovered`로 뺀다. `.isModal`은 쓰지 않는다
 ///   (탭 바를 유지하는 화면에서 탭 바까지 빠진다).
 struct WLNavHost<Content: View>: View {
-    @State private var navigator: WLNavigator
-    @State private var motion: WLNavMotion
+    let navigator: WLNavigator
+    let motion: WLNavMotion
     private let content: (WLRoute) -> Content
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.wlColors) private var c
     @Environment(\.overlayHostState) private var overlay
 
-    init(navigator: WLNavigator = WLNavigator(), @ViewBuilder content: @escaping (WLRoute) -> Content) {
-        _navigator = State(initialValue: navigator)
-        _motion = State(initialValue: WLNavMotion(navigator: navigator))
+    init(navigator: WLNavigator, motion: WLNavMotion, @ViewBuilder content: @escaping (WLRoute) -> Content) {
+        self.navigator = navigator
+        self.motion = motion
         self.content = content
     }
 
@@ -64,8 +73,8 @@ struct WLNavHost<Content: View>: View {
                 InputBlocker().zIndex(Double(Int32.max))
             }
         }
-        .environment(\.wlNavigator, navigator)
-        .environment(\.wlNavMotion, motion)
+        .environment(\.wlNavigatorStorage, navigator)
+        .environment(\.wlNavMotionStorage, motion)
         .background {
             WLEdgeBackGesture(
                 canBegin: { [motion, overlay] in motion.canBeginDrag && (overlay?.entries.isEmpty ?? true) },
@@ -74,6 +83,7 @@ struct WLNavHost<Content: View>: View {
                 onEnd: { [motion] in motion.endDrag(progress: $0, velocity: $1) }
             )
         }
+        .onChange(of: reduceMotion, initial: true) { _, value in motion.reduceMotion = value }
         .onChange(of: navigator.activeTransition) { _, t in motion.handle(t) }
     }
 
@@ -245,7 +255,7 @@ private struct WLArrivalFocus: ViewModifier {
         content
             .accessibilityAddTraits(.isHeader)
             .accessibilityFocused($focused)
-            .onChange(of: motion?.arrival) { _, arrival in
+            .onChange(of: motion.arrival) { _, arrival in
                 if let arrival, arrival.entryID == entryID { focused = true }
             }
     }
@@ -262,6 +272,7 @@ struct WLTabScrollView<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     @Environment(\.wlNavigator) private var navigator
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let topID = "wl-scroll-top"
 
     var body: some View {
@@ -275,12 +286,12 @@ struct WLTabScrollView<Content: View>: View {
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
-            .onChange(of: navigator?.scrollToTopRequest) { _, request in
+            .onChange(of: navigator.scrollToTopRequest) { _, request in
                 guard request == tab else { return }
-                withAnimation(WishlistTokens.Curve.emphasized.animation(ms: WishlistTokens.Motion.headerCollapseScroll)) {
+                withAnimation(reduceMotion ? nil : WishlistTokens.Curve.emphasized.animation(ms: WishlistTokens.Motion.headerCollapseScroll)) {
                     proxy.scrollTo(topID, anchor: .top)
                 }
-                navigator?.consumeScrollToTop(tab)
+                navigator.consumeScrollToTop(tab)
             }
         }
     }

@@ -5,6 +5,7 @@
     objectVersion = 56;
     objects = {
 /* Begin PBXBuildFile section */
+        A100000000000000000000FA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FA /* Localizable.xcstrings */; };
         A10000000000000000000001 /* WishlistApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* WishlistApp.swift */; };
         A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* ContentView.swift */; };
         A10000000000000000000003 /* WishlistTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* WishlistTokens.swift */; };
@@ -51,6 +52,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        A200000000000000000000FA /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
         A20000000000000000000001 /* WishlistApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistApp.swift; sourceTree = "<group>"; };
         A20000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
         A20000000000000000000003 /* Wishlist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wishlist.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -130,7 +132,7 @@
         };
         A40000000000000000000005 /* Resources */ = {
             isa = PBXGroup;
-            children = (A40000000000000000000006 /* Fonts */);
+            children = (A40000000000000000000006 /* Fonts */, A200000000000000000000FA /* Localizable.xcstrings */);
             path = Resources;
             sourceTree = "<group>";
         };
@@ -233,7 +235,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXResourcesBuildPhase section */
-        A60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000005 /* do_hyeon.ttf in Resources */, A10000000000000000000006 /* ibm_plex_sans_kr_regular.ttf in Resources */, A10000000000000000000007 /* ibm_plex_sans_kr_medium.ttf in Resources */, A10000000000000000000008 /* ibm_plex_sans_kr_bold.ttf in Resources */, A10000000000000000000009 /* OFL.txt in Resources */); runOnlyForDeploymentPostprocessing = 0; };
+        A60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A100000000000000000000FA /* Localizable.xcstrings in Resources */, A10000000000000000000005 /* do_hyeon.ttf in Resources */, A10000000000000000000006 /* ibm_plex_sans_kr_regular.ttf in Resources */, A10000000000000000000007 /* ibm_plex_sans_kr_medium.ttf in Resources */, A10000000000000000000008 /* ibm_plex_sans_kr_bold.ttf in Resources */, A10000000000000000000009 /* OFL.txt in Resources */); runOnlyForDeploymentPostprocessing = 0; };
         A60000000000000000000004 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 

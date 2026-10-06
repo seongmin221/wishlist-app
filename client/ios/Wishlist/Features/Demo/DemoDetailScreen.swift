@@ -1,21 +1,20 @@
 import SwiftUI
 
-/// 데모 상세(debug 빌드에서만 진입). `id` 앞머리로 상품(사진)·칩 목록·목적 상세를 고른다.
+#if DEBUG
+
+/// 데모 상세(debug 빌드에서만 진입). 타입이 있는 목적지로 상품·칩 목록·목적 상세를 고른다.
 /// 사진 없는 화면(칩 목록·목적)은 바탕을 그리지 않는다: 커진 자리 표시 면이 그 화면의 바탕이다.
 struct DemoDetailScreen: View {
-    let id: String
-    let hasPhoto: Bool
+    let destination: DemoDestination
 
     var body: some View {
-        let kind = id.split(separator: ":").first.map(String.init) ?? ""
-        let ref = id.split(separator: ":").dropFirst().first.map(String.init) ?? ""
-        switch kind {
-        case "product" where hasPhoto:
-            if let p = DemoContent.product(ref) { DemoProductDetail(product: p) }
-        case "purpose":
-            DemoPurposeDetail(purpose: DemoContent.purpose(ref))
-        default:
-            DemoChipList(chip: DemoContent.chip(ref))
+        switch destination {
+        case .product(let id):
+            if let p = DemoContent.product(id) { DemoProductDetail(product: p) }
+        case .purpose(let id):
+            DemoPurposeDetail(purpose: DemoContent.purpose(id))
+        case .chip(let id):
+            DemoChipList(chip: DemoContent.chip(id))
         }
     }
 }
@@ -28,7 +27,7 @@ private struct DemoTopBar: View {
     var body: some View {
         HStack {
             // 화면의 뒤로 버튼도 끌어서 뒤로와 같은 pop 전환을 쓴다.
-            DemoCircleButton(description: "뒤로", action: { nav?.pop() }) { BackChevron() }
+            DemoCircleButton(description: "뒤로", action: { nav.pop() }) { BackChevron() }
             Spacer()
             DemoCircleButton(description: "더 보기", action: {
                 if let overlay { overlay.showMenu(anchor: anchor.frame, items: demoMenuItems(overlay)) }
@@ -130,7 +129,7 @@ private struct DemoChipList: View {
                     ForEach(DemoContent.products, id: \.id) { p in
                         let key = "entry\(entryID ?? -1)/product/\(p.id)"
                         WLCard(onClick: {
-                            nav?.push(.demoDetail(id: DemoIds.product(p.id), hasPhoto: true), sourceKey: key)
+                            nav.push(.init(destination: DemoDestination.product(p.id), pushStyle: .photo), sourceKey: key)
                         }) {
                             HStack(spacing: WishlistTokens.Space.s12) {
                                 WLSharedPhotoSource(key: key) { DemoPhoto(tint: p.tint) }
@@ -166,7 +165,7 @@ private struct DemoPurposeDetail: View {
                 VStack(alignment: .leading, spacing: 0) {
                     DemoTopBar()
                     Spacer().frame(height: WishlistTokens.Space.s16)
-                    WLText(purpose?.name ?? "목적", .display28TwoLine, color: WishlistTokens.Purpose.onPurpose).wlArrivalFocus()
+                    WLText(purpose?.name ?? "목적", .display28TwoLine, color: WishlistTokens.Purpose.onPurpose, maxLines: 2).wlArrivalFocus()
                     Spacer().frame(height: WishlistTokens.Space.s8)
                     WLText("후보 \(purpose?.candidates ?? 0) · 어제 후보 추가", .label, color: WishlistTokens.Purpose.onPurpose)
                 }
@@ -196,3 +195,5 @@ private struct DemoPurposeDetail: View {
         }
     }
 }
+
+#endif

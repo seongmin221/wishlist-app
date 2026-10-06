@@ -54,29 +54,41 @@ struct WLText: View {
     let style: WLTextStyle
     let color: Color?
     let alignment: TextAlignment
+    let maxLines: Int?
 
     @Environment(\.wlColors) private var c
     @Environment(\.lineLimit) private var lineLimit
 
-    init(_ text: String, _ style: WLTextStyle = .body, color: Color? = nil, alignment: TextAlignment = .leading) {
+    init(_ text: String, _ style: WLTextStyle = .body, color: Color? = nil, alignment: TextAlignment = .leading, maxLines: Int? = nil) {
         self.text = text
         self.style = style
         self.color = color
         self.alignment = alignment
+        precondition(maxLines == nil || maxLines! > 0, "maxLines must be positive or nil")
+        self.maxLines = maxLines
     }
 
-    /// 한 줄로 제한한 글자(`.lineLimit(1)`)는 SwiftUI `Text` + `wlText`(한 줄 상자가 정확, `ViewThatFits`·
-    /// `minimumScaleFactor`가 그대로 동작). 그 밖에는 여러 줄도 N × 줄 높이가 되도록 `WLMultilineText`(UILabel)로 그린다.
-    /// 주의: 여러 줄 경로(UILabel)에는 SwiftUI 글자 기준선이 없다. `HStack(alignment: .firstTextBaseline)`은 아래 끝으로
-    /// 맞춰져 줄바꿈된 글자의 마지막 줄에 붙는다. 같은 스타일끼리는 `.top`(줄 상자가 같다)으로 맞추거나 `alignmentGuide`를 준다.
+    /// 기본은 줄 수 제한 없음. maxLines와 바깥 lineLimit 중 작은 제한을 따르고, 한 줄은 SwiftUI Text로 그린다.
+    static func effectiveMaxLines(_ maxLines: Int?, inherited: Int?) -> Int? {
+        switch (maxLines, inherited) {
+        case let (explicit?, environment?): min(explicit, environment)
+        case let (explicit?, nil): explicit
+        case let (nil, environment?): environment
+        case (nil, nil): nil
+        }
+    }
+
     var body: some View {
-        if lineLimit == 1 {
+        let limit = Self.effectiveMaxLines(maxLines, inherited: lineLimit)
+        if limit == 1 {
             Text(text)
                 .wlText(style)
+                .lineLimit(1)
                 .foregroundStyle(color ?? c.text)
                 .multilineTextAlignment(alignment)
         } else {
             WLMultilineText(text: text, style: style, color: color ?? c.text)
+                .lineLimit(limit)
                 .multilineTextAlignment(alignment)
         }
     }

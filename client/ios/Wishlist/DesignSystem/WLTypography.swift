@@ -127,7 +127,7 @@ private struct WLTextModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let scale = scaledSize / style.size
-        let natural = UIFont(name: style.postScriptName, size: scaledSize)?.lineHeight ?? scaledSize
+        let natural = WLFontCache.font(name: style.postScriptName, size: scaledSize).lineHeight
         // SwiftUI Text 상자는 글꼴 자체 줄 높이라 한 줄 높이를 직접 못 정한다. 목표와의 차이(extra, 음수 가능)의 절반씩을
         // 위아래 패딩으로 줘 **한 줄** 상자를 lineHeight로 맞춘다(CSS half-leading처럼 글자는 가운데).
         // 여러 줄은 이 방법으로 맞출 수 없다(음수 lineSpacing은 0으로 잘린다). 여러 줄 글자는 `WLText`가 `WLMultilineText`(UILabel `WLLabelText`)로 그린다.
@@ -209,7 +209,7 @@ struct WLLabelText: UIViewRepresentable {
         paragraph.alignment = Self.alignment(env.multilineTextAlignment)
         // 문단 스타일을 직접 주면 UILabel 기본 줄바꿈 전략(.standard: 한글은 어절 단위)이 빠져 글자 중간에서 끊긴다. 되살린다.
         paragraph.lineBreakStrategy = .standard
-        let font = UIFont(name: postScriptName, size: pointSize) ?? .systemFont(ofSize: pointSize)
+        let font = WLFontCache.font(name: postScriptName, size: pointSize)
         label.attributedText = NSAttributedString(string: text, attributes: [
             .font: font, .foregroundColor: color, .paragraphStyle: paragraph, .baselineOffset: baselineOffset,
         ])
@@ -295,11 +295,28 @@ struct WLMultilineText: View {
 
     var body: some View {
         let scale = scaledSize / style.size
-        let natural = UIFont(name: style.postScriptName, size: scaledSize)?.lineHeight ?? scaledSize
+        let natural = WLFontCache.font(name: style.postScriptName, size: scaledSize).lineHeight
         let lineHeight = style.lineHeight * scale
         WLLabelText(text: text, postScriptName: style.postScriptName, pointSize: scaledSize, lineHeight: lineHeight,
                     baselineOffset: (lineHeight - natural) / 2, color: UIColor(color))
             // VoiceOver에는 SwiftUI Text 하나로 보인다(정적 글자). 바깥의 accessibilityAddTraits·Hidden이 그대로 먹는다.
             .accessibilityRepresentation { Text(text) }
+    }
+}
+
+/// UIFont는 불변이다. 크기·이름별로 재사용하며 메모리 압박 때 NSCache가 비운다.
+private enum WLFontCache {
+    static let cache: NSCache<NSString, UIFont> = {
+        let cache = NSCache<NSString, UIFont>()
+        cache.countLimit = 128
+        return cache
+    }()
+
+    static func font(name: String, size: CGFloat) -> UIFont {
+        let key = "\(name):\(size)" as NSString
+        if let font = cache.object(forKey: key) { return font }
+        let font = UIFont(name: name, size: size) ?? .systemFont(ofSize: size)
+        cache.setObject(font, forKey: key)
+        return font
     }
 }

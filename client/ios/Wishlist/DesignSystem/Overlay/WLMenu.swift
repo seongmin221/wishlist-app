@@ -45,6 +45,7 @@ struct MenuLayer: View {
     let anchor: CGRect
     let items: [WLMenuItem]
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var q = 0.0
 
     var body: some View {
@@ -59,7 +60,7 @@ struct MenuLayer: View {
                 WLMenuCard(items: items) { item in
                     if state.requestDismiss(entry.id) { item.onClick() }
                 }
-                .scaleEffect(0.96 + 0.04 * q, anchor: UnitPoint(x: onRight ? 1 : 0, y: 0))
+                .scaleEffect(reduceMotion ? 1 : 0.96 + 0.04 * q, anchor: UnitPoint(x: onRight ? 1 : 0, y: 0))
                 .opacity(q)
                 .offset(x: x, y: rect.maxY + menuGap)
             }
@@ -69,15 +70,13 @@ struct MenuLayer: View {
     }
 
     private func run(_ phase: OverlayPhase) async {
-        let anim = WishlistTokens.Curve.easeOut.animation(ms: WishlistTokens.Motion.overflowMenu)
+        let anim: Animation? = reduceMotion ? nil : WishlistTokens.Curve.easeOut.animation(ms: WishlistTokens.Motion.overflowMenu)
         switch phase {
         case .opening:
-            withAnimation(anim) { q = 1 }
-            await overlaySleep(ms: WishlistTokens.Motion.overflowMenu)
+            await overlayAnimate(anim) { q = 1 }
             if !Task.isCancelled { state.onOpened(entry.id) }
         case .closing:
-            withAnimation(anim) { q = 0 }
-            await overlaySleep(ms: WishlistTokens.Motion.overflowMenu)
+            await overlayAnimate(anim) { q = 0 }
             if !Task.isCancelled { state.onClosed(entry.id) }
         case .open:
             break

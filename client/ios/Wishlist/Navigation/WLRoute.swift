@@ -8,42 +8,36 @@ enum WLTab: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .home: "홈"
-        case .category: "카테고리"
-        case .purpose: "목적"
+        case .home: String(localized: "wl.tab.home")
+        case .category: String(localized: "wl.tab.category")
+        case .purpose: String(localized: "wl.tab.purpose")
         }
     }
 }
 
-/// 탭 스택에 쌓이는 화면. C1에서는 탭 첫 화면과 데모 상세만 있다(Android `WLRoute`와 같다).
-enum WLRoute: Hashable {
-    case tabRoot(WLTab)
-    /// 데모 상세(debug 빌드에서만 진입). `hasPhoto`면 사진 공유 요소로, 아니면 누른 면(자리 표시)이 커지며 열린다
-    /// (motion.md 2절의 두 방식). `id` 앞머리로 상품·칩 목록·목적 상세를 고른다(`DemoIds`).
-    case demoDetail(id: String, hasPhoto: Bool)
+/// 기능이 목적지와 전환 정책을 넘긴다. 라우터는 목적지의 구체적인 타입을 알지 않는다.
+struct WLRoute: Hashable {
+    let destination: AnyHashable
+    let showsTabBar: Bool
+    let pushStyle: WLPushStyle
+    let rootTab: WLTab?
 
-    /// 이 화면이 맨 위일 때 탭 바를 보이는지.
-    var showsTabBar: Bool {
-        switch self {
-        case .tabRoot: true
-        case .demoDetail: false
-        }
+    init(destination: AnyHashable, showsTabBar: Bool = false, pushStyle: WLPushStyle) {
+        self.destination = destination
+        self.showsTabBar = showsTabBar
+        self.pushStyle = pushStyle
+        self.rootTab = nil
     }
 
-    var isTabRoot: Bool {
-        if case .tabRoot = self { return true }
-        return false
+    private init(tab: WLTab) {
+        destination = AnyHashable(tab)
+        showsTabBar = true
+        pushStyle = .surface
+        rootTab = tab
     }
+
+    static func tabRoot(_ tab: WLTab) -> WLRoute { WLRoute(tab: tab) }
+    var isTabRoot: Bool { rootTab != nil }
 }
 
-/// 화면 이동 방식. 경로가 정한다(motion.md 2절).
-enum WLPushStyle { case photo, surface }
-
-extension WLRoute {
-    var pushStyle: WLPushStyle {
-        switch self {
-        case .demoDetail(_, let hasPhoto): hasPhoto ? .photo : .surface
-        case .tabRoot: .surface
-        }
-    }
-}
+enum WLPushStyle: Hashable { case photo, surface }

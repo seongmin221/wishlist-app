@@ -15,9 +15,9 @@ struct WLChip: View {
         let fg = selected ? c.onInverse : c.text
         Button(action: action) {
             HStack(spacing: 7) {
-                WLText(text, selected ? .bodyBold : .body, color: fg)
+                WLText(text, selected ? .bodyBold : .body, color: fg, maxLines: 1)
                 if let count {
-                    WLText(String(count), WLTextStyle.price.resized(WLTextStyle.body.size), color: selected ? fg : c.textSecondary)
+                    WLText(String(count), WLTextStyle.price.resized(WLTextStyle.body.size), color: selected ? fg : c.textSecondary, maxLines: 1)
                 }
             }
             .padding(.horizontal, 14)
@@ -40,8 +40,8 @@ struct WLAddChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                WLText("+", .body, color: c.textSecondary)
-                WLText(text, .body, color: c.textSecondary)
+                WLText("+", .body, color: c.textSecondary, maxLines: 1)
+                WLText(text, .body, color: c.textSecondary, maxLines: 1)
             }
             .padding(.horizontal, 14)
             .frame(minHeight: 40)

@@ -66,6 +66,119 @@ final class WLTypographyTests: XCTestCase {
         return runs.dropFirst().map { (top: $0.0 - boxTop, bottom: $0.1 - boxTop) }
     }
 
+    func testExplicitSingleLineTextUsesOneLineEvenWhenInputContainsNewline() {
+        XCTAssertEqual(height(WLText("첫 줄\n둘째 줄", .body, maxLines: 1)), WLTextStyle.body.lineHeight, accuracy: 1)
+    }
+
+    func testExplicitAndInheritedLineLimitsAreBothHonored() {
+        XCTAssertNil(WLText.effectiveMaxLines(nil, inherited: nil))
+        XCTAssertEqual(WLText.effectiveMaxLines(nil, inherited: 2), 2)
+        XCTAssertEqual(WLText.effectiveMaxLines(3, inherited: 2), 2)
+        XCTAssertEqual(WLText.effectiveMaxLines(1, inherited: 3), 1)
+        XCTAssertEqual(height(WLText("첫 줄\n둘째 줄\n셋째 줄", .body).lineLimit(2)),
+                       2 * WLTextStyle.body.lineHeight, accuracy: 1)
+        XCTAssertEqual(height(WLText("첫 줄\n둘째 줄\n셋째 줄", .body, maxLines: 2)),
+                       2 * WLTextStyle.body.lineHeight, accuracy: 1)
+    }
+
+    func testInputCompositionProbeOnlyOwnsItsField() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 300, height: 300))
+        let first = UITextField(frame: CGRect(x: 0, y: 0, width: 250, height: 56))
+        let second = UITextField(frame: CGRect(x: 0, y: 100, width: 250, height: 56))
+        let probe = UIView(frame: first.frame)
+        window.addSubview(first)
+        window.addSubview(second)
+        window.addSubview(probe)
+        let composition = WLInputComposition()
+        composition.probe = probe
+        XCTAssertTrue(composition.owns(first))
+        XCTAssertFalse(composition.owns(second))
+    }
+
+    func testInputTruncatesPastedTextAtGraphemeBoundary() {
+        XCTAssertEqual(WLInput.truncate("가나다라", maxLength: 3), "가나다")
+        XCTAssertEqual(WLInput.truncate("👨‍👩‍👧‍👦e\u{301}🇰🇷끝", maxLength: 3), "👨‍👩‍👧‍👦e\u{301}🇰🇷")
+        XCTAssertEqual(WLInput.truncate("가", maxLength: -1), "")
+    }
+
+    func testSharedRegistryRefreshesPhotoAndReleasesItWithProbe() {
+        final class Capture {}
+        let registry = WLSharedRegistry()
+        let view = UIView()
+        registry.register("photo", view: view)
+        var observed = ""
+        registry.setPhoto("photo") { observed = "old"; return AnyView(Color.red) }
+        registry.setPhoto("photo") { observed = "new"; return AnyView(Color.blue) }
+        _ = registry.photo("photo")
+        XCTAssertEqual(observed, "new")
+        var capture: Capture? = Capture()
+        final class WeakCapture { weak var value: Capture?; init(_ value: Capture?) { self.value = value } }
+        let weakCapture = WeakCapture(capture)
+        registry.setPhoto("photo") { [capture] in
+            _ = capture
+            return AnyView(Color.clear)
+        }
+        capture = nil
+        XCTAssertNotNil(weakCapture.value)
+        registry.unregister("photo", view: view)
+        XCTAssertNil(registry.photo("photo"))
+        XCTAssertNil(weakCapture.value)
+    }
+
+    func testVisibilitySurvivesTemporaryWindowDetach() {
+        let registry = WLSharedRegistry()
+        let view = UIView()
+        let visibility = registry.sourceVisibility("photo")
+        registry.register("photo", view: view)
+        registry.setHidden("photo", true)
+        registry.unregister("photo", view: view)
+        registry.register("photo", view: view)
+        XCTAssertTrue(registry.sourceVisibility("photo") === visibility)
+        XCTAssertTrue(visibility.hidden)
+        registry.unregister("photo", view: view, releaseVisibility: true)
+        XCTAssertFalse(registry.sourceVisibility("photo") === visibility)
+    }
+
+    func testReduceMotionCompletesNavigationWithoutSharedFlight() {
+        let nav = WLNavigator()
+        let motion = WLNavMotion(navigator: nav)
+        motion.reduceMotion = true
+        nav.push(WLRoute(destination: "product", pushStyle: .photo), sourceKey: "photo")
+        let entry = nav.entries(.home).last!
+        motion.handle(nav.activeTransition)
+        XCTAssertFalse(nav.isTransitioning)
+        XCTAssertFalse(motion.channels(entry.id).animating)
+        XCTAssertEqual(motion.channels(entry.id).content, 1)
+        XCTAssertFalse(motion.registry.sourceVisibility("photo").hidden)
+        nav.pop()
+        motion.handle(nav.activeTransition)
+        XCTAssertFalse(nav.isTransitioning)
+        XCTAssertEqual(nav.entries(.home).count, 1)
+        nav.selectTab(.purpose)
+        motion.handle(nav.activeTransition)
+        XCTAssertFalse(nav.isTransitioning)
+        XCTAssertEqual(motion.tab(.home).opacity, 0)
+        XCTAssertEqual(motion.tab(.purpose).opacity, 1)
+        XCTAssertEqual(motion.tab(.purpose).scale, 1)
+    }
+
+    func testOldProbeCannotRemoveNewOwnerAndVisibilityIsPerKey() {
+        let registry = WLSharedRegistry()
+        let old = UIView(), replacement = UIView()
+        registry.register("same", view: old)
+        registry.register("same", view: replacement)
+        registry.setPhoto("same") { AnyView(Color.clear) }
+        registry.unregister("same", view: old)
+        XCTAssertNotNil(registry.photo("same"))
+        let first = registry.sourceVisibility("first")
+        let second = registry.sourceVisibility("second")
+        registry.setHidden("first", true)
+        XCTAssertTrue(first.hidden)
+        XCTAssertFalse(second.hidden)
+        registry.unregister("same", view: replacement)
+        XCTAssertNil(registry.photo("same"))
+    }
+
     func testSingleLineBoxesMatchLineHeight() {
         for limited in [false, true] {
             func h(_ t: String, _ s: WLTextStyle) -> CGFloat { height(WLText(t, s).lineLimit(limited ? 1 : nil)) }

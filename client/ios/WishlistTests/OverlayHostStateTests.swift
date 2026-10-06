@@ -18,6 +18,12 @@ final class OverlayHostStateTests: XCTestCase {
         return false
     }
 
+    func testSheetUsesCallerTitleForAccessibility() {
+        let state = OverlayHostState()
+        state.showSheet(title: "목적 만들기") {}
+        XCTAssertEqual(state.entries.last?.kind.accessibilityTitle, "목적 만들기")
+    }
+
     func testShowStartsOpeningAndBlocksInput() {
         let s = OverlayHostState()
         XCTAssertTrue(s.showSheet {})

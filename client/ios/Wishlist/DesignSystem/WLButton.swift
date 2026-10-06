@@ -39,7 +39,7 @@ struct WLButton: View {
     var body: some View {
         let (bg, fg) = colors
         Button(action: action) {
-            WLText(title, kind == .secondary ? .buttonMedium : .button, color: fg, alignment: .center)
+            WLText(title, kind == .secondary ? .buttonMedium : .button, color: fg, alignment: .center, maxLines: 1)
                 .padding(.horizontal, WishlistTokens.Space.s20)
                 .padding(.vertical, WishlistTokens.Space.s12)
                 .frame(maxWidth: .infinity, minHeight: 52, maxHeight: fillHeight ? .infinity : nil)
@@ -68,7 +68,7 @@ private struct WLWeightedRow: Layout {
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let total = proposal.width ?? 320
+        let total = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? (subviews.reduce(0) { $0 + $1.sizeThatFits(.unspecified).width } + spacing * CGFloat(max(0, subviews.count - 1)))
         let w = widths(total, subviews)
         let h = zip(subviews, w).map { $0.sizeThatFits(ProposedViewSize(width: $1, height: nil)).height }.max() ?? 0
         return CGSize(width: total, height: h)

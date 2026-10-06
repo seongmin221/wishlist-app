@@ -1,9 +1,25 @@
 import SwiftUI
 
-/// "KRW 549,000", "USD 299", "USD 19.99". 로케일과 무관하게 ','로 묶는다. 소수는 0이 아닐 때만 두 자리, KRW는 소수 없음.
+/// ISO 통화 메타데이터를 한 번만 읽는다. 알 수 없는 코드는 호출할 때마다 formatter를 만들지 않고 2자리를 쓴다.
+private enum WLCurrencyFractionDigits {
+    static let values: [String: Int] = {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.numberStyle = .currency
+        var values: [String: Int] = [:]
+        for currency in Locale.Currency.isoCurrencies.map(\.identifier) {
+            formatter.currencyCode = currency
+            values[currency] = formatter.maximumFractionDigits
+        }
+        return values
+    }()
+}
+
+/// "KRW 549,000", "USD 299", "USD 19.99". 로케일과 무관하게 ','로 묶는다. 소수는 0이 아닐 때만 ISO 4217 통화별 자리 수로 표시한다.
 /// (C2에서 KMP domain으로 옮긴다. 지금은 컴포넌트 미리보기용.)
 func formatPrice(_ amount: Decimal, currency: String) -> String {
-    let scale = currency == "KRW" ? 0 : 2
+    let currency = currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    let scale = WLCurrencyFractionDigits.values[currency] ?? 2
     var source = amount
     var v = Decimal()
     NSDecimalRound(&v, &source, scale, .plain) // 절반은 0에서 먼 쪽으로(Java HALF_UP)
@@ -21,8 +37,8 @@ func formatPrice(_ amount: Decimal, currency: String) -> String {
     let sign = v < 0 ? "-" : ""
     var tail = ""
     if scale > 0 && fraction != 0 {
-        let cents = NSDecimalNumber(decimal: fraction * 100).intValue
-        tail = "." + (cents < 10 ? "0\(cents)" : "\(cents)")
+        let units = NSDecimalNumber(decimal: fraction * pow(Decimal(10), scale)).stringValue
+        tail = "." + String(repeating: "0", count: max(0, scale - units.count)) + units
     }
     return "\(currency) \(sign)\(grouped)\(tail)"
 }

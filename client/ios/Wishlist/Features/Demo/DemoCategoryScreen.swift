@@ -1,5 +1,7 @@
 import SwiftUI
 
+#if DEBUG
+
 /// 카테고리 탭 데모: 왼쪽 상위 레일 + 오른쪽 세부 유형 알약 칩(칩 → 목록은 자리 표시 면 이동).
 struct DemoCategoryScreen: View {
     @Environment(\.wlColors) private var c
@@ -51,3 +53,5 @@ struct DemoCategoryScreen: View {
         .accessibilityAddTraits(on ? [.isSelected] : [])
     }
 }
+
+#endif

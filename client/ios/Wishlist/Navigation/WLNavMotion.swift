@@ -41,8 +41,7 @@ final class WLNavMotion {
     /// 남은 거리 비율로 줄인 모션의 최소 시간. 거의 끌지 않았을 때 튀어 보이지 않게 하는 구현 기본값(Android와 같다).
     static let revertMinMillis = 120
 
-    /// 전환 동안 비워 두는 원래 사진 자리(key).
-    private(set) var hiddenSources: Set<String> = []
+    @ObservationIgnored var reduceMotion = false
     /// push가 끝나 포커스를 받을 칸. VoiceOver 포커스를 상세 제목으로 옮기는 데 쓴다.
     private(set) var arrival: WLArrival?
 
@@ -73,6 +72,33 @@ final class WLNavMotion {
 
     func handle(_ transition: WLNavTransition?) {
         guard let t = transition else { return }
+        if reduceMotion, t.kind != .backGesture {
+            snap {
+                switch t.kind {
+                case .push:
+                    if let entry = navigator.entries(t.tab).last {
+                        let ch = channels(entry.id)
+                        ch.phase = entry.route.pushStyle == .photo ? 1 : 2
+                        ch.content = 1
+                        settlePush(entry, t)
+                    }
+                case .pop:
+                    pendingPopRemaining = nil
+                    if let entry = navigator.exiting?.entry {
+                        if let key = entry.sourceKey { registry.setHidden(key, false) }
+                        entryChannels[entry.id] = nil
+                    }
+                    finish(t)
+                case .tab(let from):
+                    tab(from).opacity = 0
+                    tab(t.tab).opacity = 1
+                    tab(t.tab).scale = 1
+                    finish(t)
+                case .backGesture: break
+                }
+            }
+            return
+        }
         switch t.kind {
         case .push:
             guard let entry = navigator.entries(t.tab).last else { return finish(t) }
@@ -99,7 +125,7 @@ final class WLNavMotion {
         }
         switch entry.route.pushStyle {
         case .photo:
-            if let key = entry.sourceKey { hiddenSources.insert(key) }
+            if let key = entry.sourceKey { registry.setHidden(key, true) }
             Task { @MainActor in
                 // 상세 자리가 재어지기 전(.zero)에는 움직이지 않는다. 그동안 사진은 원래 자리에, 상세는 투명하게 있다.
                 ch.target = await measuredTarget(entry.id) ?? ch.source
@@ -123,7 +149,7 @@ final class WLNavMotion {
     private func settlePush(_ entry: WLBackStackEntry, _ t: WLNavTransition) {
         let ch = channels(entry.id)
         ch.animating = false
-        if let key = entry.sourceKey { hiddenSources.remove(key) }
+        if let key = entry.sourceKey { registry.setHidden(key, false) }
         arrivalSerial += 1
         arrival = WLArrival(entryID: entry.id, serial: arrivalSerial)
         finish(t)
@@ -136,7 +162,7 @@ final class WLNavMotion {
         if !ch.animating { prepareBack(entry, ch) }
         let done: () -> Void = { [weak self] in
             guard let self else { return }
-            if let key = entry.sourceKey { hiddenSources.remove(key) }
+            if let key = entry.sourceKey { registry.setHidden(key, false) }
             finish(t)
             entryChannels[entry.id] = nil
         }
@@ -160,7 +186,7 @@ final class WLNavMotion {
             if entry.route.pushStyle == .photo, let target = registry.frame(WLSharedRegistry.targetKey(entry.id)) { ch.target = target }
             ch.animating = true
         }
-        if entry.route.pushStyle == .photo, let key = entry.sourceKey { hiddenSources.insert(key) }
+        if entry.route.pushStyle == .photo, let key = entry.sourceKey { registry.setHidden(key, true) }
     }
 
     private func startTab(from: WLTab, to: WLTab, _ t: WLNavTransition) {
@@ -188,7 +214,7 @@ final class WLNavMotion {
         guard let entry = navigator.entries(navigator.currentTab).last, navigator.beginBackGesture(),
               let t = navigator.activeTransition else { return false }
         drag = (entry, t)
-        prepareBack(entry, channels(entry.id))
+        if !reduceMotion { prepareBack(entry, channels(entry.id)) }
         return true
     }
 
@@ -198,7 +224,7 @@ final class WLNavMotion {
         let ch = channels(drag.entry.id)
         snap {
             // 사진: 상세 자리(1) → 원래 자리 쪽. 면: 화면 전체(2) → 떠오름(1) 쪽. 내용은 같이 옅어진다.
-            ch.phase = drag.entry.route.pushStyle == .photo ? 1 - p : 2 - p
+            if !reduceMotion { ch.phase = drag.entry.route.pushStyle == .photo ? 1 - p : 2 - p }
             ch.content = 1 - p
         }
     }
@@ -218,12 +244,12 @@ final class WLNavMotion {
         let ch = channels(drag.entry.id)
         let style = drag.entry.route.pushStyle
         let ms = scaled(style == .photo ? M.pushPhotoBack : M.pushSurfaceBack, p)
-        withAnimation(C.emphasized.animation(ms: ms)) {
+        withAnimation(reduceMotion ? nil : C.emphasized.animation(ms: ms)) {
             ch.phase = style == .photo ? 1 : 2
             ch.content = 1
         } completion: { [weak self] in
             ch.animating = false
-            if let key = drag.entry.sourceKey { self?.hiddenSources.remove(key) }
+            if let key = drag.entry.sourceKey { self?.registry.setHidden(key, false) }
             self?.navigator.cancelBackGesture()
         }
     }

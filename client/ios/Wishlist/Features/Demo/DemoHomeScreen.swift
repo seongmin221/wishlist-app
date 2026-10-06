@@ -1,5 +1,7 @@
 import SwiftUI
 
+#if DEBUG
+
 /// 홈 탭 데모(debug 빌드): overlay 열기, 사진 카드·칩·목적 카드 push, 가장 긴 목적 이름과 버튼 쌍.
 struct DemoHomeScreen: View {
     @Environment(\.wlNavigator) private var nav
@@ -18,7 +20,7 @@ struct DemoHomeScreen: View {
 
                 DemoSectionLabel(text: "overlay")
                 HStack(spacing: WishlistTokens.Space.s12) {
-                    WLButton("시트 열기", kind: .secondary) { overlay?.showSheet { DemoSheet() } }
+                    WLButton("시트 열기", kind: .secondary) { overlay?.showSheet(title: "시트 데모") { DemoSheet() } }
                     WLButton("확인창 열기", kind: .primary) { overlay?.showDialog(demoDeleteDialog()) }
                 }
 
@@ -44,7 +46,7 @@ struct DemoHomeScreen: View {
                         let key = "home/purpose/\(p.id)"
                         WLSharedSurfaceSource(key: key, fill: .purpose(p.color), radius: .fixed(WishlistTokens.Radius.xl)) {
                             DemoPurposeRow(purpose: p) {
-                                nav?.push(.demoDetail(id: DemoIds.purpose(p.id), hasPhoto: false), sourceKey: key)
+                                nav.push(.init(destination: DemoDestination.purpose(p.id), pushStyle: .surface), sourceKey: key)
                             }
                         }
                     }
@@ -53,8 +55,8 @@ struct DemoHomeScreen: View {
                 DemoSectionLabel(text: "가장 긴 목적 이름 · 큰 글자")
                 WLCard {
                     VStack(alignment: .leading, spacing: WishlistTokens.Space.s16) {
-                        WLText(DemoContent.longestPurposeName, .display28TwoLine)
-                        WLText(DemoContent.longestPurposeName, .display20TwoLine)
+                        WLText(DemoContent.longestPurposeName, .display28TwoLine, maxLines: 2)
+                        WLText(DemoContent.longestPurposeName, .display20TwoLine, maxLines: 2)
                         WLButtonPair(cancelText: "취소", primaryText: "목적 만들기", primaryKind: .primary, onCancel: {}, onPrimary: {})
                     }
                     .padding(WishlistTokens.Space.s20)
@@ -77,7 +79,7 @@ struct DemoProductCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: WishlistTokens.Space.s4) {
             WLCard(radius: WishlistTokens.Radius.m, onClick: {
-                nav?.push(.demoDetail(id: DemoIds.product(product.id), hasPhoto: true), sourceKey: sourceKey)
+                nav.push(.init(destination: DemoDestination.product(product.id), pushStyle: .photo), sourceKey: sourceKey)
             }) {
                 WLSharedPhotoSource(key: sourceKey) {
                     DemoPhoto(tint: product.tint)
@@ -87,8 +89,8 @@ struct DemoProductCard: View {
             }
             .accessibilityLabel("\(product.brand) \(product.name)")
             Spacer().frame(height: WishlistTokens.Space.s4)
-            WLText(product.brand, .label, color: c.textSecondary)
-            WLText(product.name, .bodyStrong).lineLimit(2)
+            WLText(product.brand, .label, color: c.textSecondary, maxLines: 1)
+            WLText(product.name, .bodyStrong, maxLines: 2).lineLimit(2)
             PriceText(amount: product.price, currency: product.currency, style: WLTextStyle.price.resized(WLTextStyle.body.size))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -103,7 +105,7 @@ private struct DemoPurposeRow: View {
     var body: some View {
         WLCard(radius: WishlistTokens.Radius.xl, onClick: action) {
             VStack(alignment: .leading, spacing: WishlistTokens.Space.s4) {
-                WLText(purpose.name, .display20TwoLine, color: WishlistTokens.Purpose.onPurpose)
+                WLText(purpose.name, .display20TwoLine, color: WishlistTokens.Purpose.onPurpose, maxLines: 2)
                 WLText("후보 \(purpose.candidates)", .label, color: WishlistTokens.Purpose.onPurpose)
             }
             .padding(.horizontal, WishlistTokens.Space.s20)
@@ -131,3 +133,5 @@ private struct DemoSheet: View {
         }
     }
 }
+
+#endif

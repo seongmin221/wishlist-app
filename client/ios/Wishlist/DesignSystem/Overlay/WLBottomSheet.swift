@@ -57,7 +57,7 @@ struct WLSheetHeader: View {
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("닫기")
+            .accessibilityLabel(String(localized: "wl.close"))
         }
     }
 }
@@ -75,7 +75,7 @@ private struct SheetHeightKey: PreferenceKey {
 /// 직접 그린 바텀시트(OverlayHost 안). 진행값 `progress`: 0 = 화면 아래로 완전히 내려감, 1 = 제자리.
 /// 열기 480 spring-sheet는 1을 살짝 넘겼다 돌아오므로 면을 80pt 아래로 더 그린다. 닫기 260 accelerate.
 /// 끌어내리기는 손잡이 줄에서만 받는다(손잡이는 끌 수 있는 시트에만 보인다).
-/// 애니메이션 완료는 토큰 시간만큼의 대기로 알리고(`.task(id: phase)`, 뷰가 사라질 때만 취소) 상태 기계는 UI 없이 테스트한다.
+/// 애니메이션의 실제 완료를 상태 기계에 전달한다. 상태 기계는 UI 없이 테스트한다.
 struct SheetLayer: View {
     let entry: OverlayEntry
     let state: OverlayHostState
@@ -83,6 +83,7 @@ struct SheetLayer: View {
     let content: () -> AnyView
 
     @Environment(\.wlColors) private var c
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var progress: CGFloat = 0
     @State private var dragOffset: CGFloat = 0
     @State private var height: CGFloat = 0
@@ -167,24 +168,22 @@ struct SheetLayer: View {
     }
 
     private func snapBack() {
-        withAnimation(WishlistTokens.Curve.springSheet.animation(ms: WishlistTokens.Motion.sheetDragDismissSnapBack)) { dragOffset = 0 }
+        withAnimation(reduceMotion ? nil : WishlistTokens.Curve.springSheet.animation(ms: WishlistTokens.Motion.sheetDragDismissSnapBack)) { dragOffset = 0 }
     }
 
     private func run(_ phase: OverlayPhase) async {
         switch phase {
         case .opening:
             // 높이가 재어지기 전에 움직이면 첫 프레임이 튄다(재어질 때까지 한 프레임씩 기다린다. 뷰가 사라지면 취소).
-            while (height == 0 || contentHeight == 0) && !Task.isCancelled { await overlaySleep(ms: 16) }
+            while (height == 0 || contentHeight == 0) && !Task.isCancelled { try? await Task.sleep(for: .milliseconds(16)) }
             if Task.isCancelled { return }
-            withAnimation(WishlistTokens.Curve.springSheet.animation(ms: WishlistTokens.Motion.sheetOpen)) { progress = 1 }
-            await overlaySleep(ms: WishlistTokens.Motion.sheetOpen)
+            await overlayAnimate(reduceMotion ? nil : WishlistTokens.Curve.springSheet.animation(ms: WishlistTokens.Motion.sheetOpen)) { progress = 1 }
             if !Task.isCancelled { state.onOpened(entry.id) }
         case .closing:
-            withAnimation(WishlistTokens.Curve.accelerate.animation(ms: WishlistTokens.Motion.sheetClose)) {
+            await overlayAnimate(reduceMotion ? nil : WishlistTokens.Curve.accelerate.animation(ms: WishlistTokens.Motion.sheetClose)) {
                 progress = 0
                 dragOffset = 0
             }
-            await overlaySleep(ms: WishlistTokens.Motion.sheetClose)
             if !Task.isCancelled { state.onClosed(entry.id) }
         case .open:
             break

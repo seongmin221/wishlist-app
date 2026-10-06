@@ -2,13 +2,24 @@ import SwiftUI
 
 /// 앱 루트: 테마 → overlay(시트·확인창·메뉴) → 탭 셸.
 struct ContentView: View {
+    @State private var navigator: WLNavigator
+    @State private var motion: WLNavMotion
+
+    init() {
+        let navigator = WLNavigator()
+        _navigator = State(initialValue: navigator)
+        _motion = State(initialValue: WLNavMotion(navigator: navigator))
+    }
+
     @State private var overlay = OverlayHostState()
 
     var body: some View {
         WLTheme {
             OverlayHost(state: overlay) {
-                WLNavHost { route in AppRoute(route: route) }
+                WLNavHost(navigator: navigator, motion: motion) { route in AppRoute(route: route) }
             }
+            .environment(\.wlNavigatorStorage, navigator)
+            .environment(\.wlNavMotionStorage, motion)
         }
     }
 }
@@ -17,17 +28,18 @@ private struct AppRoute: View {
     let route: WLRoute
 
     var body: some View {
-        switch route {
-        case .tabRoot(let tab):
+        if let tab = route.rootTab {
             #if DEBUG
             DemoTabRoot(tab: tab)
             #else
             PlainTabRoot(tab: tab)
             #endif
-        case .demoDetail(let id, let hasPhoto):
-            // 데모 상세는 debug 빌드의 데모 첫 화면에서만 열린다.
-            DemoDetailScreen(id: id, hasPhoto: hasPhoto)
         }
+        #if DEBUG
+        if let destination = route.destination.base as? DemoDestination {
+            DemoDetailScreen(destination: destination)
+        }
+        #endif
     }
 }
 
