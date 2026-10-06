@@ -39,7 +39,7 @@ MVP 초기에는 local과 production만 운용한다. local은 개발·단위·�
 
 local은 Docker PostgreSQL로 migration·repository를 통합 테스트하고 Firebase Auth Emulator로 인증 경계를 검증한다. Cloud Tasks·OpenAI adapter는 in-memory fake, extraction은 fixture HTTP server로 대체한다. 실제 Cloud Tasks IAM은 production smoke test, OpenAI 품질·latency는 대표 URL 평가로 검증한다.
 
-`APP_ROLE=general-worker`는 DB와 `OPENAI_API_KEY`, `OPENAI_MODEL_SNAPSHOT`을 요구하며 `/internal/worker/general`을 연결한다. 로컬은 모델 별칭을 명시적으로 허용하지만 production은 snapshot ID를 요구한다. API 역할은 기존 Firebase 인증과 상품 생성 경로를 유지한다. 로컬 통합 테스트는 상품 생성 HTTP → 일반 Worker HTTP → 토큰 계산·Responses adapter(fake HTTP) → DB `READY` 및 카테고리 저장까지 확인한다. 별도 opt-in smoke test는 실제 OpenAI에 같은 경로를 호출해 `C011` 저장까지 확인했다. 이 두 테스트의 상품 metadata 추출은 재현 가능한 fixture로 대체했다. Worker HTTP 경로의 접근 제어는 Cloud Run private service와 인증된 Cloud Tasks 호출에 의존하므로, 해당 서비스의 공개 접근을 허용해서는 안 된다.
+`APP_ROLE=general-worker`는 DB와 `OPENAI_API_KEY`, `OPENAI_MODEL_SNAPSHOT`을 요구하며 `/internal/worker/general`을 연결한다. 로컬은 모델 별칭을 명시적으로 허용하지만 production은 snapshot ID를 요구한다. API 역할은 Firebase 인증과 상품 생성·상세 조회를 연결하며, 생성/replay/상세는 [B1 공통 응답·지정 발행 계약](wishlist-item-read-api.md)을 사용한다. 로컬 통합 테스트는 상품 생성 HTTP → 일반 Worker HTTP → 토큰 계산·Responses adapter(fake HTTP) → DB `READY` 및 카테고리 저장까지 확인한다. 별도 opt-in smoke test는 실제 OpenAI에 같은 경로를 호출해 `C011` 저장까지 확인했다. 이 두 테스트의 상품 metadata 추출은 재현 가능한 fixture로 대체했다. Worker HTTP 경로의 접근 제어는 Cloud Run private service와 인증된 Cloud Tasks 호출에 의존하므로, 해당 서비스의 공개 접근을 허용해서는 안 된다.
 
 실제 URL 추출까지 포함한 8건 로컬 경로 실측 결과와 외부 사이트의 간헐적 실패는 [추출 파이프라인 파일럿](extraction-pipeline.md#실제-url-8건-로컬-파일럿-2026-09-24)에 기록한다. 해당 검증도 Firebase·Cloud Tasks·배포 앱의 인증 및 호출 경로는 포함하지 않는다.
 

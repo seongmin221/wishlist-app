@@ -98,7 +98,11 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 
 **통과:** 생성 201/Location, replay 200/표시 header, 같은 key 다른 URL 409, 다른 owner GET 404, READY/PARTIAL/실패 표현, DELETED 일반 GET 404·생성 replay에는 기존 tombstone. 중복 key 재전송은 item/job/outbox를 늘리지 않는다. deletionImpact의 목적 정보는 B3/B8에서 실제 연결 데이터와 함께 확장한다.
 
-**주요 테스트:** 기존 `CreateWishlistItemServiceTest`, `WishlistRoutesTest`, `DatabaseMigrationTest`; 신규 `GetWishlistItemServiceTest`와 mapper 상태표 테스트.
+**주요 테스트:** `CreateWishlistItemServiceTest`, `WishlistRoutesTest`, `DatabaseMigrationTest`, `DatabaseFactoryTest`, `OutboxDispatcherTest`; 신규 `WishlistDetailRoutesTest`가 실제 PostgreSQL을 통해 상세 service·공통 mapper의 상태표와 HTTP 계약을 함께 검증한다.
+
+**현재 구현:** owner-scoped 상세 GET·생성/replay 공통 mapper·선택 clientCreatedAt/V10·신규 event 지정 발행을 연결했다. 확정한 입력·출력·nullable metadata와 후속 목적 deletionImpact 범위는 [B1 조회 계약](wishlist-item-read-api.md)을 따른다. B2 이후 API와 B5 maintenance runtime의 완료를 의미하지 않는다.
+
+**검증:** 실제 PostgreSQL Testcontainers의 강제 전체 실행 190개 중 189 통과·실패/오류 0·opt-in RealUrlPilot 1 skip. [B1 구현 기록](../../history/architecture/server/b1-item-read-and-create-2026-10-06.md)에 명령·회귀·검증 범위를 남겼다.
 
 ## B2 — 카테고리 기본 관리
 
@@ -134,7 +138,7 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 
 **내부 순서:** WORK-01 후보/metadata 공급 → WORK-02 browser runtime → OPS-01 maintenance runtime·outbox/reconciler/budget 연결. B0의 보호 조건을 새 경로에도 적용한다.
 
-- API의 commit 후 발행은 생성 transaction의 connection을 반환한 뒤 실행한다. B0 보완에서 동시 발행과 createTask RPC 5초 제한을 적용했다. 현재 `dispatchPending(1)`은 가장 오래된 event를 선택하므로 신규 event의 즉시 발행을 보장하지 않는다. B5에서 신규 event 지정 발행과 전체 backlog 발행을 분리하고 실패는 Scheduler로 복구한다.
+- API의 commit 후 발행은 생성 transaction의 connection을 반환한 뒤 실행한다. B0 보완의 동시 발행 보호·createTask RPC 5초 제한을 유지하고 B1에서 신규 event 지정 발행을 연결했다. B5에서는 `dispatchPending`의 backlog 발행·Scheduler 복구와 지정 발행을 함께 검증한다.
 - maintenance는 RUNNING lease 복구뿐 아니라 오래된 GENERAL_PENDING/BROWSER_PENDING도 검사한다. 미발행 outbox는 기존 event를 발행하고, Cloud Tasks 재시도 소진·task 유실 후 PENDING은 새 outbox/task 이름으로 재예약한다. 살아 있는 queue task/backlog는 중복 재예약하지 않는다. [PENDING 복구 설계](analysis-pending-recovery.md)를 따른다.
 - 처리 예산 80초 < Worker 응답 상한 90초 < Cloud Tasks 105초 < 분석 lease 120초 관계를 유지한다. redirect·token 계산·LLM·browser는 남은 처리 시간을 공유한다. B0의 timeout/RETRY outbox와 B5의 Scheduler를 함께 검증한다.
 - 일반/browser stage 전환이 generation 전체 최대 3회·30분 예산을 초기화하지 않도록 횟수·deadline 계약과 테스트를 고정한다.

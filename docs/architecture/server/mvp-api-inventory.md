@@ -1,13 +1,13 @@
 # MVP 화면·기능별 API 목록
 
-> 상태: 요구사항 추적 및 API 구성 제안 · 최초 조사 2026-10-04 · B0 구현 현황 갱신 2026-10-05
+> 상태: 요구사항 추적 및 API 구성 제안 · 최초 조사 2026-10-04 · B1 구현 현황 갱신 2026-10-06
 >
 > 범위: 현재 MVP 제품 문서와 전달된 와이어프레임의 모든 화면·사용자 행동. URI, JSON 필드명과 신규 오류 코드는 구현 전 계약에서 고정한다. 제품의 미결정 규칙을 확정한 문서나 완성된 OpenAPI 명세는 아니다.
 
 ## 확인 기준과 문서 우선순위
 
 - 제품·디자인: `design/handoff@51c67e006ac5c52f3aebeb939fdc9187dc78ab4e`. 해당 워크트리의 변경 사항이 없는 상태에서 읽었다.
-- 최초 서버 조사: `server/initial-setup@9eacba51420e07de150b9427b8d2ed39be184939`. 현재 상태는 `server/b0-foundation`의 B0 Task 1~9를 기준으로 갱신하며 [완료 기록](../../history/architecture/server/b0-foundation-implementation.md)에서 검증한다.
+- 최초 서버 조사: `server/initial-setup@9eacba51420e07de150b9427b8d2ed39be184939`. B0 Task 1~9는 [완료 기록](../../history/architecture/server/b0-foundation-implementation.md)에서 검증하며, 현재 B1 생성·상세 구현은 develop@59c11cc 기반 Orca workspace의 [B1 조회 계약](wishlist-item-read-api.md)을 따른다.
 - 와이어프레임: `design/handoff/wireframes/README.md`, manifest, 보드 HTML 43개와 FlowMap. 첫 화면뿐 아니라 HTML의 조건부 표시·시트·확인창·입력·핸들러를 확인했다. 실제 브라우저의 클릭 검증은 수행하지 않았다.
 - 보드 HTML이 실제 API를 호출하지 않더라도 제품 문서가 요구하는 동작이면 목록에 포함했다. 시트 닫기·가짜 목록 초기화처럼 예시 runtime만의 행동을 서버 기능으로 자동 채택하지 않았다.
 - 최신 제품 문서 → 최신 디자인 결정 → 와이어프레임 예시 순서로 기능을 해석한다. 이력의 대체된 규칙은 현재 요구사항으로 사용하지 않는다. 기존 확정 API 계약과 충돌하는 새 제품 규칙은 아래에서 별도로 표시한다.
@@ -32,14 +32,14 @@
 
 | 종류 | 수 | 현재 상태 |
 | --- | ---: | --- |
-| 앱 서버 제품 API 동작 | **37** | 상품 생성 1개 부분 구현, 나머지 36개 route 없음. B0는 정책·DTO·조회/Worker/runtime 기반 완료 |
+| 앱 서버 제품 API 동작 | **37** | B1 상품 생성·상세 2개 route 연결, 나머지 35개 route 없음. 목적 삭제 영향·표시 metadata 등 후속 확장은 각 묶음에서 완료 |
 | 내부 작업 HTTP 동작 | **3** | 일반 Worker 연결, browser는 조건부 route/service만 있고 runtime 연결 없음, maintenance 신규 제안 |
 | 공통 health HTTP 동작 | **1** | `/health` 구현 |
 | 와이어프레임 | **43** | 아래 W01~W43 모두 API 또는 기기/외부 서비스 책임에 연결 |
 
 동작 수는 `HTTP method + path` 기준이다. query, 시트·확인 상태와 같은 요청의 재사용을 중복 집계하지 않는다. preview·별도 후보 페이지 등 조회 분리는 이 문서의 권장 구성으로, 필요한 데이터를 다른 응답에 합쳐 제공하면 endpoint 수는 줄일 수 있다. **37은 기능을 지원하기 위한 현재 구성안의 수이며 제품 기능의 수나 최소 API 수를 뜻하지 않는다.**
 
-B0의 공통 DTO와 owner-scoped 상태 repository는 공개 GET 연결이 아니다. ITEM-03 route와 생성/replay의 실제 mapper, clientCreatedAt 보관은 B1에 남는다. WORK-02와 OPS-01 runtime은 B5에 남는다.
+B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생성/replay의 실제 mapper에 연결했다. clientCreatedAt 보관과 신규 outbox event 지정 발행도 B1에 포함한다. [B1 계약](wishlist-item-read-api.md)을 따르며 WORK-02와 OPS-01 runtime은 B5에 남는다.
 
 신규 목록의 ‘필수 데이터’는 구현 명세 작성에 필요한 최소 입출력 범위다. 필드 타입·null/누락·status code·각 오류 응답의 완전한 schema는 후속 계약에서 작성한다. 구현 상태는 설계 문서가 아니라 코드의 route와 runtime 조립을 기준으로 판단했다.
 
@@ -49,9 +49,9 @@ B0의 공통 DTO와 owner-scoped 상태 repository는 공개 GET 연결이 아�
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **부분**: 생성·job/outbox·인증·key·공개 오류·IO/pool 있음. clientCreatedAt 미처리, 문자열 mapper·metadata 상수 유지(B1 교체) |
+| ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, 선택 clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **구현(B1)**: 공유 시각 보관·실제 공통 mapper·신규 event 지정 발행. nullable 표시 metadata 및 후속 참조 확장은 B2/B3/B5/B6 |
 | ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 앞뒤 cursor·anchorResolved | 없음 |
-| ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | 없음 |
+| ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 목적 deletionImpact는 B3/B8 확장 |
 | ITEM-04 | `PATCH /v1/wishlist-items/{id}` | 일반 편집 한 번에 저장, 브랜드 수정·category 재지정·purpose 선택/해제 · S3/S4 | expectedVersion, 변경된 이름/brand/mediaId/categoryId/purposeId. 생략=유지, optional null=해제 | 갱신된 item·출처·review·version. 사용자 값만 수정, price/currency/sourceUrl 변경 제외 | 없음 |
 | ITEM-05 | `DELETE /v1/wishlist-items/{id}` | 일반·분석 중 삭제, 목적에서 항목 제거 · S2/S4 | item ID. 기존 계약상 expectedVersion 없음 | 204, 늦은 Worker 반영 차단. owner의 이미 삭제한 item 반복 삭제도 204 | 없음 |
 | ITEM-06 | `POST /v1/wishlist-items/{id}/analysis-attempts` | 재시도 가능한 실패를 다시 분석 · S2/S8 | attemptRequestId를 Idempotency-Key로 전달 | 새 generation·PROCESSING item, job/outbox 원자 생성. 수동 완료·terminal·PROCESSING이면 거절 | 없음 |
