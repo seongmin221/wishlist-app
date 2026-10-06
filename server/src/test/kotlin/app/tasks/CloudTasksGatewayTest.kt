@@ -7,6 +7,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CloudTasksGatewayTest {
+    @Test fun `create task rpc is bounded to five seconds without hidden retries`() {
+        val settings = CloudTasksGateway.clientSettings().createTaskSettings()
+        assertEquals(java.time.Duration.ofSeconds(5), settings.retrySettings.totalTimeoutDuration)
+        assertEquals(java.time.Duration.ofSeconds(5), settings.retrySettings.initialRpcTimeoutDuration)
+        assertEquals(java.time.Duration.ofSeconds(5), settings.retrySettings.maxRpcTimeoutDuration)
+        assertTrue(settings.retryableCodes.isEmpty())
+    }
+
     @Test
     fun `general task has deterministic name oidc target and 105 second deadline`() {
         val jobId = UUID.randomUUID()

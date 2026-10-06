@@ -7,12 +7,40 @@ import app.wishlist.CreateWishlistItemService
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
+
+import app.testutil.*
+import app.analysis.*
+import kotlin.test.assertNull
 
 class GeneralExtractionProcessorTest {
+    @Test fun `extraction finishing after claim invalidation cannot save metadata or classify`() = withAnalysisDatabase { source ->
+        for (change in listOf("token", "version", "generation", "manual", "lease")) {
+            val claim = newAnalysisClaim(source)
+            var calls = 0
+            var expected: String? = null
+            val outcome = pausedAnalysisCall({ pause ->
+                GeneralExtractionProcessor(source, { pause(); ExtractionResult.Complete(Metadata("stale", null, null, "https://example.com/item")) },
+                    { _, _ -> calls++; ProcessingOutcome.Complete }).process(claim)
+            }, {
+                val sql = when (change) {
+                    "token" -> "update analysis_jobs set execution_token='${UUID.randomUUID()}' where id='${claim.jobId}'"
+                    "lease" -> "update analysis_jobs set lease_until=clock_timestamp()-interval '1 second' where id='${claim.jobId}'"
+                    "version" -> "update wishlist_items set version=version+1 where id='${claim.itemId}'"
+                    "generation" -> "update wishlist_items set current_generation=2 where id='${claim.itemId}'"
+                    else -> "update wishlist_items set manual_completion_at=now() where id='${claim.itemId}'"
+                }
+                analysisSql(source, sql); expected = pendingSnapshot(source, claim)
+            })
+            assertEquals(ProcessingOutcome.Stale, outcome, change)
+            assertEquals(0, calls)
+            assertEquals(expected, pendingSnapshot(source, claim))
+        }
+    }
+
     @Test
     fun `complete extraction stores metadata before marking item ready`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
@@ -23,7 +51,7 @@ class GeneralExtractionProcessorTest {
             val processor = GeneralExtractionProcessor(source,
                 { url -> ExtractionResult.Complete(Metadata("A product", "Description", null, url)) },
                 { id, _ ->
-                    source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id); s.executeUpdate() } }
+                    source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
                     app.analysis.ProcessingOutcome.Complete
                 })
 
@@ -40,7 +68,7 @@ class GeneralExtractionProcessorTest {
 
     @Test
     fun `insufficient metadata becomes partial and asks for manual completion`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
@@ -61,7 +89,7 @@ class GeneralExtractionProcessorTest {
 
     @Test
     fun `blocked redirect is terminal without retry`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)

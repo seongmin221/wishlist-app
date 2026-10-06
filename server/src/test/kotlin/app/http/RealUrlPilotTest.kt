@@ -27,7 +27,7 @@ import kotlin.test.assertEquals
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 import org.junit.jupiter.api.Assumptions.assumeTrue
 
 /** Opt-in diagnostic: live shop HTML and OpenAI are intentionally not part of the normal suite. */
@@ -39,7 +39,7 @@ class RealUrlPilotTest {
             .bufferedReader().use { lines -> lines.readLines().filter(String::isNotBlank).map { Json.parseToJsonElement(it).jsonObject } }
         assertEquals(8, cases.size)
 
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
+        PostgresTestContainer().use { db ->
             db.start()
             DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)
             val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)

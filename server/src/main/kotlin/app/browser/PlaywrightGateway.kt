@@ -1,5 +1,7 @@
 package app.browser
 
+import app.analysis.WorkerExecution
+import java.time.Duration
 import app.extraction.ExtractionResult
 import app.extraction.HttpFetchResponse
 import app.extraction.HttpMetadataExtractor
@@ -16,13 +18,13 @@ class PlaywrightGateway(private val safety: UrlSafetyPolicy) {
         safety.validate(url)
         try {
             Playwright.create().use { playwright ->
-                playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true)).use { browser ->
+                playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true).setTimeout(WorkerExecution.remaining(Duration.ofSeconds(30)).toMillis().toDouble())).use { browser ->
                     browser.newContext().use { context ->
                         context.route("**/*") { route ->
                             if (canRequest(route.request().url())) route.resume() else route.abort()
                         }
                         val page = context.newPage()
-                        page.navigate(url, com.microsoft.playwright.Page.NavigateOptions().setTimeout(30_000.0))
+                        page.navigate(url, com.microsoft.playwright.Page.NavigateOptions().setTimeout(WorkerExecution.remaining(Duration.ofSeconds(30)).toMillis().toDouble()))
                         val finalUrl = page.url()
                         safety.validate(finalUrl)
                         val html = page.content()

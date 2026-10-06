@@ -1,5 +1,8 @@
 package app.budget
 
+import app.analysis.AnalysisClaim
+import app.analysis.AnalysisWriteGuard
+import app.analysis.analysisDatabaseTime
 import java.sql.Connection
 import java.sql.Timestamp
 import java.time.Instant
@@ -11,6 +14,7 @@ enum class ReservationState { RESERVED, IN_FLIGHT, SETTLED, RELEASED }
 data class BudgetReservation(val id: UUID, val requestId: UUID, val maximumMicrousd: Long)
 sealed interface ReserveResult {
     data class Reserved(val reservation: BudgetReservation) : ReserveResult
+    data object Stale : ReserveResult
     data object Exceeded : ReserveResult
 }
 data class WindowTotals(val reserved: Long, val settled: Long)
@@ -26,16 +30,16 @@ class LlmBudgetService(
 ) {
     init { require(modelSnapshot.isNotBlank() && (allowLocalAlias || modelSnapshot != "gpt-5.6-luna")) }
 
-    fun reserveBeforeCall(jobId: UUID, generation: Int, requestId: UUID): ReserveResult = transaction { c ->
-        c.prepareStatement("select id, maximum_microusd, state from llm_budget_reservations where request_id=?").use { s ->
+    fun reserveBeforeCall(claim: AnalysisClaim, requestId: UUID): ReserveResult = transaction { c ->
+        if (!AnalysisWriteGuard.lockCurrent(c, claim)) return@transaction ReserveResult.Stale
+        c.prepareStatement("select id, maximum_microusd, analysis_job_id, generation from llm_budget_reservations where request_id=?").use { s ->
             s.setObject(1, requestId)
-            s.executeQuery().use { r -> if (r.next()) return@transaction ReserveResult.Reserved(BudgetReservation(r.getObject(1, UUID::class.java), requestId, r.getLong(2))) }
+            s.executeQuery().use { r -> if (r.next()) {
+                require(r.getObject(3, UUID::class.java) == claim.jobId && r.getInt(4) == claim.generation) { "Reservation belongs to another analysis job" }
+                return@transaction ReserveResult.Reserved(BudgetReservation(r.getObject(1, UUID::class.java), requestId, r.getLong(2)))
+            } }
         }
-        val valid = c.prepareStatement("select 1 from analysis_jobs j join wishlist_items i on i.id=j.wishlist_item_id where j.id=? and j.generation=? and i.lifecycle_status='ACTIVE' and j.stage in ('GENERAL_RUNNING','BROWSER_RUNNING','CLASSIFICATION_RUNNING')").use { s ->
-            s.setObject(1, jobId); s.setInt(2, generation); s.executeQuery().use { it.next() }
-        }
-        require(valid) { "Inactive or unclaimed analysis job" }
-        val now = Instant.now()
+        val now = c.analysisDatabaseTime()
         val windows = windows(now)
         val maximum = price.maximumMicrousd()
         windows.forEach { (type, start, ceiling) ->
@@ -49,6 +53,7 @@ class LlmBudgetService(
             }
             if (!allowed) return@transaction ReserveResult.Exceeded
         }
+        if (!AnalysisWriteGuard.lockCurrent(c, claim)) return@transaction ReserveResult.Stale
         windows.forEach { (type, start, ceiling) ->
             c.adjustWindow(type, start, maximum, 0)
             val total = c.prepareStatement("select reserved_microusd+settled_microusd from llm_budget_windows where window_type=? and window_start=?").use { s ->
@@ -59,16 +64,16 @@ class LlmBudgetService(
             }
         }
         val id = UUID.randomUUID()
-        c.prepareStatement("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,model_snapshot,state,maximum_microusd,lease_until) values(?,?,?,?,?,?,'RESERVED',?,?)").use { s ->
-            s.setObject(1, id); s.setObject(2, requestId); s.setObject(3, jobId); s.setInt(4, generation)
-            s.setString(5, price.version); s.setString(6, modelSnapshot); s.setLong(7, maximum); s.setTimestamp(8, Timestamp.from(now.plusSeconds(120))); s.executeUpdate()
+        c.prepareStatement("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,model_snapshot,state,maximum_microusd,lease_until,created_at) values(?,?,?,?,?,?,'RESERVED',?,?,?)").use { s ->
+            s.setObject(1, id); s.setObject(2, requestId); s.setObject(3, claim.jobId); s.setInt(4, claim.generation)
+            s.setString(5, price.version); s.setString(6, modelSnapshot); s.setLong(7, maximum); s.setTimestamp(8, Timestamp.from(c.analysisDatabaseTime().plusSeconds(120))); s.setTimestamp(9, Timestamp.from(now)); s.executeUpdate()
         }
         ReserveResult.Reserved(BudgetReservation(id, requestId, maximum))
     }
 
     fun markInFlight(id: UUID) = transaction { c ->
         c.prepareStatement("update llm_budget_reservations set state='IN_FLIGHT', lease_until=? where id=? and state='RESERVED'").use { s ->
-            s.setTimestamp(1, Timestamp.from(Instant.now().plusSeconds(120))); s.setObject(2, id)
+            s.setTimestamp(1, Timestamp.from(c.analysisDatabaseTime().plusSeconds(120))); s.setObject(2, id)
             check(s.executeUpdate() == 1) { "Reservation cannot enter flight" }
         }
     }
@@ -77,9 +82,25 @@ class LlmBudgetService(
 
     fun settleMaximum(id: UUID) = finalize(id, price.maximumMicrousd(), false)
 
-    fun reconcileExpired(now: Instant = Instant.now()): Int = transaction { c ->
+    fun releaseReserved(id: UUID) = releaseUnsent(id, ReservationState.RESERVED)
+
+    /** Caller must prove client.send was never entered; transport failures are not proof. */
+    fun releaseUnsentInFlight(id: UUID) = releaseUnsent(id, ReservationState.IN_FLIGHT)
+
+    private fun releaseUnsent(id: UUID, expected: ReservationState) = transaction { c ->
+        val state = c.prepareStatement("select state from llm_budget_reservations where id=? for update").use { s ->
+            s.setObject(1, id); s.executeQuery().use { r -> check(r.next()); ReservationState.valueOf(r.getString(1)) }
+        }
+        // Reconciliation may already have released this unsent reservation.
+        if (state == ReservationState.RELEASED) return@transaction
+        check(state == expected) { "Unexpected reservation state for unsent release" }
+        c.finalizeLocked(id, 0, true)
+    }
+
+    fun reconcileExpired(now: Instant? = null): Int = transaction { c ->
+        val databaseNow = now ?: c.analysisDatabaseTime()
         val expired = c.prepareStatement("select id,state,maximum_microusd from llm_budget_reservations where state in ('RESERVED','IN_FLIGHT') and lease_until<? for update skip locked").use { s ->
-            s.setTimestamp(1, Timestamp.from(now)); s.executeQuery().use { r -> buildList { while (r.next()) add(Triple(r.getObject(1, UUID::class.java), ReservationState.valueOf(r.getString(2)), r.getLong(3))) } }
+            s.setTimestamp(1, Timestamp.from(databaseNow)); s.executeQuery().use { r -> buildList { while (r.next()) add(Triple(r.getObject(1, UUID::class.java), ReservationState.valueOf(r.getString(2)), r.getLong(3))) } }
         }
         expired.forEach { (id, state, maximum) -> c.finalizeLocked(id, if (state == ReservationState.IN_FLIGHT) maximum else 0, state == ReservationState.RESERVED) }
         expired.size

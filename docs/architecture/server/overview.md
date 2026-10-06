@@ -2,6 +2,14 @@
 
 > 상태: **부분 확정** — MVP 서버는 Kotlin/JVM + Ktor, Neon PostgreSQL, Firebase Authentication과 Google Cloud Run을 사용한다. 분석 작업은 transactional outbox와 Cloud Tasks로 전달한다.
 
+## B0 구현 현황 — 2026-10-05
+
+B0 Task 1~9의 상태·DTO/error·V8/V9·owner 조회 기반, Worker claim/guard/중간·최종 결과/lease 복구, IO·역할 pool·client 종료 기반을 구현했다. 상세 검증과 감사·B1 인계는 [B0 구현 완료 기록](../../history/architecture/server/b0-foundation-implementation.md), 저장 정책은 [상품 상태 저장 기반](wishlist-state-persistence.md), runtime은 [IO와 자원 수명](runtime-resources.md)을 따른다. 완료 기록의 최종 회귀·리뷰가 통과 조건이다.
+
+현재 runtime 역할은 local health·API·일반 Worker다. 상품 생성/replay와 일반 Worker HTTP를 유지했으며 제품 조회·변경 API를 새로 공개하지 않았다. browser service/route와 reconciler는 local 통합 테스트로 검증한 기반이며 browser/maintenance runtime, 전체 generation retry 예산, Scheduler 연결은 B5다. 실제 client 생성/replay JSON mapper와 ITEM-03 상세 GET은 B1에서 구현한다.
+
+운영 적용에서는 구 Worker drain/중지 → V8/V9 별도 migration → 실행 보호 코드 배포 → queue 재개 순서를 지킨다. migration만으로 구 Worker의 token 없는 SQL을 차단할 수 없으므로 혼재 운영을 하지 않는다. 이번 B0에서 production 작업은 수행하지 않았다.
+
 ## 논리 모듈
 
 - **API**: 인증된 요청의 생성·조회·수정, 짧은 응답
@@ -12,7 +20,7 @@
 - **Persistence**: PostgreSQL repository와 migration
 - **Integration**: Auth, queue, LLM, browser rendering adapter
 
-Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. domain/application 로직이 Ktor, AWS, DB driver에 직접 의존하지 않게 해 향후 테스트와 기술 교체의 비용을 낮춘다.
+Ktor의 HTTP routing과 plugin은 adapter 계층에 둔다. 상태 정책은 HTTP/DB 없이 계산하며, 현재 application service/repository는 동기 JDBC를 사용한다. 외부 adapter와 상태·transaction 책임을 구분해 향후 교체 범위를 제한한다.
 
 ## 관리형 PostgreSQL과 Auth
 
@@ -45,7 +53,7 @@ production migration은 API·Worker와 별도의 Neon DB role·credential을 사
 
 기본 인프라는 평균 월 30,000원 상한으로 관리한다. GCP production project에는 월 20,000원 budget alert를 두고 50%·80%·100%에서 알림을 받으며, Neon은 월 10,000원 목표 비용으로 별도 확인한다. 자동 billing·서비스 중단은 하지 않는다. API·Worker latency·오류·instance, Worker 실행 시간·retry, Queue backlog와 저장부터 분석 완료까지의 p95 시간을 비용과 함께 관측한다.
 
-Worker request timeout은 90초, Cloud Tasks task deadline은 105초로 시작한다. 대표 URL 부하 시험에서 전체 완료 p95 5분, timeout·retry 비율과 queue backlog를 확인해 timeout과 capacity를 함께 조정한다.
+처리 예산은 80초, Worker 전체 응답 상한은 90초, Cloud Tasks task deadline은 105초, DB 분석 lease는 120초다. 외부 호출은 남은 처리 예산을 공유한다. retry 전환은 새 outbox를 함께 저장하며 오래된 PENDING 복구는 B5 maintenance에 연결한다. 대표 URL 부하 시험에서 전체 완료 p95 5분, timeout·retry 비율과 queue backlog를 확인해 timeout과 capacity를 함께 조정한다.
 
 production은 전용 Google Cloud project 하나에 Firebase Authentication, Cloud Run, Cloud Tasks, Cloud Scheduler와 Secret Manager를 함께 둔다. Neon은 별도의 production 전용 project·database를 사용한다. staging을 추가할 때는 production 자원을 공유하지 않는다.
 
@@ -99,15 +107,17 @@ Cloud Tasks와 transactional outbox 선택은 [ADR-008](../../history/architectu
 - 하나의 generation은 최대 3회, 10초부터 최대 10분의 exponential backoff로 전체 30분 동안 재시도한다. 3회 또는 30분 중 하나라도 먼저 도달하면 추가 분석을 막는다.
 - Cloud Tasks queue도 `maxAttempts=3`, `minBackoff=10s`, `maxBackoff=600s`, `maxRetryDuration=1800s`로 고정한다. Worker가 DB attempt count와 최초 시도 기준 deadline을 사전 검증하며 소진 시 `FAILED_RETRYABLE`을 기록하고 2xx로 끝낸다.
 - Worker는 같은 작업이 중복 전달·실행되어도 상태 전이와 `WishlistItem` 결과가 한 번 처리한 경우와 같은 최종 결과가 되도록 idempotent해야 한다.
-- 일반 Worker는 `GENERAL_PENDING → GENERAL_RUNNING`을 DB에서 claim하며 첫 시도부터 30분과 최대 3회를 사전에 검증한다. 실행 중 종료되어 120초 넘게 `GENERAL_RUNNING`에 남은 job은 reconciler가 다시 대기 상태와 새 outbox event로 복구한다. 한도를 소진한 작업은 `FAILED_RETRYABLE`로 기록한다.
+- 일반 Worker는 `GENERAL_PENDING → GENERAL_RUNNING`을 DB에서 claim하며 첫 시도부터 30분과 최대 3회를 사전에 검증한다. DB lease가 만료된 RUNNING job은 reconciler가 item→job 잠금과 현재 실행을 재검증해 대기 상태·token 해제·새 outbox event로 복구한다. updated_at 경과 시간으로 복구하지 않는다. 한도를 소진한 작업은 `FAILED_RETRYABLE`로 기록한다.
 - browser Worker도 generation·owner·lifecycle과 `BROWSER_PENDING` 단계 claim을 원자적으로 검증한다. 중복·stale browser task는 결과를 쓰지 않고 2xx로 끝낸다. 대상 사이트 차단·navigation timeout·대상 DNS/연결 오류·추출 부족은 `PARTIAL`을 저장하고 2xx로 끝내며, DB commit 실패·Worker runtime 장애처럼 terminal 상태를 쓰지 못한 인프라 오류만 재시도한다.
 - retry 횟수, backoff, 장기 실패와 추출 성공률을 관측 가능하게 만든다. Cloud Tasks retry 소진 후 task가 삭제돼도 `AnalysisJob`의 실패 기록은 보존한다.
-- Worker는 AI 요청 후보 snapshot을 기록하고 결과 반영 때 generation·lifecycle·후보 유효성을 재검증한다. stale 결과는 반영하지 않는다.
+- Worker는 AI 요청 후보 snapshot을 generation 내에서 보존하고 generation·token·lease·stage·owner·lifecycle·수동 완료·claimed version을 검증한다. 공급 snapshot의 ID 밖 결과와 stale 실행은 반영하지 않는다. 사용자 category/purpose 자원이 준비된 뒤 변경·삭제 시 후보 활성/소유자/version 재검증은 B2/B3/B8에서 확장한다.
 - runtime은 명시적으로 지원하지 않는 Worker 역할을 설정하면 기동을 거부한다. production API는 DB·Firebase·Cloud Tasks 필수 설정이 없으면 health-only로 조용히 기동하지 않는다. Worker 역할 조립과 private endpoint 배포가 끝나기 전에는 Worker 서비스를 출시하지 않는다.
 - [추출 pipeline](extraction-pipeline.md)은 서버 구현의 보안 경계다.
 - WishlistItem의 독립 상태 축, idempotency, anchor window와 경쟁 상황은 [WishlistItem 상태 모델과 API 계약](../wishlist-item-state-api.md)을 따른다.
 
 ## 기술 미결정 사항
+
+와이어프레임에 필요한 상품 조회·사용자 변경·카테고리·목적·아카이브의 추가 설계는 [MVP 제품 API 설계 제안](mvp-product-api-design.md)에 정리한다. 이 제안은 현재 구현이나 확정된 상태/API 계약을 자동으로 대체하지 않는다. 코드와 화면의 차이 및 실제 검증 범위는 [2026-10-04 서버 정밀 검토](../../history/architecture/server/technical-design-checkpoint-2026-10-04.md)를 따른다.
 
 - Worker request timeout, Cloud Tasks task deadline, 비용 alert의 정확한 기준
 - 실제 부하·비용 측정에 따른 초기 resource와 queue 용량 조정

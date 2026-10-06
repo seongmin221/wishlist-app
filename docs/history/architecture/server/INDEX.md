@@ -49,8 +49,35 @@
 
 ## 기술 설계 체크포인트
 
+- [2026-10-04 와이어프레임 기준 서버 정밀 검토](technical-design-checkpoint-2026-10-04.md) — 검토 완료 · 설계 제안
 - [2026-09-19 인프라 설계 체크포인트](technical-design-checkpoint-2026-09-19.md) — 진행 중
 - [2026-09-15 인프라 설계 체크포인트](technical-design-checkpoint-2026-09-15.md) — 대체됨
 - [2026-09-13 기술 설계 체크포인트](technical-design-checkpoint-2026-09-13.md) — 대체됨
 
 추가 결정은 `ADR-번호-제목.md` 형식으로 이 폴더에 기록한다.
+
+- [MVP API 구현 순서 결정](api-implementation-sequencing-2026-10-04.md) — 37개 API 최초 배정·자원 의존 순서·단계 통과 조건
+
+- [B0 Task 1 상태 정책 구현](b0-task-1-state-policy-2026-10-05.md) — server 브랜치 분리·상태별 허용 행동·단위/회귀 검증
+
+- [DB 테스트 호스트 준비 대기](db-test-host-readiness-2026-10-05.md) — 기존 연결 실패 해소·공통 fixture·전체 회귀
+
+- [B0 Task 2 공통 API 응답 구현](b0-task-2-api-contract-2026-10-05.md) — 요청 ID·공개 오류·DTO·가격 정밀도
+
+- [B0 Task 3 상태·실행 스키마 구현](b0-task-3-state-schema-2026-10-05.md) — V7 업그레이드·데이터 보존·사용자 범위 조회
+
+- [B0 Task 4 원자 claim·쓰기 보호](b0-task-4-analysis-claim-2026-10-05.md) — item→job 잠금·실행 token·DB 시각·경합 검증
+
+- [B0 Task 5 중간 결과·AI 예산 claim 연결](b0-task-5-pending-claims-2026-10-05.md) — stale 저장 차단·후보 snapshot·실제 비용 정산
+
+- [B0 Task 6 Worker 최종 반영](b0-task-6-final-results-2026-10-05.md) — 사용자 값·검토 보호·최종 version·fallback·503/204 경합 검증
+
+- [B0 Task 7 lease 기반 복구](b0-task-7-lease-recovery-2026-10-05.md) — 만료 token 폐기·현재 상품 재검증·동시 복구·예산 보존
+
+- [B0 Task 8 IO와 자원 수명](b0-task-8-runtime-resources-2026-10-05.md) — 역할 pool·client 재사용·종료 gate·실제 발행과 취소
+
+- [B0 전체 구현·검증 기록](b0-foundation-implementation.md) — Task 1~9·전체 회귀·쓰기 감사·legacy rollout·B1 인계
+
+- [B0 외부 리뷰 보완](b0-review-hardening-2026-10-05.md) — 시간 상한·동시 발행·오류 관측·DB 시각·PENDING 복구 설계
+
+- [B0 후속 리뷰 보완](b0-followup-review-2026-10-06.md) — queue claim·LLM 마감·예산 계약·최종 version 복구·DB 시각·중복 저장 정리

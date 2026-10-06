@@ -16,12 +16,27 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.testcontainers.containers.PostgreSQLContainer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import app.testutil.PostgresTestContainer
 
 class WishlistRoutesTest {
+    @Test fun `blocking creation runs outside the route executor`() {
+        app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes({ _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }) { UUID.randomUUID() } }, {
+            post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
+        })
+    }
+
+    @Test fun `creation cancellation propagates to the request pipeline`() {
+        app.testutil.assertRouteCancellation({ block -> wishlistRoutes({ _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }) { UUID.randomUUID() } }, {
+            post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
+        })
+    }
+
     @Test
     fun `create replay conflict and invalid url use stable http contract`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val service = CreateWishlistItemService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password))
@@ -29,7 +44,7 @@ class WishlistRoutesTest {
             val key = UUID.randomUUID()
 
             testApplication {
-                application { routing { wishlistRoutes(service) { owner } } }
+                application { installApiHttpSupport(); routing { wishlistRoutes(service) { owner } } }
                 suspend fun submit(url: String) = client.post("/v1/wishlist-items") {
                     header("Idempotency-Key", key.toString())
                     contentType(ContentType.Application.Json)
@@ -49,6 +64,11 @@ class WishlistRoutesTest {
 
                 val conflict = submit("https://example.com/another")
                 assertEquals(HttpStatusCode.Conflict, conflict.status)
+                val error = Json.parseToJsonElement(conflict.bodyAsText()).jsonObject.getValue("error").jsonObject
+                assertEquals("IDEMPOTENCY_KEY_REUSED", error.getValue("code").jsonPrimitive.content)
+                assertEquals(conflict.headers["X-Request-ID"], error.getValue("requestId").jsonPrimitive.content)
+                UUID.fromString(first.headers["X-Request-ID"]!!)
+                UUID.fromString(replay.headers["X-Request-ID"]!!)
 
                 val invalid = submit("http://127.0.0.1/private")
                 assertEquals(HttpStatusCode.UnprocessableEntity, invalid.status)

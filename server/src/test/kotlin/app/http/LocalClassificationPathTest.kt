@@ -26,13 +26,13 @@ import java.net.URI
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.testcontainers.containers.PostgreSQLContainer
+import app.testutil.PostgresTestContainer
 
 class LocalClassificationPathTest {
     @Test fun `opt in real OpenAI smoke follows create and worker HTTP path`() {
         if (System.getenv("RUN_REAL_OPENAI_SMOKE") != "1") return
         val key = requireNotNull(System.getenv("OPENAI_API_KEY"))
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
+        PostgresTestContainer().use { db ->
             db.start()
             DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)
             val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)
@@ -41,7 +41,7 @@ class LocalClassificationPathTest {
             var observed: GatewayResponse? = null
             val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = "gpt-5.6-luna", allowLocalAlias = true),
                 { catalog.snapshot(catalog.categories.map { it.id }.toSet()) },
-                { metadata, candidates -> gateway.classify(metadata, candidates).also { observed = it } })
+                { metadata, candidates, beforeSend -> gateway.classify(metadata, candidates, beforeSend).also { observed = it } })
             val processor = GeneralExtractionProcessor(source,
                 { url -> ExtractionResult.Complete(Metadata("CAYL cap", null, null, url)) }, classifier::classify)
             testApplication {
@@ -73,7 +73,7 @@ class LocalClassificationPathTest {
     }
 
     @Test fun `create API through general worker HTTP commits classified item ready`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { db ->
+        PostgresTestContainer().use { db ->
             db.start()
             DatabaseFactory.migrate(db.jdbcUrl, db.username, db.password)
             val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)

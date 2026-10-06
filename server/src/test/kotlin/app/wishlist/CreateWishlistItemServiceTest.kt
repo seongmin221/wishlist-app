@@ -4,6 +4,7 @@ import app.DatabaseFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import app.testutil.PostgresTestContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -11,7 +12,7 @@ import java.util.concurrent.Executors
 class CreateWishlistItemServiceTest {
     @Test
     fun `same owner and key returns original item without a second job`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val service = CreateWishlistItemService(
@@ -71,7 +72,7 @@ class CreateWishlistItemServiceTest {
 
     @Test
     fun `queue publication failure after commit does not lose accepted item`() {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             var attempted = 0
@@ -87,7 +88,7 @@ class CreateWishlistItemServiceTest {
     }
 
     private fun withDatabase(block: (PostgreSQLContainer<*>, CreateWishlistItemService) -> Unit) {
-        PostgreSQLContainer<Nothing>("postgres:16-alpine").use { database ->
+        PostgresTestContainer().use { database ->
             database.start()
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             block(database, CreateWishlistItemService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)))

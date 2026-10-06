@@ -5,6 +5,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class RuntimeConfigTest {
+    @Test fun `runtime selects bounded pool defaults and validates explicit override`() {
+        val api = mapOf("DATABASE_URL" to "jdbc:postgresql://example/db", "DATABASE_USER" to "user",
+            "DATABASE_PASSWORD" to "password", "FIREBASE_PROJECT_ID" to "project")
+        val worker = api + mapOf("APP_ROLE" to "general-worker", "OPENAI_API_KEY" to "secret", "OPENAI_MODEL_SNAPSHOT" to "local-model")
+        assertEquals(5, RuntimeConfig.fromEnvironment(api).databasePool.maximumPoolSize)
+        assertEquals(2, RuntimeConfig.fromEnvironment(worker).databasePool.maximumPoolSize)
+        assertEquals(7, RuntimeConfig.fromEnvironment(api + ("DB_POOL_MAX_SIZE" to "7")).databasePool.maximumPoolSize)
+        assertEquals(5000L, RuntimeConfig.fromEnvironment(api).databasePool.connectionTimeoutMs)
+        for (value in listOf("0", "-1", "bad", "", "2147483648")) {
+            assertFailsWith<IllegalArgumentException> { RuntimeConfig.fromEnvironment(api + ("DB_POOL_MAX_SIZE" to value)) }
+        }
+    }
+
     @Test fun `local without credentials remains health only`() {
         assertEquals(RuntimeRole.LOCAL_HEALTH, RuntimeConfig.fromEnvironment(emptyMap()).role)
     }

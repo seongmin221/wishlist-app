@@ -1,6 +1,6 @@
 package app.tasks
 
-import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import java.util.UUID
 import javax.sql.DataSource
 
@@ -18,13 +18,22 @@ class OutboxDispatcher(private val dataSource: DataSource, private val gateway: 
                     }
                 }
                 published++
-            } catch (_: Exception) {
-                dataSource.connection.use { connection ->
-                    connection.prepareStatement("update outbox_events set lease_until=null where id=? and published_at is null").use {
-                        it.setObject(1, event.id)
-                        it.executeUpdate()
+            } catch (cause: Exception) {
+                try {
+                    dataSource.connection.use { connection ->
+                        connection.prepareStatement("update outbox_events set lease_until=null where id=? and published_at is null").use {
+                            it.setObject(1, event.id)
+                            it.executeUpdate()
+                        }
                     }
+                } catch (cleanup: Exception) {
+                    if (cause is CancellationException) {
+                        if (cleanup !== cause) cause.addSuppressed(cleanup)
+                        throw cause
+                    }
+                    throw cleanup
                 }
+                if (cause is CancellationException) throw cause
                 return published
             }
         }
@@ -37,7 +46,7 @@ class OutboxDispatcher(private val dataSource: DataSource, private val gateway: 
             val event = connection.prepareStatement(
                 """select e.id, e.task_name, e.event_type, j.id as job_id, j.generation
                    from outbox_events e join analysis_jobs j on j.id=e.analysis_job_id
-                   where e.published_at is null and (e.lease_until is null or e.lease_until < now())
+                   where e.published_at is null and (e.lease_until is null or e.lease_until < clock_timestamp())
                    order by e.created_at for update of e skip locked limit 1""",
             ).use { statement ->
                 statement.executeQuery().use { rows ->
@@ -48,9 +57,8 @@ class OutboxDispatcher(private val dataSource: DataSource, private val gateway: 
                 }
             }
             if (event != null) {
-                connection.prepareStatement("update outbox_events set lease_until=? where id=?").use {
-                    it.setObject(1, java.sql.Timestamp.from(Instant.now().plusSeconds(120)))
-                    it.setObject(2, event.id)
+                connection.prepareStatement("update outbox_events set lease_until=clock_timestamp()+interval '120 seconds' where id=?").use {
+                    it.setObject(1, event.id)
                     it.executeUpdate()
                 }
             }

@@ -2,6 +2,7 @@
 .superpowers/
 server/.gradle/
 server/build/
+server/.kotlin/
 
 # Client build outputs and machine-specific IDE configuration
 client/.gradle/
