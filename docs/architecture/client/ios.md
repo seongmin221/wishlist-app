@@ -20,6 +20,8 @@
 ## 탭 셸과 화면 이동 (C1)
 
 - `TabView`·`NavigationStack`·시스템 `.sheet`를 쓰지 않는다. `Navigation/WLNavigator`가 탭별 독립 스택과 현재 탭을 가진 순수 상태 기계(`@Observable`, 단위 테스트 대상)이고 `WLNavHost`가 그린다. 규칙은 Android `WLNavigator`와 같다. 모션 원본은 [motion.md](../../../design/handoff/interactions/motion.md) 2·3절이고 [iOS 라우터 spike](../../history/architecture/client/ios-router-spike-2026-10-05.md)의 조건부 진행 결정을 따른다.
+- 앱 루트 `ContentView`가 `WLNavigator`·`WLNavMotion`을 소유하고 `WLNavHost`에 명시적으로 넘기고 `OverlayHost` 바깥에서 environment로 제공한다. 시트·메뉴·확인창에도 같은 navigator·motion이 전달되며 누락된 환경 값은 즉시 실패한다. overlay의 content가 다시 평가될 때 host의 기본 인자로 새 navigator를 만들지 않는다. 저장·복원은 별도 후속 과제다.
+- `WLRoute`는 feature 목적지(`AnyHashable`)와 `showsTabBar`·`pushStyle`을 보유한다. 앱 renderer가 목적지 타입으로 화면을 고르고 라우터는 데모 id 문자열을 해석하지 않는다.
 - 전환 중 입력: `push`·`pop`·`selectTab`은 전환을 시작하고 상태를 바로 바꾼다. 화면이 모션을 끝내면 자기 전환일 때만 `finishTransition()`을 부른다. 그동안 이동·탭·뒤로는 무시하고 화면 전체를 `InputBlocker`로 막는다. pop된 칸은 `exiting`으로 남아 뒤로 모션 동안 그려진다.
 - 세 탭의 모든 스택 칸을 한 `ZStack`에 펼쳐 살려 둔다(칸 id가 정체성). 스크롤·입력 상태와 공유 요소의 원래 자리가 깊이 2 이상에서도 남는다. 탭 전환은 탭마다 opacity·scale 값으로 페이드 스루하고, 현재 탭을 다시 누르면 `scrollToTopRequest`로 맨 위 스크롤을 요청한다(`WLTabScrollView`).
 - 공유 요소는 `matchedGeometryEffect` 대신 원래 자리 ↔ 상세 자리 사각형을 phase 하나로 보간해 그린다(`WLNavMotion`, `WLSharedElement`). 사각형은 요소 뒤의 UIKit 탐침에서 전환을 시작할 때만 읽는다(스크롤마다 올리지 않는다). 사진은 전환 층이 그리다가 끝나면 상세 안의 사진으로 넘긴다. 자리 표시 면은 칸 바로 아래 층에 그려 탭 바 밑으로 커지고, 탭 바는 다음 화면 내용과 같은 시간표로 옅어진다.
@@ -29,4 +31,6 @@
 - 칸 `ZStack`은 늘 자식이 둘 이상이게 보이지 않는 자리를 둔다. 자식이 하나인 `.contain` 컨테이너는 접근성 트리에서 접혀 escape 동작이 전달 경로에서 빠졌다.
 - 실기기 VoiceOver(포커스 이동·문지르기)는 아직 확인하지 않았다. TODO: 실기기에서 push 뒤 포커스가 제목으로 옮겨 가지 않으면 전환 끝에 `UIAccessibility.post(notification: .screenChanged, argument:)`를 보낸다(spike 기록의 권고).
 - 탭 바는 화면 아래 끝에서 24(보드 값) 위에 놓는다. 탭 글자는 Dynamic Type `xxLarge`까지만 따른다.
-- 데모 화면(`Features/Demo`)은 debug 빌드의 탭 첫 화면에서만 보이고 release는 탭 이름만 보인다.
+- 데모 화면·경로 정의와 renderer의 데모 분기를 모두 `#if DEBUG`로 제한한다. release는 데모 타입을 참조하지 않고 탭 이름만 보인다.
+
+- 유지된 세 탭·모든 스택 칸의 메모리·관찰·레이아웃 비용은 [C3 성능 확인](c3-performance-checks.md)에서 측정한다. 입력 조합 감지는 앱 공용 알림 관찰자와 window별 약한 responder cache를 사용하며 첫 탐색 이후 키 입력마다 전체 트리를 재탐색하지 않는다.

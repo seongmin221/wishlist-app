@@ -12,6 +12,7 @@ ADR-027은 토큰을 `tokens.json`에서 두 플랫폼 상수로 생성하기로
 - 입력은 두 개다. 모션은 핸드오프 `tokens.json`을 그대로 읽는다. 색·모서리·간격·목적 색·상태 색은 `client/tools/design-tokens.json`에 디자인 결정 값을 옮겨 적고, 행마다 `source`에 결정 날짜를 남긴다.
 - 출력 `WishlistTokens.kt`·`WishlistTokens.swift`는 커밋한다. 손으로 고치지 않으며(`GENERATED` 머리), `--check`가 생성물과 원본이 다르면 실패한다. 이름은 두 플랫폼 공통 camelCase다.
 - 생성기가 내보내는 이름은 생성기 안의 표(`THEME_FIELDS`, `MOTION_MS`, `MOTION_RATIO`)로 고른다. 화면에 새 값이 필요하면 코드에 리터럴을 쓰지 않고 이 표나 원본 JSON에 더한다.
+- 색 입력은 `#RRGGBB`로 검증한다. 짧은 RGB와 alpha 포함 hex는 두 플랫폼 의미가 달라질 수 있어 받지 않는다. CI가 생성기 테스트와 `--check`를 실행한다.
 
 ## 이유와 trade-off
 
