@@ -115,6 +115,21 @@ final class WLTypographyTests: XCTestCase {
         }
     }
 
+    /// 줄 높이가 글꼴보다 작은 스타일에서 한글·g 꼬리 잉크가 상자 밖으로 나와도 잘리지 않는다(이전 SwiftUI `Text`와 같은 범위).
+    func testInkOutsideLineBoxIsNotClipped() {
+        for style in [WLTextStyle.display28Edit, .display28, .price, .body] {
+            for sample in ["가", "g", "가g"] {
+                let reference = inkLines(Text(sample).wlText(style))
+                let actual = inkLines(WLText(sample, style))
+                print("WLTYPO clip \(style.postScriptName) \(style.lineHeight) '\(sample)' ref=\(reference) actual=\(actual)")
+                XCTAssertEqual(actual.count, 1, "\(style.postScriptName) \(sample)")
+                guard let r = reference.first, let a = actual.first else { continue }
+                XCTAssertEqual(a.top, r.top, accuracy: 0.5, "\(style.postScriptName) \(sample) top")
+                XCTAssertEqual(a.bottom, r.bottom, accuracy: 0.5, "\(style.postScriptName) \(sample) bottom")
+            }
+        }
+    }
+
     private func accessibilityElements(_ o: NSObject, _ out: inout [NSObject], depth: Int = 0) {
         if depth > 30 { return }
         if o.isAccessibilityElement { out.append(o) }

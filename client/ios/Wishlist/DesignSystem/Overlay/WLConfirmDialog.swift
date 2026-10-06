@@ -17,7 +17,8 @@ struct WLConfirmDialogCard: View {
             if !spec.bullets.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(spec.bullets.enumerated()), id: \.offset) { _, b in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        // 글머리표와 글은 같은 스타일(같은 줄 상자)이라 .top이면 첫 줄에 맞는다(여러 줄 WLText에는 글자 기준선이 없다).
+                        HStack(alignment: .top, spacing: 8) {
                             WLText("•", dialogBody, color: c.text).accessibilityHidden(true)
                             WLText(b, dialogBody, color: c.text)
                                 .frame(maxWidth: .infinity, alignment: .leading)

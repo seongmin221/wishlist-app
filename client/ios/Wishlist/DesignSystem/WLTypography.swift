@@ -130,7 +130,7 @@ private struct WLTextModifier: ViewModifier {
         let natural = UIFont(name: style.postScriptName, size: scaledSize)?.lineHeight ?? scaledSize
         // SwiftUI Text 상자는 글꼴 자체 줄 높이라 한 줄 높이를 직접 못 정한다. 목표와의 차이(extra, 음수 가능)의 절반씩을
         // 위아래 패딩으로 줘 **한 줄** 상자를 lineHeight로 맞춘다(CSS half-leading처럼 글자는 가운데).
-        // 여러 줄은 이 방법으로 맞출 수 없다(음수 lineSpacing은 0으로 잘린다). 여러 줄 글자는 `WLText`가 `WLLabelText`로 그린다.
+        // 여러 줄은 이 방법으로 맞출 수 없다(음수 lineSpacing은 0으로 잘린다). 여러 줄 글자는 `WLText`가 `WLMultilineText`(UILabel `WLLabelText`)로 그린다.
         let extra = style.lineHeight * scale - natural
         let styled = content
             .font(style.font)
@@ -168,7 +168,7 @@ private struct WLUnderlineModifier: ViewModifier {
 
 extension View {
     /// 글꼴, 줄 높이, tabular 숫자를 한 번에 적용한다. **한 줄** 상자(`Text`·`TextField`)만 정확하다.
-    /// 여러 줄일 수 있는 글자는 `WLText`를 쓴다(줄 수 제한이 1이 아니면 `WLLabelText`로 그린다).
+    /// 여러 줄일 수 있는 글자는 `WLText`를 쓴다(줄 수 제한이 1이 아니면 `WLMultilineText`로 그린다).
     func wlText(_ style: WLTextStyle) -> some View {
         modifier(WLTextModifier(style: style))
     }
@@ -193,33 +193,36 @@ struct WLLabelText: UIViewRepresentable {
     let baselineOffset: CGFloat
     let color: UIColor
 
-    func makeUIView(context: Context) -> UILabel {
-        let label = UILabel()
-        label.backgroundColor = .clear
-        label.isAccessibilityElement = false
-        label.accessibilityElementsHidden = true
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        label.setContentHuggingPriority(.defaultHigh, for: .vertical)
-        return label
+    func makeUIView(context: Context) -> WLLabelBox {
+        let box = WLLabelBox()
+        box.isAccessibilityElement = false
+        box.accessibilityElementsHidden = true
+        return box
     }
 
-    func updateUIView(_ label: UILabel, context: Context) {
+    func updateUIView(_ box: WLLabelBox, context: Context) {
+        let label = box.label
         let env = context.environment
         let paragraph = NSMutableParagraphStyle()
         paragraph.minimumLineHeight = lineHeight
         paragraph.maximumLineHeight = lineHeight
         paragraph.alignment = Self.alignment(env.multilineTextAlignment)
+        // 문단 스타일을 직접 주면 UILabel 기본 줄바꿈 전략(.standard: 한글은 어절 단위)이 빠져 글자 중간에서 끊긴다. 되살린다.
+        paragraph.lineBreakStrategy = .standard
         let font = UIFont(name: postScriptName, size: pointSize) ?? .systemFont(ofSize: pointSize)
         label.attributedText = NSAttributedString(string: text, attributes: [
             .font: font, .foregroundColor: color, .paragraphStyle: paragraph, .baselineOffset: baselineOffset,
         ])
         label.numberOfLines = env.lineLimit ?? 0
         label.lineBreakMode = Self.lineBreak(env.truncationMode)
+        box.inkPad = ceil(max(pointSize, lineHeight) * 0.5)
+        box.setNeedsLayout()
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UILabel, context: Context) -> CGSize? {
-        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? .greatestFiniteMagnitude
-        let fitted = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: WLLabelBox, context: Context) -> CGSize? {
+        // 폭 제안이 없거나 무한이면 한 줄 폭. 0(최소 크기 탐색)은 UILabel이 "제한 없음"으로 읽으므로 1로 바꿔 가장 좁게 감싼다.
+        let width = proposal.width.flatMap { $0.isFinite ? max($0, 1) : nil } ?? .greatestFiniteMagnitude
+        let fitted = uiView.label.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
         return CGSize(width: min(ceil(fitted.width), width), height: fitted.height)
     }
 
@@ -237,6 +240,41 @@ struct WLLabelText: UIViewRepresentable {
         case .middle: return .byTruncatingMiddle
         default: return .byTruncatingTail
         }
+    }
+}
+
+/// UILabel을 담는 상자. 레이아웃 상자(SwiftUI가 준 크기)보다 위아래·좌우 `inkPad`만큼 큰 UILabel을 두고 글자는 원래 상자
+/// 자리에 그린다. UILabel은 자기 bounds 밖 잉크를 잘라(줄 높이가 글꼴보다 작은 display28Edit·price의 한글 위·아래, g 꼬리),
+/// 이전 SwiftUI `Text`(음수 padding, 자르지 않음)와 같게 하려고 그리는 면만 넓힌다. 상자 크기는 바뀌지 않는다.
+final class WLLabelBox: UIView {
+    let label = WLInkLabel()
+    var inkPad: CGFloat = 0 { didSet { label.inkPad = inkPad } }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        clipsToBounds = false
+        label.backgroundColor = .clear
+        label.clipsToBounds = false
+        label.isAccessibilityElement = false
+        addSubview(label)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        label.frame = bounds.insetBy(dx: -inkPad, dy: -inkPad)
+    }
+}
+
+/// 넓힌 bounds 안에서 `inkPad`만큼 안쪽(= 원래 상자)에 글자를 그리는 UILabel.
+final class WLInkLabel: UILabel {
+    var inkPad: CGFloat = 0
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.insetBy(dx: inkPad, dy: inkPad))
     }
 }
 

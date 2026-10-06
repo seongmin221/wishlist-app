@@ -67,6 +67,8 @@ struct WLText: View {
 
     /// 한 줄로 제한한 글자(`.lineLimit(1)`)는 SwiftUI `Text` + `wlText`(한 줄 상자가 정확, `ViewThatFits`·
     /// `minimumScaleFactor`가 그대로 동작). 그 밖에는 여러 줄도 N × 줄 높이가 되도록 `WLMultilineText`(UILabel)로 그린다.
+    /// 주의: 여러 줄 경로(UILabel)에는 SwiftUI 글자 기준선이 없다. `HStack(alignment: .firstTextBaseline)`은 아래 끝으로
+    /// 맞춰져 줄바꿈된 글자의 마지막 줄에 붙는다. 같은 스타일끼리는 `.top`(줄 상자가 같다)으로 맞추거나 `alignmentGuide`를 준다.
     var body: some View {
         if lineLimit == 1 {
             Text(text)
