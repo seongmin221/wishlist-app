@@ -168,7 +168,7 @@ Idempotency-Key: {clientSubmissionId}
 
 서버는 사용자와 Idempotency-Key 조합을 유일하게 보장한다. 같은 key와 같은 요청을 다시 받으면 기존 항목을 반환한다. 같은 key를 다른 URL에 사용하면 `409 IDEMPOTENCY_KEY_REUSED`를 반환한다. URL이 같더라도 새 key이면 새 상품을 생성한다.
 
-`clientCreatedAt`은 선택 입력이며 생략/null을 허용한다. 전달된 문자열은 시간대가 있는 ISO 8601 시각(현지/UTC 모두 연도 1~9999)이어야 하며 잘못된 값은 `422 INVALID_CLIENT_CREATED_AT`다. microsecond 미만은 절삭해 저장한다. 공유 시각을 별도 보관하고 서버 생성 시각·저장순을 유지한다. 유효 재전송에서 공유 시각이 달라져도 최초 값을 유지한다. 응답은 보관한 값을 UTC·DB 정밀도로 반환한다. Idempotency-Key와 GET ID는 정규 UUID 형식만 받으며 대소문자는 허용한다.
+`sourceUrl`은 최대 2048자이며 UTF-8로 인코딩할 수 없는 문자열과 함께 `422 INVALID_URL`로 거절한다. `clientCreatedAt`은 선택 입력이며 생략/null을 허용한다. 전달된 문자열은 시간대가 있는 ISO 8601 시각(현지/UTC 모두 연도 1~9999)이어야 하며 잘못된 값은 `422 INVALID_CLIENT_CREATED_AT`다. microsecond 미만은 절삭해 저장한다. 공유 시각을 별도 보관하고 서버 생성 시각·저장순을 유지한다. 유효 재전송에서 공유 시각이 달라져도 최초 값을 유지한다. 응답은 보관한 값을 UTC·DB 정밀도로 반환한다. Idempotency-Key와 GET ID는 정규 UUID 형식만 받으며 대소문자는 허용한다.
 
 분석을 기다리지 않고 생성된 `WishlistItem` 표현, `Location` header와 `201 Created`를 반환한다. 같은 요청의 재전송이면 기존 표현과 `200 OK`, `Idempotency-Replayed: true`를 반환한다. 클라이언트는 두 응답을 모두 서버 생성 성공으로 처리한다.
 
