@@ -2,19 +2,25 @@ package app.wishlist
 
 import kotlinx.coroutines.CancellationException
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
 
 sealed interface CreateResult {
-    val item: WishlistItem?
-    val itemId: UUID get() = requireNotNull(item).id
+    /** Outcomes backed by a stored item; only these expose an item ID. */
+    sealed interface Stored : CreateResult {
+        val item: WishlistItem
+        val itemId: UUID get() = item.id
+    }
 
-    data class Created(override val item: WishlistItem, val outboxEventId: UUID) : CreateResult
-    data class Replayed(override val item: WishlistItem) : CreateResult
-    data class IdempotencyKeyReused(override val item: WishlistItem) : CreateResult
-    data object InvalidUrl : CreateResult { override val item: WishlistItem? = null }
+    data class Created(override val item: WishlistItem, val outboxEventId: UUID) : Stored
+    data class Replayed(override val item: WishlistItem) : Stored
+    data class IdempotencyKeyReused(override val item: WishlistItem) : Stored
+    data object InvalidUrl : CreateResult
 }
+
+private const val MAX_SOURCE_URL_LENGTH = 2048
 
 class CreateWishlistItemService(
     private val dataSource: DataSource,
@@ -51,7 +57,12 @@ class CreateWishlistItemService(
         return result
     }
 
-    private fun isPublicHttpUrl(sourceUrl: String): Boolean = runCatching {
-        URI(sourceUrl).let { it.scheme in setOf("http", "https") && !it.host.isNullOrBlank() && it.host !in setOf("localhost", "127.0.0.1", "::1") }
-    }.getOrDefault(false)
+    private fun isPublicHttpUrl(sourceUrl: String): Boolean {
+        if (sourceUrl.length > MAX_SOURCE_URL_LENGTH) return false
+        // JDBC replaces unpaired surrogates, so the stored URL would stop matching its own key replay.
+        if (!StandardCharsets.UTF_8.newEncoder().canEncode(sourceUrl)) return false
+        return runCatching {
+            URI(sourceUrl).let { it.scheme in setOf("http", "https") && !it.host.isNullOrBlank() && it.host !in setOf("localhost", "127.0.0.1", "::1") }
+        }.getOrDefault(false)
+    }
 }

@@ -2,6 +2,7 @@ package app.wishlist
 
 import app.DatabaseFactory
 import app.testutil.PostgresTestContainer
+import app.testutil.createdItemId
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +17,7 @@ class WishlistItemRepositoryTest {
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
             val owner = UUID.randomUUID()
-            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").itemId
+            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
             source.connection.use { connection ->
                 connection.createStatement().use { it.executeUpdate("""
                     update wishlist_items set analysis_status='PARTIAL', review_status='CONFIRMED',
@@ -62,7 +63,7 @@ class WishlistItemRepositoryTest {
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
             val owner = UUID.randomUUID()
-            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").itemId
+            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
             val stored = assertNotNull(WishlistItemRepository(source).findOwned(owner, item)).storedState
             assertEquals(1, stored.currentGeneration)
             assertEquals(1, stored.version)

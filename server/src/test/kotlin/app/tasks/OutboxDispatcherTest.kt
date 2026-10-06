@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import app.testutil.PostgresTestContainer
+import app.testutil.createdItemId
 import org.testcontainers.containers.PostgreSQLContainer
 
 class OutboxDispatcherTest {
@@ -42,15 +43,31 @@ class OutboxDispatcherTest {
     }
 
     @Test fun `creation publishes its own event ahead of an older retry backlog`() = app.testutil.withAnalysisDatabase { source ->
-        val oldItem = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/old").itemId
+        val oldItem = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/old").createdItemId
         app.testutil.analysisSql(source, "update outbox_events set created_at=clock_timestamp()-interval '1 hour'")
         val dispatcher = OutboxDispatcher(source, TaskGateway { })
         val service = CreateWishlistItemService(source) { eventId -> dispatcher.dispatchEvent(eventId) }
-        val fresh = service.create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/new").itemId
+        val fresh = service.create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/new").createdItemId
         assertEquals("1", app.testutil.analysisScalar(source, """select count(*) from outbox_events e join analysis_jobs j on j.id=e.analysis_job_id
             where j.wishlist_item_id='$fresh' and e.published_at is not null"""))
         assertEquals("1", app.testutil.analysisScalar(source, """select count(*) from outbox_events e join analysis_jobs j on j.id=e.analysis_job_id
             where j.wishlist_item_id='$oldItem' and e.published_at is null"""))
+    }
+
+    @Test fun `lease release failure keeps the publication failure as suppressed`() = app.testutil.withAnalysisDatabase { source ->
+        CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item")
+        val eventId = UUID.fromString(app.testutil.analysisScalar(source, "select id from outbox_events"))
+        var connections = 0
+        val unavailableAfterClaim = object : javax.sql.DataSource by source {
+            override fun getConnection(): java.sql.Connection {
+                if (++connections > 1) throw java.sql.SQLException("pool unavailable")
+                return source.connection
+            }
+        }
+        val queueFailure = IllegalStateException("queue unavailable")
+        val dispatcher = OutboxDispatcher(unavailableAfterClaim, TaskGateway { throw queueFailure })
+        val thrown = kotlin.test.assertFailsWith<java.sql.SQLException> { dispatcher.dispatchEvent(eventId) }
+        kotlin.test.assertTrue(queueFailure in thrown.suppressed)
     }
 
     @Test fun `outbox lease uses the same database clock for reservation and discovery`() = app.testutil.withAnalysisDatabase { source ->

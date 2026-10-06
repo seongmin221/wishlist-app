@@ -2,6 +2,7 @@ package app.analysis
 
 import app.DatabaseFactory
 import app.testutil.PostgresTestContainer
+import app.testutil.createdItemId
 import app.wishlist.CreateWishlistItemService
 import java.sql.Connection
 import java.sql.SQLException
@@ -213,7 +214,7 @@ class AnalysisClaimRepositoryTest {
     private data class Job(val jobId: UUID, val itemId: UUID, val ownerId: UUID)
     private fun createJob(source: DataSource, lane: AnalysisLane = AnalysisLane.GENERAL): Job {
         val owner = UUID.randomUUID()
-        val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").itemId
+        val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
         val id = UUID.fromString(scalar(source, "select id from analysis_jobs where wishlist_item_id='$item'"))
         if (lane == AnalysisLane.BROWSER) sql(source, "update analysis_jobs set stage='BROWSER_PENDING',browser_attempted=true where id='$id'")
         return Job(id, item, owner)

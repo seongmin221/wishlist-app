@@ -81,7 +81,7 @@ class CreateWishlistItemServiceTest {
             val results = futures.map { it.get() }
             assertEquals(1, results.count { it is CreateResult.Created })
             assertEquals(1, results.count { it is CreateResult.Replayed })
-            assertEquals(1, results.map { it.itemId }.distinct().size)
+            assertEquals(1, results.map { assertIs<CreateResult.Stored>(it).itemId }.distinct().size)
         } finally {
             pool.shutdownNow()
         }
@@ -94,6 +94,26 @@ class CreateWishlistItemServiceTest {
     fun `unsafe url is rejected before any database write`() = withDatabase { database, service ->
         assertIs<CreateResult.InvalidUrl>(service.create(UUID.randomUUID(), UUID.randomUUID(), "http://127.0.0.1/private"))
         assertEquals(0, databaseCount(database, "wishlist_items"))
+    }
+
+    @Test
+    fun `unencodable and overlong urls are rejected before any database write`() = withDatabase { database, service ->
+        val base = "https://example.com/"
+        for (url in listOf("${base}a\uD800b", "${base}a\uDC00", base + "a".repeat(2049 - base.length))) {
+            assertIs<CreateResult.InvalidUrl>(service.create(UUID.randomUUID(), UUID.randomUUID(), url), url.take(40))
+        }
+        assertEquals(0, databaseCount(database, "wishlist_items"))
+    }
+
+    @Test
+    fun `boundary length and surrogate pair urls round trip for key replay`() = withDatabase { _, service ->
+        val base = "https://example.com/"
+        for (url in listOf(base + "a".repeat(2048 - base.length), "${base}😀")) {
+            val owner = UUID.randomUUID()
+            val key = UUID.randomUUID()
+            assertIs<CreateResult.Created>(service.create(owner, key, url))
+            assertIs<CreateResult.Replayed>(service.create(owner, key, url))
+        }
     }
 
     @Test

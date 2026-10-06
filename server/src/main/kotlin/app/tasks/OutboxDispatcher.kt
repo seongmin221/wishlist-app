@@ -40,6 +40,7 @@ class OutboxDispatcher(private val dataSource: DataSource, private val gateway: 
                     if (cleanup !== cause) cause.addSuppressed(cleanup)
                     throw cause
                 }
+                if (cleanup !== cause) cleanup.addSuppressed(cause)
                 throw cleanup
             }
             if (cause is CancellationException) throw cause

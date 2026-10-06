@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 data class FinishJob(val itemId: UUID, val jobId: UUID)
 
 fun newFinishJob(source: DataSource, lane: AnalysisLane): FinishJob {
-    val item = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item").itemId
+    val item = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item").createdItemId
     val job = UUID.fromString(analysisScalar(source, "select id from analysis_jobs where wishlist_item_id='$item'"))
     if (lane == AnalysisLane.BROWSER) analysisSql(source, "update analysis_jobs set stage='BROWSER_PENDING',browser_attempted=true where id='$job'")
     return FinishJob(item, job)

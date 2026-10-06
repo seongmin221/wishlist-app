@@ -2,6 +2,7 @@ package app.http
 
 import app.testutil.analysisScalar
 import app.testutil.analysisSql
+import app.testutil.createdItemId
 import app.testutil.withAnalysisDatabase
 import app.wishlist.CreateWishlistItemService
 import io.ktor.client.request.*
@@ -36,7 +37,7 @@ class WishlistDetailRoutesTest {
 
     @Test fun `partial failed and manually completed details preserve actions and safe failure codes`() = withAnalysisDatabase { source ->
         val owner = UUID.randomUUID()
-        val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").itemId
+        val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
         testApplication {
             application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner } } }
             val cases = listOf(
@@ -75,7 +76,7 @@ class WishlistDetailRoutesTest {
         val owner = UUID.randomUUID()
         val key = UUID.randomUUID()
         val url = "https://example.com/item"
-        val item = CreateWishlistItemService(source).create(owner, key, url).itemId
+        val item = CreateWishlistItemService(source).create(owner, key, url).createdItemId
         analysisSql(source, """update wishlist_items set product_name='상품', product_image_url='https://example.com/image',
             name_source='USER', image_source='AI', category_id='C026', category_source='AI', category_missing_reason=null,
             analysis_status='READY', review_status='PENDING', version=7 where id='$item'""")
@@ -106,7 +107,7 @@ class WishlistDetailRoutesTest {
     @Test fun `detail hides other owners missing and deleted items while replay retains tombstone`() = withAnalysisDatabase { source ->
         val owner = UUID.randomUUID()
         val key = UUID.randomUUID()
-        val item = CreateWishlistItemService(source).create(owner, key, "https://example.com/item").itemId
+        val item = CreateWishlistItemService(source).create(owner, key, "https://example.com/item").createdItemId
         testApplication {
             application {
                 installApiHttpSupport()
