@@ -90,7 +90,7 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 
 **산출물:** 클라이언트가 저장 후 같은 ID를 조회해 실제 분석 상태·metadata를 표시할 수 있다.
 
-**파일 경계:** B0의 `WishlistItemStateRepository`, `WishlistItemPolicy`, `app/http/WishlistItemDtos.kt`, `ApiHttpSupport`와 IO/pool을 사용한다. 기존 `WishlistItem.kt`, `CreateWishlistItemService.kt`, `WishlistRoutes.kt`, DTO를 확장하고 `app/wishlist/GetWishlistItemService.kt`와 `app/wishlist/WishlistItemViewMapper.kt`를 추가한다. 현재 state repository에 없는 표시 metadata·시각·원본 URL은 owner 조건을 유지한 조회 projection으로 확장한다. 생성·상세·replay는 동일 mapper를 사용한다.
+**파일 경계:** B0의 repository를 생성·조회용 `WishlistItemRepository`로 정리하고 `WishlistItemPolicy`, `app/http/WishlistItemDtos.kt`, `ApiHttpSupport`와 IO/pool을 사용한다. `WishlistItem.kt`, `CreateWishlistItemService.kt`, `WishlistRoutes.kt`, DTO를 확장하고 `app/wishlist/GetWishlistItemService.kt`와 HTTP presenter인 `app/http/WishlistItemViewMapper.kt`를 추가한다. 표시 metadata·시각·원본 URL은 owner 조건을 유지한 조회 projection으로 읽는다. 생성·상세·replay는 동일 mapper를 사용하고 `Main`이 생성·조회 서비스를 각각 주입한다.
 
 **내부 순서:** owner-scoped 상세 조회 → ITEM-03 route → 생성 DTO·clientCreatedAt 보관 → ITEM-01/replay mapper 교체. metadata를 상수 null로 만드는 현재 문자열 응답을 제거한다. 공유 시각은 서버 정렬 시각과 분리한다.
 
@@ -103,6 +103,8 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 **현재 구현:** owner-scoped 상세 GET·생성/replay 공통 mapper·선택 clientCreatedAt/V10·신규 event 지정 발행을 연결했다. 확정한 입력·출력·nullable metadata와 후속 목적 deletionImpact 범위는 [B1 조회 계약](wishlist-item-read-api.md)을 따른다. B2 이후 API와 B5 maintenance runtime의 완료를 의미하지 않는다.
 
 **검증:** 실제 PostgreSQL Testcontainers의 강제 전체 실행 190개 중 189 통과·실패/오류 0·opt-in RealUrlPilot 1 skip. [B1 구현 기록](../../history/architecture/server/b1-item-read-and-create-2026-10-06.md)에 명령·회귀·검증 범위를 남겼다.
+
+**리뷰 보완:** 생성 응답은 commit한 snapshot을 반환하며 post-commit 재조회하지 않는다. 순수 요청 파서·HTTP presenter·명시 서비스 주입·실패 enum·UTC/JDBC 경계를 적용했고 [후속 검증](../../history/architecture/server/b1-review-boundaries-2026-10-06.md)은 200개 중 199 통과·실패/오류 0·RealUrlPilot 1 skip이다.
 
 ## B2 — 카테고리 기본 관리
 

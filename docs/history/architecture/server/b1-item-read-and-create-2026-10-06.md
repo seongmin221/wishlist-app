@@ -2,6 +2,8 @@
 
 > 2026-10-06 · develop@59c11cc 기반 · Orca `server-b1-handoff`
 
+이 문서는 최초 B1 구현 기록이다. 생성 응답의 post-commit 재조회·mapper 위치·repository API는 [후속 리뷰 보완](b1-review-boundaries-2026-10-06.md)에서 변경했다. 현재 계약과 검증 결과는 그 기록을 함께 따른다.
+
 ## 범위와 결정
 
 사용자가 B1 설계와 선택 `clientCreatedAt` 정책을 승인한 뒤 구현했다. 원본 B0 인계 문서와 수신 기록은 보존했다. 기존 임시 worktree에서 SIGTERM으로 중단한 테스트는 통과/실패 판단에 사용하지 않았다.
