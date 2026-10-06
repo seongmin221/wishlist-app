@@ -48,7 +48,7 @@ extension View {
     }
 }
 
-/// `wlText`를 한 번에 적용한 글자. 색은 기본으로 글자색 토큰.
+/// WLTextStyle 글자. 색은 기본으로 글자색 토큰. 한 줄·여러 줄 모두 보드처럼 N × 줄 높이 상자다.
 struct WLText: View {
     let text: String
     let style: WLTextStyle
@@ -56,6 +56,7 @@ struct WLText: View {
     let alignment: TextAlignment
 
     @Environment(\.wlColors) private var c
+    @Environment(\.lineLimit) private var lineLimit
 
     init(_ text: String, _ style: WLTextStyle = .body, color: Color? = nil, alignment: TextAlignment = .leading) {
         self.text = text
@@ -64,10 +65,17 @@ struct WLText: View {
         self.alignment = alignment
     }
 
+    /// 한 줄로 제한한 글자(`.lineLimit(1)`)는 SwiftUI `Text` + `wlText`(한 줄 상자가 정확, `ViewThatFits`·
+    /// `minimumScaleFactor`가 그대로 동작). 그 밖에는 여러 줄도 N × 줄 높이가 되도록 `WLMultilineText`(UILabel)로 그린다.
     var body: some View {
-        Text(text)
-            .wlText(style)
-            .foregroundStyle(color ?? c.text)
-            .multilineTextAlignment(alignment)
+        if lineLimit == 1 {
+            Text(text)
+                .wlText(style)
+                .foregroundStyle(color ?? c.text)
+                .multilineTextAlignment(alignment)
+        } else {
+            WLMultilineText(text: text, style: style, color: color ?? c.text)
+                .multilineTextAlignment(alignment)
+        }
     }
 }

@@ -117,36 +117,28 @@ struct WLTextStyle {
 
 private struct WLTextModifier: ViewModifier {
     let style: WLTextStyle
-    /// true면 한 줄 입력칸(TextField)용: 줄 높이 배수가 TextField에 먹지 않으므로 위아래 패딩(음수 가능)으로 한 줄 상자만 맞춘다.
-    let field: Bool
     // Font.custom(size:)이 Dynamic Type으로 커지는 것과 같은 곡선으로 크기를 얻는다.
     @ScaledMetric(relativeTo: .body) private var scaledSize: CGFloat = 1
 
-    init(style: WLTextStyle, field: Bool) {
+    init(style: WLTextStyle) {
         self.style = style
-        self.field = field
         _scaledSize = ScaledMetric(wrappedValue: style.size, relativeTo: .body)
     }
 
     func body(content: Content) -> some View {
         let scale = scaledSize / style.size
         let natural = UIFont(name: style.postScriptName, size: scaledSize)?.lineHeight ?? scaledSize
-        // 목표 줄 높이와 글꼴 자체 줄 높이의 차이. Plex는 글꼴 줄 높이(1.5em)가 목표보다 커서 음수다.
+        // SwiftUI Text 상자는 글꼴 자체 줄 높이라 한 줄 높이를 직접 못 정한다. 목표와의 차이(extra, 음수 가능)의 절반씩을
+        // 위아래 패딩으로 줘 **한 줄** 상자를 lineHeight로 맞춘다(CSS half-leading처럼 글자는 가운데).
+        // 여러 줄은 이 방법으로 맞출 수 없다(음수 lineSpacing은 0으로 잘린다). 여러 줄 글자는 `WLText`가 `WLLabelText`로 그린다.
         let extra = style.lineHeight * scale - natural
-        if field {
-            let styled = content.font(style.font).padding(.vertical, extra / 2)
-            if style.tabular { styled.monospacedDigit() } else { styled }
+        let styled = content
+            .font(style.font)
+            .padding(.vertical, extra / 2)
+        if style.tabular {
+            styled.monospacedDigit()
         } else {
-            // Text: 줄 높이 배수(`_lineHeightMultiple`)로 모든 줄을 정확히 lineHeight로 만든다. `lineSpacing`은 음수를
-            // 0으로 잘라 Plex 여러 줄이 줄마다 약 2pt씩 커졌다(C1 최종 리뷰, iOS 17.5·26.5에서 잼). 배수를 쓰면 줄 상자는
-            // 맞지만 글자가 줄 안에서 extra/2만큼 위(줄이면)·아래(늘이면)로 치우치므로 offset으로 CSS처럼 가운데에 되돌린다
-            // (offset은 레이아웃을 바꾸지 않는다). iOS 26 `.lineHeight(.exact)`는 글자 위치가 스타일마다 달라 쓰지 않는다.
-            // `WLTypographyTests`가 한 줄·세 줄 상자 높이를 지킨다.
-            let styled = content
-                .font(style.font)
-                .environment(\._lineHeightMultiple, style.lineHeight * scale / natural)
-                .offset(y: -extra / 2)
-            if style.tabular { styled.monospacedDigit() } else { styled }
+            styled
         }
     }
 }
@@ -175,18 +167,101 @@ private struct WLUnderlineModifier: ViewModifier {
 }
 
 extension View {
-    /// 글꼴, 줄 높이, tabular 숫자를 한 번에 적용한다(`Text`용, 여러 줄도 N × 줄 높이).
+    /// 글꼴, 줄 높이, tabular 숫자를 한 번에 적용한다. **한 줄** 상자(`Text`·`TextField`)만 정확하다.
+    /// 여러 줄일 수 있는 글자는 `WLText`를 쓴다(줄 수 제한이 1이 아니면 `WLLabelText`로 그린다).
     func wlText(_ style: WLTextStyle) -> some View {
-        modifier(WLTextModifier(style: style, field: false))
-    }
-
-    /// 한 줄 `TextField`용 `wlText`. 상자 높이를 줄 높이에 맞춘다(`WLUnderlineField`가 쓴다).
-    func wlFieldText(_ style: WLTextStyle) -> some View {
-        modifier(WLTextModifier(style: style, field: true))
+        modifier(WLTextModifier(style: style))
     }
 
     /// `wlText(style)` 뒤에 붙인다. 한글 아래 끝에서 3px 아래에 `thickness`(기본 1) 밑줄을 그린다.
     func wlUnderlined(_ style: WLTextStyle, color: Color, thickness: CGFloat = 1) -> some View {
         modifier(WLUnderlineModifier(style: style, color: color, thickness: thickness))
+    }
+}
+
+/// 여러 줄일 수 있는 `WLText`(줄 수 제한이 1이 아닌 글자). SwiftUI `Text`는 iOS 17–25에서 글꼴보다 작은 줄 높이를 공개 API로
+/// 줄 수 없고(음수 `lineSpacing`은 0으로 잘린다), iOS 26 `.lineHeight(.exact)`는 도현 글자를 줄 높이와 상관없이 아래로
+/// 붙이고 줄 상자 밖으로 나온 잉크를 잘라(display28Edit·price) 쓰지 않는다. 그래서 모든 iOS에서 UILabel
+/// (`NSParagraphStyle` 최소 = 최대 줄 높이 + `baselineOffset` (줄 높이 − 글꼴 줄 높이)/2로 CSS처럼 가운데)로 그린다.
+/// 줄 수·말줄임·정렬은 SwiftUI environment(`lineLimit`, `truncationMode`, `multilineTextAlignment`)를 따른다.
+/// 접근성은 SwiftUI 쪽 `accessibilityRepresentation`이 `Text`로 맡는다(UILabel 자체는 숨겨 두 번 읽지 않는다).
+struct WLLabelText: UIViewRepresentable {
+    let text: String
+    let postScriptName: String
+    let pointSize: CGFloat
+    let lineHeight: CGFloat
+    let baselineOffset: CGFloat
+    let color: UIColor
+
+    func makeUIView(context: Context) -> UILabel {
+        let label = UILabel()
+        label.backgroundColor = .clear
+        label.isAccessibilityElement = false
+        label.accessibilityElementsHidden = true
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.setContentHuggingPriority(.defaultHigh, for: .vertical)
+        return label
+    }
+
+    func updateUIView(_ label: UILabel, context: Context) {
+        let env = context.environment
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = lineHeight
+        paragraph.maximumLineHeight = lineHeight
+        paragraph.alignment = Self.alignment(env.multilineTextAlignment)
+        let font = UIFont(name: postScriptName, size: pointSize) ?? .systemFont(ofSize: pointSize)
+        label.attributedText = NSAttributedString(string: text, attributes: [
+            .font: font, .foregroundColor: color, .paragraphStyle: paragraph, .baselineOffset: baselineOffset,
+        ])
+        label.numberOfLines = env.lineLimit ?? 0
+        label.lineBreakMode = Self.lineBreak(env.truncationMode)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UILabel, context: Context) -> CGSize? {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? .greatestFiniteMagnitude
+        let fitted = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: min(ceil(fitted.width), width), height: fitted.height)
+    }
+
+    private static func alignment(_ a: TextAlignment) -> NSTextAlignment {
+        switch a {
+        case .leading: return .natural
+        case .center: return .center
+        case .trailing: return UIApplication.shared.userInterfaceLayoutDirection == .rightToLeft ? .left : .right
+        }
+    }
+
+    private static func lineBreak(_ m: Text.TruncationMode) -> NSLineBreakMode {
+        switch m {
+        case .head: return .byTruncatingHead
+        case .middle: return .byTruncatingMiddle
+        default: return .byTruncatingTail
+        }
+    }
+}
+
+/// `WLText`의 여러 줄 경로. Dynamic Type 배율을 `wlText`와 같은 곡선(`@ScaledMetric`, body 기준)으로 얻는다.
+struct WLMultilineText: View {
+    let text: String
+    let style: WLTextStyle
+    let color: Color
+
+    @ScaledMetric(relativeTo: .body) private var scaledSize: CGFloat = 1
+
+    init(text: String, style: WLTextStyle, color: Color) {
+        self.text = text
+        self.style = style
+        self.color = color
+        _scaledSize = ScaledMetric(wrappedValue: style.size, relativeTo: .body)
+    }
+
+    var body: some View {
+        let scale = scaledSize / style.size
+        let natural = UIFont(name: style.postScriptName, size: scaledSize)?.lineHeight ?? scaledSize
+        let lineHeight = style.lineHeight * scale
+        WLLabelText(text: text, postScriptName: style.postScriptName, pointSize: scaledSize, lineHeight: lineHeight,
+                    baselineOffset: (lineHeight - natural) / 2, color: UIColor(color))
+            // VoiceOver에는 SwiftUI Text 하나로 보인다(정적 글자). 바깥의 accessibilityAddTraits·Hidden이 그대로 먹는다.
+            .accessibilityRepresentation { Text(text) }
     }
 }
