@@ -1,8 +1,8 @@
 # 서버 연동 상태
 
-> 2026-10-07 C2 Task 8 기준. 서버 계약 기준은 병합된 B2 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이다. 서버 구현 상태는 저장소의 API inventory를 대조한 값이며 이 task에서 서버 테스트를 재실행하지 않았다.
+> 2026-10-07 C2 Task 10(최종 검증) 기준. API별 backend는 Task 8 조립 결과이며 Task 9·10에서 바뀌지 않았다. 서버 계약 기준은 병합된 B2 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이다. 서버 구현 상태는 저장소의 API inventory를 대조한 값이며 이 task에서 서버 테스트를 재실행하지 않았다.
 
-C2 Remote 대상은 **ITEM-01·ITEM-03만**이다. Task 5는 Create/Get Fake와 seed 전용 `CatalogRepository`를 구현했고, 공통 계약 harness의 같은 7개 시나리오를 Fake에서 실제 실행했다. Task 6b는 ITEM-01·03의 Remote(`RemoteItemRepository`)와 MockEngine 기반 공통 계약 7개를 구현·실행했다(fixture는 서버 develop `1c6d949`의 DTO·mapper에서 손으로 옮겼다). 모든 행의 실서버 검증은 미실행이다.
+C2 Remote 대상은 **ITEM-01·ITEM-03만**이다. Task 5는 Create/Get Fake와 seed 전용 `CatalogRepository`를 구현했고, 공통 계약 harness의 같은 7개 시나리오를 Fake에서 실제 실행했다. Task 6b는 ITEM-01·03의 Remote(`RemoteItemRepository`)와 MockEngine 기반 공통 계약 7개를 구현·실행했다(fixture는 서버 develop `1c6d949`의 DTO·mapper에서 손으로 옮겼다). 모든 행의 실서버 검증은 미실행이다. 최종 로컬 검증 결과는 [C2 최종 검증 기록](../../history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.
 
 `CatalogRepository`의 category/purpose/item 조회는 화면 개발용 시드 경계다. CAT-01의 SELECT/BROWSE·count, PUR-01의 요약, ITEM-02의 cursor/anchor wire 계약 완료를 의미하지 않는다. BoardDisplayMetadata의 69개 chip 합계·목적 후보 숫자는 이미지 비교 fixture이고 실제 저장소 집계에 사용하지 않는다. Task 8 runtime 조립 기준 앱 backend는 아래 표의 `C2 앱 backend` 열과 같다. DEBUG 앱은 ITEM-01·03만 FAKE이고 나머지는 UNAVAILABLE이며, RELEASE 앱은 37개 모두 UNAVAILABLE이다. 두 앱 모두 REMOTE가 없다(Remote는 MockEngine 테스트에서만 ITEM-01·03을 REMOTE로 조립). 인증과 실서버 연결은 후속 단계다.
 

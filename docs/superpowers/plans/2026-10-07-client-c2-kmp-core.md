@@ -4,7 +4,7 @@
 
 **Goal:** C3 이후 두 플랫폼이 같은 모델·상태 규칙·repository·저장소·Presenter를 사용하도록, 화면 없이 검증 가능한 KMP 핵심을 만든다.
 
-**Architecture:** `:shared` 한 모듈 안에서 `presentation → domain → repository(interface) ← data(remote | fake | local)` 경계를 둔다. 서버 응답의 상태·허용 행동은 Remote의 권위이며, 같은 정책을 domain 테스트와 Fake에서 재현한다. 플랫폼은 engine·DB driver·token 공급·Presenter 수명만 연결한다.
+**Architecture:** `:shared` 한 모듈 안에서(실행 중 SQLDelight 생성 public 타입의 ObjC 노출을 막으려 내부 모듈 `:localdb`를 추가했다. [결정 기록](../../history/architecture/client/c2-localdb-module-split-2026-10-07.md)) `presentation → domain → repository(interface) ← data(remote | fake | local)` 경계를 둔다. 서버 응답의 상태·허용 행동은 Remote의 권위이며, 같은 정책을 domain 테스트와 Fake에서 재현한다. 플랫폼은 engine·DB driver·token 공급·Presenter 수명만 연결한다.
 
 **Tech Stack:** Kotlin 2.3.21, AGP 9.0.0, Gradle 9.3.0, Ktor client(OkHttp/Darwin), kotlinx.serialization, SQLDelight, Koin DSL, SKIE, kotlin.test/coroutines-test/Turbine/MockEngine.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 상태: **승인 v4 · Task 1~5 검증 완료, 중간 확인 대기 (2026-10-07)**. 아래 제안 인터페이스와 기본값은 구현 계획이며 서버 신규 계약을 확정하지 않는다. 사용자 승인에 따라 Task 1부터 실행하며 Task 5 뒤 중간 확인을 받는다.
+- 상태: **승인 v4 · Task 1~9 완료, Task 10 Step 1~4 완료(전체 로컬 검증·문서·커밋), PR 생성 대기 (2026-10-07)**. 모듈 구성은 `:shared`·`:android`와 SQLDelight 전용 내부 모듈 `:localdb`다. 아래 제안 인터페이스와 기본값은 구현 계획이며 서버 신규 계약을 확정하지 않는다. 사용자 승인에 따라 Task 1부터 실행하며 Task 5 뒤 중간 확인을 받는다.
 - 브랜치 `client/c2-kmp-core`, PR base `develop`. 시작 HEAD: `e884d14fcd59be026886b2056f3e0e377a5c627f`.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. `iosArm64`/`iosSimulatorArm64`, static `Shared.framework` direct integration 유지. 공유 코드에 Compose/SwiftUI 의존성 없음.
 - 서버 최신 확인(2026-10-07 13:48 KST): B1 PR [#8](https://github.com/seongmin221/wishlist-app/pull/8)와 B2 PR [#9](https://github.com/seongmin221/wishlist-app/pull/9) merged. B2 브랜치 `origin/seongmin221/server-b2-category-management` tip `3df880e`, 최신 `origin/develop`은 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이며 열린 PR은 없다. B2 PR #9 mergedAt은 13:31:42 KST. 과거 시작 HEAD는 위 기록을 유지하며, Task 1 실행 전에 `origin/develop` `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0` 위로 승인된 rebase를 완료했다(실행 기준 계획 commit `dd62150`). 이 commit의 서버 계약을 기준으로 실행한다.
@@ -587,8 +587,8 @@ Presenter의 유일한 상품 조회 의존성은 GetItemRepository다. 캐시 �
 | --- | --- | --- |
 | 최종 로컬 검증·architecture/INDEX/로드맵·develop 대상 draft PR | Task 1 의존성 결과 대조·실행 건수/fail/skip·문서 링크·diff | merge·최종 단계에서 최초 호환성 조사 |
 
-- [ ] **Step 1: 최종 의존성 대조.** Task 1에서 검증하고 후속 Step 0에서 대조한 catalog/dependency graph·Kotlin/AGP/Gradle baseline·공식 근거 기록만 대조. 새로운 호환성 조사를 마지막까지 미루지 않는다.
-- [ ] **Step 2: 전체 로컬 검증.** 아래 명령 모두 성공, shared host/Native의 실행 건수·fail/skip·로그 경로 기록. 플랫폼 자동 CI 비활성화 유지. UI 변경은 가격 입력·null/blank 표시 규칙 이관이므로 기존 가격 fixture의 라이트·다크 데모 표시를 확인하고 기존 fixture를 검증한다.
+- [x] **Step 1: 최종 의존성 대조.** Task 1에서 검증하고 후속 Step 0에서 대조한 catalog/dependency graph·Kotlin/AGP/Gradle baseline·공식 근거 기록만 대조. 새로운 호환성 조사를 마지막까지 미루지 않는다.
+- [x] **Step 2: 전체 로컬 검증.** 아래 명령 모두 성공, shared host/Native의 실행 건수·fail/skip·로그 경로 기록. 플랫폼 자동 CI 비활성화 유지. UI 변경은 가격 입력·null/blank 표시 규칙 이관이므로 기존 가격 fixture의 라이트·다크 데모 표시를 확인하고 기존 fixture를 검증한다. **결과(2026-10-07):** 모든 명령 성공, host 246·simulator 243·Android 66×2·XCTest 81, 실패/skip 0([기록](../../history/architecture/client/c2-final-verification-2026-10-07.md)). 가격 fixture의 라이트·다크 시각 확인은 수동 항목이라 **미실행**(자동 테스트는 형식·null/blank 규칙만 검증).
 
 ```sh
 # repository root
@@ -609,21 +609,21 @@ xcodebuild -project client/ios/Wishlist.xcodeproj -scheme Wishlist \
   -derivedDataPath client/ios/DerivedData CODE_SIGNING_ALLOWED=NO build
 ```
 
-- [ ] **Step 3: 문서 정합성.** 37개 API ID의 중복/누락과 실제 backend 상태 대조; Fake 규칙 테스트·MockEngine Remote·실서버 검증 분리. 알려진 C1 한계·C3 성능/모듈 검토 인계 유지. 날짜·서버 commit·채택 의존성·metadata precision 후속 검증·미결정 정책을 정확히 기록. 문서 링크 검사와 `git diff --check`.
-- [ ] **Step 4: 리뷰·커밋.** 선택 실행 방식의 독립 리뷰와 중요 결함 수정·재검증 후 완료 표시. `docs: C2 공통 핵심 구조와 검증 결과 기록` + 본문. 실패/미실행이 있으면 완료로 승격하지 않는다.
+- [x] **Step 3: 문서 정합성.** 37개 API ID의 중복/누락과 실제 backend 상태 대조; Fake 규칙 테스트·MockEngine Remote·실서버 검증 분리. 알려진 C1 한계·C3 성능/모듈 검토 인계 유지. 날짜·서버 commit·채택 의존성·metadata precision 후속 검증·미결정 정책을 정확히 기록. 문서 링크 검사와 `git diff --check`.
+- [x] **Step 4: 리뷰·커밋.** 선택 실행 방식의 독립 리뷰와 중요 결함 수정·재검증 후 완료 표시. `docs: C2 공통 핵심 구조와 검증 결과 기록` + 본문. 실패/미실행이 있으면 완료로 승격하지 않는다. **결과:** 이 task는 자체 검토와 커밋까지 완료했다. 독립 리뷰는 전체 브랜치 리뷰로 이후 별도 수행한다.
 - [ ] **Step 5: PR.** `client/c2-kmp-core` push, base develop의 draft PR 생성. 최종 설명에 모델·fake 범위·SQL transaction·B1 Remote·Swift 수명, 로컬 검증 건수/환경/미실행·C3 인계를 적는다. merge는 별도 요청 범위.
 
 ## C2 완료 기준
 
-- [ ] SKIE Kotlin2.3.21 static framework 연결, Swift Flow/suspend/취소 및 Kotlin→Swift 비suspend token callback 실행 증거 있음(또는 승인받은 대안의 동일 증거).
-- [ ] 축소한 C2 모델·state policy·가격·상품 Fake 규칙·Presenter 전이가 Android host/iOS simulator commonTest에서 통과.
-- [ ] ITEM-01·03 Fake/Remote 공통 계약 통과; 후속 API는 단계·잠정 계약이 추적됨.
-- [ ] SQLDelight 재개방·계정 격리·accept 원자성 실제 SQLite 테스트와 CachedGetItemRepository 성공/404/경합 계약 통과.
-- [ ] 두 플랫폼이 같은 가격 함수 사용, Android/iOS build·기존 회귀 통과, release 전수 UNAVAILABLE backend·DI graph 검증.
-- [ ] Koin API별 선택·debug bootstrap과 플랫폼 runtime/Presenter 자원 수명이 검증됨.
-- [ ] OkHttp redirect host 실행 검증, Darwin은 소스 검토와 C12 인계로 명확히 구분됨.
-- [ ] 전체 후보 의존성 호환성은 Task 1에서 검증하고, Task 5 중간 산출물을 사용자에게 확인받음.
-- [ ] architecture/INDEX/integration-status·의미 있는 결정 이력·PR 검증 결과 최신화.
+- [x] SKIE Kotlin2.3.21 static framework 연결, Swift Flow/suspend/취소 및 Kotlin→Swift 비suspend token callback 실행 증거 있음(또는 승인받은 대안의 동일 증거).
+- [x] 축소한 C2 모델·state policy·가격·상품 Fake 규칙·Presenter 전이가 Android host/iOS simulator commonTest에서 통과.
+- [x] ITEM-01·03 Fake/Remote 공통 계약 통과; 후속 API는 단계·잠정 계약이 추적됨.
+- [x] SQLDelight 재개방·계정 격리·accept 원자성 실제 SQLite 테스트와 CachedGetItemRepository 성공/404/경합 계약 통과.
+- [x] 두 플랫폼이 같은 가격 함수 사용, Android/iOS build·기존 회귀 통과, release 전수 UNAVAILABLE backend·DI graph 검증.
+- [x] Koin API별 선택·debug bootstrap과 플랫폼 runtime/Presenter 자원 수명이 검증됨.
+- [x] OkHttp redirect host 실행 검증, Darwin은 소스 검토와 C12 인계로 명확히 구분됨.
+- [x] 전체 후보 의존성 호환성은 Task 1에서 검증하고, Task 5 중간 산출물을 사용자에게 확인받음.
+- [x] architecture/INDEX/integration-status·의미 있는 결정 이력 최신화. PR 설명의 검증 결과는 PR 생성 시 반영한다(초안 `.superpowers/sdd/…/pr-body.md`).
 
 ## 초안 자체 검토
 

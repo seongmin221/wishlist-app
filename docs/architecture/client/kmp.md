@@ -24,7 +24,7 @@
 
 ## 초기 구현
 
-- 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared` 모듈로 시작한다.
+- 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared`, `:localdb` 모듈이다(`:localdb`는 C2 Task 7에서 추가, 아래 "모듈 구성").
 - shared target은 Android, `iosArm64`, `iosSimulatorArm64`다. Android는 공식 KMP library plugin, iOS는 static `Shared.framework` direct integration을 사용한다.
 - 지원 하한은 Android 8(API 26), iOS 17이다.
 - 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드, Fake·Remote(ITEM-01·03)·로컬 캐시와 이를 조립하는 `SharedRuntime`, 그리고 C4가 확장할 상품 상세 Presenter 기반(아래 마지막 두 절)도 포함한다. 화면 비즈니스 기능은 후속 구현 대상이다.
@@ -37,13 +37,13 @@
 | --- | --- |
 | HTTP·JSON | Ktor client(OkHttp / Darwin), kotlinx.serialization |
 | local DB | SQLDelight |
-| DI | Koin(shared 모듈 + 플랫폼 모듈) |
+| DI | Koin(`:shared` 안 internal 조립, runtime별 격리 `koinApplication`. 앱은 `SharedRuntimeFactory`만 호출) |
 | Swift 연결 | SKIE(Flow·suspend → AsyncSequence·async). 미지원 시 KMP-NativeCoroutines |
 | 인증 | 플랫폼별 Firebase 공식 SDK가 KMP `AuthTokenProvider` 구현 |
 | 설정 저장 | multiplatform-settings |
 | 테스트 | kotlin.test, Turbine, Ktor MockEngine |
 
-`shared`는 Gradle 모듈 하나로 두고 패키지로 경계를 나눈다.
+공유 코드는 `:shared`의 패키지로 경계를 나눈다. SQLDelight plugin·schema·생성 코드만 내부 모듈 `:localdb`에 둔다.
 
 ```text
 core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  presentation/
@@ -53,6 +53,8 @@ core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  pres
 - `presentation`의 Presenter(`StateFlow<State>` + intent)가 화면 데이터, 로딩·오류, 편집 초안과 dirty 여부, 연속 처리 진행, 409 복구 상태를 소유한다.
 - `repository`는 서버 API ID 단위 인터페이스다. Fake·Remote·UNAVAILABLE을 API ID마다 명시한 `RepositoryBindings`로 고르고(build mode에서 추론하지 않는다), 서버 묶음이 끝나면 API ID 단위로 Remote로 바꾼다. 같은 계약 테스트를 양쪽에 실행한다.
 - 서버가 아직 고정하지 않은 필드·오류 코드는 `CONTRACT-PENDING(<API-ID>)`로 표시하고 DTO·매퍼 안에만 둔다.
+
+**모듈 구성(계획과 다른 점):** C2 계획의 Architecture는 `:shared` 한 모듈이었다. SQLDelight 생성 클래스는 `public`만 가능해서 `:shared`에 두면 `Shared.h`(ObjC header)에 노출되므로 internal 모듈 `:localdb`로 분리했다. `:shared`는 `implementation`으로만 의존하고 export하지 않으며, iOS 앱 target은 `-lsqlite3`를 직접 링크한다. 결정 기록은 [C2 `:localdb` 모듈 분리](../../history/architecture/client/c2-localdb-module-split-2026-10-07.md).
 
 빌드 명령과 검증 제한은 [client 실행 가이드](../../../client/README.md), 상세 근거와 핸드오프 검토는 [초기 셋업](initial-setup.md)에 정리한다.
 
@@ -180,7 +182,16 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - **조회·재시도:** `load(id)`는 loading=true·error=null로 시작한다. 같은 id의 항목이 보이는 중이면(refresh) 항목을 유지하고, 다른 id면 바로 비운다. 성공은 항목 표시, 일반 오류는 기존 항목을 유지한 채 error, `NOT_FOUND`는 항목 제거 + error다. `retry()`는 마지막 id를 다시 조회하며 첫 load 전에는 아무것도 하지 않는다.
 - **마지막 요청 승리:** 새 load/retry는 이전 요청을 취소하고 request ID를 올린다. 취소를 무시하고 늦게 도착한 응답도 request ID가 현재가 아니면 버린다.
 - **session:** 계정 변경·같은 계정 재로그인(세대 증가)을 관찰하면 진행 요청을 취소하고 `Initial`로 되돌린다. 마지막 id는 남기므로 이후 `retry()`는 새 session으로 다시 조회한다. 응답 발행은 요청 시점 snapshot으로 `AuthSession.withCurrent` 안에서 하므로 계정 변경과 직렬화되고, 관찰자가 아직 변경을 처리하지 못한 경합에서도 이전 session의 응답은 게시되지 않는다. 관찰보다 먼저 들어온 load는 처리 시작 시 session을 먼저 동기화해 새 계정 요청이 뒤늦은 관찰에 취소되지 않는다.
-- **close:** `close()`는 scope를 취소한다. 멱등이며 이후 intent·session 변경·늦은 응답은 state를 바꾸지 않는다(state는 마지막 값에 멈춘다).
+- **close:** `close()`는 scope를 취소한다. 멱등이며 이후 intent·session 변경·늦은 응답은 대체로 state를 바꾸지 않는다(state는 마지막 값에 멈춘다). 다만 다른 스레드의 in-flight 발행과 close의 순서는 보장하지 않고, close 시점에 진행 중이던 요청의 `loading=true`가 그대로 남는다(현재 테스트가 이를 고정하며 C4에서 다룬다).
 - **취소:** `CancellationException`은 전파하고 오류 state로 바꾸지 않는다.
 - **플랫폼 소유자(C4 유지 계약):** Android `ItemDetailPresenterOwner`(`ViewModel`)는 `onCleared()`에서, iOS `ItemDetailPresenterOwner`(`@MainActor @Observable`)는 `close()`/`deinit`에서 Presenter를 닫는다. 두 owner 모두 화면을 그리지 않는다. 자세한 내용은 [Android](android.md)·[iOS](ios.md) 문서의 C2 절에 있다.
 - **검증:** commonTest `ItemDetailPresenterTest`(조회·재시도·refresh 오류·NOT_FOUND·마지막 요청 승리·늦은 응답·close·계정/세대 변경·관찰 지연 경합·취소 전파·주입 dispatcher)와 `SharedModulesTest`의 runtime Presenter 연결을 Android host와 iOS simulator에서 실행한다. Task 1 interop probe는 삭제했고, Swift Flow 수집·collector 취소·suspend·close·계정 전환은 `SharedInteropTests`가 실제 Presenter·runtime으로, Swift `PlatformTokenSource` callback 성공/오류는 REMOTE ITEM-03 runtime + 도달 불가 base URL로 공개 API만 써서 검증한다(성공은 token이 전달되어 NETWORK, 오류는 `UNAUTHENTICATED`와 Swift `errorCode`).
+
+## C2 최종 검증 요약
+
+> 2026-10-07 Task 10. 명령·건수·로그 경로는 [C2 최종 검증 기록](../../history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.
+
+- 의존성 baseline(Kotlin 2.3.21·AGP 9.0.0·Gradle 9.3.0·catalog)은 Task 1 이후 변경이 없다([호환성 기록](../../history/architecture/client/c2-dependency-compatibility-2026-10-07.md)).
+- shared commonTest는 Android host 246개·iOS simulator 243개(차이 3개는 Android host 전용 `OkHttpRedirectTest`), Android 단위 테스트는 debug/release 각 66개, iOS XCTest 81개를 실행했고 실패·오류·skip은 0이다.
+- Android Context SQLite driver는 compile/assemble만 확인했고 기기 runtime smoke는 C3로 넘긴다. Darwin redirect는 Ktor 3.4.3 delegate 소스 검토만 했고 실제 검증은 C12다. 실서버 호출은 어디에서도 실행하지 않았다.
+- 각 Task 리뷰에서 남긴 경미한 결함(deferred minor)은 수정하지 않았다. 위 절들은 해당 한계(예: Presenter close 이후의 경합, DB I/O dispatcher, bootstrap 실패 시 DEBUG never-ready)를 숨기지 않는 범위로만 서술한다.
