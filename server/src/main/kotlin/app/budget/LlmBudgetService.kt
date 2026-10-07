@@ -48,9 +48,14 @@ class LlmBudgetService(
             }
         }
         windows.forEach { (type, start, ceiling) ->
-            val allowed = c.prepareStatement("select reserved_microusd,settled_microusd,ceiling_microusd from llm_budget_windows where window_type=? and window_start=? for update").use { s ->
-                s.setString(1, type); s.setTimestamp(2, Timestamp.from(start)); s.executeQuery().use { r -> r.next(); r.getLong(3) == ceiling && r.getLong(1) + r.getLong(2) + maximum <= ceiling }
+            val (total, stored) = c.prepareStatement("select reserved_microusd,settled_microusd,ceiling_microusd from llm_budget_windows where window_type=? and window_start=? for update").use { s ->
+                s.setString(1, type); s.setTimestamp(2, Timestamp.from(start)); s.executeQuery().use { r -> r.next(); (r.getLong(1) + r.getLong(2)) to r.getLong(3) }
             }
+            // A window created by another release keeps its spend but adopts this release's approved ceiling.
+            if (stored != ceiling) c.prepareStatement("update llm_budget_windows set ceiling_microusd=? where window_type=? and window_start=?").use { s ->
+                s.setLong(1, ceiling); s.setString(2, type); s.setTimestamp(3, Timestamp.from(start)); check(s.executeUpdate() == 1)
+            }
+            val allowed = total + maximum <= ceiling
             if (!allowed) return@transaction ReserveResult.Exceeded
         }
         if (!AnalysisWriteGuard.lockCurrent(c, claim)) return@transaction ReserveResult.Stale

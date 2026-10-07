@@ -47,17 +47,27 @@ class PurposeGatewaySizingTest {
     }
     private fun answer(purpose: String?) = """{"category_status":"ASSIGNED","category_id":"C026","purpose_status":"${if (purpose == null) "UNASSIGNED" else "ASSIGNED"}","purpose_id":${purpose?.let { "\"$it\"" } ?: "null"}}"""
 
-    @Test fun `tiers shrink purpose evidence before custom evidence for every input shape`() {
-        val all = listOf(Seen(2400,20,true,10,true,true), Seen(2400,20,true,10,true,false), Seen(2400,20,true,10,false,false),
-            Seen(800,20,false,10,false,false), Seen(160,20,false,10,false,false), Seen(160,0,false,10,false,false),
-            Seen(160,0,false,5,false,false), Seen(160,0,false,0,false,false))
-        val (both, tooLarge, paid) = run(snapshot(20, purposes(10)), { false }, { error("must not pay") })
-        assertEquals(all, both); assertTrue(paid.isEmpty())
+    private val all = listOf(Seen(2400,20,true,10,true,true), Seen(2400,20,true,10,true,false), Seen(2400,20,true,10,false,false),
+        Seen(800,20,false,10,false,false), Seen(160,20,false,10,false,false), Seen(160,0,false,10,false,false),
+        Seen(160,0,false,5,false,false), Seen(160,0,false,0,false,false))
+
+    @Test fun `the earliest fitting tier is chosen with at most four token counts for every input shape`() {
+        val shapes = mapOf(
+            snapshot(20, purposes(10)) to all,
+            snapshot(0, purposes(10)) to listOf(all[0], all[1], all[2], all[5], all[6], all[7]).map { it.copy(custom = 0, customDetail = false) },
+            snapshot(20, emptyList()) to listOf(all[0], all[3], all[4], all[7]).map { it.copy(purposes = 0, description = false, items = false) },
+            snapshot(0, emptyList()) to listOf(all[0].copy(custom = 0, customDetail = false, purposes = 0, description = false, items = false), all[7]),
+        )
+        for ((candidates, tiers) in shapes) for (target in tiers.indices) {
+            val (seen, response, paid) = run(candidates, { shape -> tiers.indexOf(shape).also { assertTrue(it >= 0, "unexpected shape $shape") } >= target }, { answer(null) })
+            assertTrue(seen.size <= 4, "count calls ${seen.size} for target $target")
+            assertEquals(tiers[target], seen.last { tiers.indexOf(it) >= target }, "target $target")
+            assertEquals(1, paid.size)
+            assertEquals(tiers[target].purposes, response.sent!!.purposeCount)
+        }
+        val (seen, tooLarge, paid) = run(snapshot(20, purposes(10)), { false }, { error("must not pay") })
         assertEquals(ClassificationResult.Unusable("input_too_large"), tooLarge.classification)
-        assertEquals(listOf(all[0], all[1], all[2], all[5], all[6], all[7]).map { it.copy(custom = 0, customDetail = false) },
-            run(snapshot(0, purposes(10)), { false }, { error("") }).first)
-        assertEquals(listOf(20, 20, 20, 0), run(snapshot(20, emptyList()), { false }, { error("") }).first.map { it.custom })
-        assertEquals(listOf(2400, 160), run(snapshot(0, emptyList()), { false }, { error("") }).first.map { it.product })
+        assertTrue(seen.size <= 4); assertTrue(paid.isEmpty())
     }
 
     @Test fun `aliases follow snapshot order and map back to judged purpose ids`() {

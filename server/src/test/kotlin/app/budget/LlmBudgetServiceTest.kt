@@ -106,6 +106,16 @@ class LlmBudgetServiceTest {
         assertEquals(2, service.pendingAlerts().size)
     }
 
+    @Test fun `a window created with an older release ceiling adopts the configured ceiling`() = withAnalysisDatabase { source ->
+        val claim = newAnalysisClaim(source)
+        analysisSql(source, """insert into llm_budget_windows(id,window_type,window_start,reserved_microusd,settled_microusd,ceiling_microusd) values
+            ('${UUID.randomUUID()}','DAILY',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,599500,600000),
+            ('${UUID.randomUUID()}','MONTHLY',date_trunc('month',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,0,6000000)""")
+        assertIs<ReserveResult.Reserved>(LlmBudgetService(source).reserveBeforeCall(claim, UUID.randomUUID()))
+        assertEquals("721000", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='DAILY'"))
+        assertEquals("7210000", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='MONTHLY'"))
+    }
+
     private fun withBudget(block: (LlmBudgetService, AnalysisClaim) -> Unit) {
         PostgresTestContainer().use { db ->
             db.start()

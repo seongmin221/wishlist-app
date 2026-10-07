@@ -60,7 +60,7 @@ class CategoryGatewaySizingTest {
                 .classify("상".repeat(2400),snapshot) { flight++ }
             if(returnCustom) assertIs<ClassificationResult.Unusable>(result.classification)
             else assertEquals(ClassificationResult.Assigned("C026",null,purposeJudged=false),result.classification)
-            assertEquals(if(customCount==0) listOf(0,0) else listOf(20,20,20,0),counts)
+            assertEquals(if(customCount==0) listOf(0,0) else listOf(20,20,0),counts) // first tier, then binary search
             assertEquals(1,paid);assertEquals(1,flight)
         } finally { server.stop(0) }
     }
