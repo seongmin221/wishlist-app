@@ -70,6 +70,7 @@ internal class RuntimeResourcesProbe(
             }
         },
         createEngine = { CountingEngine(engineFactory()).also { engines += it } },
+        utcOffsetSeconds = { TEST_UTC_OFFSET_SECONDS },
     )
 }
 
@@ -102,3 +103,6 @@ internal fun createRuntime(
     dispatchers = RuntimeDispatchers(default = dispatcher, io = dispatcher),
     seedOverride = seedOverride,
 )
+
+/** Fixed device offset (KST) so relative-date tests do not depend on the host zone. */
+internal const val TEST_UTC_OFFSET_SECONDS = 9 * 3600

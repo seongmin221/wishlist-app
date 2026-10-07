@@ -214,6 +214,14 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - **플랫폼 소유자(C4 유지 계약):** Android `ItemDetailPresenterOwner`(`ViewModel`)는 `onCleared()`에서, iOS `ItemDetailPresenterOwner`(`@MainActor @Observable`)는 `close()`/`deinit`에서 Presenter를 닫는다. 두 owner 모두 화면을 그리지 않는다. 자세한 내용은 [Android](android.md)·[iOS](ios.md) 문서의 C2 절에 있다.
 - **검증:** commonTest `ItemDetailPresenterTest`(조회·재시도·refresh 오류·NOT_FOUND·마지막 요청 승리·늦은 응답·close·계정/세대 변경·관찰 지연 경합·취소 전파·주입 dispatcher)와 `SharedModulesTest`의 runtime Presenter 연결을 Android host와 iOS simulator에서 실행한다. Task 1 interop probe는 삭제했고, Swift Flow 수집·collector 취소·suspend·close·계정 전환은 `SharedInteropTests`가 실제 Presenter·runtime으로, Swift `PlatformTokenSource` callback 성공/오류는 REMOTE ITEM-03 runtime + 도달 불가 base URL로 공개 API만 써서 검증한다(성공은 token이 전달되어 NETWORK, 오류는 `UNAUTHENTICATED`와 Swift `errorCode`).
 
+## 로그인·홈 Presenter (C3)
+
+`SharedRuntime.accountPresenter()`와 `homePresenter()`는 호출마다 새 인스턴스를 만들며(runtime io dispatcher 위), 플랫폼 소유자가 `close()`한다. 둘 다 `ItemDetailPresenter`처럼 단일 레인 scope, 멱등 `close()`, close 뒤 intent 무시를 따르고 생성자는 `internal`이다.
+
+- `AccountPresenter`: `AccountState(restored, account, showFirstRunLogin, signingIn, error)`. 첫 실행 로그인은 복원이 끝난 뒤 저장 플래그를 읽고, 로그인 중 `signIn` 중복 탭은 무시하며, 한 번이라도 로그인했거나 건너뛰면 다시 보이지 않는다(로그아웃 뒤에도).
+- `HomePresenter`: `HomeState`(Loading/LoggedOut/LoggedIn)는 `auth.account`와 `SubmissionCoordinator.view`를 결합한다. view의 `accountId`가 현재 계정과 다르면 Loading(또는 로그아웃 상태에서는 빈 목록)이라 계정 전환 중 이전 계정 줄이 나오지 않는다. 줄은 local(오래된 순) 다음 processing(`createdAt` 순, Kotlin에서 정렬). `savedAt`은 state 갱신과 `refresh()` 때마다 `PlatformResources.utcOffsetSeconds`로 다시 계산한다.
+- foreground refresh는 앱 전역이다. 플랫폼이 `submissions().refresh(FOREGROUND)`를 부르고 HomePresenter는 view 변화에만 반응하며, `refresh()`만 USER_REFRESH와 `refreshing` 표시를 맡는다.
+
 ## C2 최종 검증 요약
 
 > 2026-10-07 Task 10. 명령·건수·로그 경로는 [C2 최종 검증 기록](../../history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.

@@ -16,6 +16,8 @@ import app.wishlist.shared.data.fake.BoardSeeds
 import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.data.fake.FakeAuthFacade
 import app.wishlist.shared.data.fake.FakeStore
+import app.wishlist.shared.presentation.AccountPresenter
+import app.wishlist.shared.presentation.HomePresenter
 import app.wishlist.shared.presentation.ItemDetailPresenter
 import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
@@ -211,6 +213,26 @@ class SharedRuntime internal constructor(
      */
     fun itemDetailPresenter(): ItemDetailPresenter =
         ItemDetailPresenter(repository = getItemRepository(), session = session, dispatcher = env.dispatchers.io)
+
+    /** A new login Presenter over [auth]; the platform owner calls [AccountPresenter.close]. */
+    fun accountPresenter(): AccountPresenter = AccountPresenter(auth = auth(), dispatcher = env.dispatchers.io)
+
+    /**
+     * A new home list Presenter over [auth] and the one [submissions] coordinator. Foreground
+     * refresh stays app-wide (the platform calls `submissions().refresh(FOREGROUND)`). The
+     * platform owner calls [HomePresenter.close].
+     */
+    fun homePresenter(): HomePresenter {
+        val submissions = submissions()
+        return HomePresenter(
+            auth = auth(),
+            view = submissions.view,
+            refresh = { submissions.refresh(it) },
+            clock = env.clock,
+            utcOffsetSeconds = env.platform.utcOffsetSeconds,
+            dispatcher = env.dispatchers.io,
+        )
+    }
 
     /**
      * Releases the HTTP client, its engine and the SQL driver once (if created). Idempotent and

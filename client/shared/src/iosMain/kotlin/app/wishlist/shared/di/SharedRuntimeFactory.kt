@@ -5,6 +5,10 @@ import app.wishlist.shared.data.local.DriverFactory
 import app.wishlist.shared.data.remote.platformHttpEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import platform.Foundation.NSDate
+import platform.Foundation.NSTimeZone
+import platform.Foundation.dateWithTimeIntervalSince1970
+import platform.Foundation.localTimeZone
 
 /** iOS entry point. The app owns exactly one runtime per process (its `WishlistApp`). */
 object SharedRuntimeFactory {
@@ -15,6 +19,9 @@ object SharedRuntimeFactory {
         platform = PlatformResources(
             openDriver = { DriverFactory().create() },
             createEngine = ::platformHttpEngine,
+            utcOffsetSeconds = { at ->
+                NSTimeZone.localTimeZone.secondsFromGMTForDate(NSDate.dateWithTimeIntervalSince1970(at.epochSeconds.toDouble())).toInt()
+            },
         ),
         clock = systemClock,
         ids = randomIds,

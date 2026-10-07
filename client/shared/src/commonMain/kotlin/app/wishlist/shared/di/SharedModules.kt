@@ -33,6 +33,7 @@ import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import kotlin.time.Instant
 
 /**
  * Platform seams: the SQL driver and HTTP engine are opened lazily, on first use, by the graph. The
@@ -41,6 +42,8 @@ import org.koin.dsl.module
 internal class PlatformResources(
     val openDriver: () -> SqlDriver,
     val createEngine: () -> HttpClientEngine,
+    /** UTC offset in seconds of the device time zone at [Instant] (row dates follow the user's calendar). */
+    val utcOffsetSeconds: (Instant) -> Int,
 )
 
 internal class RuntimeEnvironment(

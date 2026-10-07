@@ -1,0 +1,103 @@
+package app.wishlist.shared.presentation
+
+import app.wishlist.shared.core.AuthAccount
+import app.wishlist.shared.core.AuthFacade
+import app.wishlist.shared.core.Clock
+import app.wishlist.shared.domain.DisplayFormat
+import app.wishlist.shared.model.LocalSubmission
+import app.wishlist.shared.model.SubmissionStatus
+import app.wishlist.shared.model.WishlistItem
+import app.wishlist.shared.submission.FlushTrigger
+import app.wishlist.shared.submission.SubmissionView
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
+import kotlin.time.Instant
+
+/**
+ * Home list over the login state and the [SubmissionView]. Only a view that belongs to the
+ * current account is shown: while the account and the view disagree (an account switch passes
+ * through signed out, and the view follows later) the state is Loading or LoggedOut, never rows
+ * of the other account. Relative times are recomputed on every state update and every refresh.
+ *
+ * Foreground refresh is app-wide (the platform asks the coordinator directly); this Presenter
+ * only reacts to the view. [close] cancels everything, is idempotent, and later intents are ignored.
+ */
+class HomePresenter internal constructor(
+    private val auth: AuthFacade,
+    view: StateFlow<SubmissionView>,
+    private val refresh: suspend (FlushTrigger) -> Unit,
+    private val clock: Clock,
+    private val utcOffsetSeconds: (Instant) -> Int,
+    dispatcher: CoroutineDispatcher,
+) : Presenter {
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher.limitedParallelism(1))
+    private val refreshing = MutableStateFlow(false)
+    private val recompute = MutableStateFlow(0)
+    private val mutableState = MutableStateFlow<HomeState>(HomeState.Loading)
+
+    /** Read-only and thread-safe; platform owners collect it and render on the main thread. */
+    val state: StateFlow<HomeState> = mutableState.asStateFlow()
+
+    init {
+        scope.launch {
+            combine(auth.restored, auth.account, view, refreshing, recompute) { restored, account, current, busy, _ ->
+                compose(restored, account, current, busy)
+            }.collect { mutableState.value = it }
+        }
+    }
+
+    /** Pull-to-refresh: shows [HomeState.LoggedIn.refreshing] until the refresh finished. */
+    fun refresh() {
+        scope.launch {
+            if (refreshing.value) return@launch
+            refreshing.value = true
+            try {
+                refresh(FlushTrigger.USER_REFRESH)
+            } finally {
+                refreshing.value = false
+                recompute.value++
+            }
+        }
+    }
+
+    override fun close() {
+        scope.cancel()
+    }
+
+    private fun compose(restored: Boolean, account: AuthAccount?, view: SubmissionView, busy: Boolean): HomeState {
+        if (!restored) return HomeState.Loading
+        val now = clock.now()
+        val offset = utcOffsetSeconds(now)
+        fun row(key: String, url: String, at: Instant, status: RowStatus) =
+            HomeRow(key, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, offset), status)
+        if (account == null) {
+            // A view still tied to an account is not this signed-out state's: show nothing of it.
+            val unbound = if (view.accountId == null) view.local.filter { it.accountBinding == null } else emptyList()
+            return HomeState.LoggedOut(
+                unbound.oldestFirst().map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, RowStatus.LOCAL_ONLY) },
+            )
+        }
+        if (view.accountId != account.accountId) return HomeState.Loading
+        val local = view.local.oldestFirst().map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, it.submissionStatus.toRow()) }
+        val processing = view.processing
+            .sortedWith(compareBy<WishlistItem> { it.createdAt }.thenBy { it.id })
+            .map { row("item-${it.id}", it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
+        return HomeState.LoggedIn(local + processing, busy)
+    }
+
+    private fun List<LocalSubmission>.oldestFirst() =
+        sortedWith(compareBy<LocalSubmission> { it.sharedAt }.thenBy { it.clientSubmissionId })
+
+    private fun SubmissionStatus.toRow() = when (this) {
+        SubmissionStatus.SUBMITTING -> RowStatus.SENDING
+        SubmissionStatus.PENDING -> RowStatus.WAITING_NETWORK
+        SubmissionStatus.FAILED -> RowStatus.FAILED
+    }
+}
