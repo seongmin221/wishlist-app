@@ -35,6 +35,7 @@ class CreateWishlistItemService(
         val result = dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
+                app.persistence.OwnerStructureLock.lock(connection,ownerId)
                 val itemId = UUID.randomUUID()
                 val result = if (items.insertItem(connection, itemId, ownerId, key, sourceUrl, clientCreatedAt)) {
                     val eventId = items.insertInitialAnalysis(connection, itemId)

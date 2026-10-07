@@ -29,12 +29,27 @@ class CategoryInputPolicyTest {
     }
 
     @Test fun `optional empty text is allowed without changing original text`() {
-        assertEquals(emptySet(), CategoryInputPolicy.validate(CategoryInput("책상", "", listOf("", " 예시 "))))
+        assertEquals(emptySet(), CategoryInputPolicy.validate(CategoryInput("책상", "", listOf(" 예시 "))))
+    }
+
+    @Test fun `optional examples reject present blank strings without rewriting them`() {
+        for(value in listOf("", "  ", "\u00a0\u2003")) assertEquals(setOf("examples"),CategoryInputPolicy.validate(CategoryInput("desk",null,listOf(value))))
+        assertEquals(emptySet(),CategoryInputPolicy.validate(CategoryInput("desk",null,emptyList())))
     }
 
     @Test fun `visible joined unicode text remains valid`() {
         for (name in listOf("👩‍💻", "می\u200cخواهم", "🏴\uDB40\uDC67\uDB40\uDC62\uDB40\uDC65\uDB40\uDC6E\uDB40\uDC67\uDB40\uDC7F")) {
             assertEquals(emptySet(), CategoryInputPolicy.validate(CategoryInput(name, null, emptyList())), name)
         }
+    }
+
+    @Test fun `description allows LF and CRLF while names examples and other controls stay strict`() {
+        assertEquals(emptySet(),CategoryInputPolicy.validate(CategoryInput("desk","one\ntwo\r\nthree",listOf("keyboard"))))
+        assertEquals(setOf("description"),CategoryInputPolicy.validate(CategoryInput("desk","one\rtwo",emptyList())))
+        assertEquals(setOf("name","examples"),CategoryInputPolicy.validate(CategoryInput("one\ntwo",null,listOf("one\ntwo"))))
+    }
+
+    @Test fun `comparison keys normalize canonically equivalent Hangul without changing display text`() {
+        assertEquals("책상",CategoryInputPolicy.normalizedName("\u110E\u1162\u11A8\u1109\u1161\u11BC"))
     }
 }
