@@ -3,6 +3,7 @@
 | 주제 | 문서 |
 | --- | --- |
 | modular monolith, API, Worker 경계 | [overview.md](overview.md) |
+| 로컬 전체 테스트·JDK/container 환경·Testcontainers socket 선택 | [local-test-environment.md](local-test-environment.md) |
 | Product metadata extraction pipeline | [extraction-pipeline.md](extraction-pipeline.md) |
 | 와이어프레임 기반 제품 API·데이터 모델·구현 순서 제안 | [mvp-product-api-design.md](mvp-product-api-design.md) |
 | 전체 화면·행동과 API 37개 대응, 최소 입출력·현재 구현 상태 | [mvp-api-inventory.md](mvp-api-inventory.md) |
@@ -26,3 +27,5 @@
 | B5 오래된 PENDING·queue 소진·미발행 outbox 복구 설계 | [analysis-pending-recovery.md](analysis-pending-recovery.md) |
 | B0 외부 리뷰의 실행 시간·동시 발행·오류·복구 보완 | [보완 기록](../../history/architecture/server/b0-review-hardening-2026-10-05.md) |
 | B0 후속 리뷰의 queue claim·LLM 예산/마감·최종 version 복구·DB 시각 | [후속 기록](../../history/architecture/server/b0-followup-review-2026-10-06.md) |
+
+- [B4 상품 목록·홈 조회 설계 제안](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 제품 정책 확정, 사용자 spec 검토 전

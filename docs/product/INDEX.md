@@ -9,8 +9,8 @@
 ## 사용자 흐름
 
 - [상품 저장](save-a-product.md) — URL 공유부터 분석·복구까지
-- [구매 후보 정리](organize-candidates.md) — 분류, 목적, 중복 후보의 검토
-- [상품 확인과 편집](inspect-and-edit-a-product.md) — 목록 확인, 정보 보완·편집, 원본 링크 탐색과 활성 상품 삭제
+- [구매 후보 정리](organize-candidates.md) — 분류, 목적, 중복 후보 검토·연속 처리 재진입과 다시 보기
+- [상품 확인과 편집](inspect-and-edit-a-product.md) — 홈 최근 목적 3개·목록 확인·정보 보완·편집·원본 링크·활성 상품 삭제
 - [구매 결정 종료](finish-a-purchase-decision.md) — 구매 상품 지정, 목적 아카이브, 복원과 기록 삭제
 
 ## 공통 참조
