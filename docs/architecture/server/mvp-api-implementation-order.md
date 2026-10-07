@@ -112,7 +112,7 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 [확정 계약](category-management-api.md)과 [작업별 계획](../../superpowers/plans/2026-10-07-b2-category-management.md)을 준비했다.
 생성 key는 계정 데이터 유지 동안 보존, 미확정 stale 실행만 예산 승계 재예약, 신규 생성은 owner별 60초 5건으로 확정했다.
 CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement를 구현·독립 리뷰했다.
-최종 단독 전체 실행은 245개 중244 통과·실패/오류0·RealUrlPilot1 skip이다.
+최초 B2 단독 전체는245개 중244 통과였으며, [후속 리뷰 보완](../../history/architecture/server/b2-review-followup-2026-10-07.md) 후 최종 단독 전체는252개 중251 통과·실패/오류0·RealUrlPilot1 skip이다.
 [구현·리뷰 이력](../../history/architecture/server/b2-category-implementation-2026-10-07.md)을 따른다.
 새 공간의 직접 baseline은 전체 `--rerun-tasks` 203개 중 202 통과·실패/오류 0·RealUrlPilot 1 skip이다.
 입력 기반 리뷰 보완 후 단독 전체 실행은 214개 중 213 통과·실패/오류 0·RealUrlPilot 1 skip이다.

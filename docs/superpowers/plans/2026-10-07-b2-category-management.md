@@ -95,3 +95,9 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home DOCKER_
 ```
 
 최종 결과: 사용자 지정 단독 전체 --rerun-tasks, 245개 중244 통과·실패/오류0·RealUrlPilot1 skip(4분5초). 독립 리뷰 Important 2건과 기존 목적 빈 슬롯 연결 회귀를 보완했다. 의미별 로컬 커밋 후 push/PR/merge 없이 종료한다.
+
+## 후속 리뷰 보완
+
+공용-only 최소 fallback, 보호된 stale 상품 상태, 예산 소진 FAILED, V12 공용 FK와 legacy 보존을 추가 검증한다. snapshot codec/CategoryRef/단일 공급·optional 타입/count 조회를 정리하고 API·AI·영속성 문서를 분리한다. 진행과 결과는 [후속 리뷰 이력](../../history/architecture/server/b2-review-followup-2026-10-07.md)에 보존한다.
+
+후속 보완 완료: targeted78개·최종 단독 전체252개 중251 통과·실패/오류0·RealUrlPilot1 skip(4분23초). 독립 리뷰 Critical/Important 없음.

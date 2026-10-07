@@ -90,4 +90,50 @@ claim·finish·reconciler의 lane별 재시도 한도는 AnalysisJobTransitions�
 
 ## B2 category 후보 보호
 
-V11 app_users를 잠금 기준으로 사용한다. 기존 owner는 backfill하고 신규 owner는 공통 helper가 lazy insert 뒤 FOR UPDATE한다. B1 생성과 Worker claim/staging/finish/recovery는 owner를 먼저 잠근다. custom snapshot v2는 owner·version·구조화된 이름/설명/예시를 저장하고 동일 connection에서 공급한다. 재사용과 최종 반영에서 stale를 검사하며 잘못된 구조는 유료 호출 없이 최종 replacement로 넘긴다. replacement는 기존 시도 횟수·최초 시각을 승계한다. CONFIRMED/DEFERRED의 기존 category·purpose와 USER/override 연결은 유효한 새 AI 결과에도 유지한다. 기존 B0 계약의 null·UNASSIGNED 목적 슬롯 신규 AI 연결은 유지한다. 세부 사항은 [B2 category 계약](category-management-api.md)을 따른다.
+V11 app_users를 잠금 기준으로 사용한다. 기존 owner는 backfill하고 신규 owner는 공통 helper가 lazy insert 뒤 FOR UPDATE한다. B1 생성과 Worker claim/staging/finish/recovery는 owner를 먼저 잠근다. custom snapshot v2는 owner·version·구조화된 이름/설명/예시를 저장하고 동일 connection에서 공급한다. 재사용과 최종 반영에서 stale를 검사하며 잘못된 구조는 유료 호출 없이 최종 replacement로 넘긴다. replacement는 기존 시도 횟수·최초 시각을 승계한다. CONFIRMED/DEFERRED의 기존 category·purpose와 USER/override 연결은 유효한 새 AI 결과에도 유지한다. stale AI assignment를 건너뛸 때는 기존 category 기준으로 READY/PARTIAL을 계산한다. 기존 B0 계약의 null·UNASSIGNED 목적 슬롯 신규 AI 연결은 유지한다. 세부 사항은 [AI 후보와 stale 보호](category-ai-candidates.md)를 따른다.
+
+## Category 스키마와 구조 잠금
+
+V11은 app_users 잠금 기준, public_category_groups/public_categories registry,
+custom_categories와 생성 receipt를 추가한다. 이전 migration은 수정하지 않는다.
+app_users는 기존 wishlist owner를 backfill하고 Firebase 정보는 nullable이다.
+신규 Firebase owner는 공통 잠금 helper가 INSERT ON CONFLICT DO NOTHING 후 FOR UPDATE한다.
+CAT-03뿐 아니라 B1 ITEM-01와 Worker 잠금 경로도 이 helper를 사용한다.
+인증 시 사용할 owner UUID 알고리즘을 바꾸지 않는다.
+
+custom에는 owner, 고정 parent FK, 원문/normalized 이름, description/text[] examples,
+version, AI 허용/내부 이유, createdAt/updatedAt/deletedAt을 저장한다.
+DB 길이·배열 개수·version 제약과 미삭제 normalized partial UNIQUE를 둔다.
+20개 제한과 rate limit은 app_users FOR UPDATE 아래 transaction에서 검사한다.
+
+wishlist_items에 public `category_id`와 별도 `custom_category_id` UUID를 두고
+둘 중 최대 하나 CHECK, `(owner_id,custom_category_id)` 복합 FK를 추가한다.
+V8 assignment CHECK를 교체해 두 종류 모두 source AI/USER·missingReason null을 요구한다.
+공개 category.id는 공용 C-ID 또는 custom UUID 하나로 합친다.
+legacy 공용 참조와 V10 item/job/outbox 의미를 upgrade 테스트로 보존한다.
+
+모든 B2 구조 변경과 Worker 최종 적용은 owner→category→item(ID순)→job 순서다.
+owner discovery는 잠금 없는 조회 후 잠금 안에서 관계를 재검증한다.
+기존 claim/staging/finish/reconciler 경로도 같은 선행 owner 잠금에 맞춘다.
+DB 잠금을 잡은 채 외부 HTTP/AI를 호출하지 않는다. snapshot 공급은 같은 connection으로
+읽어 bounded pool에서 잠금 transaction이 두 번째 connection을 기다리지 않게 한다.
+
+
+V12는 public category_id에 public_categories FK를 NOT VALID로 추가한다. 새 참조와 변경된
+참조는 공용 registry ID만 허용한다. 이미 저장된 legacy의 알 수 없는 ID는 삭제·재지정하지
+않고 보존한다. rollout에서 다음 조회로 legacy를 점검하고 제품 수선 절차 후 constraint를
+VALIDATE한다. 미검증 상태를 모든 역사 데이터의 무결성이 검증된 것으로 해석하지 않는다.
+
+```sql
+SELECT i.id, i.owner_id, i.category_id
+FROM wishlist_items i
+LEFT JOIN public_categories c ON c.id = i.category_id
+WHERE i.category_id IS NOT NULL AND c.id IS NULL;
+-- 위 참조를 수선한 뒤 실행:
+ALTER TABLE wishlist_items VALIDATE CONSTRAINT wishlist_public_category_fk;
+```
+
+목록과 상세 category 표현은 해당 item_count를 함께 읽는다. 생성·replay의
+customUsedCount 계산은 item_count projection 없이 owner 범위 COUNT(*)를 사용한다. TaxonomyCatalog v1은 process에서 한 번 파싱한 불변 catalog를 공유한다.
+
+CAT-01은 repeatable-read transaction snapshot으로 목록과 count를 일치시킨다. 생성 receipt의 payload fingerprint는 기본값을 적용한 원문 JSON의 SHA-256이다. 생성 rate limit은 owner 잠금 뒤 단일 clock_timestamp()를 materialized asOf로 읽고 created_at > asOf - 60초의 성공 receipt를 센다. Replay는 count/rate 검사보다 먼저 처리하며 실패 transaction은 receipt를 남기지 않는다.

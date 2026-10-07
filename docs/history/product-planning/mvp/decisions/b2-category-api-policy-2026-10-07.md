@@ -13,3 +13,5 @@
 상품 초안 취소 뒤 생성 category 수명은 별도 제품 확인 대상이다. B2 생성은 상품 연결과 독립적이며 자동 취소·삭제 API를 추가하지 않는다.
 
 구체적인 HTTP 오류·replay·순서·토큰 tier·잠금 계약은 [B2 서버 계약](../../../../architecture/server/category-management-api.md)을 따른다.
+
+후속 피드백의 공용-only owner도 전체 입력 초과 시 metadata160자의 공용 최소 단계를 시도하도록 반영했다. Unicode filler/방향 표시 문자의 거절 범위는 새로 확대하지 않고 현재 허용 범위를 계약에 명시했다. 이는 기존 저장 원문 보존 규칙을 유지한다.

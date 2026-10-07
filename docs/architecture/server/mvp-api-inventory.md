@@ -78,7 +78,7 @@ READY 항목에서 사용자 category 삭제 때문에 category가 빈 경우에
 ## 앱 서버 API — 카테고리 6개
 
 B2 CAT-01~04와 owner별 AI 후보·stale 보호를 구현·검증했다. [확정 계약](category-management-api.md)을 따른다.
-최종 전체 실행은 245개 중244 통과·실패/오류0·RealUrlPilot1 skip이다.
+후속 리뷰 보완 후 최종 전체 실행은 252개 중251 통과·실패/오류0·RealUrlPilot1 skip이다.
 생성 key는 계정 데이터 유지 동안 보존, 미확정 stale 실행은 예산을 승계해 재예약, 신규 생성은 owner별 60초 5건으로 사용자 확인을 완료했다.
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
