@@ -274,9 +274,11 @@ final class WLTypographyTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         var found: [NSObject] = []
         accessibilityElements(h.view, &found)
+        // SwiftUI는 앱 접근성이 켜져 있을 때만 요소를 만든다(CI는 시뮬레이터에서 켜고 실행한다).
         XCTAssertEqual(found.map { $0.accessibilityLabel ?? "" }, ["제목 글자", "본문 글자", "한 줄"])
         XCTAssertFalse(found.contains { $0 is UILabel })
-        XCTAssertTrue(found[0].accessibilityTraits.contains(.header))
+        guard let first = found.first else { return }
+        XCTAssertTrue(first.accessibilityTraits.contains(.header))
         XCTAssertTrue(found.allSatisfy { $0.accessibilityTraits.contains(.staticText) })
     }
 }

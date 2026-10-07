@@ -88,7 +88,7 @@ python3 client/tools/gen_tokens.py --check
 
 색 입력은 `#RRGGBB`만 허용한다. `#RGB`·8자리 hex 등은 생성 단계에서 실패한다.
 
-`.github/workflows/client-checks.yml`은 클라이언트·모션 토큰 변경의 PR과 develop push에서 위 검사를 실행하고, Android Debug/Release 단위 테스트·빌드와 lint, arm64 iOS simulator 테스트·Release 빌드를 검증한다. 수동 실행도 가능하다. iOS CI는 `macos-15` arm64 / Xcode 26.0.1에서 iOS 17.5·26.0 matrix를 사용한다. `prepare-ci-simulator.sh`가 필요한 runtime을 다운로드·설치하고 전용 기기를 만든다. PR 브랜치 push는 실행하지 않아 PR과 중복되지 않는다. 새 workflow는 아직 원격에 반영하지 않았으며 실행 이력도 확인되지 않았다. GitHub에서 required check를 지정하는 branch protection 설정은 별도다. 이번 리뷰의 검증 범위와 실기기 확인 목록은 [C1 리뷰 기록](../docs/history/architecture/client/c1-review-2026-10-06.md)에 있다.
+`.github/workflows/client-checks.yml`은 클라이언트·모션 토큰 변경의 PR과 develop push에서 위 검사를 실행하고, Android Debug/Release 단위 테스트·빌드와 lint, arm64 iOS simulator 테스트·Release 빌드를 검증한다. 수동 실행도 가능하다. iOS CI는 `macos-15` arm64 / Xcode 26.0.1에서 iOS 17.5·26.0.1 matrix를 사용한다(러너의 iOS 26.0 시뮬레이터 런타임 버전 문자열이 `26.0.1`이다). `prepare-ci-simulator.sh`가 필요한 runtime을 다운로드·설치하고 전용 기기를 만든다. 테스트 전에 시뮬레이터의 앱 접근성(`ApplicationAccessibilityEnabled`)을 켠다. SwiftUI는 이 설정이 켜져 있을 때만 접근성 요소를 만들고 `WLTypographyTests`가 그 트리를 읽는다. PR 브랜치 push는 실행하지 않아 PR과 중복되지 않는다. 첫 원격 실행(PR #7)의 실패 원인과 수정은 [C1 리뷰 기록](../docs/history/architecture/client/c1-review-2026-10-06.md#ci-첫-실행-수정-2026-10-07)에 있다. GitHub에서 required check를 지정하는 branch protection 설정은 별도다. 이번 리뷰의 검증 범위와 실기기 확인 목록은 [C1 리뷰 기록](../docs/history/architecture/client/c1-review-2026-10-06.md)에 있다.
 
 ## 테스트와 데모
 

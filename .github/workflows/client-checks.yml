@@ -50,8 +50,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@07d1f8453baaff67fb503883367f8b13e6158a54 # v6
         with:
           cache-provider: basic
-      - name: Install Android SDK 36
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Test, lint and build both variants
         run: ./gradlew :android:testDebugUnitTest :android:testReleaseUnitTest :android:lintDebug :android:assembleDebug :android:assembleRelease :shared:testAndroidHostTest
 
@@ -66,7 +64,7 @@ jobs:
         include:
           - runtime: '17.5'
             device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro
-          - runtime: '26.0'
+          - runtime: '26.0.1'
             device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
@@ -84,13 +82,18 @@ jobs:
         run: |
           device_id=$(bash client/ios/scripts/prepare-ci-simulator.sh '${{ matrix.runtime }}' '${{ matrix.device-type }}')
           echo "device_id=$device_id" >> "$GITHUB_OUTPUT"
+      # SwiftUI exposes accessibility elements only when app accessibility is on; WLTypographyTests reads that tree.
+      - name: Enable simulator app accessibility
+        run: |
+          xcrun simctl boot '${{ steps.simulator.outputs.device_id }}' || true
+          xcrun simctl spawn '${{ steps.simulator.outputs.device_id }}' defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true
       - name: Test on arm64 simulator
         run: >-
           xcodebuild test -project client/ios/Wishlist.xcodeproj -scheme Wishlist
           -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.device_id }}'
           -derivedDataPath client/ios/DerivedData CODE_SIGNING_ALLOWED=NO
       - name: Build Release without signing
-        if: matrix.runtime == '26.0'
+        if: matrix.runtime == '26.0.1'
         run: >-
           xcodebuild build -project client/ios/Wishlist.xcodeproj -scheme Wishlist
           -configuration Release -sdk iphonesimulator
