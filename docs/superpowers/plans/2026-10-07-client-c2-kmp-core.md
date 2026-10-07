@@ -428,12 +428,12 @@ interface AuthTokenProvider {
 
 추가로 서버 action 목록에 DELETE가 없으면 빈 set을 기대한다.
 
-- [ ] **Step 0: 선행 산출물 확인.** Task6a의 고정 dependency·transport·세션 계약 사용. DTO fixture의 기준 commit과 API ID를 기록한다.
-- [ ] **Step 1: 실패 테스트.** Task 1 병합 기준의 B1+B2 fixture(상품 category.name/parentId/kind 포함)의201/replay200/GET/404/ARCHIVED/삭제 tombstone·nullable metadata·clientCreatedAt·공개 failure code. raw decimal 정확성/JSON string number 거절. 서버 requiredAction/allowedActions가 유지되고 evaluator로 덮어쓰지 않음. 추가 필드는 허용. unknown allowedActions 제거; unknown analysis.status 또는 requiredAction→UNKNOWN과 서버 목록에 존재하는 DELETE만 유지, 나머지 상세 데이터 유지; unknown lifecycleStatus→단건 INVALID_RESPONSE. unknown review/source/missingReason은 UNKNOWN 보존·서버가 준 알려진 행동 유지, unknown failureCode는 일반 실패 안내로 매핑. required 필드 누락/잘못된 JSON 타입도 INVALID_RESPONSE.
-- [ ] **Step 2: RED.** KMP_TEST.
-- [ ] **Step 3: 구현.** `server/src/main/kotlin/app/http/WishlistItemDtos.kt`, `WishlistItemViewMapper.kt`, `WishlistRoutes.kt`, `DecimalJsonSerializer.kt`와 B2 `CategoryDtos.kt`의 독립 JSON fixture를 사용. raw enum 문자열은 mapper에서 필드별로 해석한다. 요청 ownerId 없음, 데이터 source를 보존. normal/설명용 UNKNOWN 응답의 행동은 서버 권위다. 분기용 UNKNOWN은 DELETE만 남기되 서버가 허용하지 않은 DELETE를 새로 만들지 않는다. Swift UI에는 구체 model/state만 노출.
-- [ ] **Step 4: 공통 계약 실행.** Fake와 Remote(MockEngine)에 같은 생성/replay/상세/404/tombstone 시나리오 실행. Fake를 호출해 Remote fixture 정답을 만들지 않는다. session 전환/동일 계정 재로그인 stale 응답 거절도 양쪽 검증. 후속 mutation의 검증 수준은 Fake 규칙 테스트로 표시한다.
-- [ ] **Step 5: GREEN·커밋.** KMP_TEST, 실서버 검증 수준 표시. `feature(kmp): 상품 API 모델과 저장소 계약 연결`.
+- [x] **Step 0: 선행 산출물 확인.** Task6a의 고정 dependency·transport·세션 계약 사용. DTO fixture의 기준 commit과 API ID를 기록한다.
+- [x] **Step 1: 실패 테스트.** Task 1 병합 기준의 B1+B2 fixture(상품 category.name/parentId/kind 포함)의201/replay200/GET/404/ARCHIVED/삭제 tombstone·nullable metadata·clientCreatedAt·공개 failure code. raw decimal 정확성/JSON string number 거절. 서버 requiredAction/allowedActions가 유지되고 evaluator로 덮어쓰지 않음. 추가 필드는 허용. unknown allowedActions 제거; unknown analysis.status 또는 requiredAction→UNKNOWN과 서버 목록에 존재하는 DELETE만 유지, 나머지 상세 데이터 유지; unknown lifecycleStatus→단건 INVALID_RESPONSE. unknown review/source/missingReason은 UNKNOWN 보존·서버가 준 알려진 행동 유지, unknown failureCode는 일반 실패 안내로 매핑. required 필드 누락/잘못된 JSON 타입도 INVALID_RESPONSE.
+- [x] **Step 2: RED.** KMP_TEST.
+- [x] **Step 3: 구현.** `server/src/main/kotlin/app/http/WishlistItemDtos.kt`, `WishlistItemViewMapper.kt`, `WishlistRoutes.kt`, `DecimalJsonSerializer.kt`와 B2 `CategoryDtos.kt`의 독립 JSON fixture를 사용. raw enum 문자열은 mapper에서 필드별로 해석한다. 요청 ownerId 없음, 데이터 source를 보존. normal/설명용 UNKNOWN 응답의 행동은 서버 권위다. 분기용 UNKNOWN은 DELETE만 남기되 서버가 허용하지 않은 DELETE를 새로 만들지 않는다. Swift UI에는 구체 model/state만 노출.
+- [x] **Step 4: 공통 계약 실행.** Fake와 Remote(MockEngine)에 같은 생성/replay/상세/404/tombstone 시나리오 실행. Fake를 호출해 Remote fixture 정답을 만들지 않는다. session 전환/동일 계정 재로그인 stale 응답 거절도 양쪽 검증. 후속 mutation의 검증 수준은 Fake 규칙 테스트로 표시한다.
+- [x] **Step 5: GREEN·커밋.** KMP_TEST, 실서버 검증 수준 표시. `feature(kmp): 상품 API 모델과 저장소 계약 연결`.
 
 ## Task 7: SQLDelight 최소 schema·계정 격리·accept 원자성
 

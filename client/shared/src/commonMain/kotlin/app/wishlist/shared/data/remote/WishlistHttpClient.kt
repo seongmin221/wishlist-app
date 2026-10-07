@@ -11,6 +11,7 @@ import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.takeFrom
 import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.url
@@ -19,6 +20,8 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.Url
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.Json
 
 internal const val REQUEST_TIMEOUT_MILLIS = 30_000L
@@ -66,7 +69,8 @@ internal class AuthenticatedTransport(
         buildRequest: HttpRequestBuilder.() -> Unit,
     ): ClientResult<HttpResponse> {
         if (isStale(snapshot)) return sessionChanged()
-        val authenticated = isAuthenticated(buildFor(buildRequest))
+        val template = buildFor(buildRequest)
+        val authenticated = isAuthenticated(template)
 
         var token: String? = null
         if (authenticated) {
@@ -77,7 +81,7 @@ internal class AuthenticatedTransport(
         }
         if (isStale(snapshot)) return sessionChanged()
 
-        var response = when (val sent = send(buildRequest, token)) {
+        var response = when (val sent = send(template, token)) {
             is ClientResult.Failure -> return sent
             is ClientResult.Success -> sent.value
         }
@@ -87,7 +91,7 @@ internal class AuthenticatedTransport(
                 is ClientResult.Success -> second.value
             }
             if (isStale(snapshot)) return sessionChanged()
-            response = when (val resent = send(buildRequest, refreshed)) {
+            response = when (val resent = send(template, refreshed)) {
                 is ClientResult.Failure -> return resent
                 is ClientResult.Success -> resent.value
             }
@@ -119,15 +123,17 @@ internal class AuthenticatedTransport(
     }
 
     private suspend fun send(
-        buildRequest: HttpRequestBuilder.() -> Unit,
+        template: HttpRequestBuilder,
         token: String?,
     ): ClientResult<HttpResponse> = try {
-        ClientResult.Success(client.request(buildFor(buildRequest).apply {
+        ClientResult.Success(client.request(HttpRequestBuilder().takeFrom(template).apply {
             if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
         }))
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
+        // A cancelled caller can surface as an IO error; it must propagate, not become NETWORK.
+        currentCoroutineContext().ensureActive()
         ClientResult.Failure(ApiErrorMapper.fromThrowable(e))
     }
 }

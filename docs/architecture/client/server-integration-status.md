@@ -1,8 +1,8 @@
 # 서버 연동 상태
 
-> 2026-10-07 C2 Task 5 기준. 서버 계약 기준은 병합된 B2 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이다. 서버 구현 상태는 저장소의 API inventory를 대조한 값이며 이 task에서 서버 테스트를 재실행하지 않았다.
+> 2026-10-07 C2 Task 6b 기준. 서버 계약 기준은 병합된 B2 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이다. 서버 구현 상태는 저장소의 API inventory를 대조한 값이며 이 task에서 서버 테스트를 재실행하지 않았다.
 
-C2 Remote 대상은 **ITEM-01·ITEM-03만**이다. Task 5는 Create/Get Fake와 seed 전용 `CatalogRepository`를 구현했고, 공통 계약 harness의 같은 7개 시나리오를 Fake에서 실제 실행했다. Remote·MockEngine 검증은 Task 6b에서 수행한다. 모든 행의 실서버 검증은 미실행이다.
+C2 Remote 대상은 **ITEM-01·ITEM-03만**이다. Task 5는 Create/Get Fake와 seed 전용 `CatalogRepository`를 구현했고, 공통 계약 harness의 같은 7개 시나리오를 Fake에서 실제 실행했다. Task 6b는 ITEM-01·03의 Remote(`RemoteItemRepository`)와 MockEngine 기반 공통 계약 7개를 구현·실행했다(fixture는 서버 develop `1c6d949`의 DTO·mapper에서 손으로 옮겼다). 모든 행의 실서버 검증은 미실행이다.
 
 `CatalogRepository`의 category/purpose/item 조회는 화면 개발용 시드 경계다. CAT-01의 SELECT/BROWSE·count, PUR-01의 요약, ITEM-02의 cursor/anchor wire 계약 완료를 의미하지 않는다. BoardDisplayMetadata의 69개 chip 합계·목적 후보 숫자는 이미지 비교 fixture이고 실제 저장소 집계에 사용하지 않는다. C2 release backend는 후속 조립 완료 시 37개 모두 UNAVAILABLE이며, 인증과 실서버 연결은 후속 단계다.
 
@@ -10,9 +10,9 @@ FakeStore가 단독으로 생성 idempotency·최신 snapshot 재전송·삭제 
 
 | API ID | 서버 B단계·상태 | 클라이언트 C단계 | Fake | Remote | MockEngine 검증 | 실서버 검증 |
 | --- | --- | --- | --- | --- | --- | --- |
-| ITEM-01 | B1 완료 | C2 기반 → C3 | 구현 · 공통 계약 7개 통과 | C2 대상 · Task 6b 미구현 | C2 대상 · Task 6b 미실행 | 미실행 |
+| ITEM-01 | B1 완료 | C2 기반 → C3 | 구현 · 공통 계약 7개 통과 | 구현 · `RemoteItemRepository` | 공통 계약 7개 + Remote 집중 테스트 통과 | 미실행 |
 | ITEM-02 | B4 미구현 | C5/C6 → C7 | 시드 조회 구현 · wire projection 미구현 | 미구현 · C5/C6 → C7 | 미실행 | 미실행 |
-| ITEM-03 | B1 완료 | C2 기반 → C4 | 구현 · 공통 계약 7개 통과 | C2 대상 · Task 6b 미구현 | C2 대상 · Task 6b 미실행 | 미실행 |
+| ITEM-03 | B1 완료 | C2 기반 → C4 | 구현 · 공통 계약 7개 통과 | 구현 · `RemoteItemRepository` | 공통 계약 7개 + Remote 집중 테스트 통과 | 미실행 |
 | ITEM-04 | B7 미구현 | C8 | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
 | ITEM-05 | B7 미구현 | C8 | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
 | ITEM-06 | B7 미구현 | C8 | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
