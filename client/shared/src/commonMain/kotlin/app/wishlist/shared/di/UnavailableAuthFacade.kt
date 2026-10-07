@@ -8,14 +8,17 @@ import app.wishlist.shared.core.ErrorKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** RELEASE (no real login yet) and a closed runtime: always signed out, sign-in is UNAVAILABLE. */
+/**
+ * RELEASE (no real login yet) and a closed runtime: always signed out, sign-in is UNAVAILABLE.
+ * The first-run login guide counts as seen, so it stays suppressed until real auth exists.
+ */
 internal class UnavailableAuthFacade : AuthFacade {
     override val account: StateFlow<AuthAccount?> = MutableStateFlow(null)
     override val restored: StateFlow<Boolean> = MutableStateFlow(true)
 
     override suspend fun signIn(provider: AuthProvider): ClientResult<AuthAccount> = unavailable(AUTH_UNAVAILABLE)
     override suspend fun signOut(): ClientResult<Unit> = unavailable(AUTH_UNAVAILABLE)
-    override suspend fun hasSeenFirstRunLogin(): Boolean = false
+    override suspend fun hasSeenFirstRunLogin(): Boolean = true
     override suspend fun markFirstRunLoginSeen() {}
 }
 

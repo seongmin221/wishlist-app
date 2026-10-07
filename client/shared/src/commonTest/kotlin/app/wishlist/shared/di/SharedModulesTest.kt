@@ -199,6 +199,22 @@ class SharedModulesTest {
         runtime.close()
     }
 
+    @Test fun restored_is_published_only_together_with_ready() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = mapOf("onboarding.login.seen" to "1") }
+        val runtime = createRuntime(debugBindings(), probe = probe, dispatcher = StandardTestDispatcher(testScheduler))
+        var restoredBeforeReady: Boolean? = null
+        runtime.beforeReadyPublished = { restoredBeforeReady = runtime.auth().restored.value }
+        runtime.startDebugSession()
+        advanceUntilIdle()
+
+        assertEquals(false, restoredBeforeReady)
+        // Once restored is observed, the facade serves first-run state and sign-in.
+        assertTrue(runtime.auth().restored.value)
+        assertTrue(runtime.auth().hasSeenFirstRunLogin())
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
+        runtime.close()
+    }
+
     @Test fun release_auth_is_the_unavailable_facade() {
         val runtime = createRuntime(releaseBindings())
         assertIs<UnavailableAuthFacade>(runtime.auth())
@@ -476,6 +492,9 @@ class SharedModulesTest {
         val failure = runtime.bootstrapFailure.value
         assertEquals(ErrorKind.UNAVAILABLE, failure?.kind)
         assertEquals(BOOTSTRAP_FAILURE, failure?.code)
+        // The half-applied restore is not left behind: session and account agree.
+        assertEquals("fake-google-0001", runtime.session.state.value.accountId)
+        assertEquals("fake-google-0001", runtime.auth().account.value?.accountId)
         // The runtime still serves requests after a failed bootstrap.
         assertEquals(emptyList(), runtime.localStore().pending().successValue())
         runtime.close()

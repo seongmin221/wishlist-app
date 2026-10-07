@@ -5,11 +5,16 @@ import app.wishlist.shared.core.AuthFacade
 import app.wishlist.shared.core.AuthProvider
 import app.wishlist.shared.core.ClientError
 import app.wishlist.shared.core.ClientResult
+import app.wishlist.shared.core.ErrorKind
+import app.wishlist.shared.di.BOOTSTRAP_FAILURE
 import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.repository.LocalStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal const val AUTH_ACCOUNT_KEY = "auth.account"
 internal const val FIRST_RUN_LOGIN_SEEN_KEY = "onboarding.login.seen"
@@ -18,7 +23,8 @@ internal const val FIRST_RUN_LOGIN_SEEN_KEY = "onboarding.login.seen"
  * Fake login without any platform SDK. The signed-in account is kept in app_state as
  * `<provider>|<accountId>|<email>`. Order on sign-in: save account -> change session -> seed that
  * account's namespace; on sign-out: clear current cache -> delete saved account -> session null.
- * Seed failures never fail a sign-in (the seed is demo data); [restore] reports them instead.
+ * Seed failures/exceptions never fail a sign-in (the seed is demo data); [restore] reports them instead.
+ * Signing in while signed in first runs the sign-out path; the three operations are serialized.
  */
 internal class FakeAuthFacade(
     private val session: MutableAuthSession,
@@ -27,6 +33,8 @@ internal class FakeAuthFacade(
     /** Called after every successful sign-in, once the account's namespace is ready. */
     private val onSignedIn: () -> Unit = {},
 ) : AuthFacade {
+    // Serializes restore/signIn/signOut. Taken before any store or session gate, never inside one.
+    private val lock = Mutex()
     private val mutableAccount = MutableStateFlow<AuthAccount?>(null)
     private val mutableRestored = MutableStateFlow(false)
     override val account: StateFlow<AuthAccount?> = mutableAccount.asStateFlow()
@@ -34,46 +42,64 @@ internal class FakeAuthFacade(
 
     /**
      * Restores the saved account (corrupt data is deleted and means signed out), then seeds its
-     * namespace. Always ends with restored = true; returns why the restore was not clean, if so.
+     * namespace. Returns why the restore was not clean, if so; the account stays signed in when
+     * only the seed failed. [restored] is published separately by [publishRestored].
      */
-    suspend fun restore(): ClientError? {
-        try {
-            val stored = when (val read = store.readAppState(AUTH_ACCOUNT_KEY)) {
-                is ClientResult.Failure -> return read.error
-                is ClientResult.Success -> read.value
-            }
-            if (stored == null) return null
-            val parsed = parse(stored)
-            if (parsed == null) {
-                (store.writeAppState(AUTH_ACCOUNT_KEY, null) as? ClientResult.Failure)?.let { return it.error }
-                return null
-            }
-            session.changeAccount(parsed.accountId)
-            val failure = (seed() as? ClientResult.Failure)?.error
-            mutableAccount.value = parsed
-            return failure
-        } finally {
-            mutableRestored.value = true
+    suspend fun restore(): ClientError? = lock.withLock {
+        val stored = when (val read = store.readAppState(AUTH_ACCOUNT_KEY)) {
+            is ClientResult.Failure -> return@withLock read.error
+            is ClientResult.Success -> read.value
+        } ?: return@withLock null
+        val parsed = parse(stored)
+        if (parsed == null) {
+            return@withLock (store.writeAppState(AUTH_ACCOUNT_KEY, null) as? ClientResult.Failure)?.error
         }
+        session.changeAccount(parsed.accountId)
+        val failure = seedSafely()
+        mutableAccount.value = parsed
+        failure
+    }
+
+    /** The runtime calls this once ready is published, so a collector of [restored] is never refused. */
+    fun publishRestored() {
+        mutableRestored.value = true
     }
 
     override suspend fun signIn(provider: AuthProvider): ClientResult<AuthAccount> {
-        val account = fakeAccount(provider)
-        val saved = store.writeAppState(AUTH_ACCOUNT_KEY, format(account))
-        if (saved is ClientResult.Failure) return ClientResult.Failure(saved.error)
-        session.changeAccount(account.accountId)
-        seed()
-        mutableAccount.value = account
-        onSignedIn()
-        return ClientResult.Success(account)
+        val result = lock.withLock {
+            if (mutableAccount.value != null) {
+                // Switching accounts first runs the logout cleanup of the current one.
+                (signOutLocked() as? ClientResult.Failure)?.let { return@withLock ClientResult.Failure(it.error) }
+            }
+            val account = fakeAccount(provider)
+            val saved = store.writeAppState(AUTH_ACCOUNT_KEY, format(account))
+            if (saved is ClientResult.Failure) return@withLock ClientResult.Failure(saved.error)
+            session.changeAccount(account.accountId)
+            seedSafely()
+            mutableAccount.value = account
+            ClientResult.Success(account)
+        }
+        if (result is ClientResult.Success) onSignedIn()
+        return result
     }
 
-    override suspend fun signOut(): ClientResult<Unit> {
+    override suspend fun signOut(): ClientResult<Unit> = lock.withLock { signOutLocked() }
+
+    private suspend fun signOutLocked(): ClientResult<Unit> {
         (store.clearCurrentCache() as? ClientResult.Failure)?.let { return it }
         (store.writeAppState(AUTH_ACCOUNT_KEY, null) as? ClientResult.Failure)?.let { return it }
         session.changeAccount(null)
         mutableAccount.value = null
         return ClientResult.Success(Unit)
+    }
+
+    /** The seed is demo data: a failure or exception is reported, never allowed to half-apply a login. */
+    private suspend fun seedSafely(): ClientError? = try {
+        (seed() as? ClientResult.Failure)?.error
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        ClientError(ErrorKind.UNAVAILABLE, BOOTSTRAP_FAILURE)
     }
 
     override suspend fun hasSeenFirstRunLogin(): Boolean =

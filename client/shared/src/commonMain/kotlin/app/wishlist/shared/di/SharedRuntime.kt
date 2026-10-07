@@ -84,6 +84,8 @@ class SharedRuntime internal constructor(
         guard.use {
             mutableBootstrapFailure.value = ClientError(ErrorKind.UNAVAILABLE, BOOTSTRAP_FAILURE)
             mutableReady.value = true
+            fakeAuth?.publishRestored()
+            Unit
         }
     }
     private val scope = CoroutineScope(SupervisorJob() + env.dispatchers.default)
@@ -142,6 +144,7 @@ class SharedRuntime internal constructor(
                 mutableBootstrapFailure.value = failure
                 beforeReadyPublished()
                 mutableReady.value = true
+                auth.publishRestored()
             }
         }
     }
