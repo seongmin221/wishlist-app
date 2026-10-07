@@ -143,13 +143,14 @@ class CategoryAiIntegrationTest {
     @Test fun `valid in flight AI result preserves confirmed and deferred AI connections`() = withAnalysisDatabase { source ->
         for(review in listOf("CONFIRMED","DEFERRED")) {
             val owner=UUID.randomUUID();val claim=ownedClaim(source,owner,AnalysisLane.GENERAL)
+            val keep=insertPurpose(source,owner,"keep",null)
             val pending=AnalysisPendingResultRepository(source)
             pending.candidateSnapshotWithConnection(claim,CategoryCandidateProvider()::snapshot)
             pending.saveAssignment(claim,ClassificationResult.Assigned("C026",null))
-            analysisSql(source,"update wishlist_items set review_status='$review',category_id='C001',category_source='AI',category_missing_reason=null,purpose_id='KEEP_PURPOSE',purpose_source='AI' where id='${claim.itemId}'")
+            analysisSql(source,"update wishlist_items set review_status='$review',category_id='C001',category_source='AI',category_missing_reason=null,purpose_id='$keep',purpose_source='AI' where id='${claim.itemId}'")
             AnalysisResultRepository(source).finish(claim,ProcessingOutcome.Complete)
             assertEquals("C001",analysisScalar(source,"select category_id from wishlist_items where id='${claim.itemId}'"),review)
-            assertEquals("KEEP_PURPOSE",analysisScalar(source,"select purpose_id from wishlist_items where id='${claim.itemId}'"),review)
+            assertEquals(keep.toString(),analysisScalar(source,"select purpose_id::text from wishlist_items where id='${claim.itemId}'"),review)
             assertEquals(review,analysisScalar(source,"select review_status from wishlist_items where id='${claim.itemId}'"))
         }
     }

@@ -51,7 +51,7 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
         val lease = connection.prepareStatement("""
             update analysis_jobs set stage=?,execution_token=?,lease_until=clock_timestamp()+interval '${AnalysisTiming.LEASE_SECONDS} seconds',
                 claimed_item_version=?, $countColumn=$countColumn+1,$firstColumn=coalesce($firstColumn,clock_timestamp()),
-                ${clearMetadata}pending_category_id=null,pending_purpose_id=null,pending_failure_code=null,updated_at=clock_timestamp()
+                ${clearMetadata}pending_category_id=null,pending_purpose_id=null,pending_purpose_judged=false,pending_failure_code=null,updated_at=clock_timestamp()
             where id=? returning lease_until
         """.trimIndent()).use { statement ->
             statement.setString(1, "${lane.name}_RUNNING")

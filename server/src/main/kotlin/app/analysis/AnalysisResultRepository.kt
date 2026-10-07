@@ -1,6 +1,7 @@
 package app.analysis
 
 import app.category.CategoryRef
+import app.purpose.PurposeMembership
 import app.wishlist.AnalysisFailureCode
 import app.wishlist.CategoryMissingReason
 import java.sql.Connection
@@ -31,7 +32,8 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
 
     private fun finishLocked(c: Connection, claim: AnalysisClaim, outcome: ProcessingOutcome, job: LockedAnalysisJob): WorkerDisposition {
         val item = readItem(c, claim.itemId)
-        val validCandidates=CategoryCandidateGuard.valid(c,claim)
+        val stored = CategoryCandidateGuard.read(c, claim)
+        val validCandidates = CategoryCandidateGuard.valid(c, claim, stored)
         val preserveUserConnection=item.review in setOf("CONFIRMED","DEFERRED") || item.protects("CATEGORY",item.categorySource)
         if(!validCandidates && !preserveUserConnection) {
             c.replaceStaleCategoryJob(claim,job)
@@ -81,10 +83,12 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
         val image = mergedMetadata(item.image, pending.image, complete, item.protects("IMAGE", item.imageSource))
         val nameSource = mergedSource(item.name, pending.name, item.nameSource, complete, item.protects("NAME", item.nameSource))
         val imageSource = mergedSource(item.image, pending.image, item.imageSource, complete, item.protects("IMAGE", item.imageSource))
-        // Keep confirmed connections; retain B0 filling an unassigned purpose slot.
-        val applyPurpose = assigned && !item.protects("PURPOSE", item.purposeSource) &&
-            (item.review !in setOf("CONFIRMED","DEFERRED") || item.purpose == null && item.purposeSource == "UNASSIGNED")
-        val purpose = if (applyPurpose) pending.purpose else item.purpose
+        val decision = if (assigned) PurposeCandidateGuard.decide(c, claim, stored, pending.purpose, pending.purposeJudged)
+            else PurposeDecision.NoJudgment
+        // Reviewed items, user sources and overrides keep purpose; "no judgement" keeps the existing connection.
+        val applyPurpose = decision is PurposeDecision.Judged && !item.protects("PURPOSE", item.purposeSource) &&
+            item.review !in setOf("CONFIRMED", "DEFERRED")
+        val purpose = if (applyPurpose) (decision as PurposeDecision.Judged).purposeId?.toString() else item.purpose
         val purposeSource = if (applyPurpose) { if (purpose == null) "UNASSIGNED" else "AI" } else item.purposeSource
         val reason = when {
             category != null -> null
@@ -113,12 +117,13 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             "predicted_purpose_id" to if (assigned) pending.purpose else item.predictedPurpose,
             "analysis_failure_code" to failure,
         )
-        c.prepareStatement("update wishlist_items set ${values.keys.joinToString { if(it=="custom_category_id") "$it=?::uuid" else "$it=?" }}, " +
+        c.prepareStatement("update wishlist_items set ${values.keys.joinToString { if (it == "custom_category_id" || it == "purpose_id") "$it=?::uuid" else "$it=?" }}, " +
             "classified_at=case when ? then clock_timestamp() else classified_at end,version=version+1,updated_at=clock_timestamp() where id=?").use { s ->
             var parameter = 1
             values.values.forEach { s.setString(parameter++, it) }
             s.setBoolean(parameter++, assigned); s.setObject(parameter, claim.itemId); check(s.executeUpdate() == 1)
         }
+        if (applyPurpose) PurposeMembership.recordTransition(c, claim.ownerId, item.purpose?.let(UUID::fromString), purpose?.let(UUID::fromString))
         c.transitionAnalysisJob(claim.jobId, when (status) { "READY" -> "COMPLETE"; "PARTIAL" -> "PARTIAL"; else -> "FAILED" })
         return WorkerDisposition.ACKNOWLEDGE
     }
@@ -139,10 +144,10 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
     }
 
     private data class Pending(val name: String?, val description: String?, val image: String?, val canonical: String?,
-        val category: String?, val purpose: String?, val failure: String?)
+        val category: String?, val purpose: String?, val failure: String?, val purposeJudged: Boolean)
 
     private fun readItem(c: Connection, itemId: UUID): Item = c.prepareStatement("""select product_name,product_description,product_image_url,canonical_url,
-        name_source,image_source,coalesce(category_id,custom_category_id::text) category_id,category_source,category_missing_reason,purpose_id,purpose_source,
+        name_source,image_source,coalesce(category_id,custom_category_id::text) category_id,category_source,category_missing_reason,purpose_id::text purpose_id,purpose_source,
         review_status,predicted_category_id,predicted_purpose_id,user_override_fields from wishlist_items where id=?""").use { s ->
         s.setObject(1, itemId)
         s.executeQuery().use { r ->
@@ -157,8 +162,9 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
     }
 
     private fun readPending(c: Connection, jobId: UUID): Pending = c.prepareStatement("""select pending_product_name,pending_product_description,
-        pending_product_image_url,pending_canonical_url,pending_category_id,pending_purpose_id,pending_failure_code from analysis_jobs where id=?""").use { s ->
+        pending_product_image_url,pending_canonical_url,pending_category_id,pending_purpose_id,pending_failure_code,pending_purpose_judged
+        from analysis_jobs where id=?""").use { s ->
         s.setObject(1, jobId)
-        s.executeQuery().use { r -> check(r.next()); Pending(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getString(5), r.getString(6), r.getString(7)) }
+        s.executeQuery().use { r -> check(r.next()); Pending(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getString(5), r.getString(6), r.getString(7), r.getBoolean(8)) }
     }
 }
