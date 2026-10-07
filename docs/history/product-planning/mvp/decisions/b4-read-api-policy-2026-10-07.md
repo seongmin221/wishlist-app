@@ -50,7 +50,7 @@ HOME-01 inventory에는 서버 할 일 수가 제안돼 있지만, [디자인 �
 
 ## 제품·구현 영향
 
-- 결정의 영향: HOME-02 anchor 계약 보완 필요([문서·코드 대조](../../../architecture/server/b4-read-api-implementation-2026-10-07.md#문서코드-대조)).
+- 결정의 영향: HOME-02에 anchor 조회 계약을 추가했다([조회 계약](../../../../architecture/server/wishlist-item-read-api.md#공용-카드와-pagewindow), [문서·코드 대조](../../../architecture/server/b4-read-api-implementation-2026-10-07.md#문서코드-대조)).
 - CAT-01/02 표시용 count·공용 BROWSE 노출·상위 합계와 ITEM-02에 공통 visibility predicate를 적용한다. B8 삭제 영향은 이름 누락을 포함한 ACTIVE 전체 집합이며 표시용 count를 재사용하지 않는다. 기존 B2 테스트 기대값 변경의 근거는 이 결정이며 구현 이력에도 남긴다.
 - HOME-01은 분석 중·정보 보완·분류 검토의 개별 count를 반환한다. 합계 표시가 필요하면 클라이언트가 의미에 맞는 그룹들을 합산한다.
 - 목적별·목적 미지정 목록은 제품명이 없는 상품도 반환한다. 클라이언트는 이 카드에 이름 누락을 나타내는 대체 제목을 표시해야 한다. 구체적인 문구는 클라이언트 표시 계약에서 정하며, 서버가 임의의 제품명을 저장하거나 응답값으로 만들어 넣지는 않는다.
@@ -60,7 +60,7 @@ HOME-01 inventory에는 서버 할 일 수가 제안돼 있지만, [디자인 �
 - [상품 확인과 편집](../../../../product/inspect-and-edit-a-product.md): 홈 목적 최대 3개·빈 목적 포함·요약 필드·최근 후보 4개와 null 이미지 표시를 반영했다.
 - [구매 후보 정리](../../../../product/organize-candidates.md): 현재 미완료 대상 restart와 CONFIRMED/DEFERRED 검토 재노출 금지를 반영했다.
 - [구현 순서 B4 정책 행](../../../../architecture/server/mvp-api-implementation-order.md#미결정-정책의-해결-시점): 홈 목적 개수·빈 목적·restart를 해결로 갱신했다.
-- [카테고리 계약](../../../../architecture/server/category-management-api.md): B4의 목록 기준 itemCount와 공용 노출·상위 합계를 반영했다. 현재 B2 코드와의 차이는 구현 상태로 구분했다.
+- [카테고리 계약](../../../../architecture/server/category-management-api.md): B4의 목록 기준 itemCount와 공용 노출·상위 합계를 반영했다. 표시 count와 B8 삭제 영향의 집계 경계를 구분했다.
 - [API inventory](../../../../architecture/server/mvp-api-inventory.md): HOME-02의 정보 보완 그룹 집합, W02와 restart 행의 확정 규칙을 반영했다.
 
 ## 관련 문서

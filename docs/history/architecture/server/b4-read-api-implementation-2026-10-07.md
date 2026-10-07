@@ -1,6 +1,6 @@
 # B4 상품 목록·홈 조회 구현 이력
 
-> 2026-10-07 · 설계·계획 승인 · Native 구현 중
+> 2026-10-07 · B4 로컬 구현·독립 리뷰·전체 회귀 완료
 
 ## 수신과 baseline
 
@@ -86,3 +86,27 @@ Fixture 생성식은 owner2명 × 10,000행이다. 각 owner의 public/custom �
 목적 미지정 전용 index는 추가하지 않았다. V13 btree는 NULL을 저장하며 IS NULL 접근이 가능하다. 이번 50% NULL 분포에서는 V14 미지정 page가 짧은 category index+sort, V15가 홈 order index+filter를 선택했다. V13 재사용 가능성과 실제 planner 선택을 구분한다.
 
 V15 부재 RED는 `missing wishlist_active_public_category_order`였다. 첫 GREEN에서는 기존 migration 전체 목록이 V14에서 끝나는 기대값 때문에 실패했다. 신규 V15 추가가 근거이므로 기대값에15를 추가했고 이전 파일의 checksum 검증은 유지했다. 최종 index·migration·schema·window14개 테스트가 통과했다. 실패한 실행은 통과로 합치지 않았다.
+
+## Task 9 — 독립 리뷰와 검증 경계
+
+구현에 참여하지 않은 새 context의 reviewer(gpt-6-astra)가 `ed1eef9..4a85bb3` 전체 변경을 read-only로 spec/plan과 대조했다. Review Focus5개·두 실행 판단·코드·테스트·실측 기록을 검토한 결과 Critical0/Important0/Minor0이었다. reviewer는 테스트를 실행하지 않았으며 diff check만 직접 수행했다. 재현/수정이 필요한 지적은 없었다. 이는 root가 별도로 수행한 전체 테스트 결과와 구분한다.
+
+reviewer가 이번 결함으로 판단하지 않은 경계도 검토했다.
+
+| 경계 | 유지/후속 판단과 영향 |
+| --- | --- |
+| unsigned cursor의 유효 위치 변경 | 승인된 위치 힌트 계약이며 SQL owner/scope가 권한을 제한한다. 위치 불변 요구가 추가되면 서명과 protocol 변경이 필요하다. |
+| 요청 사이 변경 후 오래된 page cursor의 빈 window | 요청 간 snapshot은 보장하지 않고 빈 page cursor는null이다. 화면 위치 복구는 anchor로 한다. cursor만 쓰는 client는 첫 페이지 새로고침/anchor 복구가 필요할 수 있다. |
+| B8 삭제 영향·참조 해제 | 현재 삭제 mutation은 없다. 후속 구현에서 표시 count를 재사용하면 이름 없는 영향 상품을 누락한다. |
+| B10 ARCHIVED 목적 연결 상품 | 현재 archive mutation은 없다. 후속 predicate를 갱신하지 않으면 두 목적 범위 모두에서 상품이 빠질 수 있다. |
+| brand/price/metadataCheckedAt null | B5 추출/저장 경계를 유지한다. B4만으로 이 표시 데이터를 제공하지 않는다. |
+| HOME count/summary 전체 scan | 정확한 count와 공통 판정의 관측 비용을 기록했다. 큰 owner에서는 지연이 상품 수에 비례하므로 별도 실측 최적화가 필요할 수 있다. |
+| 운영 중 V15 index 생성 | 로컬 migration 검증이며 production online rollout은 검증하지 않았다. 실제 배포 시 index 생성의 쓰기 잠금 비용은 해당 DB 환경에서 확인한다. |
+
+두 실행 판단도 검토했다. 공백 category는 현재 FK로 저장할 수 없어 유효 행 parity와 derived-expression 테스트를 나눴고, 후속 FK 완화가 있어도 표현 parity가 남는다. 미구현 GET의405는 기존 POST와 경로가 같아서 발생하며, 최종401/200/400 표현 검증은 별도로 통과했다.
+
+## 최종 검증
+
+2026-10-07 이 worktree에서 JDK17·Podman 설정으로 `./gradlew test --rerun-tasks`를 완료했다. [유효 실행 명령](../../../architecture/server/local-test-environment.md#전체-테스트-실행)의 환경을 사용했고 exit0, `BUILD SUCCESSFUL in 6m 4s`였다. JUnit 결과는 **tests321·통과320·failures0·errors0·RealUrlPilot skip1**이다. B1~B3·Worker·category·목적과 신규 목록/home 회귀를 포함했다. 중단/실패 실행을 최종 통과 수에 합치지 않았다. 실제 외부 URL pilot과 production 검증은 수행하지 않았다.
+
+변경 문서의 상대 링크·JSON 예시와 diff check를 검증했다. V1~V14 파일과 client/·design/handoff/는 변경하지 않았다. 확정 제품 문서·계약·inventory·implementation order·INDEX와 계획 checkbox를 구현 결과에 맞췄다. 코드 수정 없는 독립 리뷰 이후에는 전체 suite를 이유 없이 반복하지 않았다. 로컬 의미별 커밋으로 마무리했다.

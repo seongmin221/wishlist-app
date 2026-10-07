@@ -15,4 +15,4 @@
 - [B3 목적 기본 관리 구현 계획](plans/2026-10-07-b3-purpose-management.md) — 입력 규칙·schema·서비스·HTTP·예산·AI 후보·문서 8개 작업
 
 - [B4 상품 목록·홈 조회 설계](specs/2026-10-07-b4-read-api-design.md) — 승인된 설계, group 조회·단일 anchor 입력·범위 검증 cursor·snapshot
-- [B4 상품 목록·홈 조회 구현 계획](plans/2026-10-07-b4-read-api.md) — Native Task1~8 완료·Task9 회귀/리뷰 중
+- [B4 상품 목록·홈 조회 구현 계획](plans/2026-10-07-b4-read-api.md) — Native Task1~9 완료·전체320 통과/1 skip
