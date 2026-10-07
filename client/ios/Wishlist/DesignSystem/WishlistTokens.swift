@@ -228,15 +228,10 @@ enum WishlistTokens {
         static let dialogOut: Int = 150
         static let pushPhotoOpen: Int = 420
         static let pushPhotoBack: Int = 360
-        static let pushSurfaceExpand: Int = 420
         static let pushPhotoContent: Int = 420
         static let pushPhotoBackContent: Int = 250
-        static let pushSurfaceLift: Int = 80
-        static let pushSurfaceContentDelay: Int = 190
-        static let pushSurfaceContent: Int = 230
-        static let pushSurfaceBack: Int = 360
-        static let pushSurfaceBackContent: Int = 180
-        static let pushSurfaceSettle: Int = 80
+        static let pushSlideOpen: Int = 360
+        static let pushSlideBack: Int = 300
         static let tabOutgoing: Int = 90
         static let tabIncoming: Int = 210
         static let tabIncomingDelay: Int = 90
@@ -250,9 +245,6 @@ enum WishlistTokens {
         static let sheetDragDismissVelocity: Double = 1000
         static let interactiveBackCommitProgress: Double = 0.5
         static let tabIncomingScale: Double = 0.97
-        static let pushSurfaceLiftOutset: Double = 3
-        static let pushSurfaceLiftShadowY: Double = 8
-        static let pushSurfaceLiftShadowBlur: Double = 24
-        static let pushSurfaceLiftShadowAlpha: Double = 0.14
+        static let pushSlideParallax: Double = 0.25
     }
 }

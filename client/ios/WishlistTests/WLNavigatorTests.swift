@@ -69,7 +69,7 @@ final class WLNavigatorTests: XCTestCase {
         XCTAssertTrue(nav.push(detail, sourceKey: "home/p1"))
         XCTAssertTrue(nav.isTransitioning)
 
-        XCTAssertFalse(nav.push(.init(destination: "p2", pushStyle: .surface), sourceKey: "home/p2"))
+        XCTAssertFalse(nav.push(.init(destination: "p2", pushStyle: .slide), sourceKey: "home/p2"))
         XCTAssertFalse(nav.selectTab(.purpose))
         XCTAssertFalse(nav.pop())
 
@@ -177,7 +177,7 @@ final class WLNavigatorTests: XCTestCase {
 
     func testDepthTwoPushAndPopKeepLowerEntries() {
         let nav = WLNavigator()
-        let list = WLRoute.init(destination: "chip:headphone", pushStyle: .surface)
+        let list = WLRoute.init(destination: "chip:headphone", pushStyle: .slide)
         nav.push(list, sourceKey: "home/chip/headphone")
         nav.finishTransition()
         nav.push(detail, sourceKey: "home/chiplist/headphone/p1")

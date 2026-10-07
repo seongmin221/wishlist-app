@@ -30,6 +30,8 @@
         A10000000000000000000110 /* EmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000110 /* EmptyState.swift */; };
         A10000000000000000000111 /* ExpandableGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000111 /* ExpandableGroup.swift */; };
         A10000000000000000000112 /* Masonry2Col.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000112 /* Masonry2Col.swift */; };
+        A10000000000000000000118 /* WLHeaderSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000118 /* WLHeaderSheet.swift */; };
+        A10000000000000000000119 /* WLTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000119 /* WLTopBar.swift */; };
         A10000000000000000000113 /* OverlayHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000113 /* OverlayHost.swift */; };
         A10000000000000000000114 /* Scrim.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000114 /* Scrim.swift */; };
         A10000000000000000000115 /* WLBottomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000115 /* WLBottomSheet.swift */; };
@@ -37,6 +39,7 @@
         A10000000000000000000117 /* WLMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000117 /* WLMenu.swift */; };
         A10000000000000000000033 /* WLNavigatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* WLNavigatorTests.swift */; };
         A10000000000000000000034 /* WLTypographyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* WLTypographyTests.swift */; };
+        A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* WLHeaderSheetTests.swift */; };
         A10000000000000000000201 /* WLRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000201 /* WLRoute.swift */; };
         A10000000000000000000202 /* WLNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000202 /* WLNavigator.swift */; };
         A10000000000000000000203 /* WLNavHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000203 /* WLNavHost.swift */; };
@@ -80,6 +83,8 @@
         A20000000000000000000110 /* EmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyState.swift; sourceTree = "<group>"; };
         A20000000000000000000111 /* ExpandableGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpandableGroup.swift; sourceTree = "<group>"; };
         A20000000000000000000112 /* Masonry2Col.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Masonry2Col.swift; sourceTree = "<group>"; };
+        A20000000000000000000118 /* WLHeaderSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLHeaderSheet.swift; sourceTree = "<group>"; };
+        A20000000000000000000119 /* WLTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTopBar.swift; sourceTree = "<group>"; };
         A20000000000000000000113 /* OverlayHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayHost.swift; sourceTree = "<group>"; };
         A20000000000000000000114 /* Scrim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scrim.swift; sourceTree = "<group>"; };
         A20000000000000000000115 /* WLBottomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLBottomSheet.swift; sourceTree = "<group>"; };
@@ -87,6 +92,7 @@
         A20000000000000000000117 /* WLMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLMenu.swift; sourceTree = "<group>"; };
         A20000000000000000000033 /* WLNavigatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavigatorTests.swift; sourceTree = "<group>"; };
         A20000000000000000000034 /* WLTypographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTypographyTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000035 /* WLHeaderSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLHeaderSheetTests.swift; sourceTree = "<group>"; };
         A20000000000000000000201 /* WLRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLRoute.swift; sourceTree = "<group>"; };
         A20000000000000000000202 /* WLNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavigator.swift; sourceTree = "<group>"; };
         A20000000000000000000203 /* WLNavHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavHost.swift; sourceTree = "<group>"; };
@@ -120,7 +126,7 @@
         };
         A40000000000000000000004 /* DesignSystem */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000004 /* WishlistTokens.swift */, A20000000000000000000005 /* WLTypography.swift */, A20000000000000000000101 /* WLTheme.swift */, A20000000000000000000102 /* WLButton.swift */, A20000000000000000000103 /* WLCard.swift */, A20000000000000000000104 /* WLIconTile.swift */, A20000000000000000000105 /* WLChip.swift */, A20000000000000000000106 /* WLInput.swift */, A20000000000000000000107 /* WLUnderlineField.swift */, A20000000000000000000108 /* PriceText.swift */, A20000000000000000000109 /* PurposeDot.swift */, A20000000000000000000110 /* EmptyState.swift */, A20000000000000000000111 /* ExpandableGroup.swift */, A20000000000000000000112 /* Masonry2Col.swift */, A40000000000000000000021 /* Overlay */);
+            children = (A20000000000000000000004 /* WishlistTokens.swift */, A20000000000000000000005 /* WLTypography.swift */, A20000000000000000000101 /* WLTheme.swift */, A20000000000000000000102 /* WLButton.swift */, A20000000000000000000103 /* WLCard.swift */, A20000000000000000000104 /* WLIconTile.swift */, A20000000000000000000105 /* WLChip.swift */, A20000000000000000000106 /* WLInput.swift */, A20000000000000000000107 /* WLUnderlineField.swift */, A20000000000000000000108 /* PriceText.swift */, A20000000000000000000109 /* PurposeDot.swift */, A20000000000000000000110 /* EmptyState.swift */, A20000000000000000000111 /* ExpandableGroup.swift */, A20000000000000000000112 /* Masonry2Col.swift */, A20000000000000000000118 /* WLHeaderSheet.swift */, A20000000000000000000119 /* WLTopBar.swift */, A40000000000000000000021 /* Overlay */);
             path = DesignSystem;
             sourceTree = "<group>";
         };
@@ -150,7 +156,7 @@
         };
         A40000000000000000000020 /* WishlistTests */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */);
+            children = (A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */, A20000000000000000000035 /* WLHeaderSheetTests.swift */);
             path = WishlistTests;
             sourceTree = "<group>";
         };
@@ -258,13 +264,13 @@
         A60000000000000000000001 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */, A10000000000000000000004 /* WLTypography.swift in Sources */, A10000000000000000000101 /* WLTheme.swift in Sources */, A10000000000000000000102 /* WLButton.swift in Sources */, A10000000000000000000103 /* WLCard.swift in Sources */, A10000000000000000000104 /* WLIconTile.swift in Sources */, A10000000000000000000105 /* WLChip.swift in Sources */, A10000000000000000000106 /* WLInput.swift in Sources */, A10000000000000000000107 /* WLUnderlineField.swift in Sources */, A10000000000000000000108 /* PriceText.swift in Sources */, A10000000000000000000109 /* PurposeDot.swift in Sources */, A10000000000000000000110 /* EmptyState.swift in Sources */, A10000000000000000000111 /* ExpandableGroup.swift in Sources */, A10000000000000000000112 /* Masonry2Col.swift in Sources */, A10000000000000000000113 /* OverlayHost.swift in Sources */, A10000000000000000000114 /* Scrim.swift in Sources */, A10000000000000000000115 /* WLBottomSheet.swift in Sources */, A10000000000000000000116 /* WLConfirmDialog.swift in Sources */, A10000000000000000000117 /* WLMenu.swift in Sources */, A10000000000000000000201 /* WLRoute.swift in Sources */, A10000000000000000000202 /* WLNavigator.swift in Sources */, A10000000000000000000203 /* WLNavHost.swift in Sources */, A10000000000000000000204 /* WLTabBar.swift in Sources */, A10000000000000000000205 /* WLNavMotion.swift in Sources */, A10000000000000000000206 /* WLSharedElement.swift in Sources */, A10000000000000000000207 /* WLEdgeBackGesture.swift in Sources */, A10000000000000000000211 /* DemoContent.swift in Sources */, A10000000000000000000212 /* DemoHomeScreen.swift in Sources */, A10000000000000000000213 /* DemoCategoryScreen.swift in Sources */, A10000000000000000000214 /* DemoPurposeScreen.swift in Sources */, A10000000000000000000215 /* DemoDetailScreen.swift in Sources */);
+            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */, A10000000000000000000004 /* WLTypography.swift in Sources */, A10000000000000000000101 /* WLTheme.swift in Sources */, A10000000000000000000102 /* WLButton.swift in Sources */, A10000000000000000000103 /* WLCard.swift in Sources */, A10000000000000000000104 /* WLIconTile.swift in Sources */, A10000000000000000000105 /* WLChip.swift in Sources */, A10000000000000000000106 /* WLInput.swift in Sources */, A10000000000000000000107 /* WLUnderlineField.swift in Sources */, A10000000000000000000108 /* PriceText.swift in Sources */, A10000000000000000000109 /* PurposeDot.swift in Sources */, A10000000000000000000110 /* EmptyState.swift in Sources */, A10000000000000000000111 /* ExpandableGroup.swift in Sources */, A10000000000000000000112 /* Masonry2Col.swift in Sources */, A10000000000000000000118 /* WLHeaderSheet.swift in Sources */, A10000000000000000000119 /* WLTopBar.swift in Sources */, A10000000000000000000113 /* OverlayHost.swift in Sources */, A10000000000000000000114 /* Scrim.swift in Sources */, A10000000000000000000115 /* WLBottomSheet.swift in Sources */, A10000000000000000000116 /* WLConfirmDialog.swift in Sources */, A10000000000000000000117 /* WLMenu.swift in Sources */, A10000000000000000000201 /* WLRoute.swift in Sources */, A10000000000000000000202 /* WLNavigator.swift in Sources */, A10000000000000000000203 /* WLNavHost.swift in Sources */, A10000000000000000000204 /* WLTabBar.swift in Sources */, A10000000000000000000205 /* WLNavMotion.swift in Sources */, A10000000000000000000206 /* WLSharedElement.swift in Sources */, A10000000000000000000207 /* WLEdgeBackGesture.swift in Sources */, A10000000000000000000211 /* DemoContent.swift in Sources */, A10000000000000000000212 /* DemoHomeScreen.swift in Sources */, A10000000000000000000213 /* DemoCategoryScreen.swift in Sources */, A10000000000000000000214 /* DemoPurposeScreen.swift in Sources */, A10000000000000000000215 /* DemoDetailScreen.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
         A60000000000000000000003 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */);
+            files = (A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */, A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXSourcesBuildPhase section */

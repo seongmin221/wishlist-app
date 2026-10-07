@@ -25,9 +25,9 @@ extension EnvironmentValues {
 /// - 세 탭의 모든 스택 칸을 한 `ZStack`에 펼쳐 살려 둔다(칸 id가 정체성). 스크롤·입력 상태와 공유 요소 원래 자리가
 ///   가려진 동안에도 남아 깊이 2 이상에서도 push·pop·끌어서 뒤로가 같다.
 /// - 탭 전환: 페이드 스루(이전 90 ease-in → 새 탭 210 fade-in + scale .97, 90 지연). 탭 바는 하나이고 늘 제자리다.
-/// - 화면 이동: `WLNavMotion`이 공유 요소(사진·자리 표시 면)를 phase로 보간한다. 탭 바는 탭 바가 보이는 가장 위 칸 바로 위에
-///   놓인다. 그 위로 열리는 화면의 자리 표시 면은 탭 바 밑, 내용·사진은 탭 바 위이고, 탭 바 불투명도는 다음 화면 내용과 같은
-///   시간표다(보드 strip과 같은 순서).
+/// - 화면 이동: 사진이 있는 이동은 `WLNavMotion`이 사진을 phase로 보간해 날린다. 사진이 없는 이동은 가로 밀기다
+///   (새 화면 x W → 0, 아래 화면 0 → −parallax·W, 같은 phase). 탭 바는 탭 바가 보이는 가장 위 칸 바로 위에 놓인다.
+///   두 화면 모두 탭 바를 보이면 탭 바는 움직이지도 옅어지지도 않고, 보임이 다르면 진행값과 함께 옅어진다.
 /// - 뒤로: 화면의 뒤로 버튼·VoiceOver escape는 `pop()`, 왼쪽 가장자리 끌기는 `WLEdgeBackGesture`(window 수준 UIKit pan).
 /// - 전환 중에는 화면 전체 입력을 막고 navigator도 호출을 무시한다.
 /// - 접근성: 가려진 칸·다른 탭·숨은 탭 바는 층마다 `wlAccessibilityCovered`로 뺀다. `.isModal`은 쓰지 않는다
@@ -51,21 +51,12 @@ struct WLNavHost<Content: View>: View {
         let layers = makeLayers()
         ZStack {
             c.background.ignoresSafeArea()
-            // 자리 표시 면은 칸 바로 아래 층(z - 1.5)에 따로 그린다. 탭 바가 보이는 칸 바로 위 화면이면 면이 탭 바 밑으로
-            // 커지고, 탭 바는 다음 화면 내용과 같은 시간표로 옅어진다(보드 strip push-surface: 탭 바가 면 위에 남는다).
-            ForEach(layers.filter { !$0.entry.route.isTabRoot && $0.entry.route.pushStyle == .surface }) { layer in
-                WLSurfaceBackdropLayer(
-                    channels: motion.channels(layer.entry.id),
-                    spec: motion.registry.surface(layer.entry.sourceKey) ?? WLSurfaceSpec(fill: .card, radius: .fixed(WishlistTokens.Radius.l))
-                )
-                .modifier(WLTabFade(channels: motion.tab(layer.tab)))
-                .zIndex(layer.z - 1.5)
-            }
             ForEach(layers) { layer in
                 WLEntryLayer(layer: layer, motion: motion, navigator: navigator, content: content)
                     .zIndex(layer.z)
             }
-            WLTabBarSlot(navigator: navigator, motion: motion, top: displayed(navigator.currentTab).last)
+            let current = displayed(navigator.currentTab)
+            WLTabBarSlot(navigator: navigator, motion: motion, top: current.last, below: current.dropLast().last)
                 .zIndex(tabBarZ())
             // 끌어서 뒤로·되돌림 중에도 막는다(두 번째 손가락·누르기가 상세에 닿지 않게). 끌기 자체는 window 인식기가 받으므로
             // 이 막과 상관없다.
@@ -101,11 +92,13 @@ struct WLNavHost<Content: View>: View {
             let list = displayed(tab)
             let isCurrent = tab == navigator.currentTab
             return list.enumerated().map { index, entry in
-                WLEntryLayerModel(
+                let above = index + 1 < list.count ? list[index + 1] : nil
+                return WLEntryLayerModel(
                     entry: entry,
                     tab: tab,
                     isFront: isCurrent && index == list.count - 1,
-                    z: Self.z(current: isCurrent, index: index)
+                    z: Self.z(current: isCurrent, index: index),
+                    slidingAbove: above.flatMap { $0.route.pushStyle == .slide ? $0.id : nil }
                 )
             }
         }
@@ -125,11 +118,13 @@ struct WLEntryLayerModel: Identifiable {
     /// 지금 탭의 맨 위(보이고 누를 수 있는) 칸.
     let isFront: Bool
     let z: Double
+    /// 바로 위 칸이 밀기로 열린 칸이면 그 id. 이 칸은 그 칸의 phase만큼 왼쪽으로 조금 밀린다(parallax).
+    let slidingAbove: Int?
 
     var id: Int { entry.id }
 }
 
-/// 스택 칸 하나. 탭 첫 화면은 그대로, 사진 상세는 날아가는 사진(위)과 함께 그린다. 자리 표시 면은 `WLNavHost`가 아래 층에 따로 그린다.
+/// 스택 칸 하나. 탭 첫 화면은 그대로, 사진 상세는 날아가는 사진(위)과 함께, 밀기 상세는 phase만큼 오른쪽에서 밀어 그린다.
 private struct WLEntryLayer<Content: View>: View {
     let layer: WLEntryLayerModel
     let motion: WLNavMotion
@@ -149,13 +144,21 @@ private struct WLEntryLayer<Content: View>: View {
                 content(entry.route)
             } else {
                 let ch = motion.channels(entry.id)
-                WLContentFade(channels: ch) { content(entry.route) }
-                if entry.route.pushStyle == .photo {
+                switch entry.route.pushStyle {
+                case .photo:
+                    WLContentFade(channels: ch) { content(entry.route) }
                     WLPhotoFlightLayer(channels: ch, photo: motion.registry.photo(entry.sourceKey))
+                case .slide:
+                    content(entry.route)
                 }
             }
         }
         .environment(\.wlEntryID, entry.id)
+        // 밀기: 이 칸이 밀기로 열렸으면 x = (1 − phase)·W, 바로 위 칸이 밀기면 x = −parallax·W·phase(위 칸).
+        .modifier(WLSlideOffset(
+            own: !isRoot && entry.route.pushStyle == .slide ? motion.channels(entry.id) : nil,
+            above: layer.slidingAbove.map { motion.channels($0) }
+        ))
         .modifier(WLTabFade(channels: motion.tab(layer.tab)))
         .allowsHitTesting(layer.isFront)
         // 가려진 칸·다른 탭은 층마다 뺀다. 맨 위 칸만 escape(두 손가락 문지르기)로 뒤로 간다.
@@ -208,12 +211,17 @@ private struct WLPhotoFlightLayer: View {
     }
 }
 
-private struct WLSurfaceBackdropLayer: View {
-    let channels: WLEntryChannels
-    let spec: WLSurfaceSpec
+/// 밀기 위치. 화면 폭은 이 칸의 폭이다(칸은 화면 전체를 덮는다). 렌더 단계(`visualEffect`)라 레이아웃을 다시 하지 않는다.
+private struct WLSlideOffset: ViewModifier {
+    let own: WLEntryChannels?
+    let above: WLEntryChannels?
 
-    var body: some View {
-        WLSurfaceBackdrop(phase: channels.phase, source: channels.source, spec: spec)
+    func body(content: Content) -> some View {
+        let x = (own.map { 1 - $0.phase } ?? 0) - (above.map { WishlistTokens.Motion.pushSlideParallax * $0.phase } ?? 0)
+        // 분기하지 않는다(칸의 정체성이 바뀌면 스크롤·입력 상태가 사라진다).
+        content.visualEffect { view, geometry in
+            view.offset(x: geometry.size.width * x)
+        }
     }
 }
 
@@ -222,11 +230,15 @@ private struct WLTabBarSlot: View {
     let navigator: WLNavigator
     let motion: WLNavMotion
     let top: WLBackStackEntry?
+    let below: WLBackStackEntry?
 
     var body: some View {
         let shows = top?.route.showsTabBar ?? true
+        // 밀기로 열린 맨 위 화면이 탭 바를 보이고 아래 화면은 안 보이면 진행값과 함께 나타난다.
+        let fadesIn = shows && top.map { !$0.route.isTabRoot && $0.route.pushStyle == .slide } == true
+            && below.map { !$0.route.showsTabBar } == true
         WLTabBar(current: navigator.currentTab) { navigator.selectTab($0) }
-            .modifier(WLTabBarAlpha(shows: shows, channels: top.map { motion.channels($0.id) }))
+            .modifier(WLTabBarAlpha(shows: shows, fadesIn: fadesIn, channels: top.map { motion.channels($0.id) }))
             .frame(maxHeight: .infinity, alignment: .bottom)
             .ignoresSafeArea(.all, edges: .bottom)
             .allowsHitTesting(shows)
@@ -236,10 +248,12 @@ private struct WLTabBarSlot: View {
 
 private struct WLTabBarAlpha: ViewModifier {
     let shows: Bool
+    let fadesIn: Bool
     let channels: WLEntryChannels?
 
     func body(content: Content) -> some View {
-        content.opacity(shows ? 1 : 1 - (channels?.content ?? 1))
+        let progress = channels?.content ?? 1
+        content.opacity(fadesIn ? progress : (shows ? 1 : 1 - progress))
     }
 }
 

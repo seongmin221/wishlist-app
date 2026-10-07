@@ -5,8 +5,9 @@ import SwiftUI
 /// (`content`)를 서로 다른 곡선의 `withAnimation`으로 움직여도 각자의 곡선을 탄다. 새 칸의 기본값은 "전환 시작 전" 상태다.
 @Observable
 final class WLEntryChannels {
-    /// 사진 0→1, 면 0→1→2.
+    /// 사진: 0(원래 자리) → 1(상세 자리). 밀기: 0(화면 오른쪽 밖) → 1(제자리).
     var phase: Double = 0
+    /// 사진 이동은 상세 내용 불투명도. 밀기는 내용을 옅게 하지 않고 탭 바가 보이고 안 보이는 화면 사이에서 탭 바를 옅게 한다.
     var content: Double = 0
     /// 공유 요소를 전환 층이 그리는 중(상세 안의 사진은 숨는다).
     var animating = true
@@ -78,7 +79,7 @@ final class WLNavMotion {
                 case .push:
                     if let entry = navigator.entries(t.tab).last {
                         let ch = channels(entry.id)
-                        ch.phase = entry.route.pushStyle == .photo ? 1 : 2
+                        ch.phase = 1
                         ch.content = 1
                         settlePush(entry, t)
                     }
@@ -121,7 +122,7 @@ final class WLNavMotion {
             ch.phase = 0
             ch.content = 0
             ch.animating = true
-            ch.source = registry.frame(entry.sourceKey) ?? .zero
+            ch.source = entry.route.pushStyle == .photo ? registry.frame(entry.sourceKey) ?? .zero : .zero
         }
         switch entry.route.pushStyle {
         case .photo:
@@ -134,15 +135,14 @@ final class WLNavMotion {
                 }
                 withAnimation(C.easeOut.animation(ms: M.pushPhotoContent)) { ch.content = 1 }
             }
-        case .surface:
-            withAnimation(C.easeOut.animation(ms: M.pushSurfaceLift)) { ch.phase = 1 } completion: { [weak self] in
-                withAnimation(C.emphasized.animation(ms: M.pushSurfaceExpand)) { ch.phase = 2 } completion: {
-                    self?.settlePush(entry, t)
-                }
+        case .slide:
+            // 새 화면은 오른쪽 밖(W) → 0, 아래 화면은 0 → −parallax·W(`WLNavHost`가 phase로 그린다). 페이드·막·그림자 없음.
+            withAnimation(C.emphasized.animation(ms: M.pushSlideOpen)) {
+                ch.phase = 1
+                ch.content = 1
+            } completion: { [weak self] in
+                self?.settlePush(entry, t)
             }
-            // 다음 화면 내용: 커짐 시작 후 190부터 230 동안.
-            let delay = Double(M.pushSurfaceLift + M.pushSurfaceContentDelay) / 1000
-            withAnimation(C.easeOut.animation(ms: M.pushSurfaceContent).delay(delay)) { ch.content = 1 }
         }
     }
 
@@ -170,11 +170,11 @@ final class WLNavMotion {
         case .photo:
             withAnimation(C.emphasized.animation(ms: scaled(M.pushPhotoBack, remaining))) { ch.phase = 0 } completion: { done() }
             withAnimation(C.easeIn.animation(ms: scaled(M.pushPhotoBackContent, remaining))) { ch.content = 0 }
-        case .surface:
-            withAnimation(C.easeIn.animation(ms: scaled(M.pushSurfaceBackContent, remaining))) { ch.content = 0 }
-            withAnimation(C.emphasized.animation(ms: scaled(M.pushSurfaceBack, remaining))) { ch.phase = 1 } completion: {
-                withAnimation(C.easeIn.animation(ms: M.pushSurfaceSettle)) { ch.phase = 0 } completion: { done() }
-            }
+        case .slide:
+            withAnimation(C.emphasized.animation(ms: scaled(M.pushSlideBack, remaining))) {
+                ch.phase = 0
+                ch.content = 0
+            } completion: { done() }
         }
     }
 
@@ -223,8 +223,8 @@ final class WLNavMotion {
         let p = min(1, max(0, progress))
         let ch = channels(drag.entry.id)
         snap {
-            // 사진: 상세 자리(1) → 원래 자리 쪽. 면: 화면 전체(2) → 떠오름(1) 쪽. 내용은 같이 옅어진다.
-            if !reduceMotion { ch.phase = drag.entry.route.pushStyle == .photo ? 1 - p : 2 - p }
+            // 사진: 상세 자리(1) → 원래 자리 쪽. 밀기: 제자리(1) → 오른쪽으로(위 화면 = p·W, 아래 화면 = −parallax·W·(1−p)).
+            if !reduceMotion { ch.phase = 1 - p }
             ch.content = 1 - p
         }
     }
@@ -243,9 +243,9 @@ final class WLNavMotion {
         }
         let ch = channels(drag.entry.id)
         let style = drag.entry.route.pushStyle
-        let ms = scaled(style == .photo ? M.pushPhotoBack : M.pushSurfaceBack, p)
+        let ms = scaled(style == .photo ? M.pushPhotoBack : M.pushSlideBack, p)
         withAnimation(reduceMotion ? nil : C.emphasized.animation(ms: ms)) {
-            ch.phase = style == .photo ? 1 : 2
+            ch.phase = 1
             ch.content = 1
         } completion: { [weak self] in
             ch.animating = false

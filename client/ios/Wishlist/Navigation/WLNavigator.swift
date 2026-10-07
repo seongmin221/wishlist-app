@@ -34,8 +34,8 @@ struct WLExitingEntry: Equatable {
 /// 전환 규칙(motion.md 구현 기본값 "전환 중 입력"):
 /// - `push`·`pop`·`selectTab`(다른 탭)은 전환을 시작하고(`isTransitioning = true`) 바로 상태를 바꾼다. 화면 쪽이 모션을 끝내면
 ///   `finishTransition()`을 부른다.
-/// - 전환 중에는 `push`·`pop`·`selectTab`·`beginBackGesture`를 모두 무시한다(false). 공유 요소 전환 중 탭을 누르거나 뒤로 가도
-///   자리 표시 면이 남지 않는다.
+/// - 전환 중에는 `push`·`pop`·`selectTab`·`beginBackGesture`를 모두 무시한다(false). 전환 중 탭을 누르거나 뒤로 가도
+///   전환 층(날아가는 사진)이 남지 않는다.
 /// - 현재 탭을 다시 고르면 전환 없이 `scrollToTopRequest`에 그 탭을 둔다. 탭 첫 화면이 맨 위로 스크롤하고 `consumeScrollToTop`을 부른다.
 /// - 끌어서 뒤로: `beginBackGesture` → (`commitBackGesture` → 모션 끝에 `finishTransition`) 또는 `cancelBackGesture`.
 /// - pop된 칸은 `exiting`으로 남아 뒤로 모션 동안 계속 그려지고 `finishTransition()`에서 지워진다.

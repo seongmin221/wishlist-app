@@ -32,7 +32,7 @@ struct WLRoute: Hashable {
     private init(tab: WLTab) {
         destination = AnyHashable(tab)
         showsTabBar = true
-        pushStyle = .surface
+        pushStyle = .slide
         rootTab = tab
     }
 
@@ -40,4 +40,5 @@ struct WLRoute: Hashable {
     var isTabRoot: Bool { rootTab != nil }
 }
 
-enum WLPushStyle: Hashable { case photo, surface }
+/// 화면 이동 방식: 사진이 커지는 이동, 사진이 없는 가로 밀기.
+enum WLPushStyle: Hashable { case photo, slide }

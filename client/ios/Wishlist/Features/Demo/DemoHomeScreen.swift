@@ -28,26 +28,27 @@ struct DemoHomeScreen: View {
                 HStack(alignment: .top, spacing: WishlistTokens.Space.s12) {
                     ForEach([0, 1], id: \.self) { col in
                         VStack(spacing: WishlistTokens.Space.s16) {
-                            ForEach(Array(DemoContent.products.enumerated()).filter { $0.offset % 2 == col }, id: \.element.id) { _, p in
+                            ForEach(Array(DemoContent.homeProducts.enumerated()).filter { $0.offset % 2 == col }, id: \.element.id) { _, p in
                                 DemoProductCard(product: p, sourceKey: "home/product/\(p.id)")
                             }
                         }
                     }
                 }
 
-                DemoSectionLabel(text: "사진 없는 칩 → 목록 (면이 커짐)")
+                DemoSectionLabel(text: "사진 없는 칩 → 목록 (가로 밀기)")
                 DemoFlowLayout {
-                    ForEach(DemoContent.chips.prefix(5), id: \.id) { DemoSurfaceChip(chip: $0, sourceKey: "home/chip/\($0.id)") }
+                    let digital = DemoContent.categories[2]
+                    ForEach(digital.types.prefix(5), id: \.name) {
+                        DemoListChip(top: digital.name, chip: $0, sourceKey: "home/chip/\($0.name)")
+                    }
                 }
 
                 DemoSectionLabel(text: "비교 중인 목적")
                 VStack(spacing: WishlistTokens.Space.s12) {
-                    ForEach(DemoContent.purposes.filter { ["commute", "trail", "longest"].contains($0.id) }, id: \.id) { p in
+                    ForEach([DemoContent.purposes[0], DemoContent.purposes[1], DemoContent.longestPurpose], id: \.id) { p in
                         let key = "home/purpose/\(p.id)"
-                        WLSharedSurfaceSource(key: key, fill: .purpose(p.color), radius: .fixed(WishlistTokens.Radius.xl)) {
-                            DemoPurposeRow(purpose: p) {
-                                nav.push(.init(destination: DemoDestination.purpose(p.id), pushStyle: .surface), sourceKey: key)
-                            }
+                        DemoPurposeRow(purpose: p) {
+                            nav.push(DemoDestination.purpose(p.id).route, sourceKey: key)
                         }
                     }
                 }
@@ -65,35 +66,6 @@ struct DemoHomeScreen: View {
             }
             .padding(.horizontal, WishlistTokens.Space.screenMargin)
         }
-    }
-}
-
-/// 사진 카드(사진 → 상품 상세는 사진 공유 요소 이동).
-struct DemoProductCard: View {
-    let product: DemoProduct
-    let sourceKey: String
-
-    @Environment(\.wlNavigator) private var nav
-    @Environment(\.wlColors) private var c
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: WishlistTokens.Space.s4) {
-            WLCard(radius: WishlistTokens.Radius.m, onClick: {
-                nav.push(.init(destination: DemoDestination.product(product.id), pushStyle: .photo), sourceKey: sourceKey)
-            }) {
-                WLSharedPhotoSource(key: sourceKey) {
-                    DemoPhoto(tint: product.tint)
-                        .aspectRatio(1 / product.photoRatio, contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .accessibilityLabel("\(product.brand) \(product.name)")
-            Spacer().frame(height: WishlistTokens.Space.s4)
-            WLText(product.brand, .label, color: c.textSecondary, maxLines: 1)
-            WLText(product.name, .bodyStrong, maxLines: 2).lineLimit(2)
-            PriceText(amount: product.price, currency: product.currency, style: WLTextStyle.price.resized(WLTextStyle.body.size))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
