@@ -176,11 +176,11 @@ ErrorKind: UNAUTHENTICATED/SESSION_CHANGED/NOT_FOUND/CONFLICT/VALIDATION/RATE_LI
 }
 ```
 
-- [ ] **Step 1: 실패 테스트.** 초기 null 계정, A→B/A→logout→A 세대 증가, refresh 유지, stale operation 미실행. operation Success와 Failure를 그대로 반환하고 CancellationException을 전파한다. gate 동안 changeAccount와 commit의 직렬 순서 검증.
-- [ ] **Step 2: RED.** KMP_TEST에서 AuthSessionTest 미정의 API 실패 확인.
-- [ ] **Step 3: 구현.** 공통 결과·오류·의존성 계약과 Mutex 기반 세션 gate 구현. Swift UI는 후속 구체 state를 사용한다.
-- [ ] **Step 4: GREEN.** KMP_TEST에서 성공·실패 한 겹 결과와 세션 경계 통과.
-- [ ] **Step 5: 문서·커밋.** kmp.md에 확정 세션 경계를 기록. `feature(kmp): 공통 인증 세션과 결과 계약 구현`.
+- [x] **Step 1: 실패 테스트.** 초기 null 계정, A→B/A→logout→A 세대 증가, refresh 유지, stale operation 미실행. operation Success와 Failure를 그대로 반환하고 CancellationException을 전파한다. gate 동안 changeAccount와 commit의 직렬 순서 검증.
+- [x] **Step 2: RED.** KMP_TEST에서 AuthSessionTest 미정의 API 실패 확인.
+- [x] **Step 3: 구현.** 공통 결과·오류·의존성 계약과 Mutex 기반 세션 gate 구현. Swift UI는 후속 구체 state를 사용한다.
+- [x] **Step 4: GREEN.** KMP_TEST에서 성공·실패 한 겹 결과와 세션 경계 통과.
+- [x] **Step 5: 문서·커밋.** kmp.md에 확정 세션 경계를 기록. `feature(kmp): 공통 인증 세션과 결과 계약 구현`.
 
 ## Task 2b: 모델·API ID·상태 정책
 
