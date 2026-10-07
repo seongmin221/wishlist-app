@@ -41,6 +41,10 @@ custom의 편집 필드·AI 내부 상태는 목록 DTO에 넣지 않는다.
 공용 상위 ID는 `G001`~`G011`, 공용 leaf는 `C001`~`C087`이다.
 표시 순서가 바뀌어도 ID는 재계산하지 않는다.
 
+## 표시용 집계와 B8 삭제 영향
+
+CAT-01/02 itemCount와 BROWSE 노출은 이름 존재 visibility를 따르지만, B8 CAT-05 deletion-impact는 이름 누락을 포함한 같은 owner·ACTIVE·현재 custom 참조 일치 전체를 센다. CAT-06도 이 전체 집합의 참조를 해제한다. 표시용 CustomCategory.itemCount를 삭제 영향 수로 재사용하지 않는다. B8은 별도의 ACTIVE 전체 집계 경로를 구현해야 한다. B4에서 삭제 API를 추가하지 않는다.
+
 ## CAT-03 생성과 replay
 
 `POST /v1/custom-categories`, 필수 정규 UUID `Idempotency-Key`.

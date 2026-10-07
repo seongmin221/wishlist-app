@@ -14,4 +14,4 @@
 - [B3 목적 기본 관리 설계](specs/2026-10-07-b3-purpose-management-design.md) — PUR-01~04 계약, V13 목적 참조 전환, AI 목적 후보·토큰 단계
 - [B3 목적 기본 관리 구현 계획](plans/2026-10-07-b3-purpose-management.md) — 입력 규칙·schema·서비스·HTTP·예산·AI 후보·문서 8개 작업
 
-- [B4 상품 목록·홈 조회 설계](specs/2026-10-07-b4-read-api-design.md) — 제품 정책 확정, group 조회·anchor window·서명 cursor·snapshot 설계 제안
+- [B4 상품 목록·홈 조회 설계](specs/2026-10-07-b4-read-api-design.md) — 제품 정책 확정, group 조회·단일 anchor 입력·범위 검증 cursor·snapshot 설계 제안

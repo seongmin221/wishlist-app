@@ -196,6 +196,8 @@ GET /v1/wishlist-items?categoryId={id}&anchor={cursor}&before=20&after=20
 
 ### 홈 조치 영역
 
+> B4 조회 설계는 현재 검토 중이다. [계약 비교표](../superpowers/specs/2026-10-07-b4-read-api-design.md#기존-조회-계약과-비교)는 ITEM-02의 단일 anchor와 requestedAnchorItemId를 유지하면서 대체 항목 우선순위를 구체화하고, HOME-02를 group/anchor 조회로 확장한다. spec 승인 후 아래 예시와 위 위치 복구 본문을 함께 갱신한다.
+
 ```http
 GET /v1/home/action-items?action={requiredAction}&cursor={cursor}&limit=20
 ```

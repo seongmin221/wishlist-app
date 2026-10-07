@@ -67,7 +67,7 @@ READY 항목에서 사용자 category 삭제 때문에 category가 빈 경우에
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
 | HOME-01 | `GET /v1/home` | 로그인 후 홈·foreground 복귀·사용자 새로고침 · S4/S8 | 인증 owner | 분석 중·정보 보완·분류 검토 count/미리보기, 최근 활동순 ACTIVE 목적 최대 3개(빈 목적 포함): 이름·색·아이콘·후보 수·최근 활동·최근 저장 후보 최대 4개(이미지 null도 포함·placeholder 표시). 별도 서버 할 일 합계 필드 없음(그룹 count 제공). 기기 로컬 대기는 서버 count에 포함하지 않음 | 없음 |
-| HOME-02 | `GET /v1/home/action-items` | 영역 펼침, 연속 처리, 캐러셀 특정 상품부터 진입 · S4/S7/S8 | 홈 그룹 조건(group만 받는 안 권장·B4 spec에서 확정), cursor/limit 또는 anchorItemId+anchor cursor | 같은 홈 그룹 predicate의 item 목록·totalCount·cursor·anchorResolved. 정보 보완 그룹은 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 함께 포함하고 item별 requiredAction·허용 행동은 유지 | 없음 |
+| HOME-02 | `GET /v1/home/action-items` | 영역 펼침, 연속 처리, 캐러셀 특정 상품부터 진입 · S4/S7/S8 | 홈 그룹 조건(group만 받는 안 권장·B4 spec에서 확정), cursor/limit 또는 anchor={cursor}+before/after | 같은 홈 그룹 predicate의 item 목록·totalCount·cursor·anchorResolved. 정보 보완 그룹은 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 함께 포함하고 item별 requiredAction·허용 행동은 유지 | 없음 |
 | DUP-01 | `GET /v1/wishlist-items/{id}/duplicate-candidates` | 새/기존 항목 비교 시트, 기존 실패/처리 상태 안내 · S3 | 새 item ID, cursor/limit | 중복 candidate ID·판단 근거와 MATCH/동일URL안내/판단대기 구분, 양쪽 metadata·저장일·category/purpose·version·기존 항목 삭제 영향 | 없음 |
 | DUP-02 | `PUT /v1/wishlist-items/{id}/duplicate-decisions` | 둘 다 두기/새 항목 지우기/기존 항목 지우기 확정 · S3 | candidate ID, KEEP_BOTH/DELETE_NEW/DELETE_EXISTING, decision/version 정보, 재전송 식별 key | 판단 기록과 선택 삭제를 같은 transaction에 반영, 남는/삭제 item IDs·갱신 상태. review 확정/보류는 별도 ITEM-08 | 없음 |
 
@@ -87,7 +87,7 @@ B2 CAT-01~04와 owner별 AI 후보·stale 보호를 구현·검증했다. [확�
 | CAT-02 | `GET /v1/custom-categories/{id}` | custom 목록 헤더·편집 폼 초기값 · S3 | custom category ID | 이름·고정 parent·설명·예시·itemCount·version. AI 후보 제외 내부 사유는 노출하지 않음 | **구현(B2)**: owner 상세·빈 custom·내부 AI 정보 제외 |
 | CAT-03 | `POST /v1/custom-categories` | 탭 + 추가, 선택 시트 안 새 category 만들기 · S3 | parentId, 이름, 선택 설명/예시, Idempotency-Key | 생성 category ID·표시값·사용 개수. 사용자당20·40/200/5×60 제한·같은 상위 normalized 이름 unique | **구현(B2)**: owner 잠금·receipt/replay·20개·60초5건 |
 | CAT-04 | `PATCH /v1/custom-categories/{id}` | 이름·설명·예시 저장 · S3 | expectedVersion, 변경 필드 | 새 category·version, 활성 표시명 반영. 부모 이동은 현재 문서 요구에 없으므로 받지 않음 | **구현(B2)**: version·no-op·null·parent 고정·현재 표시명 |
-| CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 active item 수·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | 없음 |
+| CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 ACTIVE 전체 item 수(이름 누락 포함, CAT-01/02 표시용 count와 별도)·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | 없음 |
 | CAT-06 | `DELETE /v1/custom-categories/{id}` | 삭제 확정 · S3/S4 | category version·impactToken | category 삭제·참조 해제·CUSTOM_CATEGORY_DELETED 원자 반영. 영향이 바뀌면 재확인 가능한 409 | 없음 |
 
 CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 ID를 편집 초안에 넣고 ITEM-04/ITEM-07/ITEM-08에서 연결한다. 상품 편집을 취소해도 이미 생성한 category를 삭제하지 않는다. 생성·연결을 하나의 API로 묶거나 취소 시 자동 삭제하려는 요구는 현재 근거에 없으며 후속 제품 확인 대상이다.

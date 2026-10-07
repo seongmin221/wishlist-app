@@ -20,4 +20,6 @@ HOME-02의 기존 action/cursor/limit 예시에 없는 anchor 입력·응답, �
 
 ## 설계 spec
 
-[상품 목록·홈 조회 설계](../../../superpowers/specs/2026-10-07-b4-read-api-design.md)에 group query, page/window 크기, 삭제·이동 anchor 복구, 카드와 cursor, snapshot·index·검증을 제안했다. 제품 정책은 확정됐지만 설계 spec 승인은 아직 받지 않았다. B4 제품 코드와 테스트는 미착수다.
+[상품 목록·홈 조회 설계](../../../superpowers/specs/2026-10-07-b4-read-api-design.md)에 group query, page/window 크기, 삭제·이동 anchor 복구, 카드와 cursor, snapshot·index·검증을 제안했다.
+
+설계 피드백을 반영해 B3 형태의 구조/범위 검증 cursor로 단순화하고 신규 secret 제안을 제거했다. ITEM-02의 기존 anchor query와 requestedAnchorItemId를 유지하며 HOME-02 확장과 대체 항목 우선순위를 계약 비교표에 구분했다. 표시용 count와 B8 삭제 영향의 집계를 분리하고, 홈 SQL·index 교체 검토·Unicode 공백 상수·DB 유효 조합 parity·반대 방향 EXISTS를 구체화했다. 상세 설계와 근거는 spec에 모았다. 제품 정책은 확정됐지만 설계 spec 승인은 아직 받지 않았다. B4 제품 코드와 테스트는 미착수다.
