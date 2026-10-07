@@ -6,7 +6,7 @@ import platform.Foundation.NSTemporaryDirectory
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-private fun dirOf(path: String) = path.substringBeforeLast('/') 
+private fun dirOf(path: String) = path.substringBeforeLast('/')
 private fun nameOf(path: String) = path.substringAfterLast('/')
 
 @OptIn(ExperimentalUuidApi::class)

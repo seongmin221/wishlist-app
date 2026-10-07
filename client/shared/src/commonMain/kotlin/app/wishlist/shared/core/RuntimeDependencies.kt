@@ -11,7 +11,7 @@ fun interface IdGenerator {
     fun newId(): String
 }
 
-data class RuntimeDispatchers(
+internal data class RuntimeDispatchers(
     val default: CoroutineDispatcher,
     val io: CoroutineDispatcher,
 )

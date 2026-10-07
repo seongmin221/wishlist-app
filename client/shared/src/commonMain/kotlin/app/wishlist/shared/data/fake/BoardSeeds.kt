@@ -11,14 +11,14 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 /** Image-comparison fixture only. Repository counts are derived from stored membership. */
-data class BoardDisplayMetadata(
+internal data class BoardDisplayMetadata(
     val categoryChipCounts: Map<String, Int>,
     val purposeCandidateCounts: Map<String, Int>,
     val cards: List<BoardCardFixture> = emptyList(),
 )
 
 /** Board-specific art stays outside the WishlistItem snapshot and UI theme tokens. */
-data class BoardCardFixture(
+internal data class BoardCardFixture(
     val cardKey: String,
     val itemId: String,
     val faceHex: String,
@@ -28,7 +28,7 @@ data class BoardCardFixture(
     val meta: String,
 )
 
-data class BoardSeedData(
+internal data class BoardSeedData(
     val categories: List<Category>,
     val purposes: List<Purpose>,
     val items: List<WishlistItem>,
@@ -38,7 +38,7 @@ data class BoardSeedData(
 )
 
 /** Board snapshots, not a full SELECT taxonomy or a wire catalog implementation. */
-object BoardSeeds {
+internal object BoardSeeds {
     fun create(clock: Clock, ids: IdGenerator): BoardSeedData {
         val now = clock.now()
         // Platform generators may emit uppercase UUIDs (NSUUID); seeds use the canonical lowercase form.

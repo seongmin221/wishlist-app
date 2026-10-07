@@ -19,7 +19,7 @@ import kotlin.uuid.Uuid
  * Artificial latency occurs before session gate -> store lock; neither gate encloses external IO.
  * Analysis advances only through explicit controls, never on a timer.
  */
-class FakeStore(private val session: AuthSession, private val clock: Clock, private val ids: IdGenerator) {
+internal class FakeStore(private val session: AuthSession, private val clock: Clock, private val ids: IdGenerator) {
     private data class Entry(var item: WishlistItem, var analysisGeneration: Int = 1,
         val retryAttempts: MutableSet<String> = mutableSetOf())
     private class OwnerStore {

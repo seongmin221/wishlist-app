@@ -4,18 +4,18 @@ import app.wishlist.shared.core.*
 import app.wishlist.shared.model.*
 
 /** Fake-only patch vocabulary, independent of unimplemented mutation DTOs. */
-sealed interface Patch<out T> {
+internal sealed interface Patch<out T> {
     data object Unchanged : Patch<Nothing>
     data class Set<T>(val value: T) : Patch<T>
 }
-data class ItemPatch(
+internal data class ItemPatch(
     val name: Patch<String?> = Patch.Unchanged,
     val imageUrl: Patch<String?> = Patch.Unchanged,
     val categoryId: Patch<String?> = Patch.Unchanged,
     val purposeId: Patch<String?> = Patch.Unchanged,
 )
-enum class ReviewDecision { CONFIRM, DEFER }
-data class AnalysisOutcome(
+internal enum class ReviewDecision { CONFIRM, DEFER }
+internal data class AnalysisOutcome(
     val status: AnalysisStatus,
     val name: String?,
     val categoryId: String?,
@@ -24,7 +24,7 @@ data class AnalysisOutcome(
 )
 
 /** Explicit development controls; these do not implement mutation wire APIs. */
-class FakeControls(private val store: FakeStore) {
+internal class FakeControls(private val store: FakeStore) {
     suspend fun completeAnalysis(id: String, analysisGeneration: Int, result: AnalysisOutcome) =
         store.completeAnalysis(id, analysisGeneration, result)
     fun failNext(apiId: ApiId, error: ClientError) = store.failNext(apiId, error)
