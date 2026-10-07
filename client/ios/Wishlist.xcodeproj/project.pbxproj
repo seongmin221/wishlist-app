@@ -5,36 +5,177 @@
     objectVersion = 56;
     objects = {
 /* Begin PBXBuildFile section */
+        A100000000000000000000FA /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000FA /* Localizable.xcstrings */; };
         A10000000000000000000001 /* WishlistApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* WishlistApp.swift */; };
         A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* ContentView.swift */; };
+        A10000000000000000000003 /* WishlistTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* WishlistTokens.swift */; };
+        A10000000000000000000004 /* WLTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* WLTypography.swift */; };
+        A10000000000000000000005 /* do_hyeon.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* do_hyeon.ttf */; };
+        A10000000000000000000006 /* ibm_plex_sans_kr_regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* ibm_plex_sans_kr_regular.ttf */; };
+        A10000000000000000000007 /* ibm_plex_sans_kr_medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* ibm_plex_sans_kr_medium.ttf */; };
+        A10000000000000000000008 /* ibm_plex_sans_kr_bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* ibm_plex_sans_kr_bold.ttf */; };
+        A10000000000000000000009 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* OFL.txt */; };
+        A10000000000000000000030 /* PriceFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* PriceFormatTests.swift */; };
+        A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* SheetDragDecisionTests.swift */; };
+        A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* OverlayHostStateTests.swift */; };
+        A10000000000000000000101 /* WLTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000101 /* WLTheme.swift */; };
+        A10000000000000000000102 /* WLButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000102 /* WLButton.swift */; };
+        A10000000000000000000103 /* WLCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000103 /* WLCard.swift */; };
+        A10000000000000000000104 /* WLIconTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000104 /* WLIconTile.swift */; };
+        A10000000000000000000105 /* WLChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000105 /* WLChip.swift */; };
+        A10000000000000000000106 /* WLInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000106 /* WLInput.swift */; };
+        A10000000000000000000107 /* WLUnderlineField.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000107 /* WLUnderlineField.swift */; };
+        A10000000000000000000108 /* PriceText.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000108 /* PriceText.swift */; };
+        A10000000000000000000109 /* PurposeDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000109 /* PurposeDot.swift */; };
+        A10000000000000000000110 /* EmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000110 /* EmptyState.swift */; };
+        A10000000000000000000111 /* ExpandableGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000111 /* ExpandableGroup.swift */; };
+        A10000000000000000000112 /* Masonry2Col.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000112 /* Masonry2Col.swift */; };
+        A10000000000000000000118 /* WLHeaderSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000118 /* WLHeaderSheet.swift */; };
+        A10000000000000000000119 /* WLTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000119 /* WLTopBar.swift */; };
+        A10000000000000000000113 /* OverlayHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000113 /* OverlayHost.swift */; };
+        A10000000000000000000114 /* Scrim.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000114 /* Scrim.swift */; };
+        A10000000000000000000115 /* WLBottomSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000115 /* WLBottomSheet.swift */; };
+        A10000000000000000000116 /* WLConfirmDialog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000116 /* WLConfirmDialog.swift */; };
+        A10000000000000000000117 /* WLMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000117 /* WLMenu.swift */; };
+        A10000000000000000000033 /* WLNavigatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* WLNavigatorTests.swift */; };
+        A10000000000000000000034 /* WLTypographyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* WLTypographyTests.swift */; };
+        A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* WLHeaderSheetTests.swift */; };
+        A10000000000000000000201 /* WLRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000201 /* WLRoute.swift */; };
+        A10000000000000000000202 /* WLNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000202 /* WLNavigator.swift */; };
+        A10000000000000000000203 /* WLNavHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000203 /* WLNavHost.swift */; };
+        A10000000000000000000204 /* WLTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000204 /* WLTabBar.swift */; };
+        A10000000000000000000205 /* WLNavMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000205 /* WLNavMotion.swift */; };
+        A10000000000000000000206 /* WLSharedElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000206 /* WLSharedElement.swift */; };
+        A10000000000000000000207 /* WLEdgeBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000207 /* WLEdgeBackGesture.swift */; };
+        A10000000000000000000211 /* DemoContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000211 /* DemoContent.swift */; };
+        A10000000000000000000212 /* DemoHomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000212 /* DemoHomeScreen.swift */; };
+        A10000000000000000000213 /* DemoCategoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000213 /* DemoCategoryScreen.swift */; };
+        A10000000000000000000214 /* DemoPurposeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000214 /* DemoPurposeScreen.swift */; };
+        A10000000000000000000215 /* DemoDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000215 /* DemoDetailScreen.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        A200000000000000000000FA /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
         A20000000000000000000001 /* WishlistApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistApp.swift; sourceTree = "<group>"; };
         A20000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
         A20000000000000000000003 /* Wishlist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wishlist.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        A20000000000000000000004 /* WishlistTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishlistTokens.swift; sourceTree = "<group>"; };
+        A20000000000000000000005 /* WLTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTypography.swift; sourceTree = "<group>"; };
+        A20000000000000000000006 /* do_hyeon.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = do_hyeon.ttf; sourceTree = "<group>"; };
+        A20000000000000000000007 /* ibm_plex_sans_kr_regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = ibm_plex_sans_kr_regular.ttf; sourceTree = "<group>"; };
+        A20000000000000000000008 /* ibm_plex_sans_kr_medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = ibm_plex_sans_kr_medium.ttf; sourceTree = "<group>"; };
+        A20000000000000000000009 /* ibm_plex_sans_kr_bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = ibm_plex_sans_kr_bold.ttf; sourceTree = "<group>"; };
+        A20000000000000000000010 /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = OFL.txt; sourceTree = "<group>"; };
+        A20000000000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+        A20000000000000000000030 /* PriceFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceFormatTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000031 /* SheetDragDecisionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetDragDecisionTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000032 /* OverlayHostStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayHostStateTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000040 /* WishlistTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WishlistTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+        A20000000000000000000101 /* WLTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTheme.swift; sourceTree = "<group>"; };
+        A20000000000000000000102 /* WLButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLButton.swift; sourceTree = "<group>"; };
+        A20000000000000000000103 /* WLCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLCard.swift; sourceTree = "<group>"; };
+        A20000000000000000000104 /* WLIconTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLIconTile.swift; sourceTree = "<group>"; };
+        A20000000000000000000105 /* WLChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLChip.swift; sourceTree = "<group>"; };
+        A20000000000000000000106 /* WLInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLInput.swift; sourceTree = "<group>"; };
+        A20000000000000000000107 /* WLUnderlineField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLUnderlineField.swift; sourceTree = "<group>"; };
+        A20000000000000000000108 /* PriceText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceText.swift; sourceTree = "<group>"; };
+        A20000000000000000000109 /* PurposeDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurposeDot.swift; sourceTree = "<group>"; };
+        A20000000000000000000110 /* EmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyState.swift; sourceTree = "<group>"; };
+        A20000000000000000000111 /* ExpandableGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpandableGroup.swift; sourceTree = "<group>"; };
+        A20000000000000000000112 /* Masonry2Col.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Masonry2Col.swift; sourceTree = "<group>"; };
+        A20000000000000000000118 /* WLHeaderSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLHeaderSheet.swift; sourceTree = "<group>"; };
+        A20000000000000000000119 /* WLTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTopBar.swift; sourceTree = "<group>"; };
+        A20000000000000000000113 /* OverlayHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayHost.swift; sourceTree = "<group>"; };
+        A20000000000000000000114 /* Scrim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scrim.swift; sourceTree = "<group>"; };
+        A20000000000000000000115 /* WLBottomSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLBottomSheet.swift; sourceTree = "<group>"; };
+        A20000000000000000000116 /* WLConfirmDialog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLConfirmDialog.swift; sourceTree = "<group>"; };
+        A20000000000000000000117 /* WLMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLMenu.swift; sourceTree = "<group>"; };
+        A20000000000000000000033 /* WLNavigatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavigatorTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000034 /* WLTypographyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTypographyTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000035 /* WLHeaderSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLHeaderSheetTests.swift; sourceTree = "<group>"; };
+        A20000000000000000000201 /* WLRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLRoute.swift; sourceTree = "<group>"; };
+        A20000000000000000000202 /* WLNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavigator.swift; sourceTree = "<group>"; };
+        A20000000000000000000203 /* WLNavHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavHost.swift; sourceTree = "<group>"; };
+        A20000000000000000000204 /* WLTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLTabBar.swift; sourceTree = "<group>"; };
+        A20000000000000000000205 /* WLNavMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLNavMotion.swift; sourceTree = "<group>"; };
+        A20000000000000000000206 /* WLSharedElement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLSharedElement.swift; sourceTree = "<group>"; };
+        A20000000000000000000207 /* WLEdgeBackGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLEdgeBackGesture.swift; sourceTree = "<group>"; };
+        A20000000000000000000211 /* DemoContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContent.swift; sourceTree = "<group>"; };
+        A20000000000000000000212 /* DemoHomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoHomeScreen.swift; sourceTree = "<group>"; };
+        A20000000000000000000213 /* DemoCategoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCategoryScreen.swift; sourceTree = "<group>"; };
+        A20000000000000000000214 /* DemoPurposeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPurposeScreen.swift; sourceTree = "<group>"; };
+        A20000000000000000000215 /* DemoDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDetailScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
         A30000000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        A30000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
         A40000000000000000000001 = {
             isa = PBXGroup;
-            children = (A40000000000000000000002 /* Wishlist */, A40000000000000000000003 /* Products */);
+            children = (A40000000000000000000002 /* Wishlist */, A40000000000000000000020 /* WishlistTests */, A40000000000000000000003 /* Products */);
             sourceTree = "<group>";
         };
         A40000000000000000000002 /* Wishlist */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000002 /* ContentView.swift */);
+            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000002 /* ContentView.swift */, A40000000000000000000004 /* DesignSystem */, A40000000000000000000007 /* Navigation */, A40000000000000000000030 /* Features */, A40000000000000000000005 /* Resources */, A20000000000000000000011 /* Info.plist */);
             path = Wishlist;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000004 /* DesignSystem */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000004 /* WishlistTokens.swift */, A20000000000000000000005 /* WLTypography.swift */, A20000000000000000000101 /* WLTheme.swift */, A20000000000000000000102 /* WLButton.swift */, A20000000000000000000103 /* WLCard.swift */, A20000000000000000000104 /* WLIconTile.swift */, A20000000000000000000105 /* WLChip.swift */, A20000000000000000000106 /* WLInput.swift */, A20000000000000000000107 /* WLUnderlineField.swift */, A20000000000000000000108 /* PriceText.swift */, A20000000000000000000109 /* PurposeDot.swift */, A20000000000000000000110 /* EmptyState.swift */, A20000000000000000000111 /* ExpandableGroup.swift */, A20000000000000000000112 /* Masonry2Col.swift */, A20000000000000000000118 /* WLHeaderSheet.swift */, A20000000000000000000119 /* WLTopBar.swift */, A40000000000000000000021 /* Overlay */);
+            path = DesignSystem;
             sourceTree = "<group>";
         };
         A40000000000000000000003 /* Products */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000003 /* Wishlist.app */);
+            children = (A20000000000000000000003 /* Wishlist.app */, A20000000000000000000040 /* WishlistTests.xctest */);
             name = Products;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000005 /* Resources */ = {
+            isa = PBXGroup;
+            children = (A40000000000000000000006 /* Fonts */, A200000000000000000000FA /* Localizable.xcstrings */);
+            path = Resources;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000006 /* Fonts */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000006 /* do_hyeon.ttf */, A20000000000000000000007 /* ibm_plex_sans_kr_regular.ttf */, A20000000000000000000008 /* ibm_plex_sans_kr_medium.ttf */, A20000000000000000000009 /* ibm_plex_sans_kr_bold.ttf */, A20000000000000000000010 /* OFL.txt */);
+            path = Fonts;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000007 /* Navigation */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000201 /* WLRoute.swift */, A20000000000000000000202 /* WLNavigator.swift */, A20000000000000000000203 /* WLNavHost.swift */, A20000000000000000000204 /* WLTabBar.swift */, A20000000000000000000205 /* WLNavMotion.swift */, A20000000000000000000206 /* WLSharedElement.swift */, A20000000000000000000207 /* WLEdgeBackGesture.swift */);
+            path = Navigation;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000020 /* WishlistTests */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */, A20000000000000000000035 /* WLHeaderSheetTests.swift */);
+            path = WishlistTests;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000021 /* Overlay */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000113 /* OverlayHost.swift */, A20000000000000000000114 /* Scrim.swift */, A20000000000000000000115 /* WLBottomSheet.swift */, A20000000000000000000116 /* WLConfirmDialog.swift */, A20000000000000000000117 /* WLMenu.swift */);
+            path = Overlay;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000030 /* Features */ = {
+            isa = PBXGroup;
+            children = (A40000000000000000000031 /* Demo */);
+            path = Features;
+            sourceTree = "<group>";
+        };
+        A40000000000000000000031 /* Demo */ = {
+            isa = PBXGroup;
+            children = (A20000000000000000000211 /* DemoContent.swift */, A20000000000000000000212 /* DemoHomeScreen.swift */, A20000000000000000000213 /* DemoCategoryScreen.swift */, A20000000000000000000214 /* DemoPurposeScreen.swift */, A20000000000000000000215 /* DemoDetailScreen.swift */);
+            path = Demo;
             sourceTree = "<group>";
         };
 /* End PBXGroup section */
@@ -51,12 +192,33 @@
             productReference = A20000000000000000000003 /* Wishlist.app */;
             productType = "com.apple.product-type.application";
         };
+        A50000000000000000000002 /* WishlistTests */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = A90000000000000000000003 /* Tests configuration list */;
+            buildPhases = (A60000000000000000000003 /* Sources */, A30000000000000000000002 /* Frameworks */, A60000000000000000000004 /* Resources */);
+            buildRules = ();
+            dependencies = (A50000000000000000000003 /* PBXTargetDependency */);
+            name = WishlistTests;
+            productName = WishlistTests;
+            productReference = A20000000000000000000040 /* WishlistTests.xctest */;
+            productType = "com.apple.product-type.bundle.unit-test";
+        };
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+        A50000000000000000000004 /* PBXContainerItemProxy */ = {
+            isa = PBXContainerItemProxy;
+            containerPortal = A80000000000000000000001 /* Project object */;
+            proxyType = 1;
+            remoteGlobalIDString = A50000000000000000000001;
+            remoteInfo = Wishlist;
+        };
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXProject section */
         A80000000000000000000001 /* Project object */ = {
             isa = PBXProject;
-            attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; TargetAttributes = {A50000000000000000000001 = {CreatedOnToolsVersion = 26.0; }; }; };
+            attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; TargetAttributes = {A50000000000000000000001 = {CreatedOnToolsVersion = 26.0; }; A50000000000000000000002 = {CreatedOnToolsVersion = 26.0; TestTargetID = A50000000000000000000001; }; }; };
             buildConfigurationList = A90000000000000000000001 /* Project configuration list */;
             compatibilityVersion = "Xcode 14.0";
             developmentRegion = ko;
@@ -66,12 +228,21 @@
             productRefGroup = A40000000000000000000003 /* Products */;
             projectDirPath = "";
             projectRoot = "";
-            targets = (A50000000000000000000001 /* Wishlist */);
+            targets = (A50000000000000000000001 /* Wishlist */, A50000000000000000000002 /* WishlistTests */);
         };
 /* End PBXProject section */
 
+/* Begin PBXTargetDependency section */
+        A50000000000000000000003 /* PBXTargetDependency */ = {
+            isa = PBXTargetDependency;
+            target = A50000000000000000000001 /* Wishlist */;
+            targetProxy = A50000000000000000000004 /* PBXContainerItemProxy */;
+        };
+/* End PBXTargetDependency section */
+
 /* Begin PBXResourcesBuildPhase section */
-        A60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        A60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A100000000000000000000FA /* Localizable.xcstrings in Resources */, A10000000000000000000005 /* do_hyeon.ttf in Resources */, A10000000000000000000006 /* ibm_plex_sans_kr_regular.ttf in Resources */, A10000000000000000000007 /* ibm_plex_sans_kr_medium.ttf in Resources */, A10000000000000000000008 /* ibm_plex_sans_kr_bold.ttf in Resources */, A10000000000000000000009 /* OFL.txt in Resources */); runOnlyForDeploymentPostprocessing = 0; };
+        A60000000000000000000004 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
@@ -93,7 +264,13 @@
         A60000000000000000000001 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */);
+            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */, A10000000000000000000004 /* WLTypography.swift in Sources */, A10000000000000000000101 /* WLTheme.swift in Sources */, A10000000000000000000102 /* WLButton.swift in Sources */, A10000000000000000000103 /* WLCard.swift in Sources */, A10000000000000000000104 /* WLIconTile.swift in Sources */, A10000000000000000000105 /* WLChip.swift in Sources */, A10000000000000000000106 /* WLInput.swift in Sources */, A10000000000000000000107 /* WLUnderlineField.swift in Sources */, A10000000000000000000108 /* PriceText.swift in Sources */, A10000000000000000000109 /* PurposeDot.swift in Sources */, A10000000000000000000110 /* EmptyState.swift in Sources */, A10000000000000000000111 /* ExpandableGroup.swift in Sources */, A10000000000000000000112 /* Masonry2Col.swift in Sources */, A10000000000000000000118 /* WLHeaderSheet.swift in Sources */, A10000000000000000000119 /* WLTopBar.swift in Sources */, A10000000000000000000113 /* OverlayHost.swift in Sources */, A10000000000000000000114 /* Scrim.swift in Sources */, A10000000000000000000115 /* WLBottomSheet.swift in Sources */, A10000000000000000000116 /* WLConfirmDialog.swift in Sources */, A10000000000000000000117 /* WLMenu.swift in Sources */, A10000000000000000000201 /* WLRoute.swift in Sources */, A10000000000000000000202 /* WLNavigator.swift in Sources */, A10000000000000000000203 /* WLNavHost.swift in Sources */, A10000000000000000000204 /* WLTabBar.swift in Sources */, A10000000000000000000205 /* WLNavMotion.swift in Sources */, A10000000000000000000206 /* WLSharedElement.swift in Sources */, A10000000000000000000207 /* WLEdgeBackGesture.swift in Sources */, A10000000000000000000211 /* DemoContent.swift in Sources */, A10000000000000000000212 /* DemoHomeScreen.swift in Sources */, A10000000000000000000213 /* DemoCategoryScreen.swift in Sources */, A10000000000000000000214 /* DemoPurposeScreen.swift in Sources */, A10000000000000000000215 /* DemoDetailScreen.swift in Sources */);
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        A60000000000000000000003 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */, A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXSourcesBuildPhase section */
@@ -136,6 +313,7 @@
                 "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
                 FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
                 GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_FILE = Wishlist/Info.plist;
                 INFOPLIST_KEY_CFBundleDisplayName = "위시리스트";
                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
                 INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -162,6 +340,7 @@
                 "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
                 FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
                 GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_FILE = Wishlist/Info.plist;
                 INFOPLIST_KEY_CFBundleDisplayName = "위시리스트";
                 INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
                 INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -179,6 +358,46 @@
             };
             name = Release;
         };
+        B10000000000000000000005 /* Tests Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+                FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+                GENERATE_INFOPLIST_FILE = YES;
+                LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks");
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = app.wishlist.ios.tests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wishlist.app/Wishlist";
+            };
+            name = Debug;
+        };
+        B10000000000000000000006 /* Tests Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                "EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+                FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+                GENERATE_INFOPLIST_FILE = YES;
+                LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks");
+                MARKETING_VERSION = 0.1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = app.wishlist.ios.tests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wishlist.app/Wishlist";
+            };
+            name = Release;
+        };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -191,6 +410,12 @@
         A90000000000000000000002 /* Target configuration list */ = {
             isa = XCConfigurationList;
             buildConfigurations = (B10000000000000000000003 /* Target Debug */, B10000000000000000000004 /* Target Release */);
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        A90000000000000000000003 /* Tests configuration list */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (B10000000000000000000005 /* Tests Debug */, B10000000000000000000006 /* Tests Release */);
             defaultConfigurationIsVisible = 0;
             defaultConfigurationName = Release;
         };

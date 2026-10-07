@@ -1,0 +1,104 @@
+name: Client checks
+
+on:
+  pull_request:
+    paths:
+      - 'client/**'
+      - 'design/handoff/interactions/tokens.json'
+      - '.github/workflows/client-checks.yml'
+  push:
+    branches:
+      - develop
+    paths:
+      - 'client/**'
+      - 'design/handoff/interactions/tokens.json'
+      - '.github/workflows/client-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tokens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - run: python3 -m unittest client/tools/test_gen_tokens.py
+      - run: python3 client/tools/gen_tokens.py --check
+
+  # 2026-10-07: Android·iOS job은 PR·push 병목이라 자동 실행을 끄고 수동 실행(workflow_dispatch)에서만 돈다.
+  android:
+    needs: tokens
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@07d1f8453baaff67fb503883367f8b13e6158a54 # v6
+        with:
+          cache-provider: basic
+      - name: Test, lint and build both variants
+        run: ./gradlew :android:testDebugUnitTest :android:testReleaseUnitTest :android:lintDebug :android:assembleDebug :android:assembleRelease :shared:testAndroidHostTest
+
+  ios:
+    needs: tokens
+    if: github.event_name == 'workflow_dispatch'
+    # shared declares iosSimulatorArm64 only. macos-15 is the arm64 image.
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: '17.5'
+            device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro
+          - runtime: '26.0.1'
+            device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@07d1f8453baaff67fb503883367f8b13e6158a54 # v6
+        with:
+          cache-provider: basic
+      - name: Prepare iOS ${{ matrix.runtime }} simulator
+        id: simulator
+        run: |
+          device_id=$(bash client/ios/scripts/prepare-ci-simulator.sh '${{ matrix.runtime }}' '${{ matrix.device-type }}')
+          echo "device_id=$device_id" >> "$GITHUB_OUTPUT"
+      # SwiftUI exposes accessibility elements only when app accessibility is on; WLTypographyTests reads that tree.
+      - name: Enable simulator app accessibility
+        run: |
+          xcrun simctl boot '${{ steps.simulator.outputs.device_id }}' || true
+          xcrun simctl spawn '${{ steps.simulator.outputs.device_id }}' defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true
+      - name: Test on arm64 simulator
+        run: >-
+          xcodebuild test -project client/ios/Wishlist.xcodeproj -scheme Wishlist
+          -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.device_id }}'
+          -derivedDataPath client/ios/DerivedData CODE_SIGNING_ALLOWED=NO
+      - name: Build Release without signing
+        if: matrix.runtime == '26.0.1'
+        run: >-
+          xcodebuild build -project client/ios/Wishlist.xcodeproj -scheme Wishlist
+          -configuration Release -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath client/ios/DerivedData CODE_SIGNING_ALLOWED=NO

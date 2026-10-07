@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">위시리스트</string>
+    <string name="wl_close">닫기</string>
+    <string name="wl_sheet">시트</string>
+    <string name="wl_expanded">펼침</string>
+    <string name="wl_collapsed">접힘</string>
+    <string name="wl_menu">메뉴</string>
+    <string name="wl_tab_home">홈</string>
+    <string name="wl_tab_category">카테고리</string>
+    <string name="wl_tab_purpose">목적</string>
+    <string name="wl_header_sheet_expand">목록 넓게 보기</string>
+    <string name="wl_header_sheet_collapse">헤더 펼치기</string>
 </resources>

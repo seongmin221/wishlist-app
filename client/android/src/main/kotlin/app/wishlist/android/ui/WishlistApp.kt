@@ -1,26 +1,23 @@
 package app.wishlist.android.ui
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import app.wishlist.shared.AppInfo
+import androidx.compose.runtime.CompositionLocalProvider
+import app.wishlist.android.navigation.LocalWLNavigator
+import app.wishlist.android.navigation.rememberWLNavigator
+import app.wishlist.android.designsystem.WLTheme
+import app.wishlist.android.designsystem.overlay.OverlayHost
+import app.wishlist.android.designsystem.overlay.rememberOverlayHostState
+import app.wishlist.android.navigation.WLNavHost
 
+/** 앱 루트: 테마 → overlay(시트·확인창·메뉴) → 탭 셸. */
 @Composable
 fun WishlistApp() {
-    val appInfo = remember { AppInfo() }
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(appInfo.displayName, style = MaterialTheme.typography.headlineLarge)
+    WLTheme {
+        val navigator = rememberWLNavigator(AppRouteCodec)
+        CompositionLocalProvider(LocalWLNavigator provides navigator) {
+            OverlayHost(rememberOverlayHostState()) {
+                WLNavHost(navigator = navigator) { route, sourceKey -> AppRoute(route, sourceKey) }
+            }
         }
     }
 }
