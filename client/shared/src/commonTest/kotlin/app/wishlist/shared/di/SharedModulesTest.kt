@@ -3,6 +3,7 @@
 package app.wishlist.shared.di
 
 import app.wishlist.shared.core.ApiId
+import app.wishlist.shared.core.AuthProvider
 import app.wishlist.shared.core.AuthSession
 import app.wishlist.shared.core.ClientError
 import app.wishlist.shared.core.ClientResult
@@ -44,6 +45,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class SharedModulesTest {
+    private val savedAccount = mapOf("auth.account" to "GOOGLE|fake-google-0001|user@example.com")
     private val remoteItemId = "00000000-0000-4000-8000-000000000101"
     private val boardOrder = listOf(
         "소니 WH-1000XM6", "보스 QuietComfort Ultra", "젠하이저 MOMENTUM 4", "애플 AirPods Max",
@@ -153,7 +155,7 @@ class SharedModulesTest {
         runtime.close()
     }
 
-    @Test fun debug_bootstrap_changes_account_then_seeds_that_namespace_then_reports_ready() = runTest {
+    @Test fun debug_bootstrap_starts_signed_out_and_reports_ready() = runTest {
         val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
         val accountWhenReady = mutableListOf<String?>()
         // A foreground collector: advanceUntilIdle does not drive background-only work.
@@ -162,15 +164,44 @@ class SharedModulesTest {
             accountWhenReady += runtime.session.state.value.accountId
         }
         runtime.startDebugSession()
-        runtime.startDebugSession() // idempotent: one account change, one seed
+        runtime.startDebugSession() // idempotent
         advanceUntilIdle()
 
-        assertEquals(listOf<String?>(DEBUG_ACCOUNT_ID), accountWhenReady)
+        assertEquals(listOf<String?>(null), accountWhenReady)
         assertNull(runtime.bootstrapFailure.value)
-        assertEquals(1L, runtime.session.state.value.generation)
+        assertEquals(0L, runtime.session.state.value.generation)
+        assertTrue(runtime.auth().restored.value)
+        assertNull(runtime.auth().account.value)
+        assertEquals(ErrorKind.UNAUTHENTICATED, runtime.catalogRepository().items(null, null).error().kind)
+
+        // Signing in seeds that account's namespace.
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val items = runtime.catalogRepository().items(null, null).successValue()
         assertEquals(boardOrder, items.map { it.product.name })
         assertEquals(7, runtime.catalogRepository().purposes().successValue().size)
+        runtime.close()
+    }
+
+    @Test fun debug_bootstrap_restores_the_saved_account_and_seeds_that_namespace_before_ready() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = mapOf("auth.account" to "APPLE|fake-apple-0001|apple@example.com") }
+        val runtime = createRuntime(debugBindings(), probe = probe, dispatcher = StandardTestDispatcher(testScheduler))
+        val seenWhenReady = mutableListOf<Pair<String?, Int>>()
+        launch {
+            runtime.ready.first { it }
+            seenWhenReady += runtime.session.state.value.accountId to runtime.catalogRepository().items(null, null).successValue().size
+        }
+        runtime.startDebugSession()
+        advanceUntilIdle()
+
+        assertEquals(listOf<Pair<String?, Int>>("fake-apple-0001" to boardOrder.size), seenWhenReady)
+        assertEquals(AuthProvider.APPLE, runtime.auth().account.value?.provider)
+        assertNull(runtime.bootstrapFailure.value)
+        runtime.close()
+    }
+
+    @Test fun release_auth_is_the_unavailable_facade() {
+        val runtime = createRuntime(releaseBindings())
+        assertIs<UnavailableAuthFacade>(runtime.auth())
         runtime.close()
     }
 
@@ -180,6 +211,7 @@ class SharedModulesTest {
         val runtime = createRuntime(debugBindings())
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
 
         val facade = assertIs<GatedGetItemRepository>(runtime.getItemRepository())
         val cached = assertIs<CachedGetItemRepository>(facade.delegate)
@@ -197,6 +229,7 @@ class SharedModulesTest {
         val runtime = createRuntime(debugBindings(ApiId.ITEM_03 to Backend.UNAVAILABLE))
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val cached = assertIs<CachedGetItemRepository>(assertIs<GatedGetItemRepository>(runtime.getItemRepository()).delegate)
         assertSame(UnavailableItemRepository, cached.delegate)
 
@@ -226,6 +259,7 @@ class SharedModulesTest {
         assertIs<RemoteItemRepository>(cached.delegate)
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
 
         val item = runtime.getItemRepository().get(remoteItemId).successValue()
         assertEquals(2, item.version)
@@ -246,8 +280,10 @@ class SharedModulesTest {
         advanceUntilIdle()
         assertEquals(RUNTIME_NOT_READY, presenter.state.value.error?.code)
 
-        // The debug bootstrap changes the runtime session's account: the Presenter starts over.
+        // Signing in changes the runtime session's account: the Presenter starts over.
         runtime.startDebugSession()
+        advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         advanceUntilIdle()
         assertEquals(ItemDetailState.Initial, presenter.state.value)
 
@@ -289,6 +325,7 @@ class SharedModulesTest {
 
         a.startDebugSession()
         a.ready.first { it }
+        a.auth().signIn(AuthProvider.GOOGLE).successValue()
         assertFalse(b.ready.value)
         assertNull(b.session.state.value.accountId)
 
@@ -317,6 +354,7 @@ class SharedModulesTest {
         )
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         runtime.getItemRepository().get(remoteItemId).successValue()
         assertEquals(1, probe.drivers.size)
         assertEquals(1, probe.engines.size)
@@ -358,20 +396,17 @@ class SharedModulesTest {
     @Test fun close_during_first_driver_open_does_not_throw_and_still_closes_the_driver_once() = runTest {
         val probe = RuntimeResourcesProbe()
         val runtime = createRuntime(debugBindings(), probe = probe)
-        runtime.startDebugSession()
-        runtime.ready.first { it }
         var closes = 0
-        // close() arrives while the first real store use is opening the driver (lookups open nothing).
+        // close() arrives while the bootstrap's first real store use (the login restore) opens the driver.
         probe.onDriverOpen = { if (closes++ == 0) runtime.close() }
 
         val facade = runtime.getItemRepository()
-        assertTrue(probe.drivers.isEmpty())
-        val failure = facade.get(remoteItemId).error()
-        assertEquals(ErrorKind.UNAVAILABLE, failure.kind)
+        assertTrue(probe.drivers.isEmpty())                    // lookups open nothing
+        runtime.startDebugSession()
         assertFalse(runtime.ready.value)
-        assertEquals(RUNTIME_NOT_READY, facade.get(remoteItemId).error().code)
         assertEquals(1, probe.drivers.size)
         assertEquals(1, probe.drivers.single().closes)
+        assertEquals(RUNTIME_NOT_READY, facade.get(remoteItemId).error().code)
         // Everything after close stays a typed failure, never an exception.
         assertEquals(RUNTIME_NOT_READY, runtime.localStore().pending().error().code)
         runtime.startDebugSession()
@@ -425,7 +460,8 @@ class SharedModulesTest {
     }
 
     @Test fun debugSeedFailureStillPublishesReadyAndReportsError() = runTest {
-        val runtime = createRuntime(debugBindings(), seedOverride = { ClientResult.Failure(ClientError(ErrorKind.VALIDATION)) })
+        val probe = RuntimeResourcesProbe().apply { appState = savedAccount }
+        val runtime = createRuntime(debugBindings(), probe = probe, seedOverride = { ClientResult.Failure(ClientError(ErrorKind.VALIDATION)) })
         runtime.startDebugSession()
         assertTrue(runtime.ready.value)
         assertEquals(ErrorKind.VALIDATION, runtime.bootstrapFailure.value?.kind)
@@ -433,7 +469,8 @@ class SharedModulesTest {
     }
 
     @Test fun unexpectedBootstrapExceptionIsReportedNotThrown() = runTest {
-        val runtime = createRuntime(debugBindings(), seedOverride = { throw IllegalStateException("seed exploded") })
+        val probe = RuntimeResourcesProbe().apply { appState = savedAccount }
+        val runtime = createRuntime(debugBindings(), probe = probe, seedOverride = { throw IllegalStateException("seed exploded") })
         runtime.startDebugSession()
         assertTrue(runtime.ready.value)
         val failure = runtime.bootstrapFailure.value

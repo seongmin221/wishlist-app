@@ -28,7 +28,7 @@ interface AuthSession {
     ): ClientResult<T>
 }
 
-class MutableAuthSession : AuthSession {
+internal class MutableAuthSession : AuthSession {
     private val gate = Mutex()
     private val mutableState = MutableStateFlow(SessionSnapshot(null, 0))
     override val state: StateFlow<SessionSnapshot> = mutableState.asStateFlow()

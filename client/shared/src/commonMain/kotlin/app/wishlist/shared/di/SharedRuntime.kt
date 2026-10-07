@@ -3,6 +3,7 @@
 package app.wishlist.shared.di
 
 import app.wishlist.shared.core.ApiId
+import app.wishlist.shared.core.AuthFacade
 import app.wishlist.shared.core.AuthSession
 import app.wishlist.shared.core.ClientError
 import app.wishlist.shared.core.ClientResult
@@ -12,6 +13,7 @@ import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.core.RuntimeDispatchers
 import app.wishlist.shared.data.fake.BoardSeeds
+import app.wishlist.shared.data.fake.FakeAuthFacade
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.presentation.ItemDetailPresenter
 import app.wishlist.shared.repository.CatalogRepository
@@ -30,9 +32,6 @@ import kotlinx.coroutines.launch
 import org.koin.core.Koin
 import org.koin.dsl.koinApplication
 import kotlin.uuid.Uuid
-
-/** Owner namespace the debug bootstrap logs into before seeding the board. */
-internal const val DEBUG_ACCOUNT_ID = "debug-board-owner"
 
 /** The debug bootstrap threw instead of returning a typed failure. */
 internal const val BOOTSTRAP_FAILURE = "BOOTSTRAP_FAILURE"
@@ -63,8 +62,8 @@ internal fun assembleSharedRuntime(
 /**
  * One isolated shared graph (its own DI container, never a global one) per app process.
  * Every component uses the same [session]. Facades are gated by [ready]: RELEASE is ready right
- * after assembly; DEBUG becomes ready only after [startDebugSession] has changed the account to
- * the debug owner and seeded that namespace. Before ready and after [close], requests return
+ * after assembly; DEBUG starts signed out and becomes ready only after [startDebugSession] has
+ * restored the saved fake account (if any) and seeded that account's namespace. Before ready and after [close], requests return
  * UNAVAILABLE/RUNTIME_NOT_READY. Apps see only these facades, never the DB, HTTP or DI library
  * types (kept Kotlin-internal so the ObjC header stays free of them).
  */
@@ -92,6 +91,19 @@ class SharedRuntime internal constructor(
     /** Test seam: runs in the bootstrap right before ready is published (close-race tests). */
     internal var beforeReadyPublished: () -> Unit = {}
 
+    // DEBUG: the fake login seeds the namespace of whichever account signs in or is restored.
+    private val fakeAuth: FakeAuthFacade? =
+        if (env.bindings.buildMode == ClientBuildMode.DEBUG) {
+            val fakeStore = koin.get<FakeStore>()
+            FakeAuthFacade(
+                session = mutableSession,
+                store = koin.get<LocalStore>(),
+                seed = seedOverride ?: { fakeStore.seed(BoardSeeds.create(env.clock, env.ids)) },
+            )
+        } else {
+            null
+        }
+
     val session: AuthSession get() = mutableSession
     val ready: StateFlow<Boolean> = mutableReady.asStateFlow()
 
@@ -105,20 +117,20 @@ class SharedRuntime internal constructor(
     private val guard = CloseGuard(onClosed = ::tearDown)
 
     /**
-     * DEBUG only, idempotent: account → debug owner, seed that same namespace, then ready=true.
-     * A failed seed or an exception still publishes ready, with the cause in [bootstrapFailure].
+     * DEBUG only, idempotent: starts signed out, restores the saved fake account (changing the
+     * session to it and seeding that namespace), then ready=true. A failed restore/seed or an
+     * exception still publishes ready, with the cause in [bootstrapFailure].
      * Calling it in RELEASE is a programming error.
      */
     fun startDebugSession() {
         check(env.bindings.buildMode == ClientBuildMode.DEBUG) { "startDebugSession is DEBUG only" }
         if (!debugStarted.compareAndSet(expect = false, update = true)) return
-        // Inside the guard, a concurrent close() cannot tear the graph down under this lookup.
-        val store = guard.use { koin.get<FakeStore>() } ?: return
-        val seed = seedOverride ?: { store.seed(BoardSeeds.create(env.clock, env.ids)) }
+        val auth = fakeAuth ?: return
+        // Refused once closing began, so a closed graph never starts a bootstrap.
+        if (guard.use { } == null) return
         scope.launch(bootstrapExceptionHandler) {
             val failure = try {
-                mutableSession.changeAccount(DEBUG_ACCOUNT_ID)
-                (seed() as? ClientResult.Failure)?.error
+                auth.restore()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -145,6 +157,12 @@ class SharedRuntime internal constructor(
     /** Debug seed catalog (DEBUG); UNAVAILABLE in RELEASE. Not a CAT/PUR/ITEM-02 wire backend. */
     fun catalogRepository(): CatalogRepository =
         GatedCatalogRepository(ready, resolveOr<CatalogRepository>(UnavailableCatalogRepository) { get() })
+
+    /** Login state and sign-in/out: the fake facade in DEBUG, UNAVAILABLE in RELEASE. */
+    fun auth(): AuthFacade = when (val auth = fakeAuth) {
+        null -> UnavailableAuthFacade()
+        else -> if (guard.use { } == null) UnavailableAuthFacade() else GatedAuthFacade(ready, auth)
+    }
 
     fun localStore(): LocalStore = GatedLocalStore(ready, resolveOr<LocalStore>(ClosedLocalStore) { get() })
 

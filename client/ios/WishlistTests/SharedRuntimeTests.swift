@@ -16,7 +16,8 @@ final class SharedRuntimeTests: XCTestCase {
     }
 
     @MainActor
-    func testDebugBootstrapMakesTheRuntimeReadyForTheDebugOwner() async {
+    func testDebugBootstrapStartsSignedOutAndReady() async {
+        await SharedTestRuntime.clearSavedLogin()
         let runtime = SharedRuntimeFactory.shared.create(bindings: AppRuntimeConfig.bindings(), remote: nil)
         defer { runtime.close() }
         XCTAssertFalse(runtime.ready.value.boolValue)
@@ -37,7 +38,9 @@ final class SharedRuntimeTests: XCTestCase {
         await collector.value
 
         XCTAssertEqual(observed.last, true)
-        XCTAssertEqual(runtime.session.state.value.accountId, "debug-board-owner")
+        XCTAssertNil(runtime.session.state.value.accountId)
+        XCTAssertTrue(runtime.auth().restored.value.boolValue)
+        XCTAssertNil(runtime.auth().account.value)
         runtime.close()
         XCTAssertFalse(runtime.ready.value.boolValue)
     }

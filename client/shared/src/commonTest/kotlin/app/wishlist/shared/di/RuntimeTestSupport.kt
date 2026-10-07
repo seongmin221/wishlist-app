@@ -8,6 +8,7 @@ import app.wishlist.shared.core.ClientResult
 import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.core.RuntimeDispatchers
+import app.wishlist.shared.data.local.WishlistDatabase
 import app.wishlist.shared.data.local.deleteTestDb
 import app.wishlist.shared.data.local.newTestDbPath
 import app.wishlist.shared.data.local.openTestDriver
@@ -52,13 +53,21 @@ internal class RuntimeResourcesProbe(
     val drivers = mutableListOf<CountingDriver>()
     val engines = mutableListOf<CountingEngine>()
 
+    /** app_state rows written into the database before the graph first uses it (e.g. a saved login). */
+    var appState: Map<String, String> = emptyMap()
+
     /** Runs inside the graph's driver creation, i.e. in the middle of a facade resolution. */
     var onDriverOpen: () -> Unit = {}
 
     val platform = PlatformResources(
         openDriver = {
             onDriverOpen()
-            newTestDbPath().let { path -> CountingDriver(openTestDriver(path), path).also { drivers += it } }
+            newTestDbPath().let { path ->
+                CountingDriver(openTestDriver(path), path).also { driver ->
+                    drivers += driver
+                    appState.forEach { (key, value) -> WishlistDatabase(driver).wishlistQueries.upsertAppState(key, value) }
+                }
+            }
         },
         createEngine = { CountingEngine(engineFactory()).also { engines += it } },
     )

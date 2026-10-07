@@ -23,7 +23,7 @@ internal const val API_UNAVAILABLE = "API_UNAVAILABLE"
 /** The runtime is not ready yet (debug bootstrap pending) or already closed. */
 internal const val RUNTIME_NOT_READY = "RUNTIME_NOT_READY"
 
-private fun unavailable(code: String) = ClientResult.Failure(ClientError(ErrorKind.UNAVAILABLE, code))
+internal fun unavailable(code: String) = ClientResult.Failure(ClientError(ErrorKind.UNAVAILABLE, code))
 
 /** The UNAVAILABLE backend for ITEM-01/ITEM-03: a typed failure, never an exception. */
 internal object UnavailableItemRepository : CreateItemRepository, GetItemRepository {

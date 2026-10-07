@@ -31,15 +31,15 @@ final class ItemDetailPresenterOwnerTests: XCTestCase {
         owner.load(id: seed.id)
         await SharedTestRuntime.eventually { owner.item?.id == seed.id }
 
-        try await SharedTestRuntime.changeAccount(runtime, to: "other-account")
+        try await SharedTestRuntime.switchAccount(runtime, to: .apple)
         await SharedTestRuntime.eventually { owner.item == nil && owner.error == nil && !owner.loading }
 
         owner.retry()
         await SharedTestRuntime.eventually { owner.error?.kind == .notFound }
         XCTAssertNil(owner.item)
 
-        // Error -> retry -> item, once the debug owner is signed in again (new generation).
-        try await SharedTestRuntime.changeAccount(runtime, to: "debug-board-owner")
+        // Error -> retry -> item, once the first account is signed in again (new generation).
+        try await SharedTestRuntime.switchAccount(runtime, to: .google)
         await SharedTestRuntime.eventually { owner.error == nil && owner.item == nil }
         owner.retry()
         await SharedTestRuntime.eventually { owner.item?.id == seed.id && !owner.loading }
@@ -79,7 +79,7 @@ final class ItemDetailPresenterOwnerTests: XCTestCase {
         // The collection task holds the owner weakly, so dropping the last reference ends it.
         await SharedTestRuntime.eventually { released == nil }
 
-        try await SharedTestRuntime.changeAccount(runtime, to: "other-account")
+        try await SharedTestRuntime.switchAccount(runtime, to: .apple)
         presenter.load(id: seed.id)
         await SharedTestRuntime.stays(for: 0.5) { presenter.state.value.item?.id == seed.id }
     }

@@ -69,16 +69,16 @@ final class SharedInteropTests: XCTestCase {
         await SharedTestRuntime.eventually { presenter.state.value.item?.id == seed.id }
 
         // Another account: the previous item and error disappear at once.
-        try await SharedTestRuntime.changeAccount(runtime, to: "other-account")
+        try await SharedTestRuntime.switchAccount(runtime, to: .apple)
         await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
 
-        // That account cannot see the debug owner's item.
+        // That account cannot see the first account's item.
         presenter.retry()
         await SharedTestRuntime.eventually { presenter.state.value.error?.kind == .notFound }
         XCTAssertNil(presenter.state.value.item)
 
-        // Back to the debug owner (a new generation): cleared again, then retry finds the item.
-        try await SharedTestRuntime.changeAccount(runtime, to: "debug-board-owner")
+        // Back to the first account (a new generation): cleared again, then retry finds the item.
+        try await SharedTestRuntime.switchAccount(runtime, to: .google)
         await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
         presenter.retry()
         await SharedTestRuntime.eventually { presenter.state.value.item?.id == seed.id }
@@ -138,6 +138,7 @@ enum SharedTestRuntime {
     static func readyDebug() async -> SharedRuntime {
         let runtime = SharedRuntimeFactory.shared.create(bindings: AppRuntimeConfig.bindings(), remote: nil)
         await start(runtime)
+        _ = try? await runtime.auth().signIn(provider: .google)
         return runtime
     }
 
@@ -152,6 +153,7 @@ enum SharedTestRuntime {
             remote: RemoteConfig(baseUrl: "http://127.0.0.1:9", tokenSource: tokenSource)
         )
         await start(runtime)
+        _ = try? await runtime.auth().signIn(provider: .google)
         return runtime
     }
 
@@ -175,10 +177,19 @@ enum SharedTestRuntime {
         return try XCTUnwrap(items?.first)
     }
 
-    /// Login/logout/relogin through the runtime's own session (the same one its Presenters use).
-    static func changeAccount(_ runtime: SharedRuntime, to accountId: String?) async throws {
-        let session = try XCTUnwrap(runtime.session as? MutableAuthSession)
-        try await session.changeAccount(accountId: accountId)
+    /// The debug database persists on the simulator, so a saved fake login from an earlier test would be
+    /// restored at the next start. Tests that need "signed out at start" clear it first.
+    @MainActor
+    static func clearSavedLogin() async {
+        let runtime = await readyDebug()
+        _ = try? await runtime.auth().signOut()
+        runtime.close()
+    }
+
+    /// Logout then login as `provider` through the runtime's fake auth facade (the same session its Presenters use).
+    static func switchAccount(_ runtime: SharedRuntime, to provider: AuthProvider) async throws {
+        _ = try await runtime.auth().signOut()
+        _ = try await runtime.auth().signIn(provider: provider)
     }
 
     /// Waits (bounded) until `condition` holds on the main actor.
