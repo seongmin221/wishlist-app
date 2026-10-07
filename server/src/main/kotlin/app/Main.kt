@@ -14,6 +14,7 @@ import app.tasks.CloudTasksGateway
 import app.tasks.OutboxDispatcher
 import app.wishlist.CreateWishlistItemService
 import app.wishlist.WishlistReadService
+import app.home.HomeReadService
 import app.wishlist.GetWishlistItemService
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.tasks.v2.CloudTasksClient
@@ -88,6 +89,7 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         wishlistRoutes(service, detailService) { resolver.resolve(it) }
         wishlistReadRoutes(readService) { resolver.resolve(it) }
         homeActionRoutes(readService) { resolver.resolve(it) }
+        homeSummaryRoutes(HomeReadService(source)) { resolver.resolve(it) }
         categoryRoutes(CategoryService(source)) { resolver.resolve(it) }
         purposeRoutes(PurposeService(source)) { resolver.resolve(it) }
     }
