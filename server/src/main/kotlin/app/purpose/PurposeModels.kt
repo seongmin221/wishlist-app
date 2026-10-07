@@ -21,7 +21,8 @@ object PurposeLimits {
     const val ACTIVE_LIMIT = 30
     const val CREATES_PER_WINDOW = 10
     const val CREATE_WINDOW_SECONDS = 60
-    const val PAGE_LIMIT = 30
+    /** Must be at least ACTIVE_LIMIT: one default page returns every active purpose, so activity reordering cannot skip any. */
+    const val PAGE_LIMIT = ACTIVE_LIMIT
 }
 
 class PurposeException(val code: String, val fields: Set<String> = emptySet(), val currentVersion: Int? = null,

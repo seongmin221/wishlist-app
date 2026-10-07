@@ -39,4 +39,9 @@ class PurposeInputPolicyTest {
         assertEquals("가나", app.text.UserTextRules.truncate("가나다", 2))
         assertEquals("😀", app.text.UserTextRules.truncate("😀😀", 1))
     }
+
+    @Test fun `one default page holds every active purpose`() {
+        // Activity-ordered paging may skip or repeat a purpose between pages; a single default page avoids it.
+        assertTrue(PurposeLimits.PAGE_LIMIT >= PurposeLimits.ACTIVE_LIMIT)
+    }
 }

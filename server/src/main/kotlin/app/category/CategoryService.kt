@@ -64,7 +64,7 @@ class CategoryService(private val dataSource: DataSource) {
         }
     }
 
-    fun patch(owner: UUID, id: UUID, expectedVersion: Int, changes: FieldChanges): CustomCategory = dataSource.inTransaction { connection ->
+    fun patch(owner: UUID, id: UUID, expectedVersion: Int, changes: CategoryChanges): CustomCategory = dataSource.inTransaction { connection ->
         OwnerStructureLock.lock(connection, owner)
         val current = categories.find(connection, owner, id, lock = true) ?: throw CategoryException("CATEGORY_NOT_FOUND")
         if (current.version != expectedVersion) {

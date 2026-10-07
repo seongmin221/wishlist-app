@@ -40,13 +40,13 @@ class WishlistItemRepository(private val dataSource: DataSource) {
                    i.manual_completion_at, i.category_source, i.purpose_id::text purpose_id, i.purpose_source,
                    i.name_source, i.image_source, i.user_override_fields, i.client_submission_id, i.source_url,
                    i.product_image_url, i.analysis_failure_code, i.client_created_at, i.created_at, i.updated_at,
-                   coalesce((select name from public_categories c where c.id=i.category_id),
-                     (select name from custom_categories c where c.id=i.custom_category_id and c.owner_id=i.owner_id and c.deleted_at is null)) category_name,
-                   coalesce((select parent_id from public_categories c where c.id=i.category_id),
-                     (select parent_id from custom_categories c where c.id=i.custom_category_id and c.owner_id=i.owner_id and c.deleted_at is null)) category_parent,
+                   coalesce(pc.name, cc.name) category_name, coalesce(pc.parent_id, cc.parent_id) category_parent,
                    case when i.custom_category_id is not null then 'CUSTOM' when i.category_id is not null then 'PUBLIC' end category_kind,
                    p.name purpose_name, p.color_key purpose_color_key, p.icon_key purpose_icon_key
-            from wishlist_items i left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id
+            from wishlist_items i
+            left join public_categories pc on pc.id=i.category_id
+            left join custom_categories cc on cc.owner_id=i.owner_id and cc.id=i.custom_category_id and cc.deleted_at is null
+            left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id
             where i.owner_id = ? and i.$keyColumn = ?
         """.trimIndent()).use { statement ->
             statement.setObject(1, ownerId)

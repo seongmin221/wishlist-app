@@ -14,7 +14,7 @@ internal object CandidateSnapshotCodec {
             require(root["purpose_labels"] == null)
             requireNotNull(root["purposes"] as? JsonArray).map { value ->
                 val row = requireNotNull(value as? JsonObject)
-                PurposeCandidate(canonicalUuid(string(row["id"])), string(row["name"]),
+                PurposeCandidate(requireNotNull(parseCanonicalUuid(string(row["id"]))).toString(), string(row["name"]),
                     row["description"]?.takeUnless { it == JsonNull }?.let(::string), strings(row["item_names"]))
             }
         } else emptyList()
@@ -67,7 +67,6 @@ internal object CandidateSnapshotCodec {
         }).toString()
     }
 
-    private fun canonicalUuid(value: String): String = requireNotNull(parseCanonicalUuid(value)).toString()
 
     private fun string(value: JsonElement?): String =
         requireNotNull((value as? JsonPrimitive)?.takeIf { it.isString }?.content)

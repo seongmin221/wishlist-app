@@ -55,7 +55,7 @@ fun Route.categoryRoutes(service: CategoryService, ownerResolver: suspend(Applic
             is CategoryRequestParseResult.Valid -> parsed.request
             is CategoryRequestParseResult.Invalid -> return@patch call.respondCategoryInputError(parsed)
         }
-        val changes = FieldChanges(request.name, request.description, request.examples)
+        val changes = CategoryChanges(request.name, request.description, request.examples)
         categoryErrors(call) {
             val result = withContext(Dispatchers.IO) { service.patch(owner, id, request.expectedVersion, changes) }
             call.respondText(ApiJson.encodeToString(result.toDto()), ContentType.Application.Json)
