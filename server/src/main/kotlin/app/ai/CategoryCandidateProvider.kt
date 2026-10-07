@@ -3,6 +3,7 @@ package app.ai
 import app.analysis.AnalysisClaim
 import app.category.CategoryRepository
 import app.category.PublicCategoryRegistry
+import app.purpose.PurposeCandidateReader
 import java.sql.Connection
 
 fun interface CategoryCandidateSupply {
@@ -18,7 +19,9 @@ class CategoryCandidateProvider : CategoryCandidateSupply {
             row.id.toString() to CustomCategoryCandidate(row.version, row.input.name, row.parentId, row.input.description, row.input.examples)
         }
         val labels = custom.mapValues { (_,row) -> "${registry.parent(row.parentId)!!.name} > ${row.name}" }
+        val purposes = PurposeCandidateReader.read(connection, claim.ownerId, claim.itemId)
         return base.copy(categoryIds = base.categoryIds + custom.keys, categoryLabels = base.categoryLabels + labels,
-            ownerId = claim.ownerId.toString(), customCategories = custom)
+            ownerId = claim.ownerId.toString(), customCategories = custom,
+            purposeIds = purposes.map { it.id }.toCollection(LinkedHashSet()), schemaVersion = 3, purposeCandidates = purposes)
     }
 }

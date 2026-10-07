@@ -100,7 +100,7 @@ class ClassificationGatewayTest {
         try {
             val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna-2026-09-01", "secret"), baseUri = URI("http://127.0.0.1:${server.address.port}/v1"))
             val result = gateway.classify("Lamp", candidates) { phases.add("in_flight") }
-            assertEquals(ClassificationResult.Assigned("CAT_HOME", null), result.classification)
+            assertEquals(ClassificationResult.Assigned("CAT_HOME", null, purposeJudged = false), result.classification)
             assertEquals(1200, result.inputTokens)
             assertEquals(listOf("token_count", "in_flight", "paid_request"), phases.toList())
         } finally { server.stop(0) }

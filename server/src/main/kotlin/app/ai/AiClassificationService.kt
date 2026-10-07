@@ -19,6 +19,7 @@ class AiClassificationService(
     private val gateway: (String, CandidateSnapshot, () -> Unit) -> GatewayResponse,
 ) {
     private val pending = AnalysisPendingResultRepository(dataSource)
+    private val logger = org.slf4j.LoggerFactory.getLogger(AiClassificationService::class.java)
 
     fun classify(claim: AnalysisClaim, metadata: Metadata): ProcessingOutcome {
         val candidates = pending.candidateSnapshotWithConnection(claim, candidates::snapshot)
@@ -37,6 +38,9 @@ class AiClassificationService(
                 check(!inFlight) { "Gateway entered flight more than once" }
                 budget.markInFlight(reservation.id)
                 inFlight = true
+            }
+            result.sent?.let { sent ->
+                logger.info("AI classification tier jobId={} tier={} customSent={} purposeSent={}", claim.jobId, sent.tier, sent.customCount, sent.purposeCount)
             }
             if (!inFlight && (result.inputTokens != null || result.outputTokens != null ||
                     result.classification is ClassificationResult.Assigned || result.classification == ClassificationResult.Abstained)) {
