@@ -11,6 +11,7 @@ import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.core.RuntimeDispatchers
 import app.wishlist.shared.data.fake.BoardSeeds
 import app.wishlist.shared.data.fake.FakeStore
+import app.wishlist.shared.presentation.ItemDetailPresenter
 import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
@@ -111,6 +112,14 @@ class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
         GatedCatalogRepository(ready, resolveOr<CatalogRepository>(UnavailableCatalogRepository) { get() })
 
     fun localStore(): LocalStore = GatedLocalStore(ready, resolveOr<LocalStore>(ClosedLocalStore) { get() })
+
+    /**
+     * A new item detail Presenter over the gated ITEM-03 facade and this runtime's one [session].
+     * Repository work runs on the runtime's background (I/O) dispatcher, never on the caller's UI
+     * thread. The platform owner that requested it calls [ItemDetailPresenter.close].
+     */
+    fun itemDetailPresenter(): ItemDetailPresenter =
+        ItemDetailPresenter(repository = getItemRepository(), session = session, dispatcher = env.dispatchers.io)
 
     /**
      * Releases the HTTP client, its engine and the SQL driver once (if created). Idempotent and

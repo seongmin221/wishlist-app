@@ -572,12 +572,12 @@ Presenter의 유일한 상품 조회 의존성은 GetItemRepository다. 캐시 �
 }
 ```
 
-- [ ] **Step 0: 고정 결과 대조.** Task 1의 coroutines-test/Turbine 버전·host/Native 결과를 사용한다.
-- [ ] **Step 1: 실패 테스트.** initial→loading→item, error→retry→item, refresh 일반 오류는 기존 item 유지, NOT_FOUND는 item 제거, B가 먼저 완료하면 A 무시, close 취소/이후 intent 무시. session 계정/세대 변경 즉시 item/error 제거·요청 취소. 늦은 repository 응답도 snapshot/request ID 비교로 폐기. cache 검증은 Task 7 suite로 유지한다.
-- [ ] **Step 2: RED.** KMP_TEST에서 Presenter suite 실패.
-- [ ] **Step 3: 구현.** SupervisorJob·주입 dispatcher·read-only StateFlow, close idempotent. CancellationException은 전파. state 발행은 Task 2a 표를 따른다. UI/navigation 람다는 state 밖에 둔다.
-- [ ] **Step 4: 플랫폼 검증.** Swift에서 구체 item/error 사용 compile, for await 수집/retry/collector 취소/close/계정 전환 XCTest, Android owner 종료 테스트. Task 1 Flow/suspend 검증을 실제 Presenter 또는 repository harness로 유지하고 callback ABI 성공/오류는 독립 harness로 유지한다. Task 6a token 취소 의미론은 commonTest가 담당한다.
-- [ ] **Step 5: GREEN·커밋.** KMP_TEST·SharedInteropTests·owner tests. `feature(kmp): 상품 상세 Presenter 기반과 수명 연결 구현`.
+- [x] **Step 0: 고정 결과 대조.** Task 1의 coroutines-test/Turbine 버전·host/Native 결과를 사용한다.
+- [x] **Step 1: 실패 테스트.** initial→loading→item, error→retry→item, refresh 일반 오류는 기존 item 유지, NOT_FOUND는 item 제거, B가 먼저 완료하면 A 무시, close 취소/이후 intent 무시. session 계정/세대 변경 즉시 item/error 제거·요청 취소. 늦은 repository 응답도 snapshot/request ID 비교로 폐기. cache 검증은 Task 7 suite로 유지한다.
+- [x] **Step 2: RED.** KMP_TEST에서 Presenter suite 실패.
+- [x] **Step 3: 구현.** SupervisorJob·주입 dispatcher·read-only StateFlow, close idempotent. CancellationException은 전파. state 발행은 Task 2a 표를 따른다. UI/navigation 람다는 state 밖에 둔다.
+- [x] **Step 4: 플랫폼 검증.** Swift에서 구체 item/error 사용 compile, for await 수집/retry/collector 취소/close/계정 전환 XCTest, Android owner 종료 테스트. Task 1 Flow/suspend 검증을 실제 Presenter 또는 repository harness로 유지하고 callback ABI 성공/오류는 독립 harness로 유지한다. Task 6a token 취소 의미론은 commonTest가 담당한다.
+- [x] **Step 5: GREEN·커밋.** KMP_TEST·SharedInteropTests·owner tests. `feature(kmp): 상품 상세 Presenter 기반과 수명 연결 구현`.
 
 ## Task 10: 전체 검증·문서·C2 PR
 

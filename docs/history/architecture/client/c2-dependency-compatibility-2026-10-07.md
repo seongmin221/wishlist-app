@@ -21,7 +21,7 @@ Ktor 3.6.0 자체의 compile/link 실패는 없었다. 배제 이유는 coroutin
 
 임시 독립 프로젝트에서 DTO encode, Ktor content negotiation/JSON 및 MockEngine 요청, OkHttp/Darwin factory, SQL schema 생성·query·세 driver, Koin module/resolve, coroutines `runTest`와 Turbine을 사용했다. 선언만 해석한 결과와 구분해 두 버전 조합의 Android host/Native compile, KMP test, simulator Debug framework와 device Release framework, Android 앱 compile을 실행했다. 임시 소스는 제품 tree에 포함하지 않는다.
 
-영구 `InteropProbe`와 `PlatformTokenSource`를 남겨 후속 Task의 ABI 기준으로 사용한다. `invokeToken`은 Swift provider를 직접 호출하며 suspend token adapter를 만들지 않는다. token adapter의 늦은 완료/중복/취소 의미론은 Task 6a 범위다. 실제 Firebase SDK는 C3/C4 인증 연결에서 다룬다. Flow/suspend는 SKIE를 사용하고 Ktor·SQLDelight·Koin은 `implementation`으로 두어 framework에 의존성 전체를 export하지 않는다.
+영구 `InteropProbe`와 `PlatformTokenSource`를 남겨 후속 Task의 ABI 기준으로 사용한다. (Task 9에서 `InteropProbe`를 삭제했다. Flow/suspend/close 보장은 실제 `ItemDetailPresenter`·runtime으로, callback ABI는 REMOTE runtime + Swift token source로 `SharedInteropTests`가 유지한다.) `invokeToken`은 Swift provider를 직접 호출하며 suspend token adapter를 만들지 않는다. token adapter의 늦은 완료/중복/취소 의미론은 Task 6a 범위다. 실제 Firebase SDK는 C3/C4 인증 연결에서 다룬다. Flow/suspend는 SKIE를 사용하고 Ktor·SQLDelight·Koin은 `implementation`으로 두어 framework에 의존성 전체를 export하지 않는다.
 
 Swift 테스트를 먼저 추가해 미정의 protocol로 compile RED를 확인한 뒤 probe를 구현했다. 생성 header에서 `fetchToken(forceRefresh:completion:)`, `complete(token:errorCode:)`, `invokeToken(source:completion:)`을 확인했다. Flow는 0→1, Swift 수집 task 취소 후 값 변경 미수집, suspend 반환, close 후 `CancellationError`, Swift token 성공과 `TOKEN_FAILED` 오류를 검증한다. 후속 Presenter도 이 경계를 유지해야 한다.
 

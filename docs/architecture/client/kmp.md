@@ -27,7 +27,7 @@
 - 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared` 모듈로 시작한다.
 - shared target은 Android, `iosArm64`, `iosSimulatorArm64`다. Android는 공식 KMP library plugin, iOS는 static `Shared.framework` direct integration을 사용한다.
 - 지원 하한은 Android 8(API 26), iOS 17이다.
-- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`·interop probe와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드, Fake·Remote(ITEM-01·03)·로컬 캐시와 이를 조립하는 `SharedRuntime`(아래 마지막 절)도 포함한다. 화면 비즈니스 기능은 후속 구현 대상이다.
+- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드, Fake·Remote(ITEM-01·03)·로컬 캐시와 이를 조립하는 `SharedRuntime`, 그리고 C4가 확장할 상품 상세 Presenter 기반(아래 마지막 두 절)도 포함한다. 화면 비즈니스 기능은 후속 구현 대상이다.
 
 ## 구현 구조
 
@@ -168,4 +168,19 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - **자원 수명:** SQL driver와 HTTP engine은 처음 필요한 facade를 얻을 때 연다. graph 조회와 debug ready 게시는 lock 없는 close guard(`CloseGuard`, 사용 중 수 + closing 상태를 한 StateFlow에서 CAS) 안에서 실행한다. `close()`는 어느 스레드에서든 한 번만 동작하며 새 조회를 즉시 거절하고 ready=false·bootstrap scope 취소를 한다. 실제 정리(만든 자원만 생성 역순으로 닫기, HttpClient는 넘겨받은 engine을 닫지 않으므로 둘 다 닫음 → Koin 종료 → ready=false)는 진행 중인 조회·게시가 모두 끝난 뒤 정확히 한 번 실행되므로, 닫힌 Koin을 조회하거나 close 뒤 ready가 true로 남지 않는다. close 이후 facade는 graph를 다시 열지 않고 `RUNTIME_NOT_READY`를 반환한다. 닫기 횟수와 경합은 internal test seam(`PlatformResources`, bootstrap 게시 직전 hook)으로 검증한다.
 - **공개 면:** 진입점은 `SharedRuntimeFactory.create(context, bindings, remote)`(androidMain)와 `SharedRuntimeFactory.shared.create(bindings:remote:)`(iosMain)이고, 공개 타입은 `SharedRuntime`·`RepositoryBindings`·`RemoteConfig`·`Backend`·`ClientBuildMode`와 기존 repository interface다. 링크한 debug simulator·release device `Shared.h`에서 Koin/Ktor/SQLDelight·HttpClient·SqlDriver·내부 DI 타입 0건을 확인했다. Swift에서는 SKIE가 `RepositoryBindings(buildMode:backends:)`의 map을 `[ApiId: Backend]`로, `ready`를 `for await` 가능한 Flow로 노출한다(RELEASE 상수는 Swift에서 `.theRelease`).
 - **static framework 링크:** runtime factory가 Native SQLite driver를 참조하므로 iOS 앱 target은 `-lsqlite3`를 직접 링크한다(static `Shared.framework`의 linker 옵션은 소비자에게 전달되지 않는다).
-- **남은 점:** `SqlLocalStore`는 DB I/O를 호출자 dispatcher에서 실행한다. `RuntimeDispatchers.io`로 옮길지는 Presenter가 생기는 Task 9/C4에서 정한다.
+- **남은 점:** `SqlLocalStore`는 DB I/O를 호출자 dispatcher에서 실행한다. Presenter 경로는 Task 9에서 runtime이 `RuntimeDispatchers.io`를 주입해 UI 스레드 밖에서 실행한다(아래 절). facade를 직접 부르는 다른 호출자는 호출 측 dispatcher를 따른다.
+
+## 상품 상세 Presenter 기반
+
+> 2026-10-07 Task 9 구현. C4는 이 Presenter/State에 상세 intent를 추가하며 아래 규칙과 소유 관계를 유지한다.
+
+- **공개 면:** `Presenter`(수명 계약, `close()`만), `ItemDetailState(item, loading, error)`와 `ItemDetailState.Initial`, `ItemDetailPresenter(repository: GetItemRepository, session: AuthSession, dispatcher: CoroutineDispatcher)`의 `state: StateFlow<ItemDetailState>`·`load(id)`·`retry()`·`close()`. 앱은 생성자 대신 `SharedRuntime.itemDetailPresenter()`를 쓴다. runtime의 gated Get facade(캐시 decorator 포함)·runtime 단일 session·`RuntimeDispatchers.io`로 만든다. 공개 생성자는 commonTest가 test dispatcher를 주입하는 경로다. UI/navigation 람다는 state에 두지 않는다.
+- **의존성:** 상품 조회는 `GetItemRepository` 하나뿐이다. 캐시 읽기·쓰기는 하지 않는다(Task 7 decorator 소유).
+- **실행 모델:** intent는 어느 스레드에서 불러도 즉시 반환한다. intent 처리, session 관찰, state 발행은 주입 dispatcher의 단일 lane(`limitedParallelism(1)`)에서 순서대로 실행되고, repository 호출만 주입 dispatcher 자체에서 실행한다. scope는 `SupervisorJob`이고 `state`는 읽기 전용 StateFlow다.
+- **조회·재시도:** `load(id)`는 loading=true·error=null로 시작한다. 같은 id의 항목이 보이는 중이면(refresh) 항목을 유지하고, 다른 id면 바로 비운다. 성공은 항목 표시, 일반 오류는 기존 항목을 유지한 채 error, `NOT_FOUND`는 항목 제거 + error다. `retry()`는 마지막 id를 다시 조회하며 첫 load 전에는 아무것도 하지 않는다.
+- **마지막 요청 승리:** 새 load/retry는 이전 요청을 취소하고 request ID를 올린다. 취소를 무시하고 늦게 도착한 응답도 request ID가 현재가 아니면 버린다.
+- **session:** 계정 변경·같은 계정 재로그인(세대 증가)을 관찰하면 진행 요청을 취소하고 `Initial`로 되돌린다. 마지막 id는 남기므로 이후 `retry()`는 새 session으로 다시 조회한다. 응답 발행은 요청 시점 snapshot으로 `AuthSession.withCurrent` 안에서 하므로 계정 변경과 직렬화되고, 관찰자가 아직 변경을 처리하지 못한 경합에서도 이전 session의 응답은 게시되지 않는다. 관찰보다 먼저 들어온 load는 처리 시작 시 session을 먼저 동기화해 새 계정 요청이 뒤늦은 관찰에 취소되지 않는다.
+- **close:** `close()`는 scope를 취소한다. 멱등이며 이후 intent·session 변경·늦은 응답은 state를 바꾸지 않는다(state는 마지막 값에 멈춘다).
+- **취소:** `CancellationException`은 전파하고 오류 state로 바꾸지 않는다.
+- **플랫폼 소유자(C4 유지 계약):** Android `ItemDetailPresenterOwner`(`ViewModel`)는 `onCleared()`에서, iOS `ItemDetailPresenterOwner`(`@MainActor @Observable`)는 `close()`/`deinit`에서 Presenter를 닫는다. 두 owner 모두 화면을 그리지 않는다. 자세한 내용은 [Android](android.md)·[iOS](ios.md) 문서의 C2 절에 있다.
+- **검증:** commonTest `ItemDetailPresenterTest`(조회·재시도·refresh 오류·NOT_FOUND·마지막 요청 승리·늦은 응답·close·계정/세대 변경·관찰 지연 경합·취소 전파·주입 dispatcher)와 `SharedModulesTest`의 runtime Presenter 연결을 Android host와 iOS simulator에서 실행한다. Task 1 interop probe는 삭제했고, Swift Flow 수집·collector 취소·suspend·close·계정 전환은 `SharedInteropTests`가 실제 Presenter·runtime으로, Swift `PlatformTokenSource` callback 성공/오류는 REMOTE ITEM-03 runtime + 도달 불가 base URL로 공개 API만 써서 검증한다(성공은 token이 전달되어 NETWORK, 오류는 `UNAUTHENTICATED`와 Swift `errorCode`).

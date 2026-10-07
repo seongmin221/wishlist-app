@@ -41,3 +41,5 @@
 - `Wishlist/Debug/DebugSessionBootstrap.swift`는 파일 전체가 `#if DEBUG`이며 `startDebugSession()`만 호출한다. Release 바이너리에는 이 타입의 심볼이 없다.
 - static `Shared.framework`가 SQLite driver를 포함하므로 앱 target `OTHER_LDFLAGS`에 `-lsqlite3`를 둔다.
 - `SharedRuntimeTests`가 앱 설정(Debug)의 binding, 실제 factory로 만든 runtime의 `ready`가 SKIE `for await`로 true가 되는 흐름과 debug owner 계정, close 후 ready=false, RELEASE binding의 즉시 ready를 검증한다.
+- `Features/Detail/ItemDetailPresenterOwner.swift`는 `@MainActor @Observable` 수명 소유자다(UI 없음). Presenter의 `state`를 main actor `Task`에서 SKIE `for await`로 수집해 구체 타입 `item: WishlistItem?`·`error: ClientError?`·`loading`으로 다시 게시한다. Task는 owner를 약하게 잡아 순환 참조가 없고, `close()`(멱등)와 `deinit`이 수집을 취소하고 Presenter를 닫는다. `init(runtime:)`은 `runtime.itemDetailPresenter()`를 쓴다.
+- `SharedInteropTests`는 Task 1 probe 대신 실제 Presenter·runtime으로 Flow 수집·collector 취소·suspend 호출·close·계정 전환(runtime session의 `MutableAuthSession.changeAccount`)을 검증하고, Swift `PlatformTokenSource` callback 성공/오류를 REMOTE ITEM-03 runtime(도달 불가 `http://127.0.0.1:9`)으로 검증한다. `ItemDetailPresenterOwnerTests`는 owner의 구체 state 수집, 계정 전환·오류 후 retry, close·deinit에 의한 종료를 검증한다.

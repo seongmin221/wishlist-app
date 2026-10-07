@@ -1,93 +1,249 @@
 import XCTest
 import Shared
+@testable import Wishlist
 
+/// Swift ↔ Kotlin interop against the real shared API (Task 1's probe guarantees, now kept by the
+/// item detail Presenter): SKIE Flow collection and collector cancellation, suspend calls, close,
+/// account switching through the runtime session, and the Swift `PlatformTokenSource` callback.
 final class SharedInteropTests: XCTestCase {
     @MainActor
-    func testFlowPublishesInitialAndIncrementedValueAndCollectionCancels() async throws {
-        let probe = InteropProbe()
-        defer { probe.close() }
-        let initial = expectation(description: "initial zero")
-        let incremented = expectation(description: "incremented one")
-        var values: [Int] = []
+    func testPresenterStateFlowDeliversInitialLoadingAndItemThenCollectorCancels() async throws {
+        let runtime = await SharedTestRuntime.readyDebug()
+        defer { runtime.close() }
+        let seed = try await SharedTestRuntime.firstSeedItem(runtime)
+        let presenter = runtime.itemDetailPresenter()
+        defer { presenter.close() }
+
+        let initial = expectation(description: "initial state")
+        let loaded = expectation(description: "loaded item")
+        var states: [ItemDetailState] = []
         let collector = Task { @MainActor in
-            for await value in probe.state {
-                values.append(Int(truncating: value))
-                if values.count == 1 { initial.fulfill() }
-                if values.count == 2 { incremented.fulfill() }
+            for await state in presenter.state {
+                states.append(state)
+                if states.count == 1 { initial.fulfill() }
+                if state.item != nil { loaded.fulfill() }
             }
         }
         await fulfillment(of: [initial], timeout: 5)
-        let result = try await probe.increment()
-        XCTAssertEqual(result, 1)
-        await fulfillment(of: [incremented], timeout: 5)
+        XCTAssertEqual(states.first, ItemDetailState.companion.Initial)
+
+        presenter.load(id: seed.id)
+        await fulfillment(of: [loaded], timeout: 5)
+        // Concrete Swift types: the item and its fields, no casts.
+        let shown: WishlistItem? = states.last?.item
+        XCTAssertEqual(shown?.id, seed.id)
+        XCTAssertEqual(shown?.product.name, seed.product.name)
+        XCTAssertFalse(states.last?.loading ?? true)
+        XCTAssertNil(states.last?.error)
+
         collector.cancel()
         await collector.value
-        _ = try await probe.increment()
-        XCTAssertEqual(values, [0, 1])
+        let collected = states.count
+        presenter.retry()
+        await SharedTestRuntime.eventually { presenter.state.value.loading == false && presenter.state.value.item != nil }
+        XCTAssertEqual(states.count, collected, "a cancelled collector must not receive values")
     }
 
     @MainActor
-    func testSuspendIncrementReturnsResult() async throws {
-        let probe = InteropProbe()
-        defer { probe.close() }
-        let result = try await probe.increment()
-        XCTAssertEqual(result, 1)
+    func testSuspendRepositoryCallsReturnConcreteResults() async throws {
+        let runtime = await SharedTestRuntime.readyDebug()
+        defer { runtime.close() }
+        let seed = try await SharedTestRuntime.firstSeedItem(runtime)
+
+        let found = try await runtime.getItemRepository().get(id: seed.id)
+        XCTAssertEqual((found as? ClientResultSuccess<WishlistItem>)?.value?.id, seed.id)
+
+        let missing = try await runtime.getItemRepository().get(id: "00000000-0000-4000-8000-0000000000ff")
+        XCTAssertEqual((missing as? ClientResultFailure)?.error.kind, .notFound)
     }
 
     @MainActor
-    func testCloseCancelsFutureSuspendWork() async {
-        let probe = InteropProbe()
-        probe.close()
-        do {
-            _ = try await probe.increment()
-            XCTFail("closed probe must reject new work")
-        } catch {
-            XCTAssertTrue(error is CancellationError)
+    func testRetryAndAccountSwitchThroughTheRuntimeSession() async throws {
+        let runtime = await SharedTestRuntime.readyDebug()
+        defer { runtime.close() }
+        let seed = try await SharedTestRuntime.firstSeedItem(runtime)
+        let presenter = runtime.itemDetailPresenter()
+        defer { presenter.close() }
+
+        presenter.load(id: seed.id)
+        await SharedTestRuntime.eventually { presenter.state.value.item?.id == seed.id }
+
+        // Another account: the previous item and error disappear at once.
+        try await SharedTestRuntime.changeAccount(runtime, to: "other-account")
+        await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
+
+        // That account cannot see the debug owner's item.
+        presenter.retry()
+        await SharedTestRuntime.eventually { presenter.state.value.error?.kind == .notFound }
+        XCTAssertNil(presenter.state.value.item)
+
+        // Back to the debug owner (a new generation): cleared again, then retry finds the item.
+        try await SharedTestRuntime.changeAccount(runtime, to: "debug-board-owner")
+        await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
+        presenter.retry()
+        await SharedTestRuntime.eventually { presenter.state.value.item?.id == seed.id }
+        XCTAssertNil(presenter.state.value.error)
+    }
+
+    @MainActor
+    func testClosedPresenterIgnoresLaterIntents() async throws {
+        let runtime = await SharedTestRuntime.readyDebug()
+        defer { runtime.close() }
+        let seed = try await SharedTestRuntime.firstSeedItem(runtime)
+        let presenter = runtime.itemDetailPresenter()
+
+        presenter.close()
+        presenter.close() // idempotent
+        presenter.load(id: seed.id)
+        presenter.retry()
+        await SharedTestRuntime.stays(for: 0.5) { presenter.state.value == ItemDetailState.companion.Initial }
+    }
+
+    // MARK: Swift PlatformTokenSource -> Kotlin callback ABI (public API only)
+
+    /// A REMOTE ITEM-03 runtime with a Swift token source and an unreachable server: the Swift
+    /// token reaches Kotlin (the request proceeds to the network and fails there, not as auth).
+    @MainActor
+    func testSwiftTokenSourceSuccessReachesKotlin() async throws {
+        let source = RecordingTokenSource(token: "swift-token", errorCode: nil)
+        let runtime = await SharedTestRuntime.readyRemote(tokenSource: source)
+        defer { runtime.close() }
+
+        let result = try await runtime.getItemRepository().get(id: SharedTestRuntime.remoteItemId)
+        XCTAssertEqual(source.forceRefreshCalls, [false])
+        let error = (result as? ClientResultFailure)?.error
+        XCTAssertEqual(error?.kind, .network, "token accepted; only the unreachable server fails: \(String(describing: error))")
+    }
+
+    @MainActor
+    func testSwiftTokenSourceErrorReachesKotlin() async throws {
+        let source = RecordingTokenSource(token: nil, errorCode: "TOKEN_FAILED")
+        let runtime = await SharedTestRuntime.readyRemote(tokenSource: source)
+        defer { runtime.close() }
+
+        let result = try await runtime.getItemRepository().get(id: SharedTestRuntime.remoteItemId)
+        XCTAssertEqual(source.forceRefreshCalls, [false])
+        let error = (result as? ClientResultFailure)?.error
+        XCTAssertEqual(error?.kind, .unauthenticated)
+        XCTAssertEqual(error?.code, "TOKEN_FAILED")
+    }
+}
+
+/// Shared runtime helpers for the interop and owner tests (tests run in the Debug configuration).
+enum SharedTestRuntime {
+    static let remoteItemId = "00000000-0000-4000-8000-000000000101"
+
+    /// The app's debug bindings (ITEM-01/03 Fake) after the debug bootstrap reported ready.
+    @MainActor
+    static func readyDebug() async -> SharedRuntime {
+        let runtime = SharedRuntimeFactory.shared.create(bindings: AppRuntimeConfig.bindings(), remote: nil)
+        await start(runtime)
+        return runtime
+    }
+
+    /// ITEM-03 REMOTE against an unreachable local port, with a Swift token source.
+    @MainActor
+    static func readyRemote(tokenSource: PlatformTokenSource) async -> SharedRuntime {
+        var backends = AppRuntimeConfig.allBackends(.unavailable)
+        backends[.item01] = .fake
+        backends[.item03] = .remote
+        let runtime = SharedRuntimeFactory.shared.create(
+            bindings: RepositoryBindings(buildMode: .debug, backends: backends),
+            remote: RemoteConfig(baseUrl: "http://127.0.0.1:9", tokenSource: tokenSource)
+        )
+        await start(runtime)
+        return runtime
+    }
+
+    @MainActor
+    private static func start(_ runtime: SharedRuntime) async {
+        runtime.startDebugSession()
+        let ready = XCTestExpectation(description: "runtime ready")
+        let collector = Task { @MainActor in
+            for await value in runtime.ready where value.boolValue {
+                ready.fulfill()
+                break
+            }
+        }
+        _ = await XCTWaiter.fulfillment(of: [ready], timeout: 10)
+        collector.cancel()
+    }
+
+    static func firstSeedItem(_ runtime: SharedRuntime) async throws -> WishlistItem {
+        let result = try await runtime.catalogRepository().items(categoryId: nil, purposeId: nil)
+        let items = (result as? ClientResultSuccess<NSArray>)?.value as? [WishlistItem]
+        return try XCTUnwrap(items?.first)
+    }
+
+    /// Login/logout/relogin through the runtime's own session (the same one its Presenters use).
+    static func changeAccount(_ runtime: SharedRuntime, to accountId: String?) async throws {
+        let session = try XCTUnwrap(runtime.session as? MutableAuthSession)
+        try await session.changeAccount(accountId: accountId)
+    }
+
+    /// Waits (bounded) until `condition` holds on the main actor.
+    @MainActor
+    static func eventually(
+        timeout: TimeInterval = 5,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ condition: @MainActor () -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            if Date() > deadline {
+                XCTFail("condition not met within \(timeout)s", file: file, line: line)
+                return
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)
         }
     }
 
-    func testSwiftTokenSourceReturnsSuccessThroughKotlin() {
-        let probe = InteropProbe()
-        defer { probe.close() }
-        let source = TestTokenSource(token: "test-token", errorCode: nil)
-        let observer = TestTokenObserver()
-        let request = probe.invokeToken(source: source, completion: observer)
-        XCTAssertEqual(observer.token, "test-token")
-        XCTAssertNil(observer.errorCode)
-        XCTAssertEqual(observer.completions, 1)
-        XCTAssertEqual(source.forceRefresh, false)
-        XCTAssertTrue((request as AnyObject) === source.request)
-    }
-
-    func testSwiftTokenSourceReturnsErrorThroughKotlin() {
-        let probe = InteropProbe()
-        defer { probe.close() }
-        let observer = TestTokenObserver()
-        _ = probe.invokeToken(source: TestTokenSource(token: nil, errorCode: "TOKEN_FAILED"), completion: observer)
-        XCTAssertNil(observer.token)
-        XCTAssertEqual(observer.errorCode, "TOKEN_FAILED")
-        XCTAssertEqual(observer.completions, 1)
+    /// Checks that `condition` keeps holding for `duration`.
+    @MainActor
+    static func stays(
+        for duration: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ condition: @MainActor () -> Bool
+    ) async {
+        let deadline = Date().addingTimeInterval(duration)
+        while Date() < deadline {
+            if !condition() {
+                XCTFail("condition stopped holding", file: file, line: line)
+                return
+            }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
     }
 }
 
-private final class TestTokenSource: NSObject, PlatformTokenSource {
-    let token: String?
-    let errorCode: String?
-    let request = TestTokenRequest()
-    var forceRefresh: Bool?
-    init(token: String?, errorCode: String?) { self.token = token; self.errorCode = errorCode }
+/// Swift implementation of the Kotlin token boundary; Kotlin calls it from a background thread.
+private final class RecordingTokenSource: NSObject, PlatformTokenSource {
+    private let lock = NSLock()
+    private let token: String?
+    private let errorCode: String?
+    private var calls: [Bool] = []
+
+    init(token: String?, errorCode: String?) {
+        self.token = token
+        self.errorCode = errorCode
+    }
+
+    var forceRefreshCalls: [Bool] {
+        lock.lock(); defer { lock.unlock() }
+        return calls
+    }
+
     func fetchToken(forceRefresh: Bool, completion: any TokenCallback) -> any TokenRequest {
-        self.forceRefresh = forceRefresh
+        lock.lock()
+        calls.append(forceRefresh)
+        lock.unlock()
         completion.complete(token: token, errorCode: errorCode)
-        return request
+        return NoOpTokenRequest()
     }
 }
-private final class TestTokenRequest: NSObject, TokenRequest { func cancel() {} }
-private final class TestTokenObserver: NSObject, TokenCallback {
-    var token: String?
-    var errorCode: String?
-    var completions = 0
-    func complete(token: String?, errorCode: String?) {
-        self.token = token; self.errorCode = errorCode; completions += 1
-    }
+
+private final class NoOpTokenRequest: NSObject, TokenRequest {
+    func cancel() {}
 }

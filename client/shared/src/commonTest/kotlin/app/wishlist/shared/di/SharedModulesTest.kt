@@ -17,6 +17,7 @@ import app.wishlist.shared.data.remote.BASE_ITEM_JSON
 import app.wishlist.shared.data.remote.FakeTokenSource
 import app.wishlist.shared.data.remote.RemoteItemRepository
 import app.wishlist.shared.data.remote.TEST_BASE_URL
+import app.wishlist.shared.presentation.ItemDetailState
 import app.wishlist.shared.di.ClientBuildMode.DEBUG
 import app.wishlist.shared.di.ClientBuildMode.RELEASE
 import app.wishlist.shared.repository.CreateItemCommand
@@ -222,6 +223,47 @@ class SharedModulesTest {
         assertEquals("$TEST_BASE_URL/v1/wishlist-items/$remoteItemId", requests.single().url.toString())
         assertEquals(2, runtime.localStore().cachedItem(runtime.session.state.value, remoteItemId).successValue()?.version)
         runtime.close()
+    }
+
+    // --- Item detail Presenter from the runtime ---------------------------------------------------
+
+    @Test fun runtime_presenter_reads_the_gated_get_facade_and_follows_the_runtime_session() = runTest {
+        val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
+        val presenter = runtime.itemDetailPresenter()
+
+        // Before ready, the gated facade answers; the Presenter reports it as an error state.
+        presenter.load(remoteItemId)
+        advanceUntilIdle()
+        assertEquals(RUNTIME_NOT_READY, presenter.state.value.error?.code)
+
+        // The debug bootstrap changes the runtime session's account: the Presenter starts over.
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        assertEquals(ItemDetailState.Initial, presenter.state.value)
+
+        val seeded = runtime.catalogRepository().items(null, null).successValue().first()
+        presenter.load(seeded.id)
+        advanceUntilIdle()
+        assertEquals(ItemDetailState(item = seeded, loading = false, error = null), presenter.state.value)
+        // Cache sync stays with the Get facade's decorator.
+        val snapshot = runtime.session.state.value
+        assertEquals(seeded.version, runtime.localStore().cachedItem(snapshot, seeded.id).successValue()?.version)
+
+        (runtime.session as MutableAuthSession).changeAccount("account-b")
+        advanceUntilIdle()
+        assertEquals(ItemDetailState.Initial, presenter.state.value)
+        presenter.retry()
+        advanceUntilIdle()
+        assertEquals(ErrorKind.NOT_FOUND, presenter.state.value.error?.kind)
+
+        presenter.close()
+        runtime.close()
+        // A Presenter created after close reads the closed facade.
+        val late = runtime.itemDetailPresenter()
+        late.load(seeded.id)
+        advanceUntilIdle()
+        assertEquals(RUNTIME_NOT_READY, late.state.value.error?.code)
+        late.close()
     }
 
     // --- Isolation and one session per runtime --------------------------------------------------
