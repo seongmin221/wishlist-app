@@ -19,7 +19,10 @@ interface LocalStore {
     /**
      * Saves against the current session; the binding must be null or the current account. Same
      * key + same URL keeps the existing row (no-op Success). Same key + different URL is
-     * CONFLICT/SUBMISSION_KEY_REUSED.
+     * CONFLICT/SUBMISSION_KEY_REUSED. Exception to the no-op: if the existing row is already bound and
+     * the given binding differs (e.g. null on a row bound to the current account), the result is
+     * VALIDATION/ACCOUNT_BINDING_MISMATCH and the row is unchanged. A re-save never binds an unbound
+     * row; binding happens only in [prepareFlush].
      */
     suspend fun saveSubmission(submission: LocalSubmission): ClientResult<Unit>
 

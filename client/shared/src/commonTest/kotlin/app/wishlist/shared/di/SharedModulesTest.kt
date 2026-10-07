@@ -34,6 +34,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -387,6 +388,22 @@ class SharedModulesTest {
         runtime.localStore().pending()
         assertEquals(1, probe.drivers.size)                    // the first real use opens it on the io dispatcher
         runtime.close()
+    }
+
+    @Test fun cancelledFirstOpenStillOpensTheDriverOnlyOnce() = runTest {
+        val probe = RuntimeResourcesProbe()
+        val runtime = createRuntime(releaseBindings(), probe = probe)
+        lateinit var caller: Job
+        // The caller is cancelled while the first open is running (the driver is already being created).
+        probe.onDriverOpen = { caller.cancel() }
+        caller = launch { runtime.localStore().pending() }
+        caller.join()
+        assertTrue(caller.isCancelled)
+        probe.onDriverOpen = {}
+        runtime.localStore().pending().successValue()
+        assertEquals(1, probe.drivers.size)                    // the next use reuses the driver opened above
+        runtime.close()
+        assertEquals(1, probe.drivers.single().closes)
     }
 
     @Test fun driverIsOpenedOnTheIoDispatcher() = runTest {

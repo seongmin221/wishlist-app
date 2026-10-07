@@ -80,13 +80,14 @@ class SharedRuntime internal constructor(
     private val mutableBootstrapFailure = MutableStateFlow<ClientError?>(null)
 
     // Backstop for anything escaping the bootstrap's own handling: still ready, never a crash.
+    // Installed on the bootstrap launch only, so other jobs in [scope] are never reported as bootstrap failures.
     private val bootstrapExceptionHandler = CoroutineExceptionHandler { _, _ ->
         guard.use {
             mutableBootstrapFailure.value = ClientError(ErrorKind.UNAVAILABLE, BOOTSTRAP_FAILURE)
             mutableReady.value = true
         }
     }
-    private val scope = CoroutineScope(SupervisorJob() + env.dispatchers.default + bootstrapExceptionHandler)
+    private val scope = CoroutineScope(SupervisorJob() + env.dispatchers.default)
 
     /** Test seam: runs in the bootstrap right before ready is published (close-race tests). */
     internal var beforeReadyPublished: () -> Unit = {}
@@ -114,7 +115,7 @@ class SharedRuntime internal constructor(
         // Inside the guard, a concurrent close() cannot tear the graph down under this lookup.
         val store = guard.use { koin.get<FakeStore>() } ?: return
         val seed = seedOverride ?: { store.seed(BoardSeeds.create(env.clock, env.ids)) }
-        scope.launch {
+        scope.launch(bootstrapExceptionHandler) {
             val failure = try {
                 mutableSession.changeAccount(DEBUG_ACCOUNT_ID)
                 (seed() as? ClientResult.Failure)?.error
