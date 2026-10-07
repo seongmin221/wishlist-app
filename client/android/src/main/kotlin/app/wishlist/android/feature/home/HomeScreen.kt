@@ -90,7 +90,13 @@ fun HomeScreen() {
                 .verticalScroll(scroll)
                 .padding(horizontal = WishlistTokens.Space.screenMargin),
         ) {
-            HomeHeader(caption = if (state is HomeState.LoggedOut) stringResource(R.string.home_logged_out_caption) else null)
+            HomeHeader(
+                caption = when (val s = state) {
+                    HomeState.Loading -> null
+                    is HomeState.LoggedOut -> stringResource(R.string.home_logged_out_caption)
+                    is HomeState.LoggedIn -> HomeRowText.todoCount(s.processing.size).resolve()
+                },
+            )
             when (val s = state) {
                 HomeState.Loading -> Unit
                 is HomeState.LoggedOut -> HomeLoggedOutContent(s)
@@ -112,7 +118,7 @@ fun HomeScreen() {
     }
 }
 
-/** 머리(FHomeL header): 제목 도현 28이 위쪽 바 세로 가운데, 오른쪽 설정 원형 버튼. 로그인 전이면 아래에 "로그인 전". */
+/** 머리(FHome header): 제목 도현 28이 위쪽 바 세로 가운데, 오른쪽 설정 원형 버튼. 아래 13/500 보조 줄(로그인 전 "로그인 전", 로그인 뒤 "할 일 N개"). */
 @Composable
 private fun HomeHeader(caption: String?) {
     val nav = LocalWLNavigator.current
@@ -207,9 +213,12 @@ internal fun HomeTodoCard(
     }
 }
 
-/** 펼친 카드 안의 링크 한 줄: 묶음 면(`sheetField`) 위 아이콘 타일·host·상태 줄·원본. */
+/**
+ * 펼친 카드 안의 링크 한 줄: 묶음 면(`sheetField`) 위 아이콘 타일·host·상태 줄. `showsOriginal`이면 오른쪽에 "원본"
+ * (로그인 전 분석 대기만, Ruling 15: 로그인 뒤 분류 중 줄은 오른쪽 동작이 없다 — 보드의 삭제는 C4/C8).
+ */
 @Composable
-internal fun HomeLinkRow(row: HomeRow, icon: WLLineIcon, tileSize: Dp) {
+internal fun HomeLinkRow(row: HomeRow, icon: WLLineIcon, tileSize: Dp, showsOriginal: Boolean = false) {
     val c = LocalWLColors.current
     Row(
         Modifier
@@ -225,7 +234,7 @@ internal fun HomeLinkRow(row: HomeRow, icon: WLLineIcon, tileSize: Dp) {
             WLText(row.host, WLType.bodyStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
             WLText(row.metaText(), WLType.label, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        OriginalLink(row.sourceUrl)
+        if (showsOriginal) OriginalLink(row.sourceUrl)
     }
 }
 

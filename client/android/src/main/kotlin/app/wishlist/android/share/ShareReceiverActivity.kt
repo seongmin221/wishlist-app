@@ -31,6 +31,13 @@ class ShareReceiverActivity : ComponentActivity() {
             overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, 0, 0)
             overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, 0, 0)
         }
+        // Restored after process death: the share was already received (and saved) by the killed
+        // instance; receiving again would add a duplicate row under a new key. A configuration
+        // recreation keeps its ViewModel (the running receive) and carries on.
+        if (!ShareLaunch.shouldReceive(restored = savedInstanceState != null, modelRetained = lastNonConfigurationInstance != null)) {
+            close()
+            return
+        }
         val app = application as WishlistApplication
         val factory = ShareReceiveModel.factory(app, ShareIntentText.from(intent), NetworkSignals.isOnline(this))
         val model = ViewModelProvider(this, factory)[ShareReceiveModel::class.java]
@@ -71,4 +78,13 @@ class ShareReceiveModel(app: WishlistApplication, text: String?, online: Boolean
             initializer { ShareReceiveModel(app, text, online) }
         }
     }
+}
+
+/** Whether this Activity instance should receive its share (pure, for JVM tests). */
+internal object ShareLaunch {
+    /**
+     * [restored]: `savedInstanceState != null`. [modelRetained]: the ViewModelStore survived (a configuration
+     * recreation, not process death). Only a restore without a retained model skips the receive.
+     */
+    fun shouldReceive(restored: Boolean, modelRetained: Boolean): Boolean = !restored || modelRetained
 }

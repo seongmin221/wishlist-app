@@ -28,6 +28,17 @@ class HomeRowTextTest {
         expected.forEach { (status, res) -> assertEquals(status.name, res, HomeRowText.meta(status)) }
     }
 
+    @Test fun processing_row_uses_the_board_extracting_key() {
+        // Ruling 14: board FHome "상품 정보 추출 중" lives under row_processing.
+        assertEquals(R.string.row_processing, HomeRowText.meta(RowStatus.PROCESSING))
+    }
+
+    @Test fun logged_in_caption_counts_the_sorting_rows() {
+        // Ruling 13: board FHome header caption "할 일 N개".
+        assertEquals(ResText(R.string.home_todo_count, 0), HomeRowText.todoCount(0))
+        assertEquals(ResText(R.string.home_todo_count, 7), HomeRowText.todoCount(7))
+    }
+
     @Test fun only_the_local_row_meta_carries_the_saved_time() {
         RowStatus.entries.forEach { status ->
             assertEquals(status.name, status == RowStatus.LOCAL_ONLY, HomeRowText.metaShowsTime(status))

@@ -32,6 +32,9 @@ object HomeRowText {
     }
 
     fun metaShowsTime(status: RowStatus): Boolean = status == RowStatus.LOCAL_ONLY
+
+    /** Logged-in header caption "할 일 N개" (N = the 분류 중 rows, the only to-do card in C3). */
+    fun todoCount(count: Int): ResText = ResText(R.string.home_todo_count, count)
 }
 
 @Composable

@@ -75,6 +75,7 @@
 | `home_login_card_devices` | 다른 기기에서도 볼 수 있어요 | Available on your other devices |
 | `home_login_button` | 로그인 | Sign in |
 | `home_todo` | 할 일 | To do |
+| `home_todo_count` | 할 일 %1$d개 | %1$d to-dos |
 | `home_pending_title` | 분석 대기 | Waiting for analysis |
 | `home_pending_subtitle` | 로그인하면 바로 정보를 가져와요 | Details arrive as soon as you sign in |
 | `home_pending_meta` | %1$s 저장 · 이 기기에만 있어요 | Saved %1$s · Only on this device |
@@ -84,7 +85,7 @@
 | `row_sending` | 보내는 중 | Sending |
 | `row_waiting_network` | 연결되면 보내요 | Sends when you're online |
 | `row_failed` | 보낼 수 없는 링크예요 | This link can't be sent |
-| `row_processing` | 정보를 가져오는 중 | Fetching details |
+| `row_processing` | 상품 정보 추출 중 | Extracting product info |
 | `time_just_now` | 방금 | just now |
 | `time_minutes` | %1$d분 전 | %1$d min ago |
 | `time_hours` | %1$d시간 전 | %1$d hr ago |

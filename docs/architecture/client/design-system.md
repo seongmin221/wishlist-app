@@ -173,5 +173,5 @@ C1에서 고치지 않고 남긴 것. C3 첫 실제 화면 전에 다시 본다.
 
 ## 데모
 
-- 탭 첫 화면이 곧 데모다. (C3부터 Android 홈 탭은 실제 `HomeScreen`이고 홈 데모는 없다. 상품 상세 데모의 ⋯ 메뉴·삭제 확인창은 `DemoDetailScreen`으로 옮겼다. iOS도 C3에서 홈 데모를 지웠고 ⋯ 메뉴·삭제 확인창은 원래 상품 상세 데모에 있다.) 홈은 컴포넌트 데모(시트 → 확인창 → `dismissAll`, ⋯ 메뉴, 사진 카드, 칩, 가장 긴 목적 이름, 긴 가격 `KRW 1,190,000`)이고, 카테고리·목적 탭과 그 하위 화면은 보드(FCategoryHome·FCategoryList·FProductDetail·FPurposeHome·FPurposeDetail)를 따른다: 카테고리 세로 페이징, 2열 엇갈림 목록, 상품 상세, 겹쳐 쌓인 목적 카드, 머리 시트를 쓰는 목적 상세. 데모 경로는 상품(사진 이동, 탭 바 숨김)·세부 유형 목록·목적 상세(가로 밀기, 탭 바 보임)로 나뉜다. 상품 사진 자리 표시 색은 UI 토큰이 아닌 이미지 견본이라 보드 값을 그대로 쓴다.
-- 데모는 Android debug source set, iOS `#if DEBUG`에만 있다. release에는 데모 경로·화면 코드가 포함되지 않으며 탭 이름만 보이는 빈 첫 화면이다.
+- 카테고리·목적 탭 첫 화면이 곧 데모다. 홈 탭은 C3부터 두 플랫폼 모두 실제 `HomeScreen`(로그인 전 FHomeLoggedOut, 로그인 뒤 FHome의 분류 중 카드)이고 홈 데모·홈 컴포넌트 데모는 없다. 상품 상세 데모의 ⋯ 메뉴·삭제 확인창은 `DemoDetailScreen`에 있다. 카테고리·목적 탭과 그 하위 화면은 보드(FCategoryHome·FCategoryList·FProductDetail·FPurposeHome·FPurposeDetail)를 따른다: 카테고리 세로 페이징, 2열 엇갈림 목록(가장 긴 가격 `KRW 1,190,000` 포함), 상품 상세, 겹쳐 쌓인 목적 카드, 머리 시트를 쓰는 목적 상세. 데모 경로는 상품(사진 이동, 탭 바 숨김)·세부 유형 목록·목적 상세(가로 밀기, 탭 바 보임)로 나뉜다. 상품 사진 자리 표시 색은 UI 토큰이 아닌 이미지 견본이라 보드 값을 그대로 쓴다.
+- 데모는 Android debug source set, iOS `#if DEBUG`에만 있다. release에는 데모 경로·화면 코드가 포함되지 않는다. release의 홈 탭·설정·로그인은 실제 화면이고, 카테고리·목적 탭만 아직 탭 이름만 보이는 빈 첫 화면이다.

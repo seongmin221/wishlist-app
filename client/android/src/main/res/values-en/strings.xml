@@ -24,6 +24,7 @@
     <string name="home_login_card_devices">Available on your other devices</string>
     <string name="home_login_button">Sign in</string>
     <string name="home_todo">To do</string>
+    <string name="home_todo_count">%1$d to-dos</string>
     <string name="home_pending_title">Waiting for analysis</string>
     <string name="home_pending_subtitle">Details arrive as soon as you sign in</string>
     <string name="home_pending_meta">Saved %1$s · Only on this device</string>
@@ -33,7 +34,7 @@
     <string name="row_sending">Sending</string>
     <string name="row_waiting_network">Sends when you\'re online</string>
     <string name="row_failed">This link can\'t be sent</string>
-    <string name="row_processing">Fetching details</string>
+    <string name="row_processing">Extracting product info</string>
     <string name="time_just_now">just now</string>
     <string name="time_minutes">%1$d min ago</string>
     <string name="time_hours">%1$d hr ago</string>
