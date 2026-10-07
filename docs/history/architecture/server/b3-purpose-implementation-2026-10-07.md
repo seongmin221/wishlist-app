@@ -45,7 +45,7 @@ opus 독립 리뷰의 판정은 "With fixes"였다(Critical 0, Important 1, Mino
 - **단계 로그 누락.** 유료 호출을 보낸 뒤의 재시도·실패 응답에도 선택 단계를 붙여 로그한다.
 - **문서 최신화.** runtime·category 문서의 2,000 문구와 spec의 V14·로그·판단 문구를 고쳤다.
 
-**보류한 Minor.** `Assigned.purposeJudged` 기본값, receipt CHECK와 operation의 결합, ASCII `btrim`, `CategoryChange` 재사용, 공용-only 요청의 `"purposes":[]`.
+**보류한 Minor.** receipt CHECK와 operation의 결합, ASCII `btrim`, 공용-only 요청의 `"purposes":[]`. `Assigned.purposeJudged` 기본값과 `CategoryChange` 재사용은 PR #11 리뷰에서 해결했다.
 
 **rollout 주의.** V13/V14 적용 전에 구 API/Worker를 멈춰야 한다(B0 drain과 같음). 구 버전이 uuid 컬럼에 문자열 목적을 쓰거나, 600,000 ceiling으로 새 window를 만들면 실패하거나 해당 window가 Exceeded가 된다.
 
@@ -63,6 +63,19 @@ PR #11 리뷰 9건을 코드와 대조했다. 정확성·운영 항목은 재현
 8. **공용 helper.** code point 자르기는 `UserTextRules.truncate`, 정규 UUID 파싱은 `app.common.parseCanonicalUuid`로 합쳤다.
 9. **검증 분리와 중립 타입.** 설명 검증을 `validateDescription`으로 분리하고, PATCH 필드 의도는 중립 패키지의 `app.common.FieldChange`로 옮겨 category와 목적이 함께 쓴다.
 
+## PR #11 2차 리뷰 반영
+
+1차 반영의 두 결정을 다시 고쳤다.
+
+- **예산 한도.** 1차의 "저장 한도를 현재 값으로 덮어쓰기"는 운영자가 내린 한도와 다음 release의 낮은 한도를 되돌린다. 리뷰가 제안한 "올리기만 하기"도 0으로 내린 한도를 다시 올린다. 그래서 저장값과 현재 값 중 작은 쪽으로 판정하고 덮어쓰지 않는다.
+- **단계 선택.** 1차의 "첫 단계 뒤 전체 이분 탐색"은 가장 흔한 "T0만 넘음"을 4회로 늘리고, 미세한 token 경계에서 통과 단계를 건너뛸 위험이 있었다. 앞 3단계는 순서대로 보고, 큰 덩어리를 빼는 뒤 단계만 이분 탐색한다(흔한 경우 1~3회, 최대 6회). B2 custom-only의 count 순서는 원래대로 돌아왔다.
+- **정리.**
+  - `fits`의 실패 보관 변수와 `!!`를 없앴다.
+  - 일괄 치환으로 잘못 바뀐 `FieldChanges` 이름을 `CategoryChanges`로 되돌렸다.
+  - `PAGE_LIMIT`를 `ACTIVE_LIMIT`에 묶고 테스트로 고정했다.
+  - 카테고리 표시값도 left join으로 읽는다.
+  - 위임만 하던 wrapper를 지웠다.
+
 ## 전체 검증
 
 실행 명령(server/):
@@ -71,12 +84,13 @@ PR #11 리뷰 9건을 코드와 대조했다. 정확성·운영 항목은 재현
 JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home DOCKER_HOST=unix:///Users/user/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1 RUN_REAL_URL_PILOT=0 ./gradlew test --rerun-tasks
 ```
 
-이 기기에는 colima socket이 없어 Testcontainers가 `/var/run/docker.sock`(podman)으로 연결했다.
+이 기기에는 colima socket이 없어 Testcontainers가 `/var/run/docker.sock`(podman)으로 연결했다. 2차 반영 중 영향 범위 실행과 전체 실행이 한 번씩 실패했다. 둘 다 서로 다른 테스트의 PostgreSQL 컨테이너 기동 실패였고, 원인은 podman의 임의 host port 충돌(`bind: address already in use`)이다. 코드 변경 없이 단독 재실행과 전체 재실행이 통과했으며, 실패한 실행은 통과로 기록하지 않았다.
 
 | 실행 | 결과 |
 | --- | --- |
 | 리뷰 전 | BUILD SUCCESSFUL, tests=289, failures=0, errors=0, skipped=1 |
 | 독립 리뷰 보완 후 | BUILD SUCCESSFUL, 5분25초, tests=292, failures=0, errors=0, skipped=1 → 291 통과·RealUrlPilot 1 skip |
-| PR #11 리뷰 반영 후 최종 | BUILD SUCCESSFUL, 5분31초, tests=295, failures=0, errors=0, skipped=1 → **294 통과·RealUrlPilot 1 skip** |
+| PR #11 1차 리뷰 반영 후 | BUILD SUCCESSFUL, 5분31초, tests=295, failures=0, errors=0, skipped=1 → 294 통과·RealUrlPilot 1 skip |
+| PR #11 2차 리뷰 반영 후 최종 | BUILD SUCCESSFUL, 5분51초, tests=296, failures=0, errors=0, skipped=1 → **295 통과·RealUrlPilot 1 skip** |
 
 실행하지 않은 범위: 실제 OpenAI 호출, production 배포, RealUrlPilot(opt-in), B4~B11. push·PR·병합은 하지 않았다.

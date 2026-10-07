@@ -128,7 +128,7 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 ## B3 — 목적 기본 관리
 
-**현재 상태(2026-10-07):** develop `1c6d949`에서 별도 Orca worktree로 수신했고 직접 baseline은 252개 중 251 통과·RealUrlPilot 1 skip이다. 정책을 사용자와 확정한 뒤 PUR-01~04·V13/V14·AI 목적 후보·입력 2,500을 구현하고 독립 리뷰를 보완했다. PR #11 코드리뷰 반영 후 최종 전체 실행은 295개 중 294 통과·실패/오류 0·RealUrlPilot 1 skip이다. [확정 계약](purpose-management-api.md), [AI 목적 후보](purpose-ai-candidates.md), [구현 이력](../../history/architecture/server/b3-purpose-implementation-2026-10-07.md)을 따른다.
+**현재 상태(2026-10-07):** develop `1c6d949`에서 별도 Orca worktree로 수신했고 직접 baseline은 252개 중 251 통과·RealUrlPilot 1 skip이다. 정책을 사용자와 확정한 뒤 PUR-01~04·V13/V14·AI 목적 후보·입력 2,500을 구현하고 독립 리뷰를 보완했다. PR #11 코드리뷰(2차) 반영 후 최종 전체 실행은 296개 중 295 통과·실패/오류 0·RealUrlPilot 1 skip이다. [확정 계약](purpose-management-api.md), [AI 목적 후보](purpose-ai-candidates.md), [구현 이력](../../history/architecture/server/b3-purpose-implementation-2026-10-07.md)을 따른다.
 
 **산출물:** 목적 생성·상세·목록·편집, 상품/검토 화면의 선택 목록.
 
