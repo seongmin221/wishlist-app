@@ -490,12 +490,12 @@ CachedGetItemRepository는 요청 시작 snapshot을 캡처하고 `cachedItem(sn
 }
 ```
 
-- [ ] **Step 0: 고정 결과 대조.** Task 1의 SQLDelight plugin·JDBC/Android/Native driver 버전과 schema 생성·compile/link 결과를 사용한다.
-- [ ] **Step 1: 실패 테스트.** 파일 DB close/reopen 후 pending 유지, 다른 accountBinding의 pending/cache 숨김, 비로그인에서는 미귀속 pending만 노출. `accept`의 upsert 후 오류 주입→pending/cache 모두 rollback; 성공→cache upsert+pending 삭제. stale snapshot·같은 account의 다른 generation·미귀속/다른 binding의 accept는 거절. 낮은 version은 skip, 같은 version도 C2 cache 정책에 따라 skip, 더 높은 version만 replace. 404 관찰 당시 version 또는 tombstone version 이하 cache만 제거하고 그 사이 도착한 최신 version은 보존한다. saveSubmission도 현재 snapshot과 일치하는 binding만 허용한다. decorator의 성공/404/일반 오류·늦은404와 새 version 경합·계정 변경·캐시 실패 계약을 별도 suite로 검증한다.
-- [ ] **Step 2: RED.** JDBC SQLite host와 Native SQLite simulator에서 같은 suite. Android Context driver는 별도 플랫폼 smoke test.
-- [ ] **Step 3: 구현.** LocalSubmission UUID primary key, item cache는 account+item key, decimal/Instant는 정확한 text. session gate→DB transaction으로 commit과 세션 변경을 직렬화한다. cache clear/remove는 pending 보존, token 저장 없음. CachedGetItemRepository의 단일 동기화 흐름을 함께 구현한다. GET 404는 조회 시작 때 캡처한 cached version을 throughVersion으로 넘기고, DELETED replay는 tombstone version을 넘긴다. throughVersion 이하만 삭제하므로 늦은404가 최신cache를 지우지 않는다. accept에서 DELETED replay는 캐시 삭제+pending 삭제를 한 transaction으로 처리한다. C2 driver는 주입 가능한 앱 sandbox의 단일 프로세스로 검증한다.
-- [ ] **Step 4: GREEN.** reopen/rollback/계정 격리/version/404·tombstone 제거 suite, driver close, 생성 schema 검증. 첫 client schema 생성 결과를 기록한다.
-- [ ] **Step 5: 문서·커밋.** D7 범위와 transaction/decorator 계약을 기록한다. `feature(kmp): 계정별 로컬 캐시와 원자 저장 기반 구현`.
+- [x] **Step 0: 고정 결과 대조.** Task 1의 SQLDelight plugin·JDBC/Android/Native driver 버전과 schema 생성·compile/link 결과를 사용한다.
+- [x] **Step 1: 실패 테스트.** 파일 DB close/reopen 후 pending 유지, 다른 accountBinding의 pending/cache 숨김, 비로그인에서는 미귀속 pending만 노출. `accept`의 upsert 후 오류 주입→pending/cache 모두 rollback; 성공→cache upsert+pending 삭제. stale snapshot·같은 account의 다른 generation·미귀속/다른 binding의 accept는 거절. 낮은 version은 skip, 같은 version도 C2 cache 정책에 따라 skip, 더 높은 version만 replace. 404 관찰 당시 version 또는 tombstone version 이하 cache만 제거하고 그 사이 도착한 최신 version은 보존한다. saveSubmission도 현재 snapshot과 일치하는 binding만 허용한다. decorator의 성공/404/일반 오류·늦은404와 새 version 경합·계정 변경·캐시 실패 계약을 별도 suite로 검증한다.
+- [x] **Step 2: RED.** JDBC SQLite host와 Native SQLite simulator에서 같은 suite. Android Context driver는 별도 플랫폼 smoke test.
+- [x] **Step 3: 구현.** LocalSubmission UUID primary key, item cache는 account+item key, decimal/Instant는 정확한 text. session gate→DB transaction으로 commit과 세션 변경을 직렬화한다. cache clear/remove는 pending 보존, token 저장 없음. CachedGetItemRepository의 단일 동기화 흐름을 함께 구현한다. GET 404는 조회 시작 때 캡처한 cached version을 throughVersion으로 넘기고, DELETED replay는 tombstone version을 넘긴다. throughVersion 이하만 삭제하므로 늦은404가 최신cache를 지우지 않는다. accept에서 DELETED replay는 캐시 삭제+pending 삭제를 한 transaction으로 처리한다. C2 driver는 주입 가능한 앱 sandbox의 단일 프로세스로 검증한다.
+- [x] **Step 4: GREEN.** reopen/rollback/계정 격리/version/404·tombstone 제거 suite, driver close, 생성 schema 검증. 첫 client schema 생성 결과를 기록한다.
+- [x] **Step 5: 문서·커밋.** D7 범위와 transaction/decorator 계약을 기록한다. `feature(kmp): 계정별 로컬 캐시와 원자 저장 기반 구현`.
 
 ## Task 8: Koin·명시적 API backend·앱 조립
 

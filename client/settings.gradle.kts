@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "WishlistClient"
-include(":android", ":shared")
+include(":android", ":shared", ":localdb")

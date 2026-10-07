@@ -19,6 +19,8 @@ kotlin {
     }
 
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
+        // SQLDelight's Native driver needs the system SQLite; the plugin lives in :localdb, so link it here.
+        target.binaries.all { linkerOpts("-lsqlite3") }
         target.binaries.framework {
             baseName = "Shared"
             isStatic = true
@@ -35,6 +37,7 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(project(":localdb"))
             implementation(libs.sqldelight.runtime)
             implementation(libs.koin.core)
         }
