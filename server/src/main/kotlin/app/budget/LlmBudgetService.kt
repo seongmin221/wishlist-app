@@ -24,8 +24,8 @@ class LlmBudgetService(
     private val dataSource: DataSource,
     private val price: PriceTable = PriceTable(),
     private val modelSnapshot: String = "test-snapshot",
-    private val dailyCeilingMicrousd: Long = 600_000,
-    private val monthlyCeilingMicrousd: Long = 6_000_000,
+    private val dailyCeilingMicrousd: Long = 721_000,
+    private val monthlyCeilingMicrousd: Long = 7_210_000,
     private val allowLocalAlias: Boolean = false,
 ) {
     init { require(modelSnapshot.isNotBlank() && (allowLocalAlias || modelSnapshot != "gpt-5.6-luna")) }

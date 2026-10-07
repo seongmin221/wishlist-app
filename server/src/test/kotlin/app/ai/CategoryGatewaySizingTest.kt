@@ -43,7 +43,7 @@ class CategoryGatewaySizingTest {
             val data=data(request)
             val size=data.getValue("custom_categories").jsonArray.size
             counts.add(size)
-            val bytes="""{"input_tokens":${if(size>0 || data.getValue("product").jsonPrimitive.content.length>160) 2001 else 1000}}""".toByteArray()
+            val bytes="""{"input_tokens":${if(size>0 || data.getValue("product").jsonPrimitive.content.length>160) 2501 else 1000}}""".toByteArray()
             exchange.sendResponseHeaders(200,bytes.size.toLong());exchange.responseBody.use { it.write(bytes) }
         }
         server.createContext("/v1/responses") { exchange ->

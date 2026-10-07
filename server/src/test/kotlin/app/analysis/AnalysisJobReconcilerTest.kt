@@ -227,7 +227,7 @@ class AnalysisJobReconcilerTest {
         assertEquals(1, AnalysisJobReconciler(source).reconcileExpired())
         assertEquals(before, snapshot())
         assertEquals(124L, budget.windowTotals("DAILY").settled)
-        assertEquals(496L, budget.windowTotals("DAILY").reserved)
+        assertEquals(596L, budget.windowTotals("DAILY").reserved)
     }
 
     private fun pauseDiscovery(source: DataSource, pause: () -> Unit): DataSource = object : DataSource by source {

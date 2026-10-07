@@ -52,7 +52,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"), versions)
                     }
                 }
             }
@@ -206,6 +206,29 @@ class DatabaseMigrationTest {
                 }
                 Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).load().validate()
             }
+        }
+    }
+
+    @Test fun `V14 raises ceilings of existing default windows so current windows keep reserving`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("13").load().migrate()
+            database.createConnection("").use { c -> c.createStatement().use { s ->
+                s.executeUpdate("""insert into llm_budget_windows(id,window_type,window_start,reserved_microusd,settled_microusd,ceiling_microusd) values
+                    ('${UUID.randomUUID()}','DAILY',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,599500,600000),
+                    ('${UUID.randomUUID()}','MONTHLY',date_trunc('month',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,0,6000000),
+                    ('${UUID.randomUUID()}','MONTH','2026-09-01T00:00:00Z',0,0,1000)""")
+            } }
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            database.createConnection("").use { c -> c.createStatement().use { s ->
+                s.executeQuery("select window_type,ceiling_microusd from llm_budget_windows order by window_type").use { r ->
+                    val rows = buildMap { while (r.next()) put(r.getString(1), r.getLong(2)) }
+                    assertEquals(mapOf("DAILY" to 721_000L, "MONTH" to 1000L, "MONTHLY" to 7_210_000L), rows)
+                }
+            } }
+            val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+            val claim = app.testutil.newAnalysisClaim(source)
+            assertTrue(app.budget.LlmBudgetService(source).reserveBeforeCall(claim, UUID.randomUUID()) is app.budget.ReserveResult.Reserved)
         }
     }
 

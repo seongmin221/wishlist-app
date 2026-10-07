@@ -7,6 +7,7 @@ import app.budget.LlmBudgetService
 import app.budget.ReserveResult
 import app.wishlist.AnalysisFailureCode
 import app.budget.BudgetReservation
+import app.budget.PriceTable
 import app.extraction.Metadata
 import java.util.UUID
 import javax.sql.DataSource
@@ -68,7 +69,7 @@ class AiClassificationService(
 
     private fun applyResponse(claim: AnalysisClaim, candidates: CandidateSnapshot, reservation: BudgetReservation,
         result: GatewayResponse, inFlight: Boolean): ProcessingOutcome {
-        val usageWithinLimit = result.inputTokens != null && result.outputTokens != null && result.inputTokens in 0..2000 && result.outputTokens in 0..80
+        val usageWithinLimit = result.inputTokens != null && result.outputTokens != null && result.inputTokens in 0..PriceTable.MAX_INPUT_TOKENS && result.outputTokens in 0..PriceTable.MAX_OUTPUT_TOKENS
         if (inFlight && usageWithinLimit) {
             budget.settle(reservation.id, result.inputTokens, result.outputTokens)
         } else if (inFlight && result.classification !is ClassificationResult.Retryable) {
