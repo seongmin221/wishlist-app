@@ -25,3 +25,24 @@ object PurposeLimits {
 
 class PurposeException(val code: String, val fields: Set<String> = emptySet(), val currentVersion: Int? = null,
     val retryAfterSeconds: Int? = null) : RuntimeException(code)
+
+enum class PurposeProjection { SUMMARY, SELECT }
+data class PurposeCursorPosition(val activityAt: Instant, val id: UUID)
+data class PurposePreview(val itemId: UUID, val imageUrl: String?)
+data class PurposeListEntry(val purpose: Purpose, val previews: List<PurposePreview>)
+data class PurposePage(val projection: PurposeProjection, val entries: List<PurposeListEntry>, val next: PurposeCursorPosition?,
+    val activeCount: Int, val archivedCount: Int)
+
+data class PurposeChanges(
+    val name: String? = null,
+    val description: app.category.CategoryChange<String?> = app.category.CategoryChange.Keep,
+    val color: PurposeColor? = null,
+    val icon: PurposeIcon? = null,
+) {
+    val hasChanges: Boolean get() = name != null || description != app.category.CategoryChange.Keep || color != null || icon != null
+    fun applyTo(current: PurposeInput) = PurposeInput(
+        name ?: current.name,
+        when (val value = description) { app.category.CategoryChange.Keep -> current.description; is app.category.CategoryChange.Set -> value.value },
+        color ?: current.color, icon ?: current.icon,
+    )
+}

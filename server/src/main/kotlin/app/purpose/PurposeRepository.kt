@@ -37,6 +37,34 @@ class PurposeRepository {
         }
     }
 
+    fun page(c: Connection, owner: UUID, after: PurposeCursorPosition?, limit: Int): List<Purpose> {
+        val keyset = if (after == null) "" else "and (p.activity_at,p.id) < (?,?)"
+        return c.prepareStatement("""select $columns from purposes p where p.owner_id=? and p.lifecycle_status='ACTIVE' $keyset
+            order by p.activity_at desc,p.id desc limit ?""").use { s ->
+            var index = 1
+            s.setObject(index++, owner)
+            if (after != null) { s.setObject(index++, after.activityAt.atOffset(java.time.ZoneOffset.UTC)); s.setObject(index++, after.id) }
+            s.setInt(index, limit)
+            s.executeQuery().use { r -> buildList { while (r.next()) add(row(r)) } }
+        }
+    }
+
+    /** Newest four saved ACTIVE candidates per purpose; same order as the ITEM-02 purpose filter. */
+    fun previews(c: Connection, owner: UUID, ids: List<UUID>): Map<UUID, List<PurposePreview>> {
+        if (ids.isEmpty()) return emptyMap()
+        val array = c.createArrayOf("uuid", ids.toTypedArray())
+        try {
+            return c.prepareStatement("""select purpose_id,id,product_image_url from (
+                select purpose_id,id,product_image_url,created_at,row_number() over (partition by purpose_id order by created_at desc,id desc) rank
+                from wishlist_items where owner_id=? and lifecycle_status='ACTIVE' and purpose_id=any(?)) ranked
+                where rank<=4 order by purpose_id,rank""").use { s ->
+                s.setObject(1, owner); s.setArray(2, array)
+                s.executeQuery().use { r -> buildList { while (r.next()) add(r.getObject(1, UUID::class.java) to
+                    PurposePreview(r.getObject(2, UUID::class.java), r.getString(3))) } }
+            }.groupBy({ it.first }, { it.second })
+        } finally { array.free() }
+    }
+
     internal fun row(r: ResultSet) = Purpose(
         r.getObject("id", UUID::class.java),
         PurposeInput(r.getString("name"), r.getString("description"), PurposeColor.valueOf(r.getString("color_key")), PurposeIcon.valueOf(r.getString("icon_key"))),

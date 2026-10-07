@@ -39,6 +39,32 @@ class PurposeService(private val dataSource: DataSource) {
 
     fun get(owner: UUID, id: UUID): Purpose? = dataSource.inTransaction(readOnly = true) { purposes.find(it, owner, id) }
 
+    fun list(owner: UUID, projection: PurposeProjection, limit: Int, after: PurposeCursorPosition?): PurposePage {
+        require(limit in 1..PurposeLimits.PAGE_LIMIT)
+        return dataSource.inTransaction(readOnly = true) { c ->
+            val rows = purposes.page(c, owner, after, limit + 1)
+            val page = rows.take(limit)
+            val previews = if (projection == PurposeProjection.SUMMARY) purposes.previews(c, owner, page.map { it.id }) else emptyMap()
+            PurposePage(
+                projection, page.map { PurposeListEntry(it, previews[it.id].orEmpty()) },
+                if (rows.size > limit) page.last().let { PurposeCursorPosition(it.activityAt, it.id) } else null,
+                purposes.count(c, owner, "ACTIVE"), purposes.count(c, owner, "ARCHIVED"),
+            )
+        }
+    }
+
+    fun patch(owner: UUID, id: UUID, expectedVersion: Int, changes: PurposeChanges): Purpose = dataSource.inTransaction { c ->
+        OwnerStructureLock.lock(c, owner)
+        val current = purposes.find(c, owner, id, lock = true) ?: throw PurposeException("PURPOSE_NOT_FOUND")
+        if (current.version != expectedVersion) throw PurposeException("PURPOSE_VERSION_CONFLICT", currentVersion = current.version)
+        if (!changes.hasChanges) throw PurposeException("INVALID_PURPOSE_INPUT")
+        val input = changes.applyTo(current.input)
+        validate(input)
+        if (input == current.input) return@inTransaction current
+        purposes.update(c, owner, id, input)
+        checkNotNull(purposes.find(c, owner, id))
+    }
+
     private fun validate(input: PurposeInput) {
         val fields = PurposeInputPolicy.validate(input.name, input.description)
         if (fields.isNotEmpty()) throw PurposeException("INVALID_PURPOSE_INPUT", fields)
