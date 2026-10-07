@@ -216,7 +216,7 @@ class AiClassificationServiceTest {
 
         assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
         source.connection.use { c -> c.createStatement().executeQuery("select analysis_status,predicted_category_id,predicted_purpose_id from wishlist_items").use { r ->
-            r.next(); assertEquals("READY", r.getString(1)); assertEquals("C026", r.getString(2)); assertEquals("PUR_GIFT", r.getString(3))
+            r.next(); assertEquals("READY", r.getString(1)); assertEquals("C026", r.getString(2)); assertNull(r.getString(3)) // an unjudged legacy purpose is not a prediction
         } }
     }
 

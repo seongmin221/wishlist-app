@@ -80,6 +80,29 @@ class PurposeFinishTest {
         }
     }
 
+    @Test fun `predicted purpose records only judged results and the default result does not judge`() = withAnalysisDatabase { source ->
+        for (case in listOf("unjudged", "renamed", "default", "judged")) {
+            val owner = UUID.randomUUID(); val claim = ownedAnalysisClaim(source, owner, AnalysisLane.GENERAL)
+            val existing = insertPurpose(source, owner, "existing", null); val chosen = insertPurpose(source, owner, "chosen", null)
+            analysisSql(source, "update wishlist_items set purpose_id='$existing',purpose_source='AI',predicted_purpose_id='$existing' where id='${claim.itemId}'")
+            seedV3Snapshot(source, claim, listOf(existing, chosen))
+            val pending = app.analysis.AnalysisPendingResultRepository(source)
+            check(pending.saveMetadata(claim, app.extraction.Metadata("AI name", null, null, "https://example.com/item")))
+            when (case) {
+                "unjudged" -> check(pending.saveAssignment(claim, app.ai.ClassificationResult.Assigned("C026", null, purposeJudged = false)))
+                "renamed" -> { check(pending.saveAssignment(claim, app.ai.ClassificationResult.Assigned("C026", chosen.toString(), purposeJudged = true)))
+                    analysisSql(source, "update purposes set name='renamed' where id='$chosen'") }
+                "default" -> check(pending.saveAssignment(claim, app.ai.ClassificationResult.Assigned("C026", null)))
+                else -> check(pending.saveAssignment(claim, app.ai.ClassificationResult.Assigned("C026", chosen.toString(), purposeJudged = true)))
+            }
+            AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Complete)
+            val expected = if (case == "judged") chosen else existing
+            assertEquals(expected.toString(), itemValue(source, claim, "purpose_id"), case)
+            assertEquals(expected.toString(), itemValue(source, claim, "predicted_purpose_id"), case)
+        }
+        assertFalse(app.ai.ClassificationResult.Assigned("C026", null).purposeJudged)
+    }
+
     @Test fun `reviewed user and override purposes are never filled or replaced`() = withAnalysisDatabase { source ->
         val cases = listOf(
             "CONFIRMED" to "purpose_source='UNASSIGNED'", "DEFERRED" to "purpose_source='UNASSIGNED'",

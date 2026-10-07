@@ -177,13 +177,15 @@ class DatabaseMigrationTest {
             Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("12").load().migrate()
             database.createConnection("").use { connection ->
                 val owner = UUID.randomUUID()
-                val ids = List(3) { UUID.randomUUID() }
-                val rows = listOf(Triple("legacy-ai", "AI", "PENDING"), Triple("legacy-user", "USER", "CONFIRMED"), Triple(null, "UNASSIGNED", "NOT_REQUIRED"))
+                val ids = List(4) { UUID.randomUUID() }
+                // The 4th row was PENDING only because of its AI purpose (category is USER); nothing remains to review.
+                val rows = listOf(Triple("legacy-ai", "AI", "PENDING"), Triple("legacy-user", "USER", "CONFIRMED"), Triple(null, "UNASSIGNED", "NOT_REQUIRED"),
+                    Triple("legacy-ai-only", "AI", "PENDING"))
                 connection.createStatement().use { it.executeUpdate("insert into app_users(id) values ('$owner')") }
                 ids.zip(rows).forEach { (id, row) ->
                     connection.createStatement().use { it.executeUpdate("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,
                         product_name,category_id,category_source,category_missing_reason,purpose_id,purpose_source,review_status)
-                        values ('$id','$owner','${UUID.randomUUID()}','https://example.com/item','READY','ACTIVE','name','C026','AI',null,
+                        values ('$id','$owner','${UUID.randomUUID()}','https://example.com/item','READY','ACTIVE','name','C026','${if (row.first == "legacy-ai-only") "USER" else "AI"}',null,
                         ${row.first?.let { "'$it'" } ?: "null"},'${row.second}','${row.third}')""") }
                 }
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
@@ -193,7 +195,7 @@ class DatabaseMigrationTest {
                         assertNull(r.getObject("purpose_id"))
                         assertEquals(row.first, r.getString("legacy_purpose_id"))
                         assertEquals(if (row.second == "AI") "UNASSIGNED" else row.second, r.getString("purpose_source"))
-                        assertEquals(row.third, r.getString("review_status"))
+                        assertEquals(if (row.first == "legacy-ai-only") "NOT_REQUIRED" else row.third, r.getString("review_status"))
                     } }
                 }
                 connection.createStatement().use { s ->

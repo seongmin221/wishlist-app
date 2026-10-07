@@ -114,7 +114,8 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             "category_source" to categorySource, "category_missing_reason" to reason, "purpose_id" to purpose,
             "purpose_source" to purposeSource, "review_status" to review,
             "predicted_category_id" to if (assigned) pending.category else item.predictedCategory,
-            "predicted_purpose_id" to if (assigned) pending.purpose else item.predictedPurpose,
+            // Diagnostics keep only purpose judgements; an unjudged or rejected result leaves the last prediction.
+            "predicted_purpose_id" to if (decision is PurposeDecision.Judged) decision.purposeId?.toString() else item.predictedPurpose,
             "analysis_failure_code" to failure,
         )
         c.prepareStatement("update wishlist_items set ${values.keys.joinToString { if (it == "custom_category_id" || it == "purpose_id") "$it=?::uuid" else "$it=?" }}, " +

@@ -24,8 +24,8 @@ data class PurposeCandidate(val id: String, val name: String, val description: S
 data class CustomCategoryCandidate(val version: Int,val name:String,val parentId:String,val description:String?,val examples:List<String>)
 
 sealed interface ClassificationResult {
-    /** purposeJudged=false means the call could not judge purposes; finish keeps the existing connection. */
-    data class Assigned(val categoryId: String, val purposeId: String?, val purposeJudged: Boolean = true) : ClassificationResult
+    /** purposeJudged=false (the safe default) means no purpose judgement; finish keeps the existing connection. */
+    data class Assigned(val categoryId: String, val purposeId: String?, val purposeJudged: Boolean = false) : ClassificationResult
     data object Abstained : ClassificationResult
     data class Unusable(val reason: String) : ClassificationResult
     data object Retryable : ClassificationResult

@@ -17,10 +17,13 @@ create table purposes (
 create index purposes_active_activity on purposes(owner_id, activity_at desc, id desc) where lifecycle_status='ACTIVE';
 
 -- No purpose table existed: stored purpose strings referenced nothing. Preserve the original text.
+-- A review that was pending only for the cleared AI purpose has nothing left to confirm.
 alter table wishlist_items add column legacy_purpose_id varchar(128);
 update wishlist_items
 set legacy_purpose_id = purpose_id,
     purpose_source = case when purpose_source = 'AI' then 'UNASSIGNED' else purpose_source end,
+    review_status = case when purpose_source = 'AI' and review_status = 'PENDING' and category_source is distinct from 'AI'
+        then 'NOT_REQUIRED' else review_status end,
     purpose_id = null
 where purpose_id is not null;
 alter table wishlist_items alter column purpose_id type uuid using null::uuid;
