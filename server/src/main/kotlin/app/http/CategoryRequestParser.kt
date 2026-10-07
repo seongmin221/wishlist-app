@@ -1,21 +1,17 @@
 package app.http
 
+import app.category.CategoryChange
 import app.category.CategoryInput
 import app.category.CategoryInputPolicy
 import kotlinx.serialization.json.*
 
 data class CategoryCreateRequest(val parentId: String, val input: CategoryInput)
 
-sealed interface CategoryFieldChange<out T> {
-    data object Keep : CategoryFieldChange<Nothing>
-    data class Set<T>(val value: T) : CategoryFieldChange<T>
-}
-
 data class CategoryPatchRequest(
     val expectedVersion: Int,
     val name: String?,
-    val description: CategoryFieldChange<String?>,
-    val examples: CategoryFieldChange<List<String>>,
+    val description: CategoryChange<String?>,
+    val examples: CategoryChange<List<String>>,
 )
 
 sealed interface CategoryRequestParseResult<out T> {
@@ -52,8 +48,8 @@ fun parseCategoryPatchRequest(raw: String): CategoryRequestParseResult<CategoryP
     val invalid = CategoryInputPolicy.validate(CategoryInput(name ?: "unchanged", description, examples))
     if (invalid.isNotEmpty()) return CategoryRequestParseResult.Invalid(fields = invalid)
     return CategoryRequestParseResult.Valid(CategoryPatchRequest(expected, name,
-        if ("description" in body) CategoryFieldChange.Set(description) else CategoryFieldChange.Keep,
-        if ("examples" in body) CategoryFieldChange.Set(examples) else CategoryFieldChange.Keep,
+        if ("description" in body) CategoryChange.Set(description) else CategoryChange.Keep,
+        if ("examples" in body) CategoryChange.Set(examples) else CategoryChange.Keep,
     ))
 }
 

@@ -16,7 +16,7 @@ object CategoryInputPolicy {
     fun normalizedName(name: String): String {
         val normalized = StringBuilder()
         var space = false
-        Normalizer.normalize(name,Normalizer.Form.NFC).codePoints().forEach { point ->
+        Normalizer.normalize(name, Normalizer.Form.NFC).codePoints().forEach { point ->
             if (Character.isWhitespace(point) || Character.isSpaceChar(point)) {
                 if (normalized.isNotEmpty()) space = true
             } else {
@@ -30,9 +30,9 @@ object CategoryInputPolicy {
 
     private fun validText(text: String, maximum: Int, multiline: Boolean = false): Boolean {
         if (text.codePointCount(0, text.length) > maximum) return false
-        val inspected=if(multiline) text.replace("\r\n","\n") else text
+        val inspected = if (multiline) text.replace("\r\n","\n") else text
         return inspected.codePoints().allMatch { point ->
-            point !in 0xD800..0xDFFF && (Character.getType(point) != Character.CONTROL.toInt() || multiline && point==10) &&
+            point !in 0xD800..0xDFFF && (Character.getType(point) != Character.CONTROL.toInt() || multiline && point == 10) &&
                 point != 0x200B && point != 0xFEFF && point !in 0x202A..0x202E && point !in 0x2066..0x2069
         }
     }

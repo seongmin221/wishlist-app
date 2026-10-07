@@ -118,7 +118,7 @@ fun assertProtectedFinishMatrix(source: DataSource, lane: AnalysisLane) {
             val job = newFinishJob(source, lane)
             val provenance = if (byOverride) "AI" else "USER"
             analysisSql(source, """update wishlist_items set product_name='kept name',product_image_url=null,name_source='$provenance',image_source='$provenance',
-                category_id='KEPT_CAT',category_source='$provenance',category_missing_reason=null,purpose_id=null,purpose_source='${if (byOverride) "UNASSIGNED" else "USER"}',
+                category_id='C003',category_source='$provenance',category_missing_reason=null,purpose_id=null,purpose_source='${if (byOverride) "UNASSIGNED" else "USER"}',
                 review_status='$review',user_override_fields=${if (byOverride) "array['NAME','IMAGE','CATEGORY','PURPOSE']" else "'{}'::text[]"}
                 where id='${job.itemId}'""".trimIndent())
             val process: (AnalysisClaim) -> ProcessingOutcome = { claim -> seedFinishResult(source, claim); outcome }
@@ -128,7 +128,7 @@ fun assertProtectedFinishMatrix(source: DataSource, lane: AnalysisLane) {
             assertEquals("kept name", analysisScalar(source, "select product_name from wishlist_items where id='${job.itemId}'"))
             assertNull(analysisScalar(source, "select product_image_url from wishlist_items where id='${job.itemId}'"))
             assertEquals(provenance, analysisScalar(source, "select name_source from wishlist_items where id='${job.itemId}'"))
-            assertEquals("KEPT_CAT", analysisScalar(source, "select category_id from wishlist_items where id='${job.itemId}'"))
+            assertEquals("C003", analysisScalar(source, "select category_id from wishlist_items where id='${job.itemId}'"))
             assertEquals(provenance, analysisScalar(source, "select category_source from wishlist_items where id='${job.itemId}'"))
             assertNull(analysisScalar(source, "select purpose_id from wishlist_items where id='${job.itemId}'"))
             assertEquals(if (byOverride) "UNASSIGNED" else "USER", analysisScalar(source, "select purpose_source from wishlist_items where id='${job.itemId}'"))
@@ -163,13 +163,13 @@ fun assertIncompleteFinishMetadata(source: DataSource) {
 fun assertPurposeOnlyReview(source: DataSource) {
     for (lane in AnalysisLane.entries) for (review in listOf("NOT_REQUIRED", "PENDING", "CONFIRMED", "DEFERRED")) {
         val job = newFinishJob(source, lane)
-        analysisSql(source, """update wishlist_items set category_id='USER_CAT',category_source='USER',category_missing_reason=null,
+        analysisSql(source, """update wishlist_items set category_id='C002',category_source='USER',category_missing_reason=null,
             review_status='$review' where id='${job.itemId}'""")
         val process: (AnalysisClaim) -> ProcessingOutcome = { claim -> seedFinishResult(source, claim); ProcessingOutcome.Complete }
         val result = if (lane == AnalysisLane.GENERAL) GeneralWorkerService(source, process).runGeneral(job.jobId, 1)
             else BrowserWorkerService(source, { Metadata("render", null, null, "https://example.com/item") }, { claim, _ -> process(claim) }).runBrowser(job.jobId, 1)
         assertEquals(WorkerDisposition.ACKNOWLEDGE, result)
-        assertEquals("USER_CAT", analysisScalar(source, "select category_id from wishlist_items where id='${job.itemId}'"))
+        assertEquals("C002", analysisScalar(source, "select category_id from wishlist_items where id='${job.itemId}'"))
         assertEquals("AI_PURPOSE", analysisScalar(source, "select purpose_id from wishlist_items where id='${job.itemId}'"))
         assertEquals("AI", analysisScalar(source, "select purpose_source from wishlist_items where id='${job.itemId}'"))
         assertEquals(if (review in setOf("CONFIRMED", "DEFERRED")) review else "PENDING",

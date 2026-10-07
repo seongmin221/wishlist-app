@@ -10,6 +10,26 @@ import java.sql.SQLException
 import kotlin.test.*
 
 class CategorySchemaTest {
+    @Test fun `V12 keeps unknown historical public reference but rejects new references`() = PostgresTestContainer().use { db ->
+        db.start()
+        Flyway.configure().dataSource(db.jdbcUrl,db.username,db.password).target("11").load().migrate()
+        val source=DatabaseFactory.dataSource(db.jdbcUrl,db.username,db.password)
+        val owner=UUID.randomUUID()
+        val item=CreateWishlistItemService(source).create(owner,UUID.randomUUID(),"https://example.com/item").createdItemId
+        analysisSql(source,"update wishlist_items set category_id='LEGACY_UNKNOWN',category_source='USER',category_missing_reason=null where id='$item'")
+        DatabaseFactory.migrate(db.jdbcUrl,db.username,db.password)
+        assertEquals("LEGACY_UNKNOWN",analysisScalar(source,"select category_id from wishlist_items where id='$item'"))
+        analysisSql(source,"update wishlist_items set product_name='preserved' where id='$item'")
+        assertEquals("23503",assertFailsWith<SQLException> { analysisSql(source,"update wishlist_items set category_id='NEW_UNKNOWN' where id='$item'") }.sqlState)
+    }
+
+    @Test fun `new public references require taxonomy IDs`() = withAnalysisDatabase { source ->
+        val owner=UUID.randomUUID()
+        val item=CreateWishlistItemService(source).create(owner,UUID.randomUUID(),"https://example.com/item").createdItemId
+        val failure=assertFailsWith<java.sql.SQLException> { analysisSql(source,"update wishlist_items set category_id='UNKNOWN_PUBLIC',category_source='AI',category_missing_reason=null where id='$item'") }
+        assertEquals("23503",failure.sqlState)
+    }
+
     @Test fun `V10 upgrade preserves sealed public snapshot and backfills owner`() = PostgresTestContainer().use { db ->
         db.start()
         Flyway.configure().dataSource(db.jdbcUrl,db.username,db.password).target("10").load().migrate()

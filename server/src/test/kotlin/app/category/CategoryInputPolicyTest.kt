@@ -3,6 +3,12 @@ package app.category
 import kotlin.test.*
 
 class CategoryInputPolicyTest {
+    @Test fun `documented Unicode separators filler and direction marks remain allowed`() {
+        for(value in listOf("a\u2028b","a\u2029b","\u3164","\u2800","\u200e","\u200f","\u061c")) {
+            assertEquals(emptySet(), CategoryInputPolicy.validate(CategoryInput(value, value, listOf(value))))
+        }
+    }
+
     @Test fun `unicode whitespace and case normalize only the comparison key`() {
         val input = CategoryInput("  My\u00a0  Desk  ", null, emptyList())
         assertEquals(emptySet(), CategoryInputPolicy.validate(input))
