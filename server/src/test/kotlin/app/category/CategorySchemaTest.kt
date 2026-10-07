@@ -15,8 +15,10 @@ class CategorySchemaTest {
         Flyway.configure().dataSource(db.jdbcUrl,db.username,db.password).target("11").load().migrate()
         val source=DatabaseFactory.dataSource(db.jdbcUrl,db.username,db.password)
         val owner=UUID.randomUUID()
-        val item=CreateWishlistItemService(source).create(owner,UUID.randomUUID(),"https://example.com/item").createdItemId
-        analysisSql(source,"update wishlist_items set category_id='LEGACY_UNKNOWN',category_source='USER',category_missing_reason=null where id='$item'")
+        // Seed the V11 row with SQL: current item services target the latest schema.
+        val item=UUID.randomUUID()
+        analysisSql(source,"""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,category_id,category_source,category_missing_reason)
+            values ('$item','$owner','${UUID.randomUUID()}','https://example.com/item','READY','ACTIVE','LEGACY_UNKNOWN','USER',null)""")
         DatabaseFactory.migrate(db.jdbcUrl,db.username,db.password)
         assertEquals("LEGACY_UNKNOWN",analysisScalar(source,"select category_id from wishlist_items where id='$item'"))
         analysisSql(source,"update wishlist_items set product_name='preserved' where id='$item'")

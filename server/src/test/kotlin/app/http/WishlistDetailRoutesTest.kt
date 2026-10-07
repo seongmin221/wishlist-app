@@ -1,6 +1,9 @@
 package app.http
 
+import app.purpose.PurposeChanges
+import app.purpose.PurposeService
 import app.testutil.analysisScalar
+import app.testutil.insertPurpose
 import app.testutil.analysisSql
 import app.testutil.createdItemId
 import app.testutil.withAnalysisDatabase
@@ -209,6 +212,30 @@ class WishlistDetailRoutesTest {
                 assertFalse(response.bodyAsText().contains("bad-secret"))
             }
             assertEquals("0", analysisScalar(source, "select count(*) from wishlist_items"))
+        }
+    }
+
+    @Test fun `item detail shows current purpose display values and empty purpose shapes`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val linked = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/a").createdItemId
+        val empty = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/b").createdItemId
+        val cleared = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/c").createdItemId
+        val purpose = insertPurpose(source, owner, "gift", null)
+        analysisSql(source, "update wishlist_items set purpose_id='$purpose',purpose_source='AI' where id='$linked'")
+        analysisSql(source, "update wishlist_items set purpose_source='USER' where id='$cleared'")
+        testApplication {
+            application { installApiHttpSupport(); routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner } } }
+            suspend fun item(id: UUID) = Json.parseToJsonElement(client.get("/v1/wishlist-items/$id").bodyAsText()).jsonObject
+            val before = item(linked)
+            assertEquals(buildJsonObject { put("id", purpose.toString()); put("name", "gift"); put("colorKey", "CORAL"); put("iconKey", "HEART"); put("source", "AI") },
+                before.getValue("purpose"))
+            PurposeService(source).patch(owner, purpose, 1, PurposeChanges(name = "renamed"))
+            val after = item(linked)
+            assertEquals("renamed", after.getValue("purpose").jsonObject.getValue("name").jsonPrimitive.content)
+            assertEquals(before.getValue("version"), after.getValue("version"))
+            for ((id, expected) in listOf(empty to "UNASSIGNED", cleared to "USER")) assertEquals(buildJsonObject {
+                put("id", JsonNull); put("name", JsonNull); put("colorKey", JsonNull); put("iconKey", JsonNull); put("source", expected)
+            }, item(id).getValue("purpose"))
         }
     }
 }

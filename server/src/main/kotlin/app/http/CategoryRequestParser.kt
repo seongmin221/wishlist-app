@@ -1,6 +1,6 @@
 package app.http
 
-import app.category.CategoryChange
+import app.common.FieldChange
 import app.category.CategoryInput
 import app.category.CategoryInputPolicy
 import kotlinx.serialization.json.*
@@ -10,8 +10,8 @@ data class CategoryCreateRequest(val parentId: String, val input: CategoryInput)
 data class CategoryPatchRequest(
     val expectedVersion: Int,
     val name: String?,
-    val description: CategoryChange<String?>,
-    val examples: CategoryChange<List<String>>,
+    val description: FieldChange<String?>,
+    val examples: FieldChange<List<String>>,
 )
 
 sealed interface CategoryRequestParseResult<out T> {
@@ -20,7 +20,7 @@ sealed interface CategoryRequestParseResult<out T> {
 }
 
 fun parseCategoryCreateRequest(raw: String): CategoryRequestParseResult<CategoryCreateRequest> {
-    val body = categoryBody(raw) ?: return CategoryRequestParseResult.Invalid()
+    val body = parseJsonObject(raw) ?: return CategoryRequestParseResult.Invalid()
     if (body.keys.any { it !in setOf("parentId", "name", "description", "examples") }) return CategoryRequestParseResult.Invalid()
     val parent = body["parentId"].strictString() ?: return CategoryRequestParseResult.Invalid(fields = setOf("parentId"))
     val name = body["name"].strictString() ?: return CategoryRequestParseResult.Invalid(fields = setOf("name"))
@@ -33,12 +33,11 @@ fun parseCategoryCreateRequest(raw: String): CategoryRequestParseResult<Category
 }
 
 fun parseCategoryPatchRequest(raw: String): CategoryRequestParseResult<CategoryPatchRequest> {
-    val body = categoryBody(raw) ?: return CategoryRequestParseResult.Invalid()
+    val body = parseJsonObject(raw) ?: return CategoryRequestParseResult.Invalid()
     if ("parentId" in body) return CategoryRequestParseResult.Invalid("CATEGORY_PARENT_IMMUTABLE", setOf("parentId"))
     if (body.keys.any { it !in setOf("expectedVersion", "name", "description", "examples") } ||
         body.keys.none { it in setOf("name", "description", "examples") }) return CategoryRequestParseResult.Invalid()
-    val version = body["expectedVersion"] as? JsonPrimitive
-    val expected = version?.takeIf { !it.isString && it.content.matches(Regex("[1-9][0-9]*")) }?.content?.toIntOrNull()
+    val expected = body.positiveVersion("expectedVersion")
         ?: return CategoryRequestParseResult.Invalid(fields = setOf("expectedVersion"))
     val name = body["name"].strictString()
     if ("name" in body && name == null) return CategoryRequestParseResult.Invalid(fields = setOf("name"))
@@ -48,19 +47,10 @@ fun parseCategoryPatchRequest(raw: String): CategoryRequestParseResult<CategoryP
     val invalid = CategoryInputPolicy.validate(CategoryInput(name ?: "unchanged", description, examples))
     if (invalid.isNotEmpty()) return CategoryRequestParseResult.Invalid(fields = invalid)
     return CategoryRequestParseResult.Valid(CategoryPatchRequest(expected, name,
-        if ("description" in body) CategoryChange.Set(description) else CategoryChange.Keep,
-        if ("examples" in body) CategoryChange.Set(examples) else CategoryChange.Keep,
+        if ("description" in body) FieldChange.Set(description) else FieldChange.Keep,
+        if ("examples" in body) FieldChange.Set(examples) else FieldChange.Keep,
     ))
 }
-
-private fun categoryBody(raw: String): JsonObject? = try {
-    Json.parseToJsonElement(raw) as? JsonObject
-} catch (_: IllegalArgumentException) { null }
-
-private fun JsonElement?.strictString(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.content
-
-private fun JsonObject.optionalStringValid(key: String): Boolean =
-    this[key] == null || this[key] == JsonNull || this[key].strictString() != null
 
 private fun JsonObject.examples(): List<String>? {
     val value = this["examples"] ?: return emptyList()

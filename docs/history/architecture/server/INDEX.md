@@ -1,5 +1,7 @@
 # Server 의사결정
 
+- [B3 목적 구현·리뷰](b3-purpose-implementation-2026-10-07.md) — PUR-01~04·V13/V14·AI 목적 후보·입력 2,500·검증
+
 - [B2 후속 리뷰 보완](b2-review-followup-2026-10-07.md) — 공용 fallback·확정 상태·FAILED stage·V12·후보 타입/codec·API 문서 분리
 
 - [B2 카테고리 구현·리뷰](b2-category-implementation-2026-10-07.md) — CAT-01~04·V11·AI owner/stale 보호·피드백 보완·전체 검증

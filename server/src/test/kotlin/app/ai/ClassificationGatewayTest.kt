@@ -61,7 +61,7 @@ class ClassificationGatewayTest {
                 exchange.sendResponseHeaders(400, -1)
                 return@createContext
             }
-            val bytes = """{"input_tokens":2001}""".toByteArray()
+            val bytes = """{"input_tokens":2501}""".toByteArray()
             exchange.sendResponseHeaders(200, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
         }
@@ -100,9 +100,29 @@ class ClassificationGatewayTest {
         try {
             val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna-2026-09-01", "secret"), baseUri = URI("http://127.0.0.1:${server.address.port}/v1"))
             val result = gateway.classify("Lamp", candidates) { phases.add("in_flight") }
-            assertEquals(ClassificationResult.Assigned("CAT_HOME", null), result.classification)
+            assertEquals(ClassificationResult.Assigned("CAT_HOME", null, purposeJudged = false), result.classification)
             assertEquals(1200, result.inputTokens)
             assertEquals(listOf("token_count", "in_flight", "paid_request"), phases.toList())
+        } finally { server.stop(0) }
+    }
+
+    @Test fun `token preflight sends a request exactly at the 2500 input cap`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        var responses = 0
+        server.createContext("/v1/responses/input_tokens") { exchange ->
+            val bytes = """{"input_tokens":2500}""".toByteArray()
+            exchange.sendResponseHeaders(200, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        }
+        server.createContext("/v1/responses") { exchange ->
+            responses++
+            exchange.sendResponseHeaders(500, -1)
+        }
+        server.start()
+        try {
+            val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna-2026-09-01", "secret"), baseUri = URI("http://127.0.0.1:${server.address.port}/v1"))
+            assertEquals(ClassificationResult.Retryable, gateway.classify("Lamp", candidates).classification)
+            assertEquals(1, responses)
         } finally { server.stop(0) }
     }
 }

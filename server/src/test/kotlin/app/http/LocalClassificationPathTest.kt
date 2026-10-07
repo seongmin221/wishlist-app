@@ -61,7 +61,7 @@ class LocalClassificationPathTest {
                     setBody("""{"jobId":"$jobId","generation":1}""")
                 }
                 assertEquals(HttpStatusCode.NoContent, processed.status)
-                assertEquals(true, observed?.inputTokens in 0..2000)
+                assertEquals(true, observed?.inputTokens in 0..2500)
                 assertEquals(true, observed?.outputTokens in 0..80)
                 source.connection.use { c -> c.createStatement().executeQuery("select analysis_status,predicted_category_id from wishlist_items").use { r ->
                     r.next()

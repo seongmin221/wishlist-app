@@ -1,6 +1,7 @@
 package app
 
 import app.category.CategoryService
+import app.purpose.PurposeService
 
 import app.ai.*
 import app.analysis.GeneralWorkerService
@@ -84,5 +85,6 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         get("/health") { call.respondText("ok") }
         wishlistRoutes(service, detailService) { resolver.resolve(it) }
         categoryRoutes(CategoryService(source)) { resolver.resolve(it) }
+        purposeRoutes(PurposeService(source)) { resolver.resolve(it) }
     }
 }

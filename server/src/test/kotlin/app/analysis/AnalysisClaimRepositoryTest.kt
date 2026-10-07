@@ -153,13 +153,14 @@ class AnalysisClaimRepositoryTest {
             val old = assertIs<ClaimResult.Claimed>(repository.claim(job.jobId, 1, lane)).claim
             sql(source, """update analysis_jobs set stage='${lane.name}_PENDING',lease_until=clock_timestamp()-interval '1 second',
                 pending_product_name='old-name',pending_product_description='old-description',pending_product_image_url='old-image',pending_canonical_url='old-url',
-                pending_category_id='old-category',pending_purpose_id='old-purpose',pending_failure_code='old-failure',candidate_snapshot_json='fixed-snapshot'
+                pending_category_id='old-category',pending_purpose_id='old-purpose',pending_failure_code='old-failure',pending_purpose_judged=true,candidate_snapshot_json='fixed-snapshot'
                 where id='${job.jobId}'""".trimIndent())
             val current = assertIs<ClaimResult.Claimed>(repository.claim(job.jobId, 1, lane)).claim
             assertNotEquals(old.executionToken, current.executionToken)
             assertFalse(guard(source, old))
             assertTrue(guard(source, current))
             assertEquals("fixed-snapshot", scalar(source, "select candidate_snapshot_json from analysis_jobs where id='${job.jobId}'"))
+            assertEquals("f", scalar(source, "select pending_purpose_judged from analysis_jobs where id='${job.jobId}'"))
             for (column in listOf("pending_category_id", "pending_purpose_id", "pending_failure_code")) {
                 assertNull(scalar(source, "select $column from analysis_jobs where id='${job.jobId}'"))
             }

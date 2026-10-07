@@ -15,6 +15,9 @@ data class WishlistItem(
     val categoryName:String? = null,
     val categoryParentId:String? = null,
     val categoryKind:String? = null,
+    val purposeName: String? = null,
+    val purposeColorKey: String? = null,
+    val purposeIconKey: String? = null,
 ) {
     val id: UUID get() = storedState.id
     val version: Int get() = storedState.version

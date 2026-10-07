@@ -26,7 +26,7 @@ class AiClassificationServiceTest {
             { _, _, _ -> GatewayResponse(ClassificationResult.Assigned("C026", null), 500, 20) })
         kotlin.test.assertFailsWith<IllegalStateException> { classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")) }
         assertEquals("SETTLED", analysisScalar(source, "select state from llm_budget_reservations"))
-        assertEquals(496L, budget.windowTotals("DAILY").settled)
+        assertEquals(596L, budget.windowTotals("DAILY").settled)
         assertEquals(0L, budget.windowTotals("DAILY").reserved)
         assertNull(analysisScalar(source, "select pending_category_id from analysis_jobs where id='${claim.jobId}'"))
     }
@@ -54,7 +54,7 @@ class AiClassificationServiceTest {
         kotlin.test.assertSame(original, caught)
         assertEquals(1, caught.suppressed.size)
         assertEquals("IN_FLIGHT", analysisScalar(source, "select state from llm_budget_reservations"))
-        assertEquals(496L, budget.windowTotals("DAILY").reserved)
+        assertEquals(596L, budget.windowTotals("DAILY").reserved)
     }
 
     @Test fun `deadline consumed by flight DB work sends no paid request and releases reservation`() = withAnalysisDatabase { source ->
@@ -103,7 +103,7 @@ class AiClassificationServiceTest {
         server.createContext("/v1/responses/input_tokens") { exchange ->
             exchange.requestBody.readAllBytes()
             duringPreflight = analysisScalar(source, "select state from llm_budget_reservations")
-            val bytes = """{"input_tokens":2001}""".toByteArray()
+            val bytes = """{"input_tokens":2501}""".toByteArray()
             exchange.sendResponseHeaders(200, bytes.size.toLong())
             exchange.responseBody.use { it.write(bytes) }
         }
@@ -187,7 +187,7 @@ class AiClassificationServiceTest {
                 analysisSql(source, "update llm_budget_reservations set lease_until=clock_timestamp()-interval '1 second' where analysis_job_id='${claim.jobId}'")
                 assertEquals(1, budget.reconcileExpired())
             } else assertEquals("SETTLED", state)
-            assertEquals("496", analysisScalar(source, "select actual_microusd from llm_budget_reservations where analysis_job_id='${claim.jobId}'"))
+            assertEquals("596", analysisScalar(source, "select actual_microusd from llm_budget_reservations where analysis_job_id='${claim.jobId}'"))
         }
     }
 
@@ -216,7 +216,7 @@ class AiClassificationServiceTest {
 
         assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
         source.connection.use { c -> c.createStatement().executeQuery("select analysis_status,predicted_category_id,predicted_purpose_id from wishlist_items").use { r ->
-            r.next(); assertEquals("READY", r.getString(1)); assertEquals("C026", r.getString(2)); assertEquals("PUR_GIFT", r.getString(3))
+            r.next(); assertEquals("READY", r.getString(1)); assertEquals("C026", r.getString(2)); assertNull(r.getString(3)) // an unjudged legacy purpose is not a prediction
         } }
     }
 

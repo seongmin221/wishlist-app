@@ -1,5 +1,6 @@
 package app.http
 
+import app.common.parseCanonicalUuid
 import app.category.*
 import io.ktor.http.*
 import io.ktor.server.application.ApplicationCall
