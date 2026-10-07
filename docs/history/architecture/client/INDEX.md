@@ -14,6 +14,7 @@
 
 ## 검증 기록
 
+- [C3 화면 비교·예외 경로·성능 측정 (2026-10-07)](c3-verification-2026-10-07.md) — 보드 대비 차이와 수정, 계정 전환·강제 종료 복구, 대기 목록 20/100/300 baseline, debug 시연 hook
 - [C2 최종 로컬 검증 (2026-10-07)](c2-final-verification-2026-10-07.md) — 실행 명령별 건수·환경·미실행과 C3/C12 인계
 - [C2 `:localdb` 모듈 분리 (2026-10-07)](c2-localdb-module-split-2026-10-07.md) — 계획의 `:shared` 단일 모듈에서 벗어난 이유(SQLDelight 생성 public 타입의 ObjC 노출 차단)
 - [C2 전반부 리뷰 후속 보완 (2026-10-07)](c2-first-half-review-followup-2026-10-07.md) — Fake 재분석 병합, 상품 ID 정규화, 정책 평가 되먹임 제거
