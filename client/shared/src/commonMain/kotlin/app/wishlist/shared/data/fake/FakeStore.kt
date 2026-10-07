@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -128,19 +130,41 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
      * Applies a final analysis like the server's AnalysisResultRepository: USER values and a
      * CONFIRMED/DEFERRED review survive, READY overwrites AI metadata, other outcomes only fill gaps.
      */
-    suspend fun completeAnalysis(id: String, analysisGeneration: Int, result: AnalysisOutcome): ClientResult<Unit> = request(null) { owner ->
-        val entry = owner.entry(id) ?: return@request missing(id)
+    suspend fun completeAnalysis(id: String, analysisGeneration: Int, result: AnalysisOutcome): ClientResult<Unit> =
+        request(null) { owner -> applyAnalysis(owner, id, analysisGeneration, result) }
+
+    /**
+     * Completes, through the same rules as [completeAnalysis], every ACTIVE PROCESSING item of the
+     * current owner created at least [minAge] before [now]. There is no timer: the caller decides
+     * when (DEBUG refresh). Returns how many items were completed; an invalid outcome skips its item.
+     */
+    suspend fun completeDueAnalyses(
+        now: Instant,
+        minAge: Duration,
+        outcome: (WishlistItem) -> AnalysisOutcome,
+    ): ClientResult<Int> = request(null) { owner ->
+        val due = owner.entries.values.filter {
+            it.item.lifecycleStatus == LifecycleStatus.ACTIVE && it.item.analysis.status == AnalysisStatus.PROCESSING &&
+                now - it.item.createdAt >= minAge
+        }
+        ClientResult.Success(due.count { entry ->
+            applyAnalysis(owner, entry.item.id, entry.analysisGeneration, outcome(entry.item)) is ClientResult.Success
+        })
+    }
+
+    private fun applyAnalysis(owner: OwnerStore, id: String, analysisGeneration: Int, result: AnalysisOutcome): ClientResult<Unit> {
+        val entry = owner.entry(id) ?: return missing(id)
         val item = entry.item
         if (entry.analysisGeneration != analysisGeneration || item.lifecycleStatus != LifecycleStatus.ACTIVE ||
-            item.analysis.status != AnalysisStatus.PROCESSING) return@request ClientResult.Success(Unit)
+            item.analysis.status != AnalysisStatus.PROCESSING) return ClientResult.Success(Unit)
         if (result.status == AnalysisStatus.PROCESSING || result.status == AnalysisStatus.UNKNOWN ||
-            (result.categoryId != null && result.missingReason != null)) return@request failure(ErrorKind.VALIDATION)
+            (result.categoryId != null && result.missingReason != null)) return failure(ErrorKind.VALIDATION)
 
         val reviewSettled = item.reviewStatus == ReviewStatus.CONFIRMED || item.reviewStatus == ReviewStatus.DEFERRED
         val userCategory = item.category.source == ValueSource.USER
         val applyCategory = result.categoryId != null && !reviewSettled && !userCategory
         val categoryId = if (applyCategory) result.categoryId else item.category.id
-        if (result.status == AnalysisStatus.READY && categoryId.isNullOrBlank()) return@request failure(ErrorKind.VALIDATION)
+        if (result.status == AnalysisStatus.READY && categoryId.isNullOrBlank()) return failure(ErrorKind.VALIDATION)
         val complete = result.status == AnalysisStatus.READY
 
         val userName = item.product.nameSource == ValueSource.USER
@@ -172,7 +196,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
             analysis = ItemAnalysis(result.status, if (complete) null else result.failureCode),
             reviewStatus = review,
         ))
-        ClientResult.Success(Unit)
+        return ClientResult.Success(Unit)
     }
 
     suspend fun edit(id: String, expectedVersion: Int, patch: ItemPatch): ClientResult<WishlistItem> =

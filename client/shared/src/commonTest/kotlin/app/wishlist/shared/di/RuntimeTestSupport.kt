@@ -91,12 +91,14 @@ internal fun createRuntime(
     probe: RuntimeResourcesProbe = RuntimeResourcesProbe(),
     dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
     seedOverride: (suspend () -> ClientResult<Unit>)? = null,
+    clock: Clock = Clock { runtimeTime },
+    ids: IdGenerator = IdGenerator { Uuid.random().toString() },
 ): SharedRuntime = assembleSharedRuntime(
     bindings = bindings,
     remote = remote,
     platform = probe.platform,
-    clock = Clock { runtimeTime },
-    ids = IdGenerator { Uuid.random().toString() },
+    clock = clock,
+    ids = ids,
     dispatchers = RuntimeDispatchers(default = dispatcher, io = dispatcher),
     seedOverride = seedOverride,
 )

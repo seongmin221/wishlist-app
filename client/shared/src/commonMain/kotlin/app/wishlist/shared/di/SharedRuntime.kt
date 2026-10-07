@@ -13,6 +13,7 @@ import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.core.RuntimeDispatchers
 import app.wishlist.shared.data.fake.BoardSeeds
+import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.data.fake.FakeAuthFacade
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.presentation.ItemDetailPresenter
@@ -20,6 +21,8 @@ import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
+import app.wishlist.shared.submission.FlushTrigger
+import app.wishlist.shared.submission.SubmissionCoordinator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -101,6 +104,7 @@ class SharedRuntime internal constructor(
                 session = mutableSession,
                 store = koin.get<LocalStore>(),
                 seed = seedOverride ?: { fakeStore.seed(BoardSeeds.create(env.clock, env.ids)) },
+                onSignedIn = { submissions().requestFlush(FlushTrigger.SIGNED_IN) },
             )
         } else {
             null
@@ -168,6 +172,34 @@ class SharedRuntime internal constructor(
     }
 
     fun localStore(): LocalStore = GatedLocalStore(ready, resolveOr<LocalStore>(ClosedLocalStore) { get() })
+
+    // Created on first use (never opens the driver by itself) over the gated facades; repository
+    // work runs on the io dispatcher. DEBUG with the Fake ITEM-03 advances fake analysis before refresh.
+    private val coordinator: SubmissionCoordinator by lazy {
+        val analysis = if (env.bindings.backendOf(ApiId.ITEM_03) == Backend.FAKE) {
+            guard.use { koin.get<DebugAnalysisDriver>() }
+        } else {
+            null
+        }
+        SubmissionCoordinator(
+            store = localStore(),
+            create = createItemRepository(),
+            get = getItemRepository(),
+            session = session,
+            clock = env.clock,
+            ids = env.ids,
+            scope = scope,
+            ready = ready,
+            beforeRefresh = { analysis?.advance() },
+            dispatcher = env.dispatchers.io,
+        )
+    }
+
+    /**
+     * The one share receiver and sender of this runtime (single-flight flush, view of the local
+     * queue). After [close] it is inert: shares report STORE_FAILED and flush requests are ignored.
+     */
+    fun submissions(): SubmissionCoordinator = coordinator
 
     /**
      * A new item detail Presenter over the gated ITEM-03 facade and this runtime's one [session].

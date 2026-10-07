@@ -65,11 +65,15 @@ internal fun SqlDriver.asLazy(): LazyDriver = LazyDriver(open = { this }, io = D
 /** File-backed store whose driver can be closed and reopened; always [close] it. */
 internal class StoreHarness(val session: MutableAuthSession = MutableAuthSession(), private val hook: () -> Unit = {}) {
     val path = newTestDbPath()
-    private var driver: SqlDriver = openTestDriver(path)
+    var driver: SqlDriver = openTestDriver(path)
+        private set
     var store = SqlLocalStore(session, driver.asLazy(), hook)
         private set
 
     suspend fun login(account: String?) = session.changeAccount(account)
+
+    /** The raw row, whatever account it is bound to (store APIs only show the session's rows). */
+    fun row(id: String): Local_submission? = WishlistDatabase(driver).wishlistQueries.selectSubmission(id).executeAsOneOrNull()
 
     fun snapshot(): SessionSnapshot = session.state.value
 

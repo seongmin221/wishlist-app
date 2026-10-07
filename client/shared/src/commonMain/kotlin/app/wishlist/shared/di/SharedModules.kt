@@ -7,6 +7,7 @@ import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.core.RuntimeDispatchers
+import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.data.fake.FakeCatalogRepository
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
@@ -180,6 +181,7 @@ private fun coreModule(env: RuntimeEnvironment) = module {
 
 private fun fakeModule() = module {
     single { FakeStore(get(), get(), get()) }
+    single { DebugAnalysisDriver(get(), get()) }
     single { FakeItemRepository(get()) }
     single { FakeCatalogRepository(get()) }
 }
