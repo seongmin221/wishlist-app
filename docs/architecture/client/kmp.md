@@ -27,7 +27,7 @@
 - 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared` 모듈로 시작한다.
 - shared target은 Android, `iosArm64`, `iosSimulatorArm64`다. Android는 공식 KMP library plugin, iOS는 static `Shared.framework` direct integration을 사용한다.
 - 지원 하한은 Android 8(API 26), iOS 17이다.
-- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`·interop probe와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·저장소·화면 비즈니스 기능은 후속 구현 대상이다.
+- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`·interop probe와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책도 포함한다. 저장소·화면 비즈니스 기능은 후속 구현 대상이다.
 
 ## 구현 구조
 
@@ -69,3 +69,21 @@ core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  pres
 - 실행 의존성 계약은 `Clock.now(): kotlin.time.Instant`, `IdGenerator.newId(): String`, `RuntimeDispatchers(default, io)`다. 실제 플랫폼 Clock·UUID·dispatcher 조립은 후속 단계에서 주입한다.
 
 공통 테스트는 초기 상태·계정/세대 변경·읽기 전용 상태 발행·결과 단일 래핑·stale operation 미실행·취소 전파/대기 취소·commit과 계정 변경 순서를 Android host와 iOS simulator에서 같은 suite로 검증한다. 동시성 테스트는 coroutine barrier를 사용하고 실제 시간 대기를 하지 않는다.
+
+
+## 상품 모델·상태 정책 경계
+
+> 2026-10-07 Task 2b 구현 — 서버 기준은 Task 1에서 병합한 B2 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`의 `WishlistItemDtos.kt`·`WishlistItemPolicy.kt`·정책 테스트다. 이 절은 공통 snapshot과 Fake 정책 계약이며 HTTP DTO·저장소·formatter 구현을 포함하지 않는다.
+
+- `WishlistItem`은 raw string ID·`clientSubmissionId`·양수 `version`·`sourceUrl`과 `ProductSnapshot`, `ItemCategory`, `ItemPurpose`, `ItemAnalysis`, review/lifecycle, 서버 `requiredAction`·`allowedActions`, 생성·갱신·수동 완료·기기 공유 시각을 보관한다. 상태 축과 수동 완료는 독립적이다. 모델은 서버 행동을 재계산하지 않으며 UI는 `WishlistItem.allowedActions`를 직접 읽는다.
+- `ProductSnapshot`은 nullable 이름·이미지 URL·정밀 가격·통화·브랜드·판매처·metadata 확인 시각·이름/이미지 출처를 보존한다. `ItemCategory`는 nullable ID·source·missingReason·name·parentId·raw kind를 보존한다. category ID가 있으면 missingReason은 null이어야 한다. `ItemPurpose(id, source)`는 사용자가 목적을 해제한 `(null, USER)`도 허용한다. 분석의 공개 `failureCode`는 nullable raw string이다.
+- `Category(id, name, parentId, kind, version)` 한 목록으로 B2 상위 그룹(`G001`~`G011`, parent/kind/version null), 공용 leaf(`C001`~`C087`, G-ID parent, PUBLIC, version null), custom leaf(UUID, G-ID parent, CUSTOM, 양수 version)를 표현한다. kind는 nullable raw string이므로 새 kind를 보존한다. ID는 UUID 타입으로 제한하지 않으며 UUID 검사는 생성·요청 경계의 책임이다. C1 보드의 사용자 분류 이름은 후속 시드에서 custom UUID leaf로 매핑한다.
+- `Purpose`는 raw ID·name·nullable description·raw colorKey/iconKey·version·createdAt/updatedAt의 최소 snapshot이다. 알려진 키는 `PurposeKeys`에 제공하되 새 키도 모델에 그대로 보관한다. `Archive`는 ID·title·originalPurposeId·목적 표시 snapshot·createdAt만 둔다. 이는 과거 표시용 모델이며 아직 구현되지 않은 archive wire·후보 페이지·복원/삭제 명령 계약을 확정하지 않는다.
+- `LocalSubmission`은 확정된 로컬 계약인 clientSubmissionId/sourceUrl/createdAt/accountBinding/submissionStatus/serverItemId/lastSubmissionError를 보관한다. 상태는 PENDING/SUBMITTING/ACCEPTED이며 마지막 오류는 nullable `ClientError`다. 기본은 미귀속 PENDING이다. 재전송·계정 격리·영속 transaction 구현은 후속 task의 책임이다.
+- Kotlin 모델 시각은 `kotlin.time.Instant`다. framework의 Instant 타입은 `KotlinInstant`로 노출되므로 Swift는 공개 `createdAtIso`, `updatedAtIso`, `manualCompletionAtIso`, `clientCreatedAtIso`, `metadataCheckedAtIso` 문자열 getter를 사용한다(각 모델이 가진 시각만 제공). nullable 시각은 nullable 문자열이다. Kotlin의 `Purpose.description`과 `ArchivePurposeSnapshot.description`은 property-target `@ObjCName`으로 Swift의 `purposeDescription`에 노출해 `NSObject.description()` 충돌을 피한다. 모든 snapshot은 Android/Swift 구체 state가 사용할 수 있도록 public이다.
+- Fake만 `evaluateItem`을 호출해 저장할 행동을 채운다. 순서는 비ACTIVE → PROCESSING → 이름 누락 → EXTRACTION_UNRESOLVED → AI_ABSTAINED/AI_RESPONSE_UNUSABLE → CUSTOM_CATEGORY_DELETED → 이유 없는 category 누락 → PENDING 검토다. 수동 완료 후에는 원래 analysis를 보존하고 MANUAL_COMPLETE/REANALYZE/REVIEW를 더 허용하지 않는다. READY의 삭제된 category는 EDIT로 재지정한다. DEFERRED는 검토를 다시 요구하지 않는다.
+- `sanitizeAllowedActions(analysisStatus, requiredAction, actions)`는 후속 Remote mapper/Fake의 매핑 경계에서 사용한다. analysis 또는 requiredAction이 UNKNOWN이면 제공된 행동 중 DELETE만 남기며 서버가 허용하지 않은 DELETE를 만들지 않는다. 알려진 상태는 입력 행동을 유지한다. review/source/missingReason의 설명용 UNKNOWN은 서버 행동을 변경하지 않는다. unknown wire action 제거와 unknown lifecycle의 INVALID_RESPONSE 처리는 후속 HTTP mapper에서 담당한다.
+- `homeActionGroup(requiredAction)`은 서버 requiredAction을 홈 그룹에 투영하는 별도 함수다. INFORMATION_COMPLETION/CATEGORY_ASSIGNMENT/CATEGORY_REASSIGNMENT는 같은 정보 보완 그룹이며 NONE/UNKNOWN은 그룹이 없다. `isListEligible`은 ACTIVE·이름/category 존재를 요구하고 analysis/requiredAction UNKNOWN을 제외한다. PARTIAL도 최소 정보가 있으면 목록에 포함하며 설명용 UNKNOWN으로 제외하지 않는다.
+- `DecimalAmount.parseOrNull`은 `[+-]?[0-9]+(\.[0-9]+)?` 형태의 plain decimal만 받아 canonical 문자열을 만든다. 양수 부호·정수 선행 0·소수 끝 0을 제거하고 음수 0을 `0`으로 정규화한다. 일반 음수·큰 정밀 값은 유지하며 Double 변환·지수 확장·자리 수 상한·metadata precision 가정을 넣지 않는다. malformed/nonfinite는 null이다. `ApiId`는 ITEM 8/HOME 2/DUP 2/CAT 6/PUR 8/ARC 9/MEDIA 2의 37개와 각 wire ID를 제공한다.
+
+독립 기대값 표와 별도 홈 투영 표로 Fake 정책을 검증하며, 서버 행동 보존과 UNKNOWN 정제·B2 category snapshot·모델 불변식·decimal 안전 파싱·API ID 누락/중복을 두 공통 테스트 runtime에서 실행한다. simulator framework 링크와 작은 Swift typecheck는 ISO 문자열 getter·목적 설명 이름·non-throwing decimal 파싱 노출을 확인한다. 실제 화면·HTTP·저장소 동작은 이 검증 범위가 아니다.

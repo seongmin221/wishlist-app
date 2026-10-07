@@ -210,11 +210,11 @@ ApiId는 ITEM_01..08/HOME_01..02/DUP_01..02/CAT_01..06/PUR_01..08/ARC_01..09/MED
 }
 ```
 
-- [ ] **Step 1: 실패 테스트.** 독립 기대값 출처는 `server/src/test/kotlin/app/wishlist/WishlistItemPolicyTest.kt`와 `server/src/main/kotlin/app/wishlist/WishlistItemPolicy.kt`; 실행 시 Task 1의 병합 기준 commit 기록. 비ACTIVE→NONE/행동없음; PROCESSING→ANALYSIS_IN_PROGRESS/DELETE만; blank 이름 및 EXTRACTION_UNRESOLVED→INFORMATION_COMPLETION; AI_ABSTAINED/AI_RESPONSE_UNUSABLE→CATEGORY_ASSIGNMENT; CUSTOM_CATEGORY_DELETED→CATEGORY_REASSIGNMENT; category/reason null legacy→INFORMATION_COMPLETION; 이후 PENDING→CLASSIFICATION_REVIEW, DEFERRED 미재노출. PARTIAL+이름/category 목록 포함, 수동 완료의 analysis 보존·추가 행동 없음, READY 재지정 EDIT. home projection은 별도 입력표.
-- [ ] **Step 2: RED.** KMP_TEST에서 ModelInvariantTest/ItemPolicyTest/ApiIdTest 실패.
-- [ ] **Step 3: 구현.** 모델·enum·ApiId와 Fake policy/홈 projection. DecimalAmount plain decimal parseOrNull은 malformed/nonfinite에 null 반환. 테스트 fixture는 대응 필드에 직접 값을 넣고 production evaluator를 기대값 생성에 사용하지 않는다.
-- [ ] **Step 4: GREEN.** KMP_TEST에서 서버 행동과 Fake evaluator·홈 projection 역할 검증.
-- [ ] **Step 5: 문서·커밋.** kmp.md 확정 모델 경계 갱신. `feature(kmp): 상품 모델과 상태 정책 구현`.
+- [x] **Step 1: 실패 테스트.** 독립 기대값 출처는 `server/src/test/kotlin/app/wishlist/WishlistItemPolicyTest.kt`와 `server/src/main/kotlin/app/wishlist/WishlistItemPolicy.kt`; 실행 시 Task 1의 병합 기준 commit 기록. 비ACTIVE→NONE/행동없음; PROCESSING→ANALYSIS_IN_PROGRESS/DELETE만; blank 이름 및 EXTRACTION_UNRESOLVED→INFORMATION_COMPLETION; AI_ABSTAINED/AI_RESPONSE_UNUSABLE→CATEGORY_ASSIGNMENT; CUSTOM_CATEGORY_DELETED→CATEGORY_REASSIGNMENT; category/reason null legacy→INFORMATION_COMPLETION; 이후 PENDING→CLASSIFICATION_REVIEW, DEFERRED 미재노출. PARTIAL+이름/category 목록 포함, 수동 완료의 analysis 보존·추가 행동 없음, READY 재지정 EDIT. home projection은 별도 입력표.
+- [x] **Step 2: RED.** KMP_TEST에서 ModelInvariantTest/ItemPolicyTest/ApiIdTest 실패.
+- [x] **Step 3: 구현.** 모델·enum·ApiId와 Fake policy/홈 projection. DecimalAmount plain decimal parseOrNull은 malformed/nonfinite에 null 반환. 테스트 fixture는 대응 필드에 직접 값을 넣고 production evaluator를 기대값 생성에 사용하지 않는다.
+- [x] **Step 4: GREEN.** KMP_TEST에서 서버 행동과 Fake evaluator·홈 projection 역할 검증.
+- [x] **Step 5: 문서·커밋.** kmp.md 확정 모델 경계 갱신. `feature(kmp): 상품 모델과 상태 정책 구현`.
 
 ## Task 3: 가격 domain과 정확한 문자열 플랫폼 입력
 
