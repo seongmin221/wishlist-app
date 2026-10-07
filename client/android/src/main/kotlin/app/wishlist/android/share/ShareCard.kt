@@ -66,7 +66,7 @@ data class ShareCardContent(@param:StringRes val title: Int, @param:StringRes va
 
 private val LineStyle = WLType.body.copy(fontSize = 13.sp, lineHeight = 1.45f.em)
 
-/** 저장 확인 카드: 패딩 16, 모서리 28, 카드색. 48 상태 타일(모서리 14) · 도현 20 제목 · 13/1.45 보조 줄. 버튼 없음. */
+/** 저장 확인 카드: 패딩 16, 모서리 28, 카드색. 48 상태 타일(모서리 14) · 도현 20 제목 · 13/1.45 보조 줄(간격 6, 보드 FShareSaved*). 버튼 없음. */
 @Composable
 fun ShareCard(kind: ShareCardKind, modifier: Modifier = Modifier) {
     val content = ShareCardContent.of(kind)
@@ -78,7 +78,7 @@ fun ShareCard(kind: ShareCardKind, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             WLIconTile(size = 48.dp, color = surface) { WLIcon(content.icon, size = 22.dp, color = onSurface) }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 WLText(stringResource(content.title), WLType.display20)
                 WLText(stringResource(content.line), LineStyle, color = LocalWLColors.current.textSecondary)
             }
