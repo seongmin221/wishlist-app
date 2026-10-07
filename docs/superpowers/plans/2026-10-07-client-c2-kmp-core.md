@@ -293,12 +293,12 @@ data class BoardDisplayMetadata(
 
 BoardSeeds.create의 반환 `BoardSeedData`는 categories/purposes/items/displayMetadata/carrierId/commuteId를 제공한다. displayMetadata는 Fake query 입력으로 사용하지 않는다.
 
-- [ ] **Step 1: 실패 테스트.** 시드에 보드 상위 카테고리 8개·목적 7개(빈 carrier 유지); 모든 category/purpose 참조 유효, 안정된 UUID item/purpose·공용 taxonomy category ID; 같은 now/ID 공급자면 동일 결과. B2 taxonomy `G001`~`G011`/`C001`~`C087`와 BROWSE 보드의 8개를 구분한다. 기준은 원격 `3df880e`의 PublicCategoryRegistryTest와 category-management-api.md이며 실행 시 병합 기준으로 재확인한다.
-- [ ] **Step 2: RED.** KMP_TEST.
-- [ ] **Step 3: 구현.** Android/iOS DemoContent·FCategoryHome/FCategoryList/FPurposeHome/FPurposeDetail을 대조해 중복 l/c 상품을 stable ID로 통합한다. 카드별 다른 사진 색/비율은 presentation fixture로 분리. 보드의 category chip count와 purpose candidate count는 `BoardDisplayMetadata`에 그대로 보관하는 **이미지 비교용 fixture 값**이다. 실제 Fake query의 count는 저장된 membership만 집계하며 이 metadata를 읽지 않는다. 보드 숫자를 맞추기 위한 더미 상품은 만들지 않는다. 두 count의 일치는 C2 완료 조건이 아니다.
-- [ ] **Step 4: 계약 harness 준비.** `RepositoryContractTest`는 factory가 제공한 같은 시나리오를 두 backend에 실행한다. fixture 생성/분석 제어는 test harness에만 있고 production repository 메서드에 노출하지 않는다. contract input에 owner context·동일 key·201/200 의미·404/tombstone을 넣는다.
-- [ ] **Step 5: GREEN·추적.** KMP_TEST. integration-status에 API 37개를 빠짐없이 등록, C단계·서버 B단계·Fake/Remote/MockEngine/실서버 검증을 별도 열로 기록. C2 실제 대상과 미구현을 구분한다.
-- [ ] **Step 6: 커밋.** `feature(kmp): 저장소 계약과 보드 기반 시드 추가`.
+- [x] **Step 1: 실패 테스트.** 시드에 보드 상위 카테고리 8개·목적 7개(빈 carrier 유지); 모든 category/purpose 참조 유효, 안정된 UUID item/purpose·공용 taxonomy category ID; 같은 now/ID 공급자면 동일 결과. B2 taxonomy `G001`~`G011`/`C001`~`C087`와 BROWSE 보드의 8개를 구분한다. 기준은 원격 `3df880e`의 PublicCategoryRegistryTest와 category-management-api.md이며 실행 시 병합 기준으로 재확인한다.
+- [x] **Step 2: RED.** KMP_TEST.
+- [x] **Step 3: 구현.** Android/iOS DemoContent·FCategoryHome/FCategoryList/FPurposeHome/FPurposeDetail을 대조해 중복 l/c 상품을 stable ID로 통합한다. 카드별 다른 사진 색/비율은 presentation fixture로 분리. 보드의 category chip count와 purpose candidate count는 `BoardDisplayMetadata`에 그대로 보관하는 **이미지 비교용 fixture 값**이다. 실제 Fake query의 count는 저장된 membership만 집계하며 이 metadata를 읽지 않는다. 보드 숫자를 맞추기 위한 더미 상품은 만들지 않는다. 두 count의 일치는 C2 완료 조건이 아니다.
+- [x] **Step 4: 계약 harness 준비.** `RepositoryContractTest`는 factory가 제공한 같은 시나리오를 두 backend에 실행한다. fixture 생성/분석 제어는 test harness에만 있고 production repository 메서드에 노출하지 않는다. contract input에 owner context·동일 key·201/200 의미·404/tombstone을 넣는다.
+- [x] **Step 5: GREEN·추적.** KMP_TEST. integration-status에 API 37개를 빠짐없이 등록, C단계·서버 B단계·Fake/Remote/MockEngine/실서버 검증을 별도 열로 기록. C2 실제 대상과 미구현을 구분한다.
+- [x] **Step 6: 커밋.** `feature(kmp): 저장소 계약과 보드 기반 시드 추가`.
 
 ## Task 5: Fake 상태 전이와 경쟁·원자성 규칙
 

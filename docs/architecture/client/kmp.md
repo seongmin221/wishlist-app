@@ -27,7 +27,7 @@
 - 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared` 모듈로 시작한다.
 - shared target은 Android, `iosArm64`, `iosSimulatorArm64`다. Android는 공식 KMP library plugin, iOS는 static `Shared.framework` direct integration을 사용한다.
 - 지원 하한은 Android 8(API 26), iOS 17이다.
-- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`·interop probe와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책도 포함한다. 저장소·화면 비즈니스 기능은 후속 구현 대상이다.
+- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`·interop probe와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드도 포함한다. 실제 저장소 backend·화면 비즈니스 기능은 후속 구현 대상이다.
 
 ## 구현 구조
 
@@ -87,3 +87,17 @@ core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  pres
 - `DecimalAmount.parseOrNull`은 `[+-]?[0-9]+(\.[0-9]+)?` 형태의 plain decimal만 받아 canonical 문자열을 만든다. 양수 부호·정수 선행 0·소수 끝 0을 제거하고 음수 0을 `0`으로 정규화한다. 일반 음수·큰 정밀 값은 유지하며 Double 변환·지수 확장·자리 수 상한·metadata precision 가정을 넣지 않는다. malformed/nonfinite는 null이다. `ApiId`는 ITEM 8/HOME 2/DUP 2/CAT 6/PUR 8/ARC 9/MEDIA 2의 37개와 각 wire ID를 제공한다.
 
 독립 기대값 표와 별도 홈 투영 표로 Fake 정책을 검증하며, 서버 행동 보존과 UNKNOWN 정제·B2 category snapshot·모델 불변식·decimal 안전 파싱·API ID 누락/중복을 두 공통 테스트 runtime에서 실행한다. simulator framework 링크와 작은 Swift typecheck는 ISO 문자열 getter·목적 설명 이름·non-throwing decimal 파싱 노출을 확인한다. 실제 화면·HTTP·저장소 동작은 이 검증 범위가 아니다.
+
+
+## 저장소 인터페이스·보드 시드 경계
+
+> 2026-10-07 Task 4 구현 — Create/Get 인터페이스·결정적 시드와 abstract 공통 계약 harness를 준비했다. Fake backend·Remote wire 실행 검증은 Task 5·6b에서 수행한다.
+
+- `CreateItemRepository`는 ITEM-01의 `CreateItemCommand(submissionId, sourceUrl, clientCreatedAt)`를 받아 snapshot을 반환한다. 같은 로컬 공유는 같은 UUID key를 재사용하며, 같은 URL을 다시 공유할 때는 새 key다. `sourceUrl`은 원문 그대로 보관한다. 이 경계에서 trim/정규화 또는 네트워크 URL 검증 정책을 추가하지 않는다. `GetItemRepository`는 owner 범위의 ITEM-03 조회다. 계정 gate와 backend 조립은 후속 task 책임이다.
+- `CatalogRepository`는 category/purpose/item 시드 조회 경계이며 nullable categoryId/purposeId로 실제 membership을 제한한다. 목록 paging·count·SELECT/BROWSE·facets 같은 서버 wire 계약을 지정하지 않는다. 시드 조회가 CAT-01/PUR-01/ITEM-02의 Remote 구현 완료를 뜻하지 않는다.
+- `BoardSeeds.create(clock, ids)`는 같은 clock 값·같은 UUID 공급 순서로 같은 `BoardSeedData`를 만든다. B2 공용 taxonomy와 registry의 G/C-ID를 그대로 사용한다. 보드 상위는 G001~G007과 G011의 8개이며 전체 SELECT taxonomy의 11개와 구별한다. flat category 목록은 8개 상위와 30개 보드 leaf다. 공용 taxonomy에 없는 오디오 케이블·DAC/백패킹 소품/레고는 각각 G003/G006/G007 아래의 owner custom UUID leaf(version 1)다.
+- 시드는 보드 목적 7개와 중복을 합친 헤드폰 8개만 포함한다. 여행 캐리어 목적은 비어 있다. 긴 이름·homeProducts 넘침 예시는 별도 UI fixture여서 여기에 목적/상품을 추가하지 않는다. 목적·상품·clientSubmissionId·custom category ID는 주입한 생성기로 공급한다. 가격은 원래 decimal 문자열을 `DecimalAmount`로 읽고 Float/Double로 변환하지 않는다.
+- `WishlistItem`은 category-list snapshot을 기준으로 한다. Marshall MAJOR V는 purpose null·PENDING이며 출퇴근 목적의 실제 membership은 4개다. `BoardDisplayMetadata`에는 보드 category chip 숫자(합계 69), 목적 candidate 숫자(출퇴근 5), l/c 카드별 사진 색·비율·caption을 보관한다. c5 Marshall과 AirPods의 다른 사진은 같은 item ID의 표시 fixture로 남기며 domain 상품을 복제하지 않는다. metadata는 repository query/filter/count에 전달하거나 읽지 않는다.
+- test-only `RepositoryContractFixture`는 같은 store의 owner context를 바꾸고 분석 완료·삭제를 제어한다. abstract `RepositoryContractTest`는 생성/replay의 같은 ID·최초 공유 시각·최신 상태, 새 key의 새 상품, 원문 URL 충돌, owner 격리, 없는 항목/삭제 GET 404와 replay tombstone 시나리오를 제공한다. 신규 201/replay 200은 도메인 결과에 넣지 않고 Task 6b transport 테스트가 검사한다. Task 4에는 concrete factory가 없어 이 contract suite는 실행되지 않았다.
+
+시드 테스트 8개와 기존 공통 테스트를 Android host·iOS simulator에서 각각 실제 실행했다(각 55개, 실패/오류/skip 0). API별 서버 B단계·클라이언트 C단계·Fake/Remote/MockEngine/실서버의 진행과 미실행은 [연동 상태](server-integration-status.md)에서 분리한다.
