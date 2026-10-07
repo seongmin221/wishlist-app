@@ -47,8 +47,16 @@ internal class SqlLocalStore(
             if (binding != null && binding != snapshot.accountId) {
                 failure(ErrorKind.VALIDATION, ACCOUNT_BINDING_MISMATCH)
             } else {
-                queries.insertSubmission(submission.toRow())
-                ClientResult.Success(Unit)
+                database.transactionWithResult<ClientResult<Unit>> {
+                    val existing = queries.selectSubmission(submission.clientSubmissionId).executeAsOneOrNull()
+                    // An existing binding may only be kept, never rebound or cleared.
+                    if (existing?.account_binding != null && existing.account_binding != binding) {
+                        failure(ErrorKind.VALIDATION, ACCOUNT_BINDING_MISMATCH)
+                    } else {
+                        queries.insertSubmission(submission.toRow())
+                        ClientResult.Success(Unit)
+                    }
+                }
             }
         }
     }

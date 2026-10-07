@@ -70,6 +70,35 @@ class LocalStoreContractTest {
         }
     }
 
+    @Test fun resave_cannot_rebind_or_unbind_a_row_owned_by_another_binding() = runTest {
+        withHarness { h ->
+            h.session.login("A")
+            h.store.saveSubmission(submission(binding = "A")).successValue()
+            // bound -> null (stale unbound writer)
+            assertEquals("ACCOUNT_BINDING_MISMATCH", h.store.saveSubmission(submission(binding = null)).error().code)
+            h.session.login("B")
+            // A's row re-saved as B's, or unbound, by another account
+            assertEquals("ACCOUNT_BINDING_MISMATCH", h.store.saveSubmission(submission(binding = "B")).error().code)
+            assertEquals("ACCOUNT_BINDING_MISMATCH", h.store.saveSubmission(submission(binding = null)).error().code)
+            assertEquals(emptyList(), h.store.pending().successValue())
+            h.session.login("A")
+            assertEquals(listOf("A"), h.store.pending().successValue().map { it.accountBinding })
+        }
+    }
+
+    @Test fun resave_allowed_paths_new_same_binding_and_unbound_to_current() = runTest {
+        withHarness { h ->
+            h.store.saveSubmission(submission(binding = null)).successValue()
+            h.store.saveSubmission(submission(binding = null)).successValue()
+            h.session.login("A")
+            h.store.saveSubmission(submission(binding = "A")).successValue()
+            h.store.saveSubmission(submission(binding = "A", status = SubmissionStatus.SUBMITTING)).successValue()
+            val saved = h.store.pending().successValue().single()
+            assertEquals("A", saved.accountBinding)
+            assertEquals(SubmissionStatus.SUBMITTING, saved.submissionStatus)
+        }
+    }
+
     @Test fun item_cache_is_isolated_per_account_and_survives_relogin() = runTest {
         withHarness { h ->
             val a1 = h.session.login("A")
