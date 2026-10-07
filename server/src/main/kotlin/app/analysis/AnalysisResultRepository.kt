@@ -83,7 +83,7 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
         val image = mergedMetadata(item.image, pending.image, complete, item.protects("IMAGE", item.imageSource))
         val nameSource = mergedSource(item.name, pending.name, item.nameSource, complete, item.protects("NAME", item.nameSource))
         val imageSource = mergedSource(item.image, pending.image, item.imageSource, complete, item.protects("IMAGE", item.imageSource))
-        val decision = if (assigned) PurposeCandidateGuard.decide(c, claim, stored, pending.purpose, pending.purposeJudged)
+        val decision = if (assigned) PurposeCandidateGuard.decide(c, claim, stored, pending.purpose, pending.purposeJudged, item.purpose)
             else PurposeDecision.NoJudgment
         // Reviewed items, user sources and overrides keep purpose; "no judgement" keeps the existing connection.
         val applyPurpose = decision is PurposeDecision.Judged && !item.protects("PURPOSE", item.purposeSource) &&

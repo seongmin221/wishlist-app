@@ -19,9 +19,13 @@ internal object PurposeCursorCodec {
         val parts = String(Base64.getUrlDecoder().decode(cursor), Charsets.UTF_8).split("|")
         require(parts.size == 5 && parts[0] == "v1" && parts[1] == projection.name && parts[2] == ownerTag(owner))
         val micros = parts[3].toLong()
+        require(micros in 0..MAX_MICROS) // a cursor only ever carries stored activity times
         PurposeCursorPosition(Instant.ofEpochSecond(Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1000),
             requireNotNull(parseCanonicalUuid(parts[4])))
     }.getOrNull()
+
+    /** 9999-12-31T23:59:59.999999Z; activity times are written by the database clock. */
+    private const val MAX_MICROS = 253_402_300_799_999_999L
 
     private fun ownerTag(owner: UUID): String = MessageDigest.getInstance("SHA-256")
         .digest(owner.toString().toByteArray(Charsets.UTF_8)).take(8).joinToString("") { "%02x".format(it) }

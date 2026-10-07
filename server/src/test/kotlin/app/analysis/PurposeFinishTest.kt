@@ -66,6 +66,20 @@ class PurposeFinishTest {
         assertEquals((before + 1).toString(), purposeValue(source, purpose, "membership_version"))
     }
 
+    @Test fun `no purpose judgement keeps an existing AI link the model did not see unchanged`() = withAnalysisDatabase { source ->
+        for (reason in listOf("unsent", "renamed")) {
+            val owner = UUID.randomUUID(); val claim = ownedAnalysisClaim(source, owner, AnalysisLane.GENERAL)
+            val existing = insertPurpose(source, owner, "existing", null); val other = insertPurpose(source, owner, "other", null)
+            analysisSql(source, "update wishlist_items set purpose_id='$existing',purpose_source='AI' where id='${claim.itemId}'")
+            seedV3Snapshot(source, claim, if (reason == "unsent") listOf(other) else listOf(existing, other))
+            if (reason == "renamed") analysisSql(source, "update purposes set name='renamed' where id='$existing'")
+            savePurposeResult(source, claim, null, judged = true)
+            AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Complete)
+            assertEquals(existing.toString(), itemValue(source, claim, "purpose_id"), reason)
+            assertEquals("1", purposeValue(source, existing, "membership_version"), reason)
+        }
+    }
+
     @Test fun `reviewed user and override purposes are never filled or replaced`() = withAnalysisDatabase { source ->
         val cases = listOf(
             "CONFIRMED" to "purpose_source='UNASSIGNED'", "DEFERRED" to "purpose_source='UNASSIGNED'",

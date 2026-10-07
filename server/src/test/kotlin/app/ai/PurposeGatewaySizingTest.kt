@@ -85,4 +85,19 @@ class PurposeGatewaySizingTest {
         assertEquals(0, seen.single().purposes)
         assertEquals(ClassificationResult.Assigned("C026", null, purposeJudged = false), response.classification)
     }
+
+    @Test fun `failed paid calls still report the tier that was sent`() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/v1/responses/input_tokens") { exchange ->
+            val bytes = """{"input_tokens":2400}""".toByteArray(); exchange.sendResponseHeaders(200, bytes.size.toLong()); exchange.responseBody.use { it.write(bytes) }
+        }
+        server.createContext("/v1/responses") { exchange -> exchange.sendResponseHeaders(503, -1) }
+        server.start()
+        try {
+            val response = OpenAiResponsesGateway(OpenAiConfig("test-snapshot", "secret"), baseUri = URI("http://127.0.0.1:${server.address.port}/v1"))
+                .classify("상품", snapshot(2, purposes(3))) {}
+            assertEquals(ClassificationResult.Retryable, response.classification)
+            assertEquals(SentCandidates(0, 2, 3), response.sent)
+        } finally { server.stop(0) }
+    }
 }

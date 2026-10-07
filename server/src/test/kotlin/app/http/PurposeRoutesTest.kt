@@ -80,6 +80,23 @@ class PurposeRoutesTest {
         }
     }
 
+    @Test fun `owner matched cursor with an out of range timestamp is rejected as a cursor error`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        repeat(3) { insertPurpose(source, owner, "p$it", null) }
+        testApplication {
+            application { installApiHttpSupport(); routing { purposeRoutes(PurposeService(source)) { owner } } }
+            val cursor = json(client.get("/v1/purposes?projection=SELECT&limit=2").bodyAsText())["nextCursor"]!!.jsonPrimitive.content
+            val parts = String(java.util.Base64.getUrlDecoder().decode(cursor)).split("|").toMutableList()
+            for (micros in listOf("-9000000000000000000", "9000000000000000000")) {
+                parts[3] = micros
+                val forged = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(parts.joinToString("|").toByteArray())
+                val response = client.get("/v1/purposes?projection=SELECT&cursor=$forged")
+                assertEquals(HttpStatusCode.BadRequest, response.status, micros)
+                assertEquals("INVALID_PURPOSE_CURSOR", json(response.bodyAsText())["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
+            }
+        }
+    }
+
     @Test fun `limit and rate errors carry codes and retry header`() = withAnalysisDatabase { source ->
         val owner = UUID.randomUUID(); val service = PurposeService(source)
         testApplication {

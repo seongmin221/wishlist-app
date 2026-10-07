@@ -115,6 +115,7 @@ class OpenAiResponsesGateway(
             }
         }
         val chosen = selected ?: return GatewayResponse(ClassificationResult.Unusable("input_too_large"), null, null)
+        val sent = SentCandidates(chosen.tier.index, chosen.customCount, chosen.purposeCount)
         val requestBuilder = HttpRequest.newBuilder(baseUri.resolve("${baseUri.path.trimEnd('/')}/responses"))
             .header("Authorization", "Bearer ${config.apiKey}")
             .header("Content-Type", "application/json")
@@ -123,9 +124,9 @@ class OpenAiResponsesGateway(
         val request = try { requestBuilder.timeout(WorkerExecution.remaining(Duration.ofSeconds(70))).build() }
             catch (cause: ProcessingDeadlineExceeded) { throw LlmRequestNotSent(cause) }
         val response = try { client.send(request, HttpResponse.BodyHandlers.ofString()) }
-            catch (_: Exception) { return GatewayResponse(ClassificationResult.Retryable, null, null) }
-        if (response.statusCode() == 429 || response.statusCode() >= 500) return GatewayResponse(ClassificationResult.Retryable, null, null)
-        if (response.statusCode() !in 200..299) return GatewayResponse(ClassificationResult.Terminal("openai_http_${response.statusCode()}"), null, null)
+            catch (_: Exception) { return GatewayResponse(ClassificationResult.Retryable, null, null, sent) }
+        if (response.statusCode() == 429 || response.statusCode() >= 500) return GatewayResponse(ClassificationResult.Retryable, null, null, sent)
+        if (response.statusCode() !in 200..299) return GatewayResponse(ClassificationResult.Terminal("openai_http_${response.statusCode()}"), null, null, sent)
         return translate(parseResponse(response.body(), chosen.validation), chosen, candidates)
     }
 
