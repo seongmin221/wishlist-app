@@ -11,6 +11,7 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 ## 후보 정리
 
 - [B2 카테고리 API 정책](b2-category-api-policy-2026-10-07.md) — 확정 · 2026-10-07
+- [B3 목적 API 정책](b3-purpose-api-policy-2026-10-07.md) — 확정 · 2026-10-07
 
 - [목적별 비교 그룹과 AI 목적 제안](purpose-groups.md) — 대체됨 · 2026-08-29
 - [taxonomy 방향 정리](taxonomy-direction.md) — 대체됨 · 2026-09-02
