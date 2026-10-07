@@ -44,7 +44,7 @@ CAT-01/02의 공용/custom count에 ITEM-02와 같은 표시 predicate를 적용
 
 ITEM-02는 기존 POST와 공존하므로 route 부재 RED는 404가 아닌 405였다. auth·입력·cursor 오류와 상세와 같은 카드 projection의 최종 GREEN을 확인했다. HOME-02는 group query로 세 보완 action을 묶고 완료한 카드가 빠지는 anchor 복구를 정상 응답으로 반환한다. ITEM HTTP+B1 회귀16개, HOME action+목록 회귀9개가 통과했다.
 
-HOME-01은 MATERIALIZED classified의 공통 판정에서 FILTER count와 group별 row_number 미리보기 key를 한 번에 읽는다. 카드 projection은 최대12개 key를 한 batch로 조회하고, 최근 ACTIVE 목적3개와 B3 후보4개를 같은 repeatable-read connection에서 읽는다. latch로 첫 SELECT 후 다른 connection의 상품/purpose 변경 commit을 재현해 이전 응답 snapshot 유지와 다음 응답 갱신을 확인했다. 홈·B3 관련9개 테스트가 통과했다.
+HOME-01은 MATERIALIZED classified의 공통 판정에서 FILTER count와 group별 row_number 미리보기 key를 한 번에 읽는다. 카드 projection은 최대12개 key를 한 batch로 조회하고, 최근 ACTIVE 목적3개와 B3 후보4개를 같은 repeatable-read connection에서 읽는다. latch로 첫 SELECT 후 다른 connection의 상품/purpose 변경 commit을 재현해 이전 응답 snapshot 유지와 다음 응답 갱신을 확인했다. 홈·B3 관련13개 테스트가 통과했다.
 
 ## Task 8 — V15 인덱스와 실제 SQL 측정
 

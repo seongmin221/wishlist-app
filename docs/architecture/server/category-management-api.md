@@ -1,6 +1,6 @@
 # 카테고리 조회·생성·편집 API 계약
 
-> 확정 계약 · CAT-01~04 · B4 itemCount 변경은 제품 결정 확정, 구현 예정
+> 확정 계약 · CAT-01~04 · B4 표시용 itemCount 구현
 
 ## 적용 범위
 
@@ -31,7 +31,7 @@ custom의 편집 필드·AI 내부 상태는 목록 DTO에 넣지 않는다.
   분석 상태·review는 제한하지 않는다. 예측 진단·다른 owner·ARCHIVED·DELETED는 세지 않는다.
   group count는 반환 leaf의 itemCount 합계다. ITEM-02와 동일한 표시 집합을 사용한다.
   이 변경은 [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md)에 따른다.
-  현재 B2 코드는 ACTIVE 전체를 집계하며 B4 구현에서 count와 BROWSE 노출을 함께 변경한다.
+  B4에서 count와 BROWSE 노출을 같은 predicate로 구현했다.
 - customUsedCount는 parent filter와 관계없는 owner 전체 미삭제 custom 수다.
 - 공용 group/leaf 순서는 v1 resource 순서다. custom은 공용 leaf 뒤에
   생성 당시 parent의 모든 기존 custom(삭제된 것 포함)의 최대 displayOrder + 1을 저장한다.

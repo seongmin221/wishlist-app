@@ -142,6 +142,8 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 **산출물:** category/purpose 목록과 홈에서 같은 상태·건수·허용 행동을 표시한다.
 
+**구현 상태:** B4 조회 API3개·CAT 표시 count·V15를 구현했다. [조회 계약](wishlist-item-read-api.md#b4-공통-조회-계약)과 [구현/검증 이력](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md)을 따른다. B5 이후 mutation·운영 복구 완성을 뜻하지 않는다.
+
 **내부 순서:** ITEM-02의 category/purpose/미지정 filter·cursor/anchor → HOME-02의 홈 그룹 window(item별 requiredAction 유지) → HOME-01의 count/미리보기·목적 요약. 홈과 연속 조회는 공통 predicate를 사용한다.
 
 **통과:** owner/filter가 다른 cursor 거절, 같은 createdAt의 안정된 페이지 순서, anchor 삭제/이동 시 복구, limit 상한, 홈 count/미리보기와 action 목록 일치, DEFERRED 자동 재노출 없음. 로컬 pending은 서버 건수에 합치지 않는다. B7의 mutation 후 같은 검증을 실제 변경 흐름으로 반복한다.

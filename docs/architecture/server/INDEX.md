@@ -11,7 +11,7 @@
 | 완료된 B0 구현 계획·변경 파일·실패/통과 검증 | [B0 구현 계획](../../superpowers/plans/2026-10-04-b0-server-foundation.md) |
 | 상품 상태·허용 행동·공통 DTO·공개 오류 계약 | [wishlist-item-state-api.md](../wishlist-item-state-api.md) |
 | 상품 상태·claim·중간/최종 쓰기 보호·lease 복구·AI 예산 경계 | [wishlist-state-persistence.md](wishlist-state-persistence.md) |
-| B1 생성·재전송·상세 projection·공유 시각·공개 실패·지정 event 발행 | [wishlist-item-read-api.md](wishlist-item-read-api.md) |
+| B1 생성·상세와 B4 목록·홈·cursor/window·오류 계약 | [wishlist-item-read-api.md](wishlist-item-read-api.md) |
 | CAT-01~04 클라이언트 계약·요청/응답 예시·오류 | [category-management-api.md](category-management-api.md) |
 | 카테고리 AI 후보·snapshot·stale·토큰 단계 | [category-ai-candidates.md](category-ai-candidates.md) |
 | PUR-01~04 클라이언트 계약·요청/응답 예시·오류 | [purpose-management-api.md](purpose-management-api.md) |
@@ -28,4 +28,4 @@
 | B0 외부 리뷰의 실행 시간·동시 발행·오류·복구 보완 | [보완 기록](../../history/architecture/server/b0-review-hardening-2026-10-05.md) |
 | B0 후속 리뷰의 queue claim·LLM 예산/마감·최종 version 복구·DB 시각 | [후속 기록](../../history/architecture/server/b0-followup-review-2026-10-06.md) |
 
-- [B4 상품 목록·홈 조회 설계](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 설계 승인·구현 계획 검토 전
+- [B4 상품 목록·홈 조회 설계](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 조회3개·공통 판정·snapshot·V15 구현, 최종 회귀/리뷰 중

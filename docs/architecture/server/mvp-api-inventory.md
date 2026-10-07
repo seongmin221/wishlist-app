@@ -50,7 +50,7 @@ B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
 | ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, 선택 clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **구현(B1)**: 공유 시각 보관·실제 공통 mapper·신규 event 지정 발행. nullable 표시 metadata 및 후속 참조 확장은 B2/B3/B5/B6 |
-| ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 앞뒤 cursor·anchorResolved | 없음 |
+| ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId 또는 purposeUnassigned=true, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 공용 카드 wrapper·totalCount·앞뒤 cursor·requested/resolved anchor ID·anchorResolved | **구현(B4)**: 단일 scope·page/anchor·공통 상세 mapper, 저장하지 않는 metadata는 B5까지 nullable |
 | ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 목적 deletionImpact는 ITEM-05와 함께 B7 확장 |
 | ITEM-04 | `PATCH /v1/wishlist-items/{id}` | 일반 편집 한 번에 저장, 브랜드 수정·category 재지정·purpose 선택/해제 · S3/S4 | expectedVersion, 변경된 이름/brand/mediaId/categoryId/purposeId. 생략=유지, optional null=해제 | 갱신된 item·출처·review·version. 사용자 값만 수정, price/currency/sourceUrl 변경 제외 | 없음 |
 | ITEM-05 | `DELETE /v1/wishlist-items/{id}` | 일반·분석 중 삭제, 목적에서 항목 제거 · S2/S4 | item ID. 기존 계약상 expectedVersion 없음 | 204, 늦은 Worker 반영 차단. owner의 이미 삭제한 item 반복 삭제도 204 | 없음 |
@@ -66,8 +66,8 @@ READY 항목에서 사용자 category 삭제 때문에 category가 빈 경우에
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| HOME-01 | `GET /v1/home` | 로그인 후 홈·foreground 복귀·사용자 새로고침 · S4/S8 | 인증 owner | 분석 중·정보 보완·분류 검토 count/미리보기, 최근 활동순 ACTIVE 목적 최대 3개(빈 목적 포함): 이름·색·아이콘·후보 수·최근 활동·최근 저장 후보 최대 4개(이미지 null도 포함·placeholder 표시). 별도 서버 할 일 합계 필드 없음(그룹 count 제공). 기기 로컬 대기는 서버 count에 포함하지 않음 | 없음 |
-| HOME-02 | `GET /v1/home/action-items` | 영역 펼침, 연속 처리, 캐러셀 특정 상품부터 진입 · S4/S7/S8 | 홈 그룹 조건(group만 받는 안 권장·B4 spec에서 확정), cursor/limit 또는 anchor={cursor}+before/after | 같은 홈 그룹 predicate의 item 목록·totalCount·cursor·anchorResolved. 정보 보완 그룹은 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 함께 포함하고 item별 requiredAction·허용 행동은 유지 | 없음 |
+| HOME-01 | `GET /v1/home` | 로그인 후 홈·foreground 복귀·사용자 새로고침 · S4/S8 | 인증 owner | 분석 중·정보 보완·분류 검토 count/미리보기, 최근 활동순 ACTIVE 목적 최대 3개(빈 목적 포함): 이름·색·아이콘·후보 수·최근 활동·최근 저장 후보 최대 4개(이미지 null도 포함·placeholder 표시). 별도 서버 할 일 합계 필드 없음(그룹 count 제공). 기기 로컬 대기는 서버 count에 포함하지 않음 | **구현(B4)**: 같은 snapshot의 count/preview·B3 최근 목적 summary |
+| HOME-02 | `GET /v1/home/action-items` | 영역 펼침, 연속 처리, 캐러셀 특정 상품부터 진입 · S4/S7/S8 | group 필수(세 홈 그룹, action query 없음), cursor/limit 또는 anchor={cursor}+before/after | 같은 홈 그룹 predicate의 item 목록·totalCount·cursor·anchorResolved. 정보 보완 그룹은 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 함께 포함하고 item별 requiredAction·허용 행동은 유지 | **구현(B4)**: group·page/anchor, 카드별 requiredAction 유지 |
 | DUP-01 | `GET /v1/wishlist-items/{id}/duplicate-candidates` | 새/기존 항목 비교 시트, 기존 실패/처리 상태 안내 · S3 | 새 item ID, cursor/limit | 중복 candidate ID·판단 근거와 MATCH/동일URL안내/판단대기 구분, 양쪽 metadata·저장일·category/purpose·version·기존 항목 삭제 영향 | 없음 |
 | DUP-02 | `PUT /v1/wishlist-items/{id}/duplicate-decisions` | 둘 다 두기/새 항목 지우기/기존 항목 지우기 확정 · S3 | candidate ID, KEEP_BOTH/DELETE_NEW/DELETE_EXISTING, decision/version 정보, 재전송 식별 key | 판단 기록과 선택 삭제를 같은 transaction에 반영, 남는/삭제 item IDs·갱신 상태. review 확정/보류는 별도 ITEM-08 | 없음 |
 

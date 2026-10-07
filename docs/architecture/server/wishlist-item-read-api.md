@@ -1,4 +1,4 @@
-# B1 상품 생성·재전송·상세 조회
+# 상품 생성·상세와 B4 목록·홈 조회
 
 ## 조회와 응답 경계
 
@@ -50,3 +50,194 @@ Scheduler가 있는 상태의 비동기 발행 전환과 API/Worker body 크기 
 값은 owner 조건의 현재 목적 row에서 읽는다. 목적이 없으면 네 값이 모두 null이고, `source`로 미연결(UNASSIGNED)과 사용자 확정 미지정(USER)을 구분한다.
 목적 편집은 상품 version·출처·review를 바꾸지 않는다. 상품 version이 같아도 목적 표시값은 바뀔 수 있다.
 목적 자원 계약은 [목적 API](purpose-management-api.md)를 따른다.
+
+## B4 공통 조회 계약
+
+ITEM-02·HOME-02·HOME-01은 API runtime에 등록한다. Worker와 LOCAL_HEALTH에는 노출하지 않는다. Firebase Bearer 인증 owner로만 조회하고 JDBC는 Dispatchers.IO의 read-only repeatable-read transaction에서 실행한다. 조회에서 owner/purpose/item/job 잠금을 잡지 않는다.
+
+### ITEM-02 범위와 표시
+
+```http
+GET /v1/wishlist-items?categoryId=C026&limit=40
+Authorization: Bearer {firebaseIdToken}
+GET /v1/wishlist-items?categoryId={customUuid}&cursor={nextCursor}&limit=40
+GET /v1/wishlist-items?purposeId={purposeUuid}&limit=40
+GET /v1/wishlist-items?purposeUnassigned=true&limit=40
+```
+
+categoryId·purposeId·purposeUnassigned 중 **정확히 하나**를 받는다. categoryId는 공용 leaf C-ID 또는 custom UUID이며 parentId 조회는 없다. category 목록은 같은 owner·ACTIVE·현재 category 일치·Kotlin isNullOrBlank 기준 이름 존재 집합이다. PROCESSING도 이름이 남아 있으면 표시한다. CAT-01/02 표시 count와 같다.
+
+특정 purposeId는 현재 owner의 ACTIVE 목적에 연결된 ACTIVE 상품 전부이며 분석/review·이름/category 존재를 제한하지 않는다. PUR candidateCount와 같은 집합이다. purposeUnassigned=true는 purpose_id IS NULL인 ACTIVE 전체이며 UNASSIGNED와 USER+null을 함께 포함한다. source는 두 의미를 구분한다. 목적별 이름 없는 카드의 placeholder는 클라이언트 책임이다. 다른 owner·없는/삭제된 custom은404 CATEGORY_NOT_FOUND, 다른 owner·없는/ARCHIVED 목적은404 PURPOSE_NOT_FOUND다.
+
+정렬은 `created_at DESC, id DESC`이고 UUID 순서도 PostgreSQL에 맡긴다. clientCreatedAt은 정렬에 쓰지 않는다. 일반 페이지 limit은 ITEM40/HOME20 기본, 1~100이다. cursor는 응답 previousCursor 또는 nextCursor를 전달하며 같은 owner·endpoint·scope·용도에만 사용할 수 있다.
+
+### 공용 카드와 page/window
+
+카드는 `item`과 `anchorCursor` wrapper다. item은 B1~B3 상세 mapper 표현과 동일하며 purpose 색/아이콘/source, reviewStatus, requiredAction, allowedActions, version을 포함한다. 가격/통화·brand·merchant·metadataCheckedAt은 B5에서 저장을 연결하므로 B4 응답은 null이다. classified_at을 확인 시각으로 대신 쓰지 않는다.
+
+다음은 ITEM-02 첫 페이지 예시다. `opaque-anchor`는 설명용 값이며 실 요청에는 응답받은 cursor를 사용한다.
+
+```json
+{
+  "items": [
+    {
+      "item": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "clientSubmissionId": "00000000-0000-0000-0000-000000000002",
+        "version": 1,
+        "sourceUrl": "https://example.com/product",
+        "product": {
+          "name": "헤드폰",
+          "imageUrl": null,
+          "price": null,
+          "currency": null,
+          "brand": null,
+          "merchant": null,
+          "metadataCheckedAt": null,
+          "nameSource": "USER",
+          "imageSource": null
+        },
+        "category": {
+          "id": "C026",
+          "source": "USER",
+          "missingReason": null,
+          "name": "헤드폰",
+          "parentId": "G003",
+          "kind": "PUBLIC"
+        },
+        "purpose": {
+          "id": null,
+          "name": null,
+          "colorKey": null,
+          "iconKey": null,
+          "source": "USER"
+        },
+        "analysis": {
+          "status": "READY",
+          "failureCode": null
+        },
+        "reviewStatus": "CONFIRMED",
+        "lifecycleStatus": "ACTIVE",
+        "requiredAction": "NONE",
+        "createdAt": "2026-10-07T10:00:00Z",
+        "updatedAt": "2026-10-07T10:00:00Z",
+        "manualCompletionAt": null,
+        "allowedActions": [
+          "EDIT",
+          "DELETE"
+        ],
+        "clientCreatedAt": null
+      },
+      "anchorCursor": "opaque-anchor"
+    }
+  ],
+  "totalCount": 1,
+  "previousCursor": null,
+  "nextCursor": null,
+  "requestedAnchorItemId": null,
+  "resolvedAnchorItemId": null,
+  "anchorResolved": null
+}
+```
+
+```http
+GET /v1/wishlist-items?categoryId=C026&anchor={anchorCursor}&before=20&after=20
+GET /v1/home/action-items?group=CLASSIFICATION_REVIEW&anchor={anchorCursor}&before=20&after=20
+```
+
+anchor query 하나에 위치와 requested ID가 들어 있다. anchorItemId/anchorCursor query는 받지 않는다. anchor는 cursor/limit과 함께 쓰지 못하며 before/after는 anchor에서만 각각0~20(기본20)이다. 응답은 anchor 자신1개를 포함해 최대41개이고 대체 anchor를 중심으로 양쪽을 채운다. 어느 한쪽이 짧다고 반대쪽 제한을 늘리지 않는다.
+
+anchor가 여전히 scope 안이면 requestedAnchorItemId=resolvedAnchorItemId, anchorResolved=true다. 삭제·이동·처리로 빠지면 요청 정렬 위치의 **다음(더 오래된) 항목**, 없으면 바로 앞(더 새로운) 항목으로 복구하고 false를 반환한다. 맨 끝 삭제도 같은 규칙이다. scope가 비면 requested ID만 남고 resolved ID=null, false, items=[]다. 연속 처리에서 false는 정상 복구이며 오류가 아니다. page 모드의 requested/resolved/anchorResolved는 모두null이다.
+
+window 바깥에 항목이 있을 때만 이전/다음 cursor를 준다. 페이지 진행 방향은 limit+1, 반대 방향은 EXISTS로 확인한다. anchor는 양방향 +1을 읽는다. 이전 페이지는 정렬상 가까운 ASC key를 제한해 가져온 뒤 DESC로 반환하므로 왕복 시 항목이 빠지지 않는다. 카드 anchor cursor와 페이지용 cursor는 서로 대체하지 않는다. totalCount는 현재 snapshot의 전체 scope count다.
+
+cursor는 B3처럼 Base64URL 구조·owner digest·scope·endpoint·용도·UUID·시각 범위·입력 길이를 검증한다. HMAC/신규 secret은 없다. 형식 오류나 범위 불일치는400이며 암호학적 위조 방지를 보장하지 않는다. 자기 범위 안의 유효 위치를 바꾼 token을 권한으로 신뢰하지 않고 SQL이 인증 owner/scope를 계속 제한한다.
+
+### HOME-02 그룹 조회
+
+```http
+GET /v1/home/action-items?group=INFORMATION_COMPLETION&limit=20
+GET /v1/home/action-items?group=INFORMATION_COMPLETION&cursor={nextCursor}&limit=20
+```
+
+필수 group은 ANALYSIS_IN_PROGRESS·INFORMATION_COMPLETION·CLASSIFICATION_REVIEW 중 하나다. action query는 없다. INFORMATION_COMPLETION 그룹은 requiredAction의 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 포함한다. 카드별 action과 allowedActions는 그대로 둔다. PROCESSING이 먼저, 이름/category 보완이 다음, PENDING review가 마지막이라는 WishlistItemPolicy 우선순위를 SQL과 공유한다.
+
+완성된 CONFIRMED/DEFERRED 상품은 검토 그룹에서 제외한다. ‘처음부터 다시 보기’는 기기 skip만 초기화하고 cursor 없이 현재 미완료 첫 페이지를 조회한다. review 상태를 되돌리거나 별도 restart API를 만들지 않는다. local pending은 서버 item으로 합치지 않는다.
+
+### HOME-01 요약
+
+```http
+GET /v1/home
+Authorization: Bearer {firebaseIdToken}
+```
+
+query를 받지 않는다. 고정순서의 세 actionGroups를 반환하며 각 count와 최대4개 최신 previews가 함께 나온다. 빈 그룹도 count=0/previews=[]로 유지한다. preview는 HOME-02 anchorCursor를 포함한다. 별도 todo 합계 필드는 없고 기기 pending은 클라이언트에서 합성한다.
+
+recentPurposes는 B3 summary DTO이며 ACTIVE activity_at DESC/id DESC 최대3개, 빈 목적도 포함한다. candidateCount는 ACTIVE 전체, previews는 최근 저장 후보 최대4개다. 이미지 없는 후보도 한 자리를 차지하고 imageUrl=null이면 클라이언트 placeholder를 쓴다. 아래는 빈 그룹과 빈 목적 예시다.
+
+```json
+{
+  "actionGroups": [
+    {
+      "group": "ANALYSIS_IN_PROGRESS",
+      "count": 0,
+      "previews": []
+    },
+    {
+      "group": "INFORMATION_COMPLETION",
+      "count": 0,
+      "previews": []
+    },
+    {
+      "group": "CLASSIFICATION_REVIEW",
+      "count": 0,
+      "previews": []
+    }
+  ],
+  "recentPurposes": [
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "name": "여행",
+      "colorKey": "CORAL",
+      "iconKey": "HEART",
+      "version": 1,
+      "description": null,
+      "candidateCount": 0,
+      "activity": {
+        "at": "2026-10-07T10:00:00Z",
+        "kind": "CREATED"
+      },
+      "previews": []
+    }
+  ]
+}
+```
+
+MATERIALIZED classified에서 requiredAction CASE를 한 번 정의하고 group을 계산한다. FILTER count와 group별 row_number key를 한 SQL로 읽으며 NONE을 ranking 전에 제외한다. 최대12개 카드 projection과 PurposeRepository.page/previews는 같은 connection snapshot에서 읽는다. N+1 상세 호출은 없다. group은 계산 filter이므로 count는 owner ACTIVE 전체를 읽는 비용이 남는다. [실측 기록](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md#task-8--v15-인덱스와-실제-sql-측정)은 정렬 index 효과와 남은 scan 비용을 구분한다.
+
+### 조회 오류와 헤더
+
+| 상황 | HTTP·code |
+| --- | --- |
+| 인증 없음/실패 | 401 UNAUTHORIZED |
+| ITEM query 혼합·중복·누락·알 수 없는 이름·범위 초과 | 400 INVALID_WISHLIST_QUERY |
+| ITEM cursor 형식/owner/scope/endpoint/용도/범위 오류 | 400 INVALID_WISHLIST_CURSOR |
+| HOME query 오류(group·bounds·HOME-01 query 등) | 400 INVALID_HOME_QUERY |
+| HOME cursor 오류 | 400 INVALID_HOME_CURSOR |
+| custom/purpose 없음 또는 다른 owner | 404 CATEGORY_NOT_FOUND / PURPOSE_NOT_FOUND |
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json; charset=UTF-8
+X-Request-ID: 00000000-0000-0000-0000-000000000004
+```
+
+```json
+{"error":{"code":"INVALID_WISHLIST_CURSOR","requestId":"00000000-0000-0000-0000-000000000004","details":{}}}
+```
+
+인증과 입력 검증은 DB 접근 전에 한다. 알 수 없는 query·중복 값·빈 값은400으로 거절한다. GET에는 Idempotency-Key나 mutation version precondition이 없다. 성공/실패 모두 X-Request-ID를 제공하며 실패 body와 같은 값이다.
+
+### 후속 경계
+
+B8 category 삭제 영향은 표시 count를 재사용하지 않고 이름 누락을 포함한 ACTIVE 전체를 센다. B10 purpose archive 이후 ARCHIVED 목적에 연결된 ACTIVE 상품은 현재 purposeId404/미지정NULL 목록 양쪽에서 빠질 수 있으므로 archive 상태 전환과 조회 predicate를 함께 갱신한다. B4는 edit/review/delete/retry/archive mutation, polling·push·search·전역sync를 추가하지 않는다.
