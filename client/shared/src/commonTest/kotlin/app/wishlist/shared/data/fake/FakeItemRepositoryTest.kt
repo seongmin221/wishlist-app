@@ -138,6 +138,13 @@ class FakeItemRepositoryTest {
         f.login("B"); assertEquals(0, f.catalog.items(null, null).successValue().size)
         assertTrue(f.catalog.purposes().successValue().isEmpty())
     }
+    @Test fun seeded_list_follows_board_order_not_random_ids() = runTest {
+        val f = FakeFixture(); f.login()
+        val seeds = BoardSeeds.create(Clock { fakeTime }, IdGenerator { Uuid.random().toString() })
+        f.store.seed(seeds).successValue()
+        val boardOrder = seeds.displayMetadata.cards.filter { it.cardKey.startsWith("l") }.map { it.itemId }
+        assertEquals(boardOrder, f.catalog.items(null, null).successValue().map { it.id })
+    }
     @Test fun scheduler_advancement_never_auto_completes_analysis() = runTest {
         val f = FakeFixture(); f.login(); val item = f.create()
         advanceTimeBy(1_000_000)

@@ -7,6 +7,7 @@ import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.domain.evaluateItem
 import app.wishlist.shared.model.*
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 /** Image-comparison fixture only. Repository counts are derived from stored membership. */
@@ -121,6 +122,8 @@ object BoardSeeds {
             val policy = evaluateItem(snapshot)
             return snapshot.copy(requiredAction = policy.requiredAction, allowedActions = policy.allowedActions)
         }
+        // createdAt is staggered by one minute in board order so the newest-first list is l1..l8,
+        // independent of the random item IDs used as the tie-breaker.
         val items = listOf(
             item("l1", "소니", "WH-1000XM6", "549000", "무신사", 2, commute = true),
             item("l2", "보스", "QuietComfort Ultra", "499000", "보스 공식몰", 2, commute = true),
@@ -130,7 +133,7 @@ object BoardSeeds {
             item("l6", "뱅앤올룹슨", "Beoplay H95", "1190000", "뱅앤올룹슨", 14),
             item("l7", "소니", "ULT WEAR", "279000", "11번가", 14, commute = true),
             item("l8", "오디오테크니카", "ATH-M50x", "219000", "오디오테크니카", 21),
-        )
+        ).mapIndexed { index, item -> (now - index.minutes).let { item.copy(createdAt = it, updatedAt = it) } }
         val cards = listOf(
             BoardCardFixture("l1", items[0].id, "#FFFFFF", "#9A9A96", "#D8D8D4", 1.0 / 1.0, "출퇴근 헤드폰 · 2일 전 확인"),
             BoardCardFixture("l2", items[1].id, "#7A6B5B", "#E9DFD2", "#A99683", 5.0 / 4.0, "출퇴근 헤드폰 · 2일 전 확인"),

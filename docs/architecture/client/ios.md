@@ -34,3 +34,10 @@
 - 데모 화면·경로 정의와 renderer의 데모 분기를 모두 `#if DEBUG`로 제한한다. release는 데모 타입을 참조하지 않고 탭 이름만 보인다.
 
 - 유지된 세 탭·모든 스택 칸의 메모리·관찰·레이아웃 비용은 [C3 성능 확인](c3-performance-checks.md)에서 측정한다. 입력 조합 감지는 앱 공용 알림 관찰자와 window별 약한 responder cache를 사용하며 첫 탐색 이후 키 입력마다 전체 트리를 재탐색하지 않는다.
+
+## 공유 runtime 연결 (C2)
+
+- `WishlistApp`이 `init()`에서 `SharedRuntimeFactory.shared.create(bindings:remote:)`로 프로세스당 `SharedRuntime` 하나를 만들어 보유한다. `AppRuntimeConfig.bindings()`가 `#if DEBUG`로 mode와 37개 map을 고른다(DEBUG: ITEM-01·03 FAKE, 나머지 UNAVAILABLE / Release: 모두 UNAVAILABLE). C2에는 remote config가 없다.
+- `Wishlist/Debug/DebugSessionBootstrap.swift`는 파일 전체가 `#if DEBUG`이며 `startDebugSession()`만 호출한다. Release 바이너리에는 이 타입의 심볼이 없다.
+- static `Shared.framework`가 SQLite driver를 포함하므로 앱 target `OTHER_LDFLAGS`에 `-lsqlite3`를 둔다.
+- `SharedRuntimeTests`가 앱 설정(Debug)의 binding, 실제 factory로 만든 runtime의 `ready`가 SKIE `for await`로 true가 되는 흐름과 debug owner 계정, close 후 ready=false, RELEASE binding의 즉시 ready를 검증한다.

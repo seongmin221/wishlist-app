@@ -533,12 +533,12 @@ data class RepositoryBindings(
 
 `createRuntime`/`resolvedBackend`는 DI test helper다. ApiId 전수 key 누락은 오류, RELEASE+FAKE는 하나라도 오류다. REMOTE를 지정한 미구현 API도 구성 오류로 처리해 명시적 UNAVAILABLE로 선택하게 한다. C2 release 앱은 **37개 모두 UNAVAILABLE**이며 runtime ready=true 이후 요청도 UNAVAILABLE을 반환한다. DEBUG는 C2 구현 API만 FAKE, 나머지는 UNAVAILABLE로 전수 지정하고 Remote 계약 테스트에서는 ITEM_01/03만 REMOTE로 바꾼다. catalog seed 조회는 별도 debug facade이며 미구현 CAT/PUR wire API의 Fake 완료로 세지 않는다.
 
-- [ ] **Step 0: 고정 결과 대조.** Task 1의 Koin DSL 버전·host/Native/framework 검증 결과를 사용한다.
-- [ ] **Step 1: 실패 테스트.** 37개 전수 map·누락 오류, backend 개별 선택, RELEASE FAKE 거절/전부 UNAVAILABLE 성공, 미구현 REMOTE 거절. runtime별 격리·동일 AuthSession·client/driver 한 번 close. Get facade가 CachedGetItemRepository를 사용해 UI 없이 cache 동기화 검증.
-- [ ] **Step 2: RED.** KMP_TEST에서 DI suite 실패.
-- [ ] **Step 3: 구현.** Android BuildConfig.DEBUG/iOS #if DEBUG가 mode와 map을 전달한다. SharedRuntime는 같은 session/token source/driver/engine으로 Kotlin token adapter와 repository를 생성한다. Get facade는 선택한 delegate를 CachedGetItemRepository로 한 번 감싼다. unavailable delegate도 오류로 cache를 유지한다. RELEASE graph는 Remote(명시 선택 시)/unavailable만 연결하며 검증 대상은 resolved backend다. commonMain의 Fake 코드 포함 여부와는 별개다.
-- [ ] **Step 4: debug bootstrap.** 양 앱 DebugSessionBootstrap이 runtime.startDebugSession을 호출하고 Kotlin scope가 changeAccount("debug-board-owner")→같은 namespace seed 주입→ready=true 순서를 소유한다. 준비 중 요청은 UNAVAILABLE. RELEASE는 조립 후 ready=true, debug bootstrap 호출 없음. Swift ready 수집은 Task 1의 interop stack 선택 이후 실행한다.
-- [ ] **Step 5: GREEN·커밋.** KMP_TEST·두 플랫폼 Debug/Release build와 mode 전달·ready·close 테스트. `feature(kmp): API별 backend와 공통 DI 조립 구현`.
+- [x] **Step 0: 고정 결과 대조.** Task 1의 Koin DSL 버전·host/Native/framework 검증 결과를 사용한다.
+- [x] **Step 1: 실패 테스트.** 37개 전수 map·누락 오류, backend 개별 선택, RELEASE FAKE 거절/전부 UNAVAILABLE 성공, 미구현 REMOTE 거절. runtime별 격리·동일 AuthSession·client/driver 한 번 close. Get facade가 CachedGetItemRepository를 사용해 UI 없이 cache 동기화 검증.
+- [x] **Step 2: RED.** KMP_TEST에서 DI suite 실패.
+- [x] **Step 3: 구현.** Android BuildConfig.DEBUG/iOS #if DEBUG가 mode와 map을 전달한다. SharedRuntime는 같은 session/token source/driver/engine으로 Kotlin token adapter와 repository를 생성한다. Get facade는 선택한 delegate를 CachedGetItemRepository로 한 번 감싼다. unavailable delegate도 오류로 cache를 유지한다. RELEASE graph는 Remote(명시 선택 시)/unavailable만 연결하며 검증 대상은 resolved backend다. commonMain의 Fake 코드 포함 여부와는 별개다.
+- [x] **Step 4: debug bootstrap.** 양 앱 DebugSessionBootstrap이 runtime.startDebugSession을 호출하고 Kotlin scope가 changeAccount("debug-board-owner")→같은 namespace seed 주입→ready=true 순서를 소유한다. 준비 중 요청은 UNAVAILABLE. RELEASE는 조립 후 ready=true, debug bootstrap 호출 없음. Swift ready 수집은 Task 1의 interop stack 선택 이후 실행한다.
+- [x] **Step 5: GREEN·커밋.** KMP_TEST·두 플랫폼 Debug/Release build와 mode 전달·ready·close 테스트. `feature(kmp): API별 backend와 공통 DI 조립 구현`.
 
 ## Task 9: 상품 상세 Presenter의 조회·세션·수명 기반
 

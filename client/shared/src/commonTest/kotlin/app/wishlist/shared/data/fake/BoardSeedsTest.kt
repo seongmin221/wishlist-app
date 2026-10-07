@@ -101,6 +101,16 @@ class BoardSeedsTest {
         val a = seed()
         assertEquals(a, seed())
         a.purposes.forEach { assertEquals(now, it.createdAt); assertEquals(now, it.updatedAt) }
-        a.items.forEach { assertEquals(now, it.createdAt); assertEquals(now, it.updatedAt) }
+        a.items.forEach { assertTrue(it.createdAt <= now); assertEquals(it.createdAt, it.updatedAt) }
+    }
+
+    @Test fun item_creation_times_are_staggered_in_board_order_l1_to_l8() {
+        val data = seed()
+        val boardOrder = data.displayMetadata.cards.filter { it.cardKey.startsWith("l") }.map { it.itemId }
+        assertEquals(listOf("l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8"),
+            data.displayMetadata.cards.filter { it.cardKey.startsWith("l") }.map { it.cardKey })
+        assertEquals(boardOrder, data.items.map { it.id })
+        assertEquals(now, data.items.first().createdAt)
+        data.items.zipWithNext().forEach { (newer, older) -> assertTrue(newer.createdAt > older.createdAt) }
     }
 }

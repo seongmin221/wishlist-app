@@ -12,7 +12,7 @@ import app.wishlist.shared.repository.LocalStore
  * only versions up to the one observed before the request, so a late 404 cannot erase a newer cache.
  */
 internal class CachedGetItemRepository(
-    private val delegate: GetItemRepository,
+    internal val delegate: GetItemRepository,
     private val localStore: LocalStore,
     private val session: AuthSession,
 ) : GetItemRepository {

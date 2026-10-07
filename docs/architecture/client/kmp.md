@@ -27,7 +27,7 @@
 - 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared` 모듈로 시작한다.
 - shared target은 Android, `iosArm64`, `iosSimulatorArm64`다. Android는 공식 KMP library plugin, iOS는 static `Shared.framework` direct integration을 사용한다.
 - 지원 하한은 Android 8(API 26), iOS 17이다.
-- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`·interop probe와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드도 포함한다. 실제 저장소 backend·화면 비즈니스 기능은 후속 구현 대상이다.
+- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`·interop probe와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드, Fake·Remote(ITEM-01·03)·로컬 캐시와 이를 조립하는 `SharedRuntime`(아래 마지막 절)도 포함한다. 화면 비즈니스 기능은 후속 구현 대상이다.
 
 ## 구현 구조
 
@@ -51,7 +51,7 @@ core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  pres
 
 - 의존 방향은 `presentation → domain → repository(interface) ← data(remote | fake | local)`이다.
 - `presentation`의 Presenter(`StateFlow<State>` + intent)가 화면 데이터, 로딩·오류, 편집 초안과 dirty 여부, 연속 처리 진행, 409 복구 상태를 소유한다.
-- `repository`는 서버 API ID 단위 인터페이스다. Fake와 Remote 구현을 Koin과 debug flavor/scheme으로 고르고, 서버 묶음이 끝나면 API ID 단위로 Remote로 바꾼다. 같은 계약 테스트를 양쪽에 실행한다.
+- `repository`는 서버 API ID 단위 인터페이스다. Fake·Remote·UNAVAILABLE을 API ID마다 명시한 `RepositoryBindings`로 고르고(build mode에서 추론하지 않는다), 서버 묶음이 끝나면 API ID 단위로 Remote로 바꾼다. 같은 계약 테스트를 양쪽에 실행한다.
 - 서버가 아직 고정하지 않은 필드·오류 코드는 `CONTRACT-PENDING(<API-ID>)`로 표시하고 DTO·매퍼 안에만 둔다.
 
 빌드 명령과 검증 제한은 [client 실행 가이드](../../../client/README.md), 상세 근거와 핸드오프 검토는 [초기 셋업](initial-setup.md)에 정리한다.
@@ -155,3 +155,17 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - **transaction 계약:** 모든 연산은 session gate(`withCurrent`) → DB transaction 순서이며 gate 안에는 짧은 DB commit만 둔다(네트워크·delay 없음). `accept`는 한 transaction에서 캐시 upsert(또는 DELETED replay면 tombstone version 이하 캐시 삭제)와 pending 삭제를 수행하고, 중간 오류는 둘 다 rollback한다. 낮은·같은 version의 upsert는 건너뛰고 더 높은 version만 교체한다. `removeCachedItem`은 `throughVersion` 이하만 지우고 `clearCurrentCache`는 현재 계정 캐시만 지우며 pending은 보존한다. DB/driver 예외는 `UNAVAILABLE/LOCAL_STORE_FAILURE`로 바꾸고 취소는 항상 전파한다. rollback 오류 주입은 `SqlLocalStore`의 internal 생성자 hook(테스트 전용)이다.
 - **decorator 계약:** `CachedGetItemRepository(delegate, localStore, session)`는 snapshot→cache read(version 관찰)→snapshot 확인→delegate→cache write→동일 snapshot 확인→반환 순서다. 성공은 upsert, `NOT_FOUND`는 관찰한 version 이하만 제거(캐시가 없었으면 no-op)해 늦은 404가 새 version을 지우지 않는다. 일반 오류는 캐시를 유지한다. 반환은 항상 delegate 응답이라 같은 version 캐시를 건너뛰어도 최신 표시명을 받는다. 캐시 read/write 실패는 ClientError로 반환하고, 계정/세대가 바뀌면 결과와 commit을 거절한다. 로그아웃 상태에서는 캐시 없이 delegate 결과를 그대로 반환한다. Presenter는 `GetItemRepository`만 소비한다.
 - **driver·검증 범위:** Android는 `AndroidSqliteDriver`(앱 sandbox, `DriverFactory(context)`), iOS는 `NativeSqliteDriver`다. 동작 suite는 같은 commonTest를 JDBC SQLite(androidHostTest, 임시 파일)와 Native SQLite(iosSimulatorArm64Test, 임시 파일)에서 `expect` 테스트 driver factory로 실행하며 close/reopen을 검증한다. Robolectric/에뮬레이터가 없어 Android Context driver는 컴파일만 확인했고 실기기 runtime smoke는 C3로 넘긴다.
+
+## API별 backend·SharedRuntime 조립
+
+> 2026-10-07 Task 8 구현. Koin 4.2.2(`koin-core`, Task 1 고정 버전)를 runtime마다 격리된 `koinApplication { }`으로 쓰고 전역 `startKoin`은 쓰지 않는다. 모든 DI·SQLDelight·Ktor 타입은 Kotlin `internal`이다.
+
+- **명시적 binding:** `RepositoryBindings(buildMode, backends: Map<ApiId, Backend>)`는 생성 시 검증한다. 37개 API 전부를 지정해야 하고(누락은 `IllegalArgumentException`), RELEASE의 FAKE는 하나라도 오류다. FAKE·REMOTE는 구현이 있는 ITEM-01·03에만 허용하고, 나머지는 명시적 UNAVAILABLE이어야 한다(미구현 REMOTE뿐 아니라 미구현 FAKE도 구성 오류). `RemoteConfig(baseUrl, PlatformTokenSource)`는 REMOTE binding이 있을 때만, 그리고 그때는 반드시 넘긴다(어느 방향이든 어긋나면 조립 오류).
+- **앱이 넘기는 값(C2):** DEBUG는 ITEM-01·03만 FAKE, 나머지 35개 UNAVAILABLE. RELEASE는 37개 모두 UNAVAILABLE. 두 앱 모두 remote config가 없다. REMOTE(ITEM-01·03)는 MockEngine 테스트에서만 조립한다.
+- **graph:** runtime 하나에 `MutableAuthSession` 하나를 두고 Fake store·SQL 저장소·token adapter·transport·Remote가 모두 그 session을 받는다. Fake 부품은 DEBUG에만 있고(RELEASE graph에는 `FakeStore` 정의가 없다), HTTP 부품은 REMOTE가 있을 때만 있다. ITEM-01/03 delegate는 binding대로 Fake·Remote·`UnavailableItemRepository` 중 하나이며, 테스트 helper `resolvedBackend`는 binding이 아니라 graph에 실제 연결된 delegate를 확인한다.
+- **facade:** `createItemRepository()`(ITEM-01), `getItemRepository()`(ITEM-03), `catalogRepository()`, `localStore()`는 구체 accessor다. Get facade는 선택한 delegate를 `CachedGetItemRepository`로 정확히 한 번 감싼다. UNAVAILABLE delegate의 오류(`UNAVAILABLE/API_UNAVAILABLE`)는 일반 오류이므로 캐시를 유지한다. `catalogRepository()`는 DEBUG에서만 seed 조회(Fake)이고 RELEASE에서는 UNAVAILABLE이다. 이는 CAT/PUR/ITEM-02 wire API의 Fake 완료가 아니다.
+- **ready·debug bootstrap:** 모든 facade 요청은 `ready`가 false면 `UNAVAILABLE/RUNTIME_NOT_READY`다. RELEASE는 조립 직후 ready=true이고 `startDebugSession()` 호출은 오류다. DEBUG는 앱의 `DebugSessionBootstrap`이 `startDebugSession()`을 부르면 runtime scope가 `changeAccount("debug-board-owner")` → 같은 namespace에 `BoardSeeds` 주입 → ready=true 순서를 소유한다(중복 호출은 무시). seed 항목의 `createdAt`은 보드 순서대로 1분씩 앞서므로 seed 목록은 무작위 UUID와 무관하게 l1..l8 순서다.
+- **자원 수명:** SQL driver와 HTTP engine은 처음 필요한 facade를 얻을 때 연다. `close()`는 한 번만 동작하며(이후 호출 무시) ready=false, bootstrap scope 취소, 만든 자원만 역순으로 닫기(HttpClient → engine → driver; HttpClient는 넘겨받은 engine을 닫지 않으므로 둘 다 닫는다), Koin 종료 순이다. close 이후 facade는 graph를 다시 열지 않고 `RUNTIME_NOT_READY`를 반환한다. 닫기 횟수는 internal test seam(`PlatformResources`)으로 센다.
+- **공개 면:** 진입점은 `SharedRuntimeFactory.create(context, bindings, remote)`(androidMain)와 `SharedRuntimeFactory.shared.create(bindings:remote:)`(iosMain)이고, 공개 타입은 `SharedRuntime`·`RepositoryBindings`·`RemoteConfig`·`Backend`·`ClientBuildMode`와 기존 repository interface다. 링크한 debug simulator·release device `Shared.h`에서 Koin/Ktor/SQLDelight·HttpClient·SqlDriver·내부 DI 타입 0건을 확인했다. Swift에서는 SKIE가 `RepositoryBindings(buildMode:backends:)`의 map을 `[ApiId: Backend]`로, `ready`를 `for await` 가능한 Flow로 노출한다(RELEASE 상수는 Swift에서 `.theRelease`).
+- **static framework 링크:** runtime factory가 Native SQLite driver를 참조하므로 iOS 앱 target은 `-lsqlite3`를 직접 링크한다(static `Shared.framework`의 linker 옵션은 소비자에게 전달되지 않는다).
+- **남은 점:** `SqlLocalStore`는 DB I/O를 호출자 dispatcher에서 실행한다. `RuntimeDispatchers.io`로 옮길지는 Presenter가 생기는 Task 9/C4에서 정한다.

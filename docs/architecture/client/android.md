@@ -32,3 +32,9 @@
 - 앱 루트가 `rememberWLNavigator(AppRouteCodec)`를 소유하고 `OverlayHost` 바깥에서 CompositionLocal로 제공한다. 시트·메뉴·확인창도 같은 navigator를 읽는다.
 - `WLRouteCodec`은 feature route를 저장 가능한 문자열 목록으로 변환한다. saver는 현재 탭·스택·칸 식별자·sourceKey·nextId를 저장하며 진행 중 전환은 복원 시 완료 상태로 정리한다. `SaveableStateHolder`의 정리 대상 칸 목록도 저장해 pop된 칸의 상태를 제거한다. 실제 기능을 추가할 때 codec 복원 계약을 함께 구현한다.
 - 입력은 부모 문자열 callback을 거치지 않는 단일 `TextFieldState`다. 조합 중에는 보존하고 commit 뒤 grapheme 제한을 적용한다. API 26 ICU·실기기 한글 IME 확인은 [C3 확인 목록](c3-performance-checks.md)에 있다.
+
+## 공유 runtime 연결 (C2)
+
+- `WishlistApplication`(manifest `android:name`)이 프로세스당 `SharedRuntime` 하나를 소유한다. `SharedRuntimeFactory.create(context, bindings, remote)`에 `AppRuntimeConfig.bindings(BuildConfig.DEBUG)`와 `remote = null`을 넘긴다. DEBUG는 ITEM-01·03 FAKE와 나머지 UNAVAILABLE, RELEASE는 37개 모두 UNAVAILABLE이다.
+- 조립 직후 variant별 `di/VariantStartup`을 부른다. debug는 `di/DebugSessionBootstrap`으로 `startDebugSession()`을 호출하고, release는 아무것도 하지 않는다(release APK dex에 `DebugSessionBootstrap` 없음). `VariantRoutes`와 같은 debug/release source set 방식이다.
+- Robolectric이 없어 Application은 JVM에서 실행하지 않는다. `testDebug`/`testRelease`의 `AppRuntimeConfig*Test`가 각 variant가 넘기는 mode·37개 map을 순수 함수로 검증하고, runtime 동작은 shared commonTest가 검증한다.
