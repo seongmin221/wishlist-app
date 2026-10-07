@@ -153,7 +153,7 @@ AI는 USER 출처·PURPOSE override·CONFIRMED/DEFERRED 중 하나라도 해당�
 
 ## 데이터와 migration
 
-V13만 추가한다. V1~V12는 수정하지 않는다.
+V13(목적 구조)과 V14(예산 window ceiling)를 추가한다. V1~V12는 수정하지 않는다.
 
 **purposes**: `id uuid`, `owner_id → app_users`, name(1~40)·description(≤200) CHECK, colorKey/iconKey CHECK,
 `lifecycle_status`(ACTIVE/ARCHIVED/DELETED, B3는 ACTIVE만 생성), `version`, `membership_version`,
@@ -214,7 +214,7 @@ key는 짧게 `{"id":"P01","n":이름,"d":설명,"i":[상품명]}`로 쓰고 고
 
 유료 입력 상한을 2,000에서 2,500으로 올리고 출력 80을 유지한다. `PriceTable` 최대 예약액은 496→596 micro USD다.
 일·월 ceiling은 같은 최대 처리 건수(일 약 1,209·월 약 12,096건)가 되도록 일 721,000·월 7,210,000 micro USD로 올린다.
-V13은 이미 생성된 `llm_budget_windows`의 ceiling도 새 값으로 갱신한다. 코드는 window ceiling 일치를 검사하므로
+V14는 이미 생성된 `llm_budget_windows`의 ceiling도 새 값으로 갱신한다. 코드는 window ceiling 일치를 검사하므로
 갱신하지 않으면 현재 일·월 window가 끝날 때까지 모든 예약이 Exceeded가 된다.
 원화 hard cap(1 USD=1,600원)은 일 약 1,160원·월 약 11,600원으로 AI·운영 문서에 반영한다.
 
@@ -248,7 +248,7 @@ V13은 이미 생성된 `llm_budget_windows`의 ceiling도 새 값으로 갱신�
 그래도 목적 설명과 custom 전체 근거는 남는다. 최악에서도 T4에서 목적 10개 이름과 custom 이름이 남고
 T5~T7은 추정이 틀렸을 때의 보험이다. T6은 6~10번째, T7은 전체 목적을 그 호출에서만 제외한다.
 
-관측: Worker는 유료 호출 전 선택 단계·전송 custom 수·전송 목적 수를 jobId와 함께 INFO 로그로 남긴다.
+관측: Worker는 유료 호출을 보낸 뒤 결과(성공·재시도·실패)와 관계없이 선택 단계·전송 custom 수·전송 목적 수를 jobId와 함께 INFO 로그로 남긴다.
 사용자 텍스트는 기록하지 않는다. T5~T7 빈도는 이 로그로 확인하며 cloud metric 연결은 B11에서 다룬다.
 
 ### 반영과 보호
@@ -256,8 +256,8 @@ T5~T7은 추정이 틀렸을 때의 보험이다. T6은 6~10번째, T7은 전체
 목적 결과는 **판단**과 **판단 없음**으로 나눈다.
 
 - 판단: 유효 v3 snapshot에서 AI가 고른 목적이 같은 owner·ACTIVE이고 이름·설명이 snapshot과 같다.
-  또는 snapshot의 목적 후보 전부를 전송한 단계(T0~T5)에서 AI가 목적 미지정을 반환했다.
-- 판단 없음: 고른 목적이 비활성·다른 owner·이름/설명 변경, v1/v2 snapshot, 일부 또는 전부를 뺀 단계(T6/T7)의
+  또는 snapshot의 목적 후보 전부를 전송한 단계(T0~T5)에서 AI가 목적 미지정을 반환했고, 상품의 현재 연결이 없거나 그 목적이 snapshot에 원문 그대로 있다.
+- 판단 없음: 고른 목적이 비활성·다른 owner·이름/설명 변경, 모델이 보지 못했거나 이름/설명이 바뀐 현재 연결에 대한 목적 미지정, v1/v2 snapshot, 일부 또는 전부를 뺀 단계(T6/T7)의
   목적 미지정 결과다. 판단 없음은 기존 연결을 그대로 유지하며 membershipVersion도 바꾸지 않는다.
 
 판단은 USER 출처·PURPOSE override·CONFIRMED/DEFERRED가 아닌 상품에만 반영한다. 연결이 바뀌면 같은 transaction에서

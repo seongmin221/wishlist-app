@@ -68,7 +68,8 @@ category 후보는 [카테고리 AI 후보](category-ai-candidates.md)를 따르
 | 결과 | 분류 | 상품 반영 |
 | --- | --- | --- |
 | 유효 v3 snapshot에서 고른 목적이 같은 owner·ACTIVE이고 이름·설명이 snapshot과 같음 | 판단 | 연결 가능 |
-| 목적 후보 전부를 보낸 단계(T0~T5)의 목적 미지정 | 판단 | 기존 AI 연결 해제 가능 |
+| 목적 후보 전부를 보낸 단계(T0~T5)의 목적 미지정이고, 현재 연결이 없거나 그 목적이 snapshot에 원문 그대로 있음 | 판단 | 기존 AI 연결 해제 가능 |
+| 현재 연결 목적이 snapshot 밖(활동순 10위 밖 등)이거나 그 뒤 이름·설명이 바뀐 상태의 목적 미지정 | 판단 없음 | 기존 연결 유지 |
 | 고른 목적의 이름·설명 변경, 비활성, 다른 owner, snapshot 밖 ID | 판단 없음 | 기존 연결 유지 |
 | v1/v2 snapshot, T6/T7의 목적 미지정 | 판단 없음 | 기존 연결 유지 |
 | 색·아이콘만 바뀐 목적 | 판단 | 연결 가능 |
@@ -83,4 +84,4 @@ category 후보는 [카테고리 AI 후보](category-ai-candidates.md)를 따르
 
 ## 관측
 
-Worker는 유료 호출 응답 후 `AI classification tier jobId={} tier={} customSent={} purposeSent={}`를 INFO 로그로 남긴다. 사용자 텍스트는 기록하지 않는다. T5~T7 빈도는 이 로그로 확인하며, cloud metric 연결은 B11에서 다룬다.
+Worker는 유료 호출을 보낸 뒤 성공·재시도·실패와 관계없이 `AI classification tier jobId={} tier={} customSent={} purposeSent={}`를 INFO 로그로 남긴다. 사용자 텍스트는 기록하지 않는다. T5~T7 빈도는 이 로그로 확인하며, cloud metric 연결은 B11에서 다룬다.

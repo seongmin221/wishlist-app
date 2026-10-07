@@ -61,4 +61,4 @@ JVM interrupt가 모든 JDBC/SDK 호출을 즉시 멈추는 것은 아니다. �
 
 ## B2 category 후보 공급
 
-Worker의 custom 후보는 잠금 transaction의 동일 connection으로 읽는다. candidate snapshot 저장 후 connection을 반환한 다음 gateway를 호출한다. max pool 1에서도 category 편집과 외부 AI 호출이 서로 DB connection을 기다리지 않는 회귀를 유지한다. 입력 토큰 preflight의 최대 네 단계는 기존 Worker 처리 시간과 2,000/80 비용 상한을 공유한다. custom 축약 후 초과 시 그 호출만 공용 taxonomy로 분류한다. B5 Scheduler/browser runtime 조립은 추가하지 않았다.
+Worker의 custom 후보는 잠금 transaction의 동일 connection으로 읽는다. candidate snapshot 저장 후 connection을 반환한 다음 gateway를 호출한다. max pool 1에서도 category 편집과 외부 AI 호출이 서로 DB connection을 기다리지 않는 회귀를 유지한다. 입력 토큰 preflight 단계(B3부터 목적 포함 최대 여덟 단계)는 기존 Worker 처리 시간과 2,500/80 비용 상한을 공유한다. custom·목적 축약 후에도 초과하면 그 호출만 공용 taxonomy로 분류한다. B5 Scheduler/browser runtime 조립은 추가하지 않았다.
