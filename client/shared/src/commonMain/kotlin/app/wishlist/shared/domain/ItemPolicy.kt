@@ -4,12 +4,14 @@ import app.wishlist.shared.model.*
 
 data class ItemPolicy(val requiredAction: RequiredAction, val allowedActions: Set<ItemAction>)
 
-/** Reproduces server policy for Fake only. Remote stores the server policy directly. */
+/**
+ * Reproduces server policy for Fake only. Remote stores the server policy directly.
+ * Reads state axes only; the item's stored requiredAction/allowedActions never feed back in.
+ */
 fun evaluateItem(item: WishlistItem): ItemPolicy {
     if (item.lifecycleStatus != LifecycleStatus.ACTIVE) return ItemPolicy(RequiredAction.NONE, emptySet())
-    if (item.analysis.status == AnalysisStatus.UNKNOWN || item.requiredAction == RequiredAction.UNKNOWN) {
-        return ItemPolicy(RequiredAction.UNKNOWN, sanitizeAllowedActions(item.analysis.status, item.requiredAction, item.allowedActions))
-    }
+    // Without a server-supplied action set there is no DELETE to keep.
+    if (item.analysis.status == AnalysisStatus.UNKNOWN) return ItemPolicy(RequiredAction.UNKNOWN, emptySet())
     if (item.analysis.status == AnalysisStatus.PROCESSING) {
         return ItemPolicy(RequiredAction.ANALYSIS_IN_PROGRESS, setOf(ItemAction.DELETE))
     }
@@ -55,7 +57,7 @@ fun isListEligible(item: WishlistItem): Boolean =
         item.analysis.status != AnalysisStatus.UNKNOWN && item.requiredAction != RequiredAction.UNKNOWN &&
         !item.product.name.isNullOrBlank() && !item.category.id.isNullOrBlank()
 
-/** Mapping boundary safety: keep supplied actions, restricting unknown branches to supplied DELETE. */
+/** Remote mapping boundary safety: keep supplied actions, restricting unknown branches to supplied DELETE. */
 fun sanitizeAllowedActions(
     analysisStatus: AnalysisStatus,
     requiredAction: RequiredAction,

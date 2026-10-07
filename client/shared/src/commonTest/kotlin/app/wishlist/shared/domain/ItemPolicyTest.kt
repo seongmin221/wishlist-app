@@ -101,9 +101,18 @@ class ItemPolicyTest {
     }
 
     @Test
-    fun fake_does_not_invent_delete_for_unknown_branch() {
+    fun fake_does_not_invent_delete_for_unknown_analysis() {
         assertEquals(ItemPolicy(RequiredAction.UNKNOWN, emptySet()), evaluateItem(itemFixture(analysis = AnalysisStatus.UNKNOWN, actions = setOf(ItemAction.EDIT))))
-        assertEquals(ItemPolicy(RequiredAction.UNKNOWN, setOf(ItemAction.DELETE)), evaluateItem(itemFixture(required = RequiredAction.UNKNOWN)))
+        assertEquals(ItemPolicy(RequiredAction.UNKNOWN, emptySet()), evaluateItem(itemFixture(analysis = AnalysisStatus.UNKNOWN, actions = setOf(ItemAction.EDIT, ItemAction.DELETE))))
+    }
+
+    @Test
+    fun fake_policy_ignores_previously_stored_policy() {
+        // A stored UNKNOWN or narrowed action set must not feed back into the next evaluation.
+        assertEquals(ItemPolicy(RequiredAction.NONE, setOf(ItemAction.EDIT, ItemAction.DELETE)),
+            evaluateItem(itemFixture(required = RequiredAction.UNKNOWN, actions = emptySet())))
+        assertEquals(ItemPolicy(RequiredAction.CLASSIFICATION_REVIEW, setOf(ItemAction.EDIT, ItemAction.DELETE, ItemAction.REVIEW)),
+            evaluateItem(itemFixture(review = ReviewStatus.PENDING, required = RequiredAction.UNKNOWN, actions = setOf(ItemAction.DELETE))))
     }
 
     @Test

@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package app.wishlist.shared.data.fake
 
 import app.wishlist.shared.core.Clock
@@ -5,6 +7,7 @@ import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.domain.evaluateItem
 import app.wishlist.shared.model.*
 import kotlin.time.Duration.Companion.days
+import kotlin.uuid.Uuid
 
 /** Image-comparison fixture only. Repository counts are derived from stored membership. */
 data class BoardDisplayMetadata(
@@ -37,6 +40,8 @@ data class BoardSeedData(
 object BoardSeeds {
     fun create(clock: Clock, ids: IdGenerator): BoardSeedData {
         val now = clock.now()
+        // Platform generators may emit uppercase UUIDs (NSUUID); seeds use the canonical lowercase form.
+        fun newId(): String = Uuid.parse(ids.newId()).toString()
         val categories = mutableListOf<Category>()
         val categoryCounts = linkedMapOf<String, Int>()
         fun group(id: String, name: String) { categories += Category(id, name) }
@@ -62,7 +67,7 @@ object BoardSeeds {
         leaf("C030", "웨어러블 기기", "G003", 2)
         leaf("C027", "이어폰", "G003", 1)
         leaf("C020", "태블릿", "G003", 1)
-        leaf(ids.newId(), "오디오 케이블·DAC", "G003", 2, custom = true)
+        leaf(newId(), "오디오 케이블·DAC", "G003", 2, custom = true)
         group("G004", "가구·인테리어")
         leaf("C039", "조명", "G004", 3)
         leaf("C034", "의자", "G004", 2)
@@ -75,29 +80,29 @@ object BoardSeeds {
         leaf("C056", "캠핑 용품", "G006", 4)
         leaf("C053", "러닝 용품", "G006", 2)
         leaf("C059", "여행 가방·캐리어", "G006", 2)
-        leaf(ids.newId(), "백패킹 소품", "G006", 1, custom = true)
+        leaf(newId(), "백패킹 소품", "G006", 1, custom = true)
         group("G007", "취미·문화·컬렉터블")
         leaf("C068", "피규어·컬렉터블", "G007", 2)
         leaf("C066", "보드게임·퍼즐", "G007", 1)
-        leaf(ids.newId(), "레고", "G007", 0, custom = true)
+        leaf(newId(), "레고", "G007", 0, custom = true)
         group("G011", "건강·웰빙")
         leaf("C086", "수면·회복 용품", "G011", 1)
 
         val purposes = listOf(
-            Purpose(ids.newId(), "출퇴근 헤드폰", "지하철에서 쓸 노이즈 캔슬링 헤드폰", "coral", "music", 1, now, now),
-            Purpose(ids.newId(), "가을 트레일 러닝", null, "mustard", "star", 1, now, now),
-            Purpose(ids.newId(), "홈오피스 의자", null, "periwinkle", "book", 1, now, now),
-            Purpose(ids.newId(), "캠핑 첫 장비", null, "cyan", "tent", 1, now, now),
-            Purpose(ids.newId(), "거실 조명 바꾸기", null, "mint", "home", 1, now, now),
-            Purpose(ids.newId(), "엄마 생신 선물", null, "pink", "gift", 1, now, now),
-            Purpose(ids.newId(), "여행 캐리어", "다음 달 출장 때 쓸 기내용 캐리어", "mustard", "plane", 1, now, now),
+            Purpose(newId(), "출퇴근 헤드폰", "지하철에서 쓸 노이즈 캔슬링 헤드폰", "coral", "music", 1, now, now),
+            Purpose(newId(), "가을 트레일 러닝", null, "mustard", "star", 1, now, now),
+            Purpose(newId(), "홈오피스 의자", null, "periwinkle", "book", 1, now, now),
+            Purpose(newId(), "캠핑 첫 장비", null, "cyan", "tent", 1, now, now),
+            Purpose(newId(), "거실 조명 바꾸기", null, "mint", "home", 1, now, now),
+            Purpose(newId(), "엄마 생신 선물", null, "pink", "gift", 1, now, now),
+            Purpose(newId(), "여행 캐리어", "다음 달 출장 때 쓸 기내용 캐리어", "mustard", "plane", 1, now, now),
         )
         val commuteId = purposes.first().id
         val headphones = categories.single { it.id == "C026" }
         fun item(key: String, brand: String, model: String, price: String, merchant: String,
                  daysSinceCheck: Int, commute: Boolean = false, pending: Boolean = false): WishlistItem {
             val snapshot = WishlistItem(
-                id = ids.newId(), clientSubmissionId = ids.newId(), version = 1,
+                id = newId(), clientSubmissionId = newId(), version = 1,
                 sourceUrl = "https://seed.wishlist.invalid/headphones/$key",
                 product = ProductSnapshot(
                     name = "$brand $model", price = requireNotNull(DecimalAmount.parseOrNull(price)),

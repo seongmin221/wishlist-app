@@ -25,6 +25,8 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
     private class OwnerStore {
         val entries = mutableMapOf<String, Entry>()
         val submissionIds = mutableMapOf<String, String>()
+        /** Item keys are canonical UUID strings, so platform casing never splits one item in two. */
+        fun entry(id: String): Entry? = uuidOrNull(id)?.let(entries::get)
         var categories: List<Category> = emptyList()
         var purposes: List<Purpose> = emptyList()
         var seeded = false
@@ -85,7 +87,7 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
     }
 
     suspend fun get(id: String): ClientResult<WishlistItem> = request(ApiId.ITEM_03) { owner ->
-        val key = uuidOrNull(id) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_ID")
+        val key = uuidOrNull(id) ?: return@request invalidItemId()
         val item = owner.entries[key]?.item
         if (item == null || item.lifecycleStatus == LifecycleStatus.DELETED)
             failure(ErrorKind.NOT_FOUND, "WISHLIST_ITEM_NOT_FOUND")
@@ -94,17 +96,23 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
 
     /** Initializes the current owner's demo namespace once, preserving subsequent edits/replays. */
     suspend fun seed(data: BoardSeedData): ClientResult<Unit> = request(null) { owner ->
-        if (!owner.seeded) {
-            owner.categories = data.categories.toList()
-            owner.purposes = data.purposes.toList()
-            data.items.forEach { item ->
-                if (item.id !in owner.entries && item.clientSubmissionId !in owner.submissionIds) {
-                    owner.entries[item.id] = Entry(withPolicy(item))
-                    owner.submissionIds[item.clientSubmissionId] = item.id
-                }
-            }
-            owner.seeded = true
+        if (owner.seeded) return@request ClientResult.Success(Unit)
+        // Store keys use the same canonical form as every lookup; reject before any partial write.
+        val items = data.items.map { item ->
+            val id = uuidOrNull(item.id) ?: return@request invalidItemId()
+            val key = uuidOrNull(item.clientSubmissionId)
+                ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
+            item.copy(id = id, clientSubmissionId = key)
         }
+        owner.categories = data.categories.toList()
+        owner.purposes = data.purposes.toList()
+        items.forEach { item ->
+            if (item.id !in owner.entries && item.clientSubmissionId !in owner.submissionIds) {
+                owner.entries[item.id] = Entry(withPolicy(item))
+                owner.submissionIds[item.clientSubmissionId] = item.id
+            }
+        }
+        owner.seeded = true
         ClientResult.Success(Unit)
     }
     suspend fun categories(): ClientResult<List<Category>> = request(ApiId.CAT_01) { ClientResult.Success(it.categories) }
@@ -116,18 +124,53 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
         }.sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id }))
     }
 
+    /**
+     * Applies a final analysis like the server's AnalysisResultRepository: USER values and a
+     * CONFIRMED/DEFERRED review survive, READY overwrites AI metadata, other outcomes only fill gaps.
+     */
     suspend fun completeAnalysis(id: String, analysisGeneration: Int, result: AnalysisOutcome): ClientResult<Unit> = request(null) { owner ->
-        val entry = owner.entries[id] ?: return@request notFound()
+        val entry = owner.entry(id) ?: return@request missing(id)
         val item = entry.item
         if (entry.analysisGeneration != analysisGeneration || item.lifecycleStatus != LifecycleStatus.ACTIVE ||
             item.analysis.status != AnalysisStatus.PROCESSING) return@request ClientResult.Success(Unit)
         if (result.status == AnalysisStatus.PROCESSING || result.status == AnalysisStatus.UNKNOWN ||
             (result.categoryId != null && result.missingReason != null)) return@request failure(ErrorKind.VALIDATION)
+
+        val reviewSettled = item.reviewStatus == ReviewStatus.CONFIRMED || item.reviewStatus == ReviewStatus.DEFERRED
+        val userCategory = item.category.source == ValueSource.USER
+        val applyCategory = result.categoryId != null && !reviewSettled && !userCategory
+        val categoryId = if (applyCategory) result.categoryId else item.category.id
+        if (result.status == AnalysisStatus.READY && categoryId.isNullOrBlank()) return@request failure(ErrorKind.VALIDATION)
+        val complete = result.status == AnalysisStatus.READY
+
+        val userName = item.product.nameSource == ValueSource.USER
+        val existingName = item.product.name
+        val name = when {
+            userName -> existingName
+            complete -> result.name ?: existingName
+            else -> existingName ?: result.name
+        }
+        val nameSource = if (!userName && result.name != null && (complete || existingName == null)) ValueSource.AI
+            else item.product.nameSource
+        val categorySource = if (applyCategory) ValueSource.AI else item.category.source
+        val missingReason = when {
+            categoryId != null -> null
+            userCategory && item.category.missingReason != null -> item.category.missingReason
+            else -> result.missingReason ?: CategoryMissingReason.EXTRACTION_UNRESOLVED
+        }
+        val unconfirmedAiCategory = categorySource == ValueSource.AI && (applyCategory || item.reviewStatus == ReviewStatus.PENDING)
+        val review = when {
+            reviewSettled -> item.reviewStatus
+            !categoryId.isNullOrBlank() && !name.isNullOrBlank() && unconfirmedAiCategory -> ReviewStatus.PENDING
+            else -> ReviewStatus.NOT_REQUIRED
+        }
+        val category = if (applyCategory) category(owner, categoryId, ValueSource.AI)
+            else item.category.copy(missingReason = missingReason)
         entry.item = next(item.copy(
-            product = item.product.copy(name = result.name, nameSource = ValueSource.AI),
-            category = category(owner, result.categoryId, ValueSource.AI, result.missingReason),
-            analysis = ItemAnalysis(result.status, result.failureCode),
-            reviewStatus = if (result.categoryId != null) ReviewStatus.PENDING else ReviewStatus.NOT_REQUIRED,
+            product = item.product.copy(name = name, nameSource = nameSource),
+            category = category,
+            analysis = ItemAnalysis(result.status, if (complete) null else result.failureCode),
+            reviewStatus = review,
         ))
         ClientResult.Success(Unit)
     }
@@ -152,7 +195,7 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
 
     private suspend fun mutate(id: String, expectedVersion: Int, action: ItemAction,
         transform: (OwnerStore, WishlistItem) -> ClientResult<WishlistItem>): ClientResult<WishlistItem> = request(null) { owner ->
-        val entry = owner.entries[id] ?: return@request notFound()
+        val entry = owner.entry(id) ?: return@request missing(id)
         val item = entry.item
         when {
             item.lifecycleStatus != LifecycleStatus.ACTIVE -> notFound()
@@ -168,7 +211,7 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
     }
 
     suspend fun delete(id: String): ClientResult<Unit> = request(null) { owner ->
-        val entry = owner.entries[id] ?: return@request notFound()
+        val entry = owner.entry(id) ?: return@request missing(id)
         if (entry.item.lifecycleStatus != LifecycleStatus.DELETED) {
             entry.item = next(entry.item.copy(lifecycleStatus = LifecycleStatus.DELETED))
         }
@@ -176,7 +219,7 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
     }
 
     suspend fun reanalyze(id: String, attemptRequestId: String): ClientResult<WishlistItem> = request(null) { owner ->
-        val entry = owner.entries[id] ?: return@request notFound()
+        val entry = owner.entry(id) ?: return@request missing(id)
         val item = entry.item
         when {
             item.lifecycleStatus != LifecycleStatus.ACTIVE -> notFound()
@@ -206,9 +249,9 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
             is Patch.Set -> ItemPurpose(value.value, if(value.value == null) ValueSource.UNASSIGNED else ValueSource.USER)
         },
     )
-    private fun category(owner: OwnerStore, id: String?, source: ValueSource, missingReason: CategoryMissingReason? = null): ItemCategory {
+    private fun category(owner: OwnerStore, id: String?, source: ValueSource): ItemCategory {
         val definition = owner.categories.firstOrNull { it.id == id }
-        return ItemCategory(id, source, missingReason, definition?.name, definition?.parentId, definition?.kind)
+        return ItemCategory(id, source, null, definition?.name, definition?.parentId, definition?.kind)
     }
     private fun next(item: WishlistItem): WishlistItem = withPolicy(item.copy(version = item.version + 1, updatedAt = clock.now()))
     private fun withPolicy(item: WishlistItem): WishlistItem {
@@ -216,9 +259,12 @@ class FakeStore(private val session: AuthSession, private val clock: Clock, priv
         return item.copy(requiredAction = policy.requiredAction, allowedActions = policy.allowedActions)
     }
     private fun <T> Patch<T>.valueOr(original: T): T = when(this) { Patch.Unchanged -> original; is Patch.Set -> value }
-    private fun uuidOrNull(value: String): String? = try { Uuid.parse(value).toString() } catch (_: IllegalArgumentException) { null }
     private fun notFound() = failure(ErrorKind.NOT_FOUND)
+    private fun invalidItemId() = failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_ID")
+    private fun missing(id: String) = if (uuidOrNull(id) == null) invalidItemId() else notFound()
     private fun conflict(item: WishlistItem) = failure(ErrorKind.CONFLICT, currentVersion = item.version)
     private fun failure(kind: ErrorKind, code: String? = null, currentVersion: Int? = null) =
         ClientResult.Failure(ClientError(kind, code, currentVersion = currentVersion))
 }
+
+private fun uuidOrNull(value: String): String? = try { Uuid.parse(value).toString() } catch (_: IllegalArgumentException) { null }
