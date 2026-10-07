@@ -4,6 +4,7 @@ package app.wishlist.shared.di
 
 import app.cash.sqldelight.db.SqlDriver
 import app.wishlist.shared.core.ApiId
+import app.wishlist.shared.core.ClientResult
 import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.core.RuntimeDispatchers
@@ -71,12 +72,16 @@ internal fun debugBindings(vararg overrides: Pair<ApiId, Backend>) = RepositoryB
     allBackends(Backend.UNAVAILABLE) + mapOf(ApiId.ITEM_01 to Backend.FAKE, ApiId.ITEM_03 to Backend.FAKE) + overrides,
 )
 
+/** RELEASE with every API explicitly UNAVAILABLE (the only valid all-local RELEASE). */
+internal fun releaseBindings() = RepositoryBindings(ClientBuildMode.RELEASE, allBackends(Backend.UNAVAILABLE))
+
 /** DI test helper: an isolated runtime over test seams. Always [SharedRuntime.close] it. */
 internal fun createRuntime(
     bindings: RepositoryBindings,
     remote: RemoteConfig? = null,
     probe: RuntimeResourcesProbe = RuntimeResourcesProbe(),
     dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
+    seedOverride: (suspend () -> ClientResult<Unit>)? = null,
 ): SharedRuntime = assembleSharedRuntime(
     bindings = bindings,
     remote = remote,
@@ -84,4 +89,5 @@ internal fun createRuntime(
     clock = Clock { runtimeTime },
     ids = IdGenerator { Uuid.random().toString() },
     dispatchers = RuntimeDispatchers(default = dispatcher, io = dispatcher),
+    seedOverride = seedOverride,
 )

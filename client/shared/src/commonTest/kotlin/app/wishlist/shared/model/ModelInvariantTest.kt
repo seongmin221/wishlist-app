@@ -73,7 +73,7 @@ class ModelInvariantTest {
     @Test
     fun local_submission_keeps_binding_retry_identity_and_public_error() {
         val error = ClientError(ErrorKind.NETWORK)
-        val local = LocalSubmission("same-submission-key", "https://shop.example/item", fixtureTime, "account-A", SubmissionStatus.PENDING, null, error)
+        val local = LocalSubmission("same-submission-key", "https://shop.example/item", fixtureTime, "account-A", SubmissionStatus.PENDING, error)
         val retry = local.copy(submissionStatus = SubmissionStatus.SUBMITTING)
         assertEquals("same-submission-key", retry.clientSubmissionId)
         assertEquals("account-A", retry.accountBinding)
@@ -95,7 +95,7 @@ class ModelInvariantTest {
         val purpose = Purpose("purpose", "목적", null, "coral", "heart", 1, fixtureTime, fixtureTime)
         assertEquals("2026-10-07T00:00:00Z", purpose.createdAtIso)
         assertEquals("2026-10-07T00:00:00Z", purpose.updatedAtIso)
-        assertEquals("2026-10-07T00:00:00Z", LocalSubmission("submission", "url", fixtureTime).createdAtIso)
+        assertEquals("2026-10-07T00:00:00Z", LocalSubmission("submission", "url", fixtureTime).sharedAtIso)
         assertEquals("2026-10-07T00:00:00Z", Archive("archive", "제목", "purpose", ArchivePurposeSnapshot("목적", null, "coral", "heart"), fixtureTime).createdAtIso)
     }
 

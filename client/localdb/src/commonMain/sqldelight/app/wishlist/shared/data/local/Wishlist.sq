@@ -1,17 +1,20 @@
--- C2 minimal local schema (D7). No tokens are stored. Money and Instants are exact text.
+-- Local schema v2 (C3-D7; v1 -> v2 in 1.sqm). No tokens are stored. Money and item Instants are
+-- exact text; submission times are integer epoch microseconds so ordering is numeric.
 CREATE TABLE local_submission (
     client_submission_id TEXT NOT NULL PRIMARY KEY,
     source_url TEXT NOT NULL,
-    created_at TEXT NOT NULL,
+    shared_at_us INTEGER NOT NULL,
     account_binding TEXT,
     status TEXT NOT NULL,
-    server_item_id TEXT,
+    retry_after_us INTEGER,
     error_kind TEXT,
     error_code TEXT,
     error_request_id TEXT,
     error_current_version INTEGER,
     error_retry_after_seconds INTEGER
 );
+
+CREATE TABLE app_state (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE TABLE item_cache (
     account_id TEXT NOT NULL,
@@ -49,20 +52,31 @@ CREATE TABLE item_cache (
     PRIMARY KEY (account_id, item_id)
 );
 
-insertSubmission:
-INSERT OR REPLACE INTO local_submission VALUES ?;
+insertSubmissionIfAbsent:
+INSERT OR IGNORE INTO local_submission VALUES ?;
 
 selectSubmission:
 SELECT * FROM local_submission WHERE client_submission_id = ?;
 
 selectVisibleSubmissions:
-SELECT * FROM local_submission
-WHERE account_binding IS NULL OR account_binding = :accountId
-ORDER BY created_at, client_submission_id;
+SELECT * FROM local_submission WHERE account_binding IS NULL OR account_binding = :accountId
+ORDER BY shared_at_us, client_submission_id;
 
 selectUnboundSubmissions:
-SELECT * FROM local_submission WHERE account_binding IS NULL
-ORDER BY created_at, client_submission_id;
+SELECT * FROM local_submission WHERE account_binding IS NULL ORDER BY shared_at_us, client_submission_id;
+
+selectBoundSubmissions:
+SELECT * FROM local_submission WHERE account_binding = :accountId ORDER BY shared_at_us, client_submission_id;
+
+resetSubmitting:
+UPDATE local_submission SET status = 'PENDING' WHERE status = 'SUBMITTING' AND (account_binding IS NULL OR account_binding = :accountId);
+
+bindUnbound:
+UPDATE local_submission SET account_binding = :accountId WHERE account_binding IS NULL;
+
+updateSubmissionState:
+UPDATE local_submission SET status = ?, retry_after_us = ?, error_kind = ?, error_code = ?, error_request_id = ?,
+  error_current_version = ?, error_retry_after_seconds = ? WHERE client_submission_id = ? AND account_binding = ?;
 
 deleteSubmission:
 DELETE FROM local_submission WHERE client_submission_id = ?;
@@ -78,3 +92,16 @@ DELETE FROM item_cache WHERE account_id = ? AND item_id = ? AND version <= ?;
 
 deleteAccountItems:
 DELETE FROM item_cache WHERE account_id = ?;
+
+selectProcessingItems:
+SELECT * FROM item_cache WHERE account_id = ? AND analysis_status = 'PROCESSING' AND lifecycle_status = 'ACTIVE'
+ORDER BY created_at, item_id;
+
+selectAppState:
+SELECT value FROM app_state WHERE key = ?;
+
+upsertAppState:
+INSERT OR REPLACE INTO app_state VALUES (?, ?);
+
+deleteAppState:
+DELETE FROM app_state WHERE key = ?;

@@ -1,0 +1,19 @@
+-- v1 -> v2 (C3-D7). v1 stored ISO-8601 text; SQLite date functions keep millisecond precision only,
+-- which is acceptable because v1 data exists only on development devices. SUBMITTING and the removed
+-- ACCEPTED state become PENDING: a re-send with the same key is idempotent on the server.
+CREATE TABLE local_submission_v2 (
+    client_submission_id TEXT NOT NULL PRIMARY KEY, source_url TEXT NOT NULL, shared_at_us INTEGER NOT NULL,
+    account_binding TEXT, status TEXT NOT NULL, retry_after_us INTEGER, error_kind TEXT, error_code TEXT,
+    error_request_id TEXT, error_current_version INTEGER, error_retry_after_seconds INTEGER
+);
+INSERT INTO local_submission_v2
+SELECT client_submission_id, source_url,
+       CAST(strftime('%s', created_at) AS INTEGER) * 1000000
+         + CAST(ROUND((CAST(strftime('%f', created_at) AS REAL) - CAST(strftime('%S', created_at) AS INTEGER)) * 1000) AS INTEGER) * 1000,
+       account_binding,
+       CASE status WHEN 'SUBMITTING' THEN 'PENDING' WHEN 'ACCEPTED' THEN 'PENDING' ELSE status END,
+       NULL, error_kind, error_code, error_request_id, error_current_version, error_retry_after_seconds
+FROM local_submission;
+DROP TABLE local_submission;
+ALTER TABLE local_submission_v2 RENAME TO local_submission;
+CREATE TABLE app_state (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);

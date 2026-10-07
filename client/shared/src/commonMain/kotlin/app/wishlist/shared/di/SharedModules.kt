@@ -11,6 +11,7 @@ import app.wishlist.shared.data.fake.FakeCatalogRepository
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.data.local.CachedGetItemRepository
+import app.wishlist.shared.data.local.LazyDriver
 import app.wishlist.shared.data.local.SqlLocalStore
 import app.wishlist.shared.data.remote.AuthTokenProvider
 import app.wishlist.shared.data.remote.AuthenticatedTransport
@@ -31,7 +32,10 @@ import org.koin.core.scope.Scope
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
-/** Platform seams: the SQL driver and HTTP engine are opened lazily, on first use, by the graph. */
+/**
+ * Platform seams: the SQL driver and HTTP engine are opened lazily, on first use, by the graph. The
+ * driver is opened by [LazyDriver] on the io dispatcher at the store's first real use.
+ */
 internal class PlatformResources(
     val openDriver: () -> SqlDriver,
     val createEngine: () -> HttpClientEngine,
@@ -61,6 +65,9 @@ internal class ResourceRegistry {
             if (closers.compareAndSet(current, current + closer)) return resource
         }
     }
+
+    /** True once [closeAll] has started; resources registered after that are already closed. */
+    val isClosed: Boolean get() = closers.value == null
 
     fun closeAll() {
         closers.getAndUpdate { null }?.asReversed()?.forEach(::runClose)
@@ -149,7 +156,18 @@ private fun coreModule(env: RuntimeEnvironment) = module {
     single { env.clock }
     single { env.ids }
     single { ResourceRegistry() }
-    single<SqlDriver> { get<ResourceRegistry>().register(env.platform.openDriver()) { it.close() } }
+    single {
+        val registry = get<ResourceRegistry>()
+        LazyDriver(
+            open = {
+                // Registered only once actually opened; an open racing close() is closed at once.
+                val driver = registry.register(env.platform.openDriver()) { it.close() }
+                check(!registry.isClosed) { "Runtime closed while opening the driver" }
+                driver
+            },
+            io = env.dispatchers.io,
+        )
+    }
     single<LocalStore> { SqlLocalStore(get(), get()) }
     single<CreateItemRepository>(ITEM_01_DELEGATE) { itemBackend(env.bindings.backendOf(ApiId.ITEM_01)) }
     single<GetItemRepository>(ITEM_03_DELEGATE) { itemBackend(env.bindings.backendOf(ApiId.ITEM_03)) }

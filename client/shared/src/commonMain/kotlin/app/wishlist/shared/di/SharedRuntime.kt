@@ -4,8 +4,10 @@ package app.wishlist.shared.di
 
 import app.wishlist.shared.core.ApiId
 import app.wishlist.shared.core.AuthSession
+import app.wishlist.shared.core.ClientError
 import app.wishlist.shared.core.ClientResult
 import app.wishlist.shared.core.Clock
+import app.wishlist.shared.core.ErrorKind
 import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.core.RuntimeDispatchers
@@ -16,6 +18,8 @@ import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -29,6 +33,9 @@ import kotlin.uuid.Uuid
 
 /** Owner namespace the debug bootstrap logs into before seeding the board. */
 internal const val DEBUG_ACCOUNT_ID = "debug-board-owner"
+
+/** The debug bootstrap threw instead of returning a typed failure. */
+internal const val BOOTSTRAP_FAILURE = "BOOTSTRAP_FAILURE"
 
 internal val systemClock = Clock { kotlin.time.Clock.System.now() }
 internal val randomIds = IdGenerator { Uuid.random().toString() }
@@ -44,11 +51,13 @@ internal fun assembleSharedRuntime(
     clock: Clock,
     ids: IdGenerator,
     dispatchers: RuntimeDispatchers,
+    /** Test seam: replaces the debug board seed in [SharedRuntime.startDebugSession]. */
+    seedOverride: (suspend () -> ClientResult<Unit>)? = null,
 ): SharedRuntime {
     require(bindings.usesRemote == (remote != null)) {
         if (remote == null) "A REMOTE binding requires RemoteConfig" else "RemoteConfig given but no API is REMOTE"
     }
-    return SharedRuntime(RuntimeEnvironment(bindings, remote, platform, clock, ids, dispatchers))
+    return SharedRuntime(RuntimeEnvironment(bindings, remote, platform, clock, ids, dispatchers), seedOverride)
 }
 
 /**
@@ -59,13 +68,25 @@ internal fun assembleSharedRuntime(
  * UNAVAILABLE/RUNTIME_NOT_READY. Apps see only these facades, never the DB, HTTP or DI library
  * types (kept Kotlin-internal so the ObjC header stays free of them).
  */
-class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
+class SharedRuntime internal constructor(
+    private val env: RuntimeEnvironment,
+    private val seedOverride: (suspend () -> ClientResult<Unit>)? = null,
+) {
     private val koinApplication = koinApplication { modules(sharedModules(env)) }
     internal val koin: Koin = koinApplication.koin
     private val mutableSession: MutableAuthSession = koin.get()
-    private val scope = CoroutineScope(SupervisorJob() + env.dispatchers.default)
     private val debugStarted = MutableStateFlow(false)
     private val mutableReady = MutableStateFlow(env.bindings.buildMode == ClientBuildMode.RELEASE)
+    private val mutableBootstrapFailure = MutableStateFlow<ClientError?>(null)
+
+    // Backstop for anything escaping the bootstrap's own handling: still ready, never a crash.
+    private val bootstrapExceptionHandler = CoroutineExceptionHandler { _, _ ->
+        guard.use {
+            mutableBootstrapFailure.value = ClientError(ErrorKind.UNAVAILABLE, BOOTSTRAP_FAILURE)
+            mutableReady.value = true
+        }
+    }
+    private val scope = CoroutineScope(SupervisorJob() + env.dispatchers.default + bootstrapExceptionHandler)
 
     /** Test seam: runs in the bootstrap right before ready is published (close-race tests). */
     internal var beforeReadyPublished: () -> Unit = {}
@@ -73,11 +94,18 @@ class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
     val session: AuthSession get() = mutableSession
     val ready: StateFlow<Boolean> = mutableReady.asStateFlow()
 
+    /**
+     * Why the DEBUG bootstrap did not complete cleanly (seed failure, or UNAVAILABLE/BOOTSTRAP_FAILURE
+     * for an unexpected exception). The runtime still becomes [ready]; null when it succeeded.
+     */
+    val bootstrapFailure: StateFlow<ClientError?> = mutableBootstrapFailure.asStateFlow()
+
     // Every graph lookup and the ready publication run inside the guard; teardown waits for them.
     private val guard = CloseGuard(onClosed = ::tearDown)
 
     /**
      * DEBUG only, idempotent: account → debug owner, seed that same namespace, then ready=true.
+     * A failed seed or an exception still publishes ready, with the cause in [bootstrapFailure].
      * Calling it in RELEASE is a programming error.
      */
     fun startDebugSession() {
@@ -85,16 +113,22 @@ class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
         if (!debugStarted.compareAndSet(expect = false, update = true)) return
         // Inside the guard, a concurrent close() cannot tear the graph down under this lookup.
         val store = guard.use { koin.get<FakeStore>() } ?: return
+        val seed = seedOverride ?: { store.seed(BoardSeeds.create(env.clock, env.ids)) }
         scope.launch {
-            mutableSession.changeAccount(DEBUG_ACCOUNT_ID)
-            val seeded = store.seed(BoardSeeds.create(env.clock, env.ids))
-            if (seeded is ClientResult.Success) {
-                // Refused once closing began; a close() during the write defers teardown (and its
-                // ready = false) until this block has left the guard.
-                guard.use {
-                    beforeReadyPublished()
-                    mutableReady.value = true
-                }
+            val failure = try {
+                mutableSession.changeAccount(DEBUG_ACCOUNT_ID)
+                (seed() as? ClientResult.Failure)?.error
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ClientError(ErrorKind.UNAVAILABLE, BOOTSTRAP_FAILURE)
+            }
+            // Refused once closing began; a close() during the write defers teardown (and its
+            // ready = false) until this block has left the guard.
+            guard.use {
+                mutableBootstrapFailure.value = failure
+                beforeReadyPublished()
+                mutableReady.value = true
             }
         }
     }

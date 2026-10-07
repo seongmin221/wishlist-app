@@ -10,6 +10,8 @@ import app.wishlist.shared.data.fake.successValue
 import app.wishlist.shared.model.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 class LocalStoreContractTest {
     private suspend fun MutableAuthSession.login(account: String): SessionSnapshot {
@@ -21,8 +23,10 @@ class LocalStoreContractTest {
         withHarness { h ->
             val a = h.session.login("A")
             val saved = submission(binding = "A").copy(
-                submissionStatus = SubmissionStatus.SUBMITTING, serverItemId = itemId,
+                submissionStatus = SubmissionStatus.SUBMITTING,
+                sharedAt = Instant.parse("2026-10-07T01:02:03.123456Z"),
                 lastSubmissionError = ClientError(ErrorKind.CONFLICT, "C", "req-1", 9, 30),
+                retryAfter = Instant.parse("2026-10-07T01:03:03.000001Z"),
             )
             h.store.saveSubmission(saved).successValue()
             h.reopen()
@@ -86,7 +90,8 @@ class LocalStoreContractTest {
         }
     }
 
-    @Test fun resave_allowed_paths_new_same_binding_and_unbound_to_current() = runTest {
+    // C3: a re-save of the same key and URL keeps the original row (binding happens in prepareFlush).
+    @Test fun resave_of_same_key_and_url_keeps_the_original_row() = runTest {
         withHarness { h ->
             h.store.saveSubmission(submission(binding = null)).successValue()
             h.store.saveSubmission(submission(binding = null)).successValue()
@@ -94,8 +99,8 @@ class LocalStoreContractTest {
             h.store.saveSubmission(submission(binding = "A")).successValue()
             h.store.saveSubmission(submission(binding = "A", status = SubmissionStatus.SUBMITTING)).successValue()
             val saved = h.store.pending().successValue().single()
-            assertEquals("A", saved.accountBinding)
-            assertEquals(SubmissionStatus.SUBMITTING, saved.submissionStatus)
+            assertNull(saved.accountBinding)
+            assertEquals(SubmissionStatus.PENDING, saved.submissionStatus)
         }
     }
 
@@ -223,13 +228,15 @@ class LocalStoreContractTest {
             h.session.login("B")
             h.store.saveSubmission(submission("00000000-0000-0000-0000-0000000000d1", "B")).successValue()
             val b = h.session.state.value
-            val other = h.store.accept(b, "00000000-0000-0000-0000-0000000000d1", item()).successValue()
+            val other = h.store.accept(b, "00000000-0000-0000-0000-0000000000d1",
+                item().copy(clientSubmissionId = "00000000-0000-0000-0000-0000000000d1")).successValue()
             assertEquals(Unit, other)
             h.session.login("A")
             h.store.saveSubmission(submission("00000000-0000-0000-0000-0000000000d2", "A")).successValue()
             h.session.login("B")
             assertEquals("ACCOUNT_BINDING_MISMATCH",
-                h.store.accept(h.session.state.value, "00000000-0000-0000-0000-0000000000d2", item(id = "00000000-0000-0000-0000-0000000000a2")).error().code)
+                h.store.accept(h.session.state.value, "00000000-0000-0000-0000-0000000000d2",
+                    item(id = "00000000-0000-0000-0000-0000000000a2").copy(clientSubmissionId = "00000000-0000-0000-0000-0000000000d2")).error().code)
             assertNull(h.store.cachedItem(h.session.state.value, "00000000-0000-0000-0000-0000000000a2").successValue())
         }
     }
@@ -260,12 +267,141 @@ class LocalStoreContractTest {
         try {
             session.changeAccount("A")
             val a = session.state.value
-            val store = SqlLocalStore(session, ThrowingDriver(real))
+            val store = SqlLocalStore(session, ThrowingDriver(real).asLazy())
             val failure = store.cachedItem(a, itemId).error()
             assertEquals(ErrorKind.UNAVAILABLE, failure.kind)
             assertEquals("LOCAL_STORE_FAILURE", failure.code)
             assertEquals("LOCAL_STORE_FAILURE", store.saveSubmission(submission()).error().code)
+            assertEquals("LOCAL_STORE_FAILURE", store.importSubmission(submission()).error().code)
+            assertEquals("LOCAL_STORE_FAILURE", store.prepareFlush(a).error().code)
+            assertEquals("LOCAL_STORE_FAILURE", store.readAppState("k").error().code)
         } finally { real.close(); deleteTestDb(path) }
+    }
+
+    @Test fun driver_open_failure_surfaces_local_store_failure() = runTest {
+        val session = MutableAuthSession()
+        val store = SqlLocalStore(session, LazyDriver(open = { throw IllegalStateException("no disk") }, io = kotlinx.coroutines.Dispatchers.Unconfined))
+        assertEquals("LOCAL_STORE_FAILURE", store.pending().error().code)
+    }
+
+    // --- C3: ordering, key guard, accept match, flush preparation, app state -----------------
+
+    @Test fun pendingOrdersBySubMillisecondInstantThenKey() = runStoreTest { h ->
+        val base = Instant.parse("2026-10-07T00:00:00Z")
+        h.store.saveSubmission(submission(id = UUID_B, sharedAt = base + 500.milliseconds)).successValue()
+        h.store.saveSubmission(submission(id = UUID_C, sharedAt = base)).successValue()
+        h.store.saveSubmission(submission(id = UUID_A, sharedAt = base + 500.milliseconds)).successValue()
+        assertEquals(listOf(UUID_C, UUID_A, UUID_B), h.store.pending().successValue().map { it.clientSubmissionId })
+    }
+
+    @Test fun sameKeyDifferentUrlIsRejectedAndOriginalKept() = runStoreTest { h ->
+        h.store.saveSubmission(submission(id = UUID_A, url = "https://a.example/1")).successValue()
+        assertEquals(ErrorKind.CONFLICT, h.store.saveSubmission(submission(id = UUID_A, url = "https://a.example/2")).failureKind())
+        assertEquals("SUBMISSION_KEY_REUSED", h.store.importSubmission(submission(id = UUID_A, url = "https://a.example/2")).failureCode())
+        assertEquals("https://a.example/1", h.store.pending().successValue().single().sourceUrl)
+    }
+
+    @Test fun sameKeySameUrlIsNoOpKeepingStatus() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.store.markSubmission(h.snapshot(), UUID_A, SubmissionStatus.FAILED, ClientError(ErrorKind.VALIDATION), null).successValue()
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        assertEquals(SubmissionStatus.FAILED, h.store.pending().successValue().single().submissionStatus)
+    }
+
+    @Test fun markSubmissionRecordsErrorAndRetryAfterOnlyForSnapshotAccount() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.store.saveSubmission(submission(id = UUID_B)).successValue()
+        val retryAt = Instant.parse("2026-10-07T00:01:00.250Z")
+        val error = ClientError(ErrorKind.RATE_LIMITED, "SLOW_DOWN", "req-9", null, 60)
+        h.store.markSubmission(h.snapshot(), UUID_A, SubmissionStatus.PENDING, error, retryAt).successValue()
+        val marked = h.store.pending().successValue().first { it.clientSubmissionId == UUID_A }
+        assertEquals(error, marked.lastSubmissionError)
+        assertEquals(retryAt, marked.retryAfter)
+        // Unbound rows and other accounts' rows are never touched; unknown keys are NOT_FOUND.
+        assertEquals("ACCOUNT_BINDING_MISMATCH",
+            h.store.markSubmission(h.snapshot(), UUID_B, SubmissionStatus.SUBMITTING, null, null).failureCode())
+        assertEquals(ErrorKind.NOT_FOUND,
+            h.store.markSubmission(h.snapshot(), UUID_C, SubmissionStatus.SUBMITTING, null, null).failureKind())
+        val stale = h.snapshot()
+        h.login("B")
+        assertEquals(ErrorKind.SESSION_CHANGED,
+            h.store.markSubmission(stale, UUID_A, SubmissionStatus.FAILED, null, null).failureKind())
+        assertEquals("ACCOUNT_BINDING_MISMATCH",
+            h.store.markSubmission(h.snapshot(), UUID_A, SubmissionStatus.FAILED, null, null).failureCode())
+        h.login("A")
+        assertEquals(SubmissionStatus.PENDING,
+            h.store.pending().successValue().first { it.clientSubmissionId == UUID_A }.submissionStatus)
+    }
+
+    @Test fun acceptRejectsItemOfAnotherSubmission() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        val wrong = itemFixture(clientSubmissionId = UUID_B)
+        assertEquals("SUBMISSION_ITEM_MISMATCH", h.store.accept(h.snapshot(), UUID_A, wrong).failureCode())
+        assertNull(h.store.cachedItem(h.snapshot(), wrong.id).successValue())
+        assertEquals(1, h.store.pending().successValue().size)
+    }
+
+    @Test fun acceptMatchesKeyCaseInsensitively() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.store.accept(h.snapshot(), UUID_A, itemFixture(clientSubmissionId = UUID_A.uppercase())).successValue()
+        assertTrue(h.store.pending().successValue().isEmpty())
+    }
+
+    @Test fun prepareFlushResetsSubmittingAndBindsUnboundOnlyToSnapshotAccount() = runStoreTest { h ->
+        h.store.saveSubmission(submission(id = UUID_A)).successValue()            // unbound
+        h.login("B"); h.store.saveSubmission(submission(id = UUID_B, binding = "B")).successValue()
+        h.login("A")
+        h.store.importSubmission(submission(id = UUID_C, binding = "A", status = SubmissionStatus.SUBMITTING)).successValue()
+        val ready = h.store.prepareFlush(h.snapshot()).successValue()
+        assertEquals(setOf(UUID_A, UUID_C), ready.map { it.clientSubmissionId }.toSet())
+        assertTrue(ready.all { it.accountBinding == "A" && it.submissionStatus == SubmissionStatus.PENDING })
+        h.login("B")
+        assertEquals(listOf(UUID_B), h.store.pending().successValue().map { it.clientSubmissionId })
+    }
+
+    @Test fun prepareFlushRejectsStaleOrLoggedOutSnapshot() = runStoreTest { h ->
+        h.store.saveSubmission(submission(id = UUID_A)).successValue()
+        assertEquals(ErrorKind.UNAUTHENTICATED, h.store.prepareFlush(h.snapshot()).failureKind())
+        val stale = h.snapshot()
+        h.login("A")
+        assertEquals(ErrorKind.SESSION_CHANGED, h.store.prepareFlush(stale).failureKind())
+        assertNull(h.store.pending().successValue().single().accountBinding)
+    }
+
+    @Test fun importKeepsShareTimeBindingOfOtherAccount() = runStoreTest { h ->
+        h.login("A")
+        h.store.importSubmission(submission(id = UUID_A, binding = "B")).successValue()
+        assertTrue(h.store.pending().successValue().isEmpty())
+        h.login("B")
+        assertEquals(1, h.store.pending().successValue().size)
+    }
+
+    @Test fun processingItemsReturnsOnlyActiveProcessingOfAccount() = runStoreTest { h ->
+        val ids = (1..4).map { "00000000-0000-4000-8000-00000000010$it" }
+        h.login("B")
+        h.store.upsertItem(h.snapshot(), itemFixture(analysis = AnalysisStatus.PROCESSING, id = ids[3])).successValue()
+        h.login("A")
+        val a = h.snapshot()
+        h.store.upsertItem(a, itemFixture(analysis = AnalysisStatus.READY, id = ids[0])).successValue()
+        h.store.upsertItem(a, itemFixture(analysis = AnalysisStatus.PROCESSING, id = ids[1])).successValue()
+        h.store.upsertItem(a, itemFixture(
+            analysis = AnalysisStatus.PROCESSING, lifecycle = LifecycleStatus.DELETED, id = ids[2],
+        )).successValue()
+        assertEquals(listOf(ids[1]), h.store.processingItems(a).successValue().map { it.id })
+        h.login("B")
+        assertEquals(listOf(ids[3]), h.store.processingItems(h.snapshot()).successValue().map { it.id })
+        assertEquals(ErrorKind.SESSION_CHANGED, h.store.processingItems(a).failureKind())
+    }
+
+    @Test fun appStateRoundTripsAndDeletes() = runStoreTest { h ->
+        h.store.writeAppState("k", "v").successValue()
+        assertEquals("v", h.store.readAppState("k").successValue())
+        h.store.writeAppState("k", null).successValue()
+        assertNull(h.store.readAppState("k").successValue())
     }
 }
 

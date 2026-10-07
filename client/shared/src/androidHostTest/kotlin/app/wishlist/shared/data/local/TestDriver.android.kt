@@ -14,12 +14,17 @@ internal actual fun openTestDriver(path: String): SqlDriver {
         cursor.next()
         QueryResult.Value(cursor.getLong(0) ?: 0L)
     }, 0).value
+    val target = WishlistDatabase.Schema.version
     if (version == 0L) {
         WishlistDatabase.Schema.create(driver).value
-        driver.execute(null, "PRAGMA user_version = ${WishlistDatabase.Schema.version}", 0)
+    } else if (version < target) {
+        WishlistDatabase.Schema.migrate(driver, version, target).value
     }
+    if (version < target) driver.execute(null, "PRAGMA user_version = $target", 0)
     return driver
 }
+
+internal actual fun openRawDriver(path: String): SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$path")
 
 internal actual fun deleteTestDb(path: String) {
     listOf("", "-journal", "-wal", "-shm").forEach { File(path + it).delete() }

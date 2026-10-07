@@ -4,7 +4,12 @@ package app.wishlist.shared.di
 
 import app.wishlist.shared.core.ApiId
 import app.wishlist.shared.core.AuthSession
+import app.wishlist.shared.core.ClientError
+import app.wishlist.shared.core.ClientResult
+import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.ErrorKind
+import app.wishlist.shared.core.IdGenerator
+import app.wishlist.shared.core.RuntimeDispatchers
 import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
@@ -27,6 +32,9 @@ import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -157,6 +165,7 @@ class SharedModulesTest {
         advanceUntilIdle()
 
         assertEquals(listOf<String?>(DEBUG_ACCOUNT_ID), accountWhenReady)
+        assertNull(runtime.bootstrapFailure.value)
         assertEquals(1L, runtime.session.state.value.generation)
         val items = runtime.catalogRepository().items(null, null).successValue()
         assertEquals(boardOrder, items.map { it.product.name })
@@ -345,16 +354,19 @@ class SharedModulesTest {
         assertEquals(RUNTIME_NOT_READY, runtime.catalogRepository().items(null, null).error().code)
     }
 
-    @Test fun close_during_facade_resolution_does_not_throw_and_still_closes_the_driver_once() = runTest {
+    @Test fun close_during_first_driver_open_does_not_throw_and_still_closes_the_driver_once() = runTest {
         val probe = RuntimeResourcesProbe()
         val runtime = createRuntime(debugBindings(), probe = probe)
         runtime.startDebugSession()
         runtime.ready.first { it }
         var closes = 0
-        // close() arrives while the Get facade is being resolved (its first lookup opens the driver).
+        // close() arrives while the first real store use is opening the driver (lookups open nothing).
         probe.onDriverOpen = { if (closes++ == 0) runtime.close() }
 
         val facade = runtime.getItemRepository()
+        assertTrue(probe.drivers.isEmpty())
+        val failure = facade.get(remoteItemId).error()
+        assertEquals(ErrorKind.UNAVAILABLE, failure.kind)
         assertFalse(runtime.ready.value)
         assertEquals(RUNTIME_NOT_READY, facade.get(remoteItemId).error().code)
         assertEquals(1, probe.drivers.size)
@@ -367,10 +379,74 @@ class SharedModulesTest {
         assertEquals(1, probe.drivers.single().closes)
     }
 
+    @Test fun facadeLookupDoesNotOpenDriverOnCallerThread() = runTest {
+        val probe = RuntimeResourcesProbe()
+        val runtime = createRuntime(releaseBindings(), probe = probe)
+        runtime.getItemRepository(); runtime.localStore()
+        assertEquals(0, probe.drivers.size)                    // a facade lookup alone opens nothing
+        runtime.localStore().pending()
+        assertEquals(1, probe.drivers.size)                    // the first real use opens it on the io dispatcher
+        runtime.close()
+    }
+
+    @Test fun driverIsOpenedOnTheIoDispatcher() = runTest {
+        val io = RecordingDispatcher()
+        val probe = RuntimeResourcesProbe()
+        val runtime = assembleSharedRuntime(
+            bindings = releaseBindings(), remote = null, platform = probe.platform,
+            clock = Clock { runtimeTime }, ids = IdGenerator { "id" },
+            dispatchers = RuntimeDispatchers(default = Dispatchers.Unconfined, io = io),
+        )
+        var openedOnIo = false
+        probe.onDriverOpen = { openedOnIo = io.inside }
+        runtime.localStore().pending().successValue()
+        assertTrue(openedOnIo)
+        assertEquals(1, io.dispatches)
+        runtime.localStore().pending().successValue()
+        assertEquals(1, io.dispatches)                         // opened once, never re-dispatched
+        runtime.close()
+    }
+
+    @Test fun debugSeedFailureStillPublishesReadyAndReportsError() = runTest {
+        val runtime = createRuntime(debugBindings(), seedOverride = { ClientResult.Failure(ClientError(ErrorKind.VALIDATION)) })
+        runtime.startDebugSession()
+        assertTrue(runtime.ready.value)
+        assertEquals(ErrorKind.VALIDATION, runtime.bootstrapFailure.value?.kind)
+        runtime.close()
+    }
+
+    @Test fun unexpectedBootstrapExceptionIsReportedNotThrown() = runTest {
+        val runtime = createRuntime(debugBindings(), seedOverride = { throw IllegalStateException("seed exploded") })
+        runtime.startDebugSession()
+        assertTrue(runtime.ready.value)
+        val failure = runtime.bootstrapFailure.value
+        assertEquals(ErrorKind.UNAVAILABLE, failure?.kind)
+        assertEquals(BOOTSTRAP_FAILURE, failure?.code)
+        // The runtime still serves requests after a failed bootstrap.
+        assertEquals(emptyList(), runtime.localStore().pending().successValue())
+        runtime.close()
+    }
+
     @Test fun closing_an_unused_runtime_opens_nothing() {
         val probe = RuntimeResourcesProbe()
         createRuntime(RepositoryBindings(RELEASE, allBackends(Backend.UNAVAILABLE)), probe = probe).close()
         assertTrue(probe.drivers.isEmpty())
         assertTrue(probe.engines.isEmpty())
+    }
+}
+
+/** Runs blocks inline but records that they were dispatched to it (the runtime's io seam). */
+private class RecordingDispatcher : CoroutineDispatcher() {
+    var dispatches = 0
+        private set
+    var inside = false
+        private set
+
+    override fun isDispatchNeeded(context: kotlin.coroutines.CoroutineContext): Boolean = true
+
+    override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
+        dispatches++
+        inside = true
+        try { block.run() } finally { inside = false }
     }
 }
