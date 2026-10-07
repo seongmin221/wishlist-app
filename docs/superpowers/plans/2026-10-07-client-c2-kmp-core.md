@@ -236,7 +236,7 @@ class PriceFormatter {
 
 가격 일반 함수는 SKIE 선택과 독립적으로 ObjC framework를 통해 Swift에서 호출한다.
 
-- [ ] **Step 1: 실패 테스트.** `549000/KRW→KRW 549,000`, `299/USD→USD 299`, `19.995/USD→USD 20`, `19.9/USD→USD 19.90`, `19.5/JPY→JPY 20`, `1.2345/KWD→KWD 1.235`, `1.23456/CLF→CLF 1.2346`. price null/currency null/blank→null; malformed decimal→null. 미등록 `" xyz "`는 `XYZ`·2자리로 표시. `" ??? "`는 D9 권장안에 따라 null. Swift wrapper는 일반 문자열 fixture와 malformed 입력을 확인한다.
+- [x] **Step 1: 실패 테스트.** `549000/KRW→KRW 549,000`, `299/USD→USD 299`, `19.995/USD→USD 20`, `19.9/USD→USD 19.90`, `19.5/JPY→JPY 20`, `1.2345/KWD→KWD 1.235`, `1.23456/CLF→CLF 1.2346`. price null/currency null/blank→null; malformed decimal→null. 미등록 `" xyz "`는 `XYZ`·2자리로 표시. `" ??? "`는 D9 권장안에 따라 null. Swift wrapper는 일반 문자열 fixture와 malformed 입력을 확인한다.
 
 ```kotlin
 @Test fun whole_amount_omits_fraction() {
@@ -247,11 +247,11 @@ class PriceFormatter {
 }
 ```
 
-- [ ] **Step 2: RED.** KMP_TEST에서 PriceFormatterTest 실패 확인.
-- [ ] **Step 3: 구현.** ISO minor-unit 표를 [SIX](https://www.six-group.com/en/products-services/financial-information/data-standards.html) 출처·조회 날짜와 함께 공유 코드에 고정한다. 통화는 trim/uppercase 후 `[A-Z]{3}` 검사(D9), unknown/미정의 unit은 2, 문자열 기반 HALF_UP/grouping, 정수면 소수 생략. 서버 B1은 price/currency를 아직 저장하지 않아 실제 응답은 null이며 nonnull 테스트는 formatter/미래 metadata 계약용 fixture임을 기록한다.
-- [ ] **Step 4: 플랫폼 입력 이관.** Android PriceText와 iOS PriceText는 `amountText:String?`, `currency:String?`를 직접 받는다. shared DecimalAmount의 canonical을 넘기고 기존 demo 가격도 문자열로 바꾼다. 플랫폼 formatter/ISO cache 삭제, nullable 공통 결과가 없으면 가격 view를 표시하지 않는다. 한 줄/두 줄 레이아웃 유지.
-- [ ] **Step 5: GREEN.** KMP_TEST·Android 가격 tests·iOS PriceFormatTests. Swift 잘못된 문자열에서 null과 앱 생존 확인.
-- [ ] **Step 6: 문서·커밋.** null/blank 규칙·가격 책임을 design-system.md에 기록, `feature(kmp): 가격 표기를 공통 도메인으로 통합`.
+- [x] **Step 2: RED.** KMP_TEST에서 PriceFormatterTest 실패 확인.
+- [x] **Step 3: 구현.** ISO minor-unit 표를 [SIX](https://www.six-group.com/en/products-services/financial-information/data-standards.html) 출처·조회 날짜와 함께 공유 코드에 고정한다. 통화는 trim/uppercase 후 `[A-Z]{3}` 검사(D9), unknown/미정의 unit은 2, 문자열 기반 HALF_UP/grouping, 정수면 소수 생략. 서버 B1은 price/currency를 아직 저장하지 않아 실제 응답은 null이며 nonnull 테스트는 formatter/미래 metadata 계약용 fixture임을 기록한다.
+- [x] **Step 4: 플랫폼 입력 이관.** Android PriceText와 iOS PriceText는 `amountText:String?`, `currency:String?`를 직접 받는다. shared DecimalAmount의 canonical을 넘기고 기존 demo 가격도 문자열로 바꾼다. 플랫폼 formatter/ISO cache 삭제, nullable 공통 결과가 없으면 가격 view를 표시하지 않는다. 한 줄/두 줄 레이아웃 유지.
+- [x] **Step 5: GREEN.** KMP_TEST·Android 가격 tests·iOS PriceFormatTests. Swift 잘못된 문자열에서 null과 앱 생존 확인.
+- [x] **Step 6: 문서·커밋.** null/blank 규칙·가격 책임을 design-system.md에 기록, `feature(kmp): 가격 표기를 공통 도메인으로 통합`.
 
 ## Task 4: repository 경계와 검증 가능한 보드 시드
 
