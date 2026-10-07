@@ -14,6 +14,7 @@
 
 ## 검증 기록
 
+- [C2 전반부 리뷰 후속 보완 (2026-10-07)](c2-first-half-review-followup-2026-10-07.md) — Fake 재분석 병합, 상품 ID 정규화, 정책 평가 되먹임 제거
 - [C2 의존성과 Swift ABI 호환성 (2026-10-07)](c2-dependency-compatibility-2026-10-07.md) — 후보/선택 버전, actual-use spike, Flow·suspend·callback 관문
 
 - [C1 리뷰 수정과 검증 (2026-10-06)](c1-review-2026-10-06.md) — 입력·전환 생명주기·접근성 보완, CI와 글꼴 용량 검토
