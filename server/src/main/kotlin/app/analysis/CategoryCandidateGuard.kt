@@ -1,46 +1,50 @@
 package app.analysis
 
-import app.ai.TaxonomyCatalog
-import kotlinx.serialization.json.*
+import app.ai.CandidateSnapshot
+import app.ai.CandidateSnapshotCodec
+import app.category.CategoryRef
 import java.sql.Connection
-import java.util.UUID
+
+internal data class StoredCandidates(
+    val hasSnapshot: Boolean,
+    val snapshot: CandidateSnapshot?,
+    val pendingCategoryId: String?,
+)
 
 internal object CategoryCandidateGuard {
-    private val publicIds=TaxonomyCatalog.loadV1().categories.map { it.id }.toSet()
-    /** Owner lock already excludes category edits. Read category rows without acquiring locks after item/job. */
-    fun valid(c:Connection,claim:AnalysisClaim):Boolean {
-        val saved=c.prepareStatement("select candidate_snapshot_json,pending_category_id from analysis_jobs where id=?").use { s ->
-            s.setObject(1,claim.jobId);s.executeQuery().use { r -> check(r.next());r.getString(1) to r.getString(2) }
+    fun read(connection: Connection, claim: AnalysisClaim): StoredCandidates = connection.prepareStatement(
+        "select candidate_snapshot_json,pending_category_id from analysis_jobs where id=?",
+    ).use { statement ->
+        statement.setObject(1, claim.jobId)
+        statement.executeQuery().use { rows ->
+            check(rows.next())
+            val raw = rows.getString(1)
+            StoredCandidates(raw != null, raw?.let(CandidateSnapshotCodec::decode), rows.getString(2))
         }
-        if(saved.first==null) return saved.second==null || saved.second in publicIds
-        return try {
-            val snapshot=Json.parseToJsonElement(saved.first!!).jsonObject
-            val ids=snapshot.getValue("categories").jsonArray.map { it.jsonPrimitive.takeIf { value -> value.isString }?.content ?: return false }.toSet()
-            if (ids.isEmpty()) return false
-            if (snapshot.getValue("purposes").jsonArray.any { it !is JsonPrimitive || !it.isString }) return false
-            if(saved.second!=null && saved.second !in ids) return false
-            val version=snapshot["schema_version"]?.jsonPrimitive?.intOrNull ?: 1
-            if(version==1) return ids.all { it in publicIds }
-            if(version!=2 || snapshot["owner_id"]?.jsonPrimitive?.content!=claim.ownerId.toString()) return false
-            val custom=snapshot["custom_categories"]?.jsonObject ?: return false
-            if(custom.keys.any { it !in ids }) return false
-            // Modern provider ID sets are sealed; UUID custom IDs additionally require owned version records.
-            if(ids.any { runCatching { UUID.fromString(it) }.isSuccess && it !in custom }) return false
-            custom.all { (id,expected) ->
-                val uuid=runCatching { UUID.fromString(id) }.getOrNull() ?: return@all false
-                val row=expected.jsonObject
-                val expectedVersion=row.getValue("version").jsonPrimitive.int
-                if(expectedVersion <= 0 || !row.getValue("name").jsonPrimitive.isString || !row.getValue("parent_id").jsonPrimitive.isString ||
-                    row.getValue("examples").jsonArray.any { it !is JsonPrimitive || !it.isString } ||
-                    (row["description"] != null && row["description"] != JsonNull && (row["description"] !is JsonPrimitive || !row.getValue("description").jsonPrimitive.isString))) return@all false
-                c.prepareStatement("select version from custom_categories where owner_id=? and id=? and deleted_at is null and ai_eligible").use { s ->
-                    s.setObject(1,claim.ownerId);s.setObject(2,uuid);s.executeQuery().use { r ->
-                        r.next() && r.getInt(1)==expectedVersion
-                    }
-                }
+    }
+
+    /** The owner lock excludes category edits; do not acquire category locks after item/job. */
+    fun valid(connection: Connection, claim: AnalysisClaim, stored: StoredCandidates = read(connection, claim)): Boolean {
+        if (!stored.hasSnapshot) {
+            return stored.pendingCategoryId == null || CategoryRef.parse(stored.pendingCategoryId) is CategoryRef.Public
+        }
+        val snapshot = stored.snapshot ?: return false
+        if (stored.pendingCategoryId != null && stored.pendingCategoryId !in snapshot.categoryIds) return false
+        val refs = snapshot.categoryIds.map { CategoryRef.parse(it) ?: return false }
+        if (snapshot.schemaVersion == 1) return refs.all { it is CategoryRef.Public }
+        if (snapshot.ownerId != claim.ownerId.toString()) return false
+        val customIds = refs.filterIsInstance<CategoryRef.Custom>().map { it.value }.toSet()
+        if (customIds != snapshot.customCategories.keys) return false
+        return customIds.all { id ->
+            val ref = CategoryRef.parse(id) as CategoryRef.Custom
+            val expected = snapshot.customCategories.getValue(id)
+            connection.prepareStatement(
+                "select version from custom_categories where owner_id=? and id=? and deleted_at is null and ai_eligible",
+            ).use { statement ->
+                statement.setObject(1, claim.ownerId)
+                statement.setObject(2, ref.id)
+                statement.executeQuery().use { rows -> rows.next() && rows.getInt(1) == expected.version }
             }
-        } catch (_: IllegalArgumentException) { false }
-        catch (_: NoSuchElementException) { false }
-        catch (_: IllegalStateException) { false }
+        }
     }
 }

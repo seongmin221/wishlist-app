@@ -28,10 +28,12 @@ class CategoryGatewaySizingTest {
 
     @Test fun `fallback rejects a custom ID which was not sent to the model`() = maxCustomFallback(true)
 
-    private fun maxCustomFallback(returnCustom:Boolean) {
+    @Test fun `public only owner also shrinks long product metadata before paid classification`() = maxCustomFallback(false, 0)
+
+    private fun maxCustomFallback(returnCustom:Boolean, customCount:Int=20) {
         val catalog=TaxonomyCatalog.loadV1()
         val public=catalog.snapshot(catalog.categories.map { it.id }.toSet())
-        val custom=(0 until 20).associate { UUID.randomUUID().toString() to CustomCategoryCandidate(1,"한".repeat(40),"G003","설".repeat(200),List(5) { "예".repeat(60) }) }
+        val custom=(0 until customCount).associate { UUID.randomUUID().toString() to CustomCategoryCandidate(1,"한".repeat(40),"G003","설".repeat(200),List(5) { "예".repeat(60) }) }
         val responseId=if(returnCustom) custom.keys.first() else "C026"
         val snapshot=public.copy(categoryIds=public.categoryIds+custom.keys,customCategories=custom)
         val server=HttpServer.create(InetSocketAddress("127.0.0.1",0),0)
@@ -41,7 +43,7 @@ class CategoryGatewaySizingTest {
             val data=data(request)
             val size=data.getValue("custom_categories").jsonArray.size
             counts.add(size)
-            val bytes="""{"input_tokens":${if(size>0) 2001 else 1000}}""".toByteArray()
+            val bytes="""{"input_tokens":${if(size>0 || data.getValue("product").jsonPrimitive.content.length>160) 2001 else 1000}}""".toByteArray()
             exchange.sendResponseHeaders(200,bytes.size.toLong());exchange.responseBody.use { it.write(bytes) }
         }
         server.createContext("/v1/responses") { exchange ->
@@ -58,7 +60,7 @@ class CategoryGatewaySizingTest {
                 .classify("상".repeat(2400),snapshot) { flight++ }
             if(returnCustom) assertIs<ClassificationResult.Unusable>(result.classification)
             else assertEquals(ClassificationResult.Assigned("C026",null),result.classification)
-            assertEquals(listOf(20,20,20,0),counts)
+            assertEquals(if(customCount==0) listOf(0,0) else listOf(20,20,20,0),counts)
             assertEquals(1,paid);assertEquals(1,flight)
         } finally { server.stop(0) }
     }

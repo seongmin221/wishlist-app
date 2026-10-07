@@ -1,5 +1,6 @@
 package app.analysis
 
+import app.category.CategoryRef
 import app.wishlist.AnalysisFailureCode
 import app.wishlist.CategoryMissingReason
 import java.sql.Connection
@@ -62,7 +63,9 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
         val applyCategory = assigned && !preserveUserConnection
         val category = if (applyCategory) pending.category else item.category
         val categorySource = if (applyCategory) "AI" else item.categorySource
-        val status = when (outcome) {
+        val effectiveOutcome = if (!validCandidates && preserveUserConnection && outcome == ProcessingOutcome.Partial)
+            ProcessingOutcome.Complete else outcome
+        val status = when (effectiveOutcome) {
             ProcessingOutcome.Complete -> if (!category.isNullOrBlank()) "READY" else "PARTIAL"
             ProcessingOutcome.Terminal -> "FAILED_TERMINAL"
             ProcessingOutcome.Retryable -> "FAILED_RETRYABLE"
@@ -96,13 +99,14 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             else -> "NOT_REQUIRED"
         }
         // Keep each column adjacent to its value; subsequent parameter positions are derived.
+        val categoryRef = category?.let(CategoryRef::parse)
         val values = linkedMapOf(
             "analysis_status" to status, "product_name" to name,
             "product_description" to mergedMetadata(item.description, pending.description, complete, false),
             "product_image_url" to image, "canonical_url" to mergedMetadata(item.canonical, pending.canonical, complete, false),
             "name_source" to nameSource, "image_source" to imageSource,
-            "category_id" to category?.takeUnless { runCatching { UUID.fromString(it) }.isSuccess },
-            "custom_category_id" to category?.takeIf { runCatching { UUID.fromString(it) }.isSuccess },
+            "category_id" to ((categoryRef as? CategoryRef.Public)?.value ?: category?.takeIf { categoryRef == null }),
+            "custom_category_id" to (categoryRef as? CategoryRef.Custom)?.value,
             "category_source" to categorySource, "category_missing_reason" to reason, "purpose_id" to purpose,
             "purpose_source" to purposeSource, "review_status" to review,
             "predicted_category_id" to if (assigned) pending.category else item.predictedCategory,

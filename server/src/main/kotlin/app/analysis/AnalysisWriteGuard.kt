@@ -1,5 +1,6 @@
 package app.analysis
 
+import app.persistence.OwnerStructureLock
 import java.sql.Connection
 import java.time.Instant
 import java.util.UUID
@@ -17,7 +18,7 @@ object AnalysisWriteGuard {
 
     internal fun lockExecution(connection: Connection, claim: AnalysisClaim): LockedAnalysisExecution? {
         require(!connection.autoCommit) { "Analysis writes require an explicit transaction" }
-        app.persistence.OwnerStructureLock.lock(connection,claim.ownerId)
+        OwnerStructureLock.lock(connection,claim.ownerId)
         val item = connection.lockAnalysisItem(claim.itemId) ?: return null
         if (item.ownerId != claim.ownerId) return null
         val job = connection.lockAnalysisJob(claim.jobId) ?: return null
@@ -93,5 +94,5 @@ internal fun Connection.lockAnalysisOwner(itemId:UUID,skipLocked:Boolean=false):
     val owner=prepareStatement("select owner_id from wishlist_items where id=?").use { s ->
         s.setObject(1,itemId);s.executeQuery().use { r -> if(r.next()) r.getObject(1,UUID::class.java) else null }
     } ?: return false
-    return app.persistence.OwnerStructureLock.lock(this,owner,skipLocked)
+    return OwnerStructureLock.lock(this,owner,skipLocked)
 }

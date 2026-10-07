@@ -25,7 +25,11 @@ class TaxonomyCatalog private constructor(val version: String, val groups: List<
     }
 
     companion object {
-        fun loadV1(): TaxonomyCatalog {
+        private val v1: TaxonomyCatalog by lazy { parseV1() }
+
+        fun loadV1(): TaxonomyCatalog = v1
+
+        private fun parseV1(): TaxonomyCatalog {
             val raw = requireNotNull(TaxonomyCatalog::class.java.classLoader.getResourceAsStream("taxonomy/v1.json")) { "Missing v1 taxonomy resource" }
                 .bufferedReader().use { it.readText() }
             val root = Json.parseToJsonElement(raw).jsonObject

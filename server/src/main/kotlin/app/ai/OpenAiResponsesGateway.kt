@@ -78,7 +78,7 @@ class OpenAiResponsesGateway(
     fun classify(metadata: String, candidates: CandidateSnapshot, beforeSend: () -> Unit = {}): GatewayResponse {
         var sentCandidates = candidates
         var body: String? = null
-        val tiers = if (candidates.customCategories.isEmpty()) listOf(0) else listOf(0, 1, 2, 3)
+        val tiers = if (candidates.customCategories.isEmpty()) listOf(0, 3) else listOf(0, 1, 2, 3)
         for (tier in tiers) {
             if (tier == 3) sentCandidates = candidates.copy(
                 categoryIds = candidates.categoryIds - candidates.customCategories.keys,

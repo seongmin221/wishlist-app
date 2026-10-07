@@ -40,7 +40,7 @@ class LocalClassificationPathTest {
             val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna", key, allowLocalAlias = true))
             var observed: GatewayResponse? = null
             val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = "gpt-5.6-luna", allowLocalAlias = true),
-                { catalog.snapshot(catalog.categories.map { it.id }.toSet()) },
+                { _, _ -> catalog.snapshot(catalog.categories.map { it.id }.toSet()) },
                 { metadata, candidates, beforeSend -> gateway.classify(metadata, candidates, beforeSend).also { observed = it } })
             val processor = GeneralExtractionProcessor(source,
                 { url -> ExtractionResult.Complete(Metadata("CAYL cap", null, null, url)) }, classifier::classify)
@@ -96,7 +96,7 @@ class LocalClassificationPathTest {
                 val catalog = TaxonomyCatalog.loadV1()
                 val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna-2026-09-01", "secret"), baseUri = URI("http://127.0.0.1:${openAi.address.port}/v1"))
                 val classifier = AiClassificationService(source, LlmBudgetService(source),
-                    { catalog.snapshot(catalog.categories.map { it.id }.toSet()) },
+                    { _, _ -> catalog.snapshot(catalog.categories.map { it.id }.toSet()) },
                     gateway::classify)
                 val processor = GeneralExtractionProcessor(source,
                     { url -> ExtractionResult.Complete(Metadata("CAYL cap", null, null, url)) }, classifier::classify)
