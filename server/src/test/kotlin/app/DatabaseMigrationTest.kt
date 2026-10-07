@@ -52,7 +52,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), versions)
                     }
                 }
             }
