@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 상태: **초안 v1 — 사용자 검토 대기 (2026-10-07)**. 설계 결정 C3-D1~D10은 이번 세션 대화에서 사용자가 승인했다.
+- 상태: **승인 v1 · Task 0~7c 완료, Task 8 Step 1·2·4 완료, 리뷰·PR 대기 (2026-10-07)**. 설계 결정 C3-D1~D10은 이번 세션 대화에서 사용자가 승인했다. 실행 중 정한 판단은 아래 [실행 중 결정(ruling) 요약](#실행-중-결정ruling-요약)에 있다.
 - 작업 공간 `/Users/user/orca/workspaces/wishlist-app/client-c3-share-save`, 현재 브랜치 `seongmin221/client-c3-share-save`(Orca 생성 이름). 관례 이름 `client/c3-share-save`로 바꿀지 **PR 전에 사용자에게 확인**한다. PR base `develop`. 시작 HEAD `321835d6c2e916a1af2a8ebfdd9ec5b32fb4f063`(PR #10 merge). merge는 사용자 승인 없이 하지 않는다.
 - C2 공간(`…/client-c2-kmp-core`)과 서버 B 공간은 수정·삭제하지 않는다.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. 공유 코드에 Compose/SwiftUI 의존성 없음. 새 라이브러리 의존성 추가 없음(필요해 보이면 구현 전에 사용자 확인).
@@ -173,8 +173,8 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 | --- | --- | --- |
 | 빌드되는 빈 확장 target(app group 파일 쓰기 1개) | 서명 없는 시뮬레이터에서 확장과 앱이 같은 app group 폴더를 보는지 | 카드 UI·inbox 형식·KMP 연결 |
 
-- [ ] **Step 1: pbxproj 편집 도구 결정.** `gem list xcodeproj`가 비어 있으면 사용자에게 `gem install --user-install xcodeproj`(개발 기기 도구, 저장소에 추가하지 않음) 설치를 확인받는다. 거절하면 기존 pbxproj 구조를 따라 손으로 편집한다(새 UUID 24자리, PBXNativeTarget `productType = "com.apple.product-type.app-extension"`, PBXCopyFilesBuildPhase `dstSubfolderSpec = 13`). 편집 스크립트는 scratchpad에 두고 커밋하지 않는다.
-- [ ] **Step 2: target 추가.** bundle id `app.wishlist.ios.share`, deployment 17.0, Swift 5 언어 모드는 앱 target과 같게. Info.plist:
+- [x] **Step 1: pbxproj 편집 도구 결정.** `gem list xcodeproj`가 비어 있으면 사용자에게 `gem install --user-install xcodeproj`(개발 기기 도구, 저장소에 추가하지 않음) 설치를 확인받는다. 거절하면 기존 pbxproj 구조를 따라 손으로 편집한다(새 UUID 24자리, PBXNativeTarget `productType = "com.apple.product-type.app-extension"`, PBXCopyFilesBuildPhase `dstSubfolderSpec = 13`). 편집 스크립트는 scratchpad에 두고 커밋하지 않는다.
+- [x] **Step 2: target 추가.** bundle id `app.wishlist.ios.share`, deployment 17.0, Swift 5 언어 모드는 앱 target과 같게. Info.plist:
 
 ```xml
 <key>NSExtension</key>
@@ -193,10 +193,10 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 ```
 
 두 entitlements에 `com.apple.security.application-groups = [group.app.wishlist]`.
-- [ ] **Step 3: spike 코드.** `ShareViewController.viewDidLoad`에서 `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.app.wishlist")`에 `spike.txt`를 쓰고 `completeRequest`. 앱 `WishlistApp.init`(DEBUG)에서 같은 URL을 `print`.
-- [ ] **Step 4: 실행.** `xcodebuild build … CODE_SIGNING_ALLOWED=NO` 후 시뮬레이터에 설치하고 Safari에서 `https://example.com` 공유 → 위시리스트 선택. `xcrun simctl get_app_container <udid> app.wishlist.ios groups`로 group 경로를 찾아 `spike.txt` 존재를 확인한다. 공유 시트 조작은 사용자에게 부탁하거나 computer-use 사용을 확인받는다.
-- [ ] **Step 5: 판정·보고.** 성공이면 spike print/파일 코드를 지우고 target·entitlements만 남겨 커밋. 실패(nil container 또는 서로 다른 경로)면 **구현을 멈추고** 원인·대안(ad-hoc "Sign to Run Locally" 서명 빌드 사용, 또는 확장 검증을 가입 뒤로 미루고 C3는 Android+iOS 앱만)을 사용자에게 보고한다.
-- [ ] **Step 6: 회귀·커밋.** IOS_TEST 81 통과. `git commit -m "feature(ios): 공유 확장 target과 app group 연결"` + 본문(서명 없는 시뮬레이터 확인 결과).
+- [x] **Step 3: spike 코드.** `ShareViewController.viewDidLoad`에서 `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.app.wishlist")`에 `spike.txt`를 쓰고 `completeRequest`. 앱 `WishlistApp.init`(DEBUG)에서 같은 URL을 `print`.
+- [x] **Step 4: 실행.** `xcodebuild build … CODE_SIGNING_ALLOWED=NO` 후 시뮬레이터에 설치하고 Safari에서 `https://example.com` 공유 → 위시리스트 선택. `xcrun simctl get_app_container <udid> app.wishlist.ios groups`로 group 경로를 찾아 `spike.txt` 존재를 확인한다. 공유 시트 조작은 사용자에게 부탁하거나 computer-use 사용을 확인받는다.
+- [x] **Step 5: 판정·보고.** 성공이면 spike print/파일 코드를 지우고 target·entitlements만 남겨 커밋. 실패(nil container 또는 서로 다른 경로)면 **구현을 멈추고** 원인·대안(ad-hoc "Sign to Run Locally" 서명 빌드 사용, 또는 확장 검증을 가입 뒤로 미루고 C3는 Android+iOS 앱만)을 사용자에게 보고한다.
+- [x] **Step 6: 회귀·커밋.** IOS_TEST 81 통과. `git commit -m "feature(ios): 공유 확장 target과 app group 연결"` + 본문(서명 없는 시뮬레이터 확인 결과).
 
 ## Task 1: C2 인계 LocalStore 수정과 v2 migration
 
@@ -249,7 +249,7 @@ interface LocalStore {
 | --- | --- | --- |
 | v2 schema·migration·LocalStore 확장·LazyDriver·bootstrap 예외 처리 | 정수 정렬, key 가드, accept 일치, migration, driver를 I/O에서 첫 사용 때만 열기, seed 실패 시 ready+오류 노출 | Coordinator·Auth(다음 task) |
 
-- [ ] **Step 1: 실패하는 테스트 작성.** `LocalStoreContractTest`에 추가(기존 harness `h.store`, `submission(...)` fixture를 `sharedAt` 인자로 확장):
+- [x] **Step 1: 실패하는 테스트 작성.** `LocalStoreContractTest`에 추가(기존 harness `h.store`, `submission(...)` fixture를 `sharedAt` 인자로 확장):
 
 ```kotlin
 @Test fun pendingOrdersBySubMillisecondInstantThenKey() = runStoreTest { h ->
@@ -362,8 +362,8 @@ interface LocalStore {
 
 `ModelInvariantTest`의 `createdAtIso`·`serverItemId` 사용을 `sharedAtIso`·제거로 바꾼다.
 
-- [ ] **Step 2: RED 확인.** `:shared:testAndroidHostTest --tests "*LocalStoreContractTest*" --tests "*SchemaMigrationTest*" --tests "*SharedModulesTest*"` → 컴파일 실패 또는 assertion 실패를 확인하고 원인을 기록.
-- [ ] **Step 3: schema 구현.** `Wishlist.sq`의 `local_submission`을 아래로 바꾸고 `app_state`·query를 추가한다(`item_cache`는 유지):
+- [x] **Step 2: RED 확인.** `:shared:testAndroidHostTest --tests "*LocalStoreContractTest*" --tests "*SchemaMigrationTest*" --tests "*SharedModulesTest*"` → 컴파일 실패 또는 assertion 실패를 확인하고 원인을 기록.
+- [x] **Step 3: schema 구현.** `Wishlist.sq`의 `local_submission`을 아래로 바꾸고 `app_state`·query를 추가한다(`item_cache`는 유지):
 
 ```sql
 CREATE TABLE local_submission (
@@ -430,8 +430,8 @@ CREATE TABLE app_state (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);
 ```
 
 v1 데이터는 개발 기기에만 있으므로 ms 정밀도 변환을 허용한다(C2 v1은 ms 미만을 쓰지 않았다는 근거가 없으므로, 변환 정밀도 한계를 kmp.md에 적는다).
-- [ ] **Step 4: SqlLocalStore·모델 구현.** `toRow/toModel`은 `sharedAt.toEpochMicroseconds()`/`Instant.fromEpochMicroseconds` 대신 존재하는 API를 확인해 `epochSeconds*1_000_000 + nanosecondsOfSecond/1000`으로 계산(ms 미만 µs 절삭, 서버 정밀도와 같음). saveSubmission·importSubmission은 transaction 안에서 `selectSubmission` → 없으면 `insertSubmissionIfAbsent`, 있으면 URL 다르면 CONFLICT, 같으면 Success. saveSubmission의 binding 규칙(현재 계정과 같거나 null)은 유지하고 importSubmission은 생략. `prepareFlush`는 `gatedForAccount`에서 `resetSubmitting(account)` → `bindUnbound(account)` → `selectBoundSubmissions(account)`를 한 transaction으로. `ClientError` 컬럼 매핑은 기존과 같다.
-- [ ] **Step 5: LazyDriver.** `PlatformResources.openDriver`를 감싸 첫 suspend 사용 때 `withContext(io)`에서 연다:
+- [x] **Step 4: SqlLocalStore·모델 구현.** `toRow/toModel`은 `sharedAt.toEpochMicroseconds()`/`Instant.fromEpochMicroseconds` 대신 존재하는 API를 확인해 `epochSeconds*1_000_000 + nanosecondsOfSecond/1000`으로 계산(ms 미만 µs 절삭, 서버 정밀도와 같음). saveSubmission·importSubmission은 transaction 안에서 `selectSubmission` → 없으면 `insertSubmissionIfAbsent`, 있으면 URL 다르면 CONFLICT, 같으면 Success. saveSubmission의 binding 규칙(현재 계정과 같거나 null)은 유지하고 importSubmission은 생략. `prepareFlush`는 `gatedForAccount`에서 `resetSubmitting(account)` → `bindUnbound(account)` → `selectBoundSubmissions(account)`를 한 transaction으로. `ClientError` 컬럼 매핑은 기존과 같다.
+- [x] **Step 5: LazyDriver.** `PlatformResources.openDriver`를 감싸 첫 suspend 사용 때 `withContext(io)`에서 연다:
 
 ```kotlin
 internal class LazyDriver(private val open: () -> SqlDriver, private val io: CoroutineDispatcher) {
@@ -444,9 +444,9 @@ internal class LazyDriver(private val open: () -> SqlDriver, private val io: Cor
 ```
 
 `SqlLocalStore`는 `LazyDriver`를 받고 `database`를 첫 사용 때 만든다(`private suspend fun db(): WishlistDatabase`). ResourceRegistry 등록은 실제로 열렸을 때만 한다. `CachedGetItemRepository`는 LocalStore만 쓰므로 그대로.
-- [ ] **Step 6: bootstrap 예외 처리.** `SharedRuntime`에 `val bootstrapFailure: StateFlow<ClientError?>`(공개)와 scope `CoroutineExceptionHandler`를 추가한다. seed 실패·예외 모두 `ready=true` + `bootstrapFailure` 설정(`ErrorKind.UNAVAILABLE`, code `BOOTSTRAP_FAILURE`; 실패 결과면 그 error). 테스트 seam `seedOverride: (suspend () -> ClientResult<Unit>)?`은 `assembleSharedRuntime` internal 인자로.
-- [ ] **Step 7: GREEN.** KMP_TEST 전체 통과, 새 test 이름과 두 runtime 건수 기록.
-- [ ] **Step 8: 커밋.** `git commit -m "bugfix: 로컬 대기 정렬·key 가드·accept 검사와 DB 열기 시점 수정"` + 본문(v2 migration, LazyDriver, bootstrap 오류 노출).
+- [x] **Step 6: bootstrap 예외 처리.** `SharedRuntime`에 `val bootstrapFailure: StateFlow<ClientError?>`(공개)와 scope `CoroutineExceptionHandler`를 추가한다. seed 실패·예외 모두 `ready=true` + `bootstrapFailure` 설정(`ErrorKind.UNAVAILABLE`, code `BOOTSTRAP_FAILURE`; 실패 결과면 그 error). 테스트 seam `seedOverride: (suspend () -> ClientResult<Unit>)?`은 `assembleSharedRuntime` internal 인자로.
+- [x] **Step 7: GREEN.** KMP_TEST 전체 통과, 새 test 이름과 두 runtime 건수 기록.
+- [x] **Step 8: 커밋.** `git commit -m "bugfix: 로컬 대기 정렬·key 가드·accept 검사와 DB 열기 시점 수정"` + 본문(v2 migration, LazyDriver, bootstrap 오류 노출).
 
 ## Task 2: fake AuthFacade·app_state·로그인 전 시작과 계정별 seed
 
@@ -485,7 +485,7 @@ app_state 키: `auth.account`(`"<provider>|<accountId>|<email>"`), `onboarding.l
 | --- | --- | --- |
 | fake/RELEASE AuthFacade, 앱 재시작 복원, DEBUG 로그인 전 시작 + 로그인한 계정 namespace에 seed | 순서(계정 저장→세션 변경→seed), 로그아웃 순서(캐시 삭제→저장 삭제→세션 null), 재로그인 generation 증가, Swift에 `changeAccount` 미노출 | 미전송 flush(Task 3이 signIn 뒤 연결) |
 
-- [ ] **Step 1: 실패하는 테스트.** `AuthFacadeTest`:
+- [x] **Step 1: 실패하는 테스트.** `AuthFacadeTest`:
 
 ```kotlin
 @Test fun signInPersistsAccountChangesSessionAndSeedsThatNamespace() = runAuthTest { h ->
@@ -525,11 +525,11 @@ app_state 키: `auth.account`(`"<provider>|<accountId>|<email>"`), `onboarding.l
 ```
 
 `SharedModulesTest`의 기존 debug bootstrap 테스트(`debug-board-owner`로 시작)를 **로그인 전 시작**으로 갱신: `startDebugSession()` 후 `ready=true`, `session.accountId == null`. RELEASE에서 `auth()`가 `UnavailableAuthFacade`인지 확인. `SharedInteropTests.swift`에 `MutableAuthSession` 타입이 Swift에 보이지 않음을 컴파일로 보장할 수 없으므로, `Shared.h`에서 `SharedMutableAuthSession`이 없는지 Step 5에서 grep으로 확인한다.
-- [ ] **Step 2: RED 확인** (`--tests "*AuthFacadeTest*" --tests "*SharedModulesTest*"`).
-- [ ] **Step 3: 구현.** `FakeAuthFacade(session: MutableAuthSession, store: LocalStore, seed: suspend () -> ClientResult<Unit>, scope)`. 복원은 `startDebugSession`이 호출하는 `restore()`에서: 읽기→파싱 실패면 삭제→`changeAccount(id)`→seed→`restored=true`. signIn: `writeAppState` → `changeAccount` → seed(실패하면 계정은 유지하고 `bootstrapFailure`처럼 결과로 반환하지 않고 로그만; seed는 데모용). signOut: `clearCurrentCache()` → `writeAppState(auth.account, null)` → `changeAccount(null)`. fake 계정 표는 Global Constraints 실행 기본값. `startDebugSession`은 `changeAccount(DEBUG_ACCOUNT_ID)`를 더 이상 하지 않고 `auth.restore()` 뒤 ready를 publish한다. `DEBUG_ACCOUNT_ID` 상수와 그 테스트를 제거한다. RELEASE `auth()`는 `UnavailableAuthFacade`(restored=true, account=null). `MutableAuthSession`을 `internal class`로 바꾸고, 공개 `SharedRuntime.session: AuthSession`은 유지.
-- [ ] **Step 4: 플랫폼 bootstrap 주석 갱신.** Android/iOS `DebugSessionBootstrap`의 설명을 "로그인 전 시작, 저장된 fake 계정 복원 → 그 계정 seed → ready"로 바꾼다(호출은 같음).
-- [ ] **Step 5: GREEN·확인.** KMP_TEST, ANDROID_CHECK, IOS_TEST. `grep -c "MutableAuthSession" client/shared/build/bin/iosSimulatorArm64/debugFramework/Shared.framework/Headers/Shared.h` = 0.
-- [ ] **Step 6: 커밋.** `feature(kmp): fake 인증 facade와 계정별 데모 seed 연결` + 본문.
+- [ ] **Step 2: RED 확인** (`--tests "*AuthFacadeTest*" --tests "*SharedModulesTest*"`). — **실행 기록: 구현을 먼저 써서 첫 RED를 기록하지 못했다(GREEN만 확인). fix round 1의 새 테스트는 RED 7건을 기록했다(`9e9a6ad`).**
+- [x] **Step 3: 구현.** `FakeAuthFacade(session: MutableAuthSession, store: LocalStore, seed: suspend () -> ClientResult<Unit>, scope)`. 복원은 `startDebugSession`이 호출하는 `restore()`에서: 읽기→파싱 실패면 삭제→`changeAccount(id)`→seed→`restored=true`. signIn: `writeAppState` → `changeAccount` → seed(실패하면 계정은 유지하고 `bootstrapFailure`처럼 결과로 반환하지 않고 로그만; seed는 데모용). signOut: `clearCurrentCache()` → `writeAppState(auth.account, null)` → `changeAccount(null)`. fake 계정 표는 Global Constraints 실행 기본값. `startDebugSession`은 `changeAccount(DEBUG_ACCOUNT_ID)`를 더 이상 하지 않고 `auth.restore()` 뒤 ready를 publish한다. `DEBUG_ACCOUNT_ID` 상수와 그 테스트를 제거한다. RELEASE `auth()`는 `UnavailableAuthFacade`(restored=true, account=null). `MutableAuthSession`을 `internal class`로 바꾸고, 공개 `SharedRuntime.session: AuthSession`은 유지.
+- [x] **Step 4: 플랫폼 bootstrap 주석 갱신.** Android/iOS `DebugSessionBootstrap`의 설명을 "로그인 전 시작, 저장된 fake 계정 복원 → 그 계정 seed → ready"로 바꾼다(호출은 같음).
+- [x] **Step 5: GREEN·확인.** KMP_TEST, ANDROID_CHECK, IOS_TEST. `grep -c "MutableAuthSession" client/shared/build/bin/iosSimulatorArm64/debugFramework/Shared.framework/Headers/Shared.h` = 0.
+- [x] **Step 6: 커밋.** `feature(kmp): fake 인증 facade와 계정별 데모 seed 연결` + 본문.
 
 ## Task 3: 공유 글 parser·SubmissionCoordinator·fake 분석 진행
 
@@ -615,7 +615,7 @@ SESSION_CHANGED 때는 어떤 store 쓰기도 성공하지 않으므로 행은 `
 | --- | --- | --- |
 | parser·표기·coordinator·오류 정책·DEBUG 분석 진행 | Review Focus 1~4, 카드 종류, import 멱등, retryAfter, 첫 POST 전 binding commit | 플랫폼 신호·화면 |
 
-- [ ] **Step 1: parser 벡터 테스트(RED).** `ShareTextParserTest` — 이 표는 Task 6 Swift 테스트와 **같은 입력·기대값**이다:
+- [x] **Step 1: parser 벡터 테스트(RED).** `ShareTextParserTest` — 이 표는 Task 6 Swift 테스트와 **같은 입력·기대값**이다:
 
 ```kotlin
 private val vectors = listOf(
@@ -641,7 +641,7 @@ private val vectors = listOf(
 규칙: 정규식 `(?i)https?://[^\s<>"'　]+`의 첫 매치, 끝에서 `.,;:!?` 와 짝 없는 `)` `]` `}` `>` `」` `』` `'` `"`를 반복 제거, scheme 뒤 host(첫 `/` `?` `#` 전) 비어 있으면 NoLink, `length > 2048`이면 TooLong. 원문 대소문자와 percent-encoding은 보존(정규화는 서버 몫).
 
 `DisplayFormatTest`: `host("https://www.Musinsa.com/p")=="musinsa.com"`, `host("https://ohou.se")=="ohou.se"`, `host("not a url")=="not a url"`; relative: 30초→JustNow, 59분→Minutes(59), 같은 날 5시간→Hours(5), 어제 23:59 vs 오늘 00:01→Yesterday(offset +9h), 같은 두 시각을 offset 0으로 계산하면 결과가 달라짐을 단언, 2일→Days(2), 미래 시각(시계 역행)→JustNow.
-- [ ] **Step 2: coordinator 테스트(RED).** `SubmissionCoordinatorTest` harness: 실제 SQLite `SqlLocalStore` + `ScriptedCreate`(호출 기록, 응답 대본, 대기 gate) + C2 `FakeStore`. 필수 테스트:
+- [x] **Step 2: coordinator 테스트(RED).** `SubmissionCoordinatorTest` harness: 실제 SQLite `SqlLocalStore` + `ScriptedCreate`(호출 기록, 응답 대본, 대기 gate) + C2 `FakeStore`. 필수 테스트:
 
 ```kotlin
 @Test fun loggedOutShareIsLocalUnboundAndNotSent()          // LOCAL, binding null, create 호출 0
@@ -677,10 +677,10 @@ private val vectors = listOf(
 `SubmissionErrorPolicyTest`: C3-D8 표의 모든 `ErrorKind`를 열거해 기대 Decision을 단언(새 kind가 생기면 컴파일 경고 대신 테스트가 실패하도록 `ErrorKind.entries` 전체를 순회).
 
 `DebugAnalysisDriverTest`: PROCESSING 4초 → 완료 안 됨, 5초 → READY(name=host 기반, categoryId=seed 첫 leaf), DELETED는 건드리지 않음, 다른 계정 항목 건드리지 않음.
-- [ ] **Step 3: RED 확인.** 각 test 클래스 필터 실행, 실패 원인 기록.
-- [ ] **Step 4: 구현.** 위 Interfaces와 알고리즘대로. single-flight는 `Mutex` + `AtomicBoolean rerun`(kotlinx `MutableStateFlow<Boolean>` CAS) 없이 `Channel<FlushTrigger>(CONFLATED)`를 하나의 consumer coroutine이 소비하는 방식으로 구현해도 된다(어느 쪽이든 테스트 기준을 지킨다). `view`는 각 쓰기 후와 `session.state` 변경 시 `store.pending()`+`processingItems()`로 다시 계산. receive의 key는 `ids.newId()`, `sharedAt = clock.now()`, binding = 현재 `session.state.value.accountId`. 카드: binding null→LOCAL, INVALID/TooLong→INVALID, online→SAVED(+`requestFlush(SHARE_RECEIVED)`), 아니면 OFFLINE. `SAVED_OPEN_APP`은 iOS 확장이 Swift에서만 쓰지만 같은 enum으로 둔다. `FakeStore.completeDueAnalyses(now, minAge, outcome: (WishlistItem) -> AnalysisOutcome)`는 기존 `completeAnalysis` 경로를 재사용하고 timer를 두지 않는다. `DebugAnalysisDriver`는 DEBUG DI에서만 `beforeRefresh`로 주입. `FakeAuthFacade.signIn` 성공 끝에 `coordinator.requestFlush(SIGNED_IN)`(순환 의존을 피하려 DI에서 `onSignedIn: () -> Unit` 콜백으로 연결).
-- [ ] **Step 5: GREEN.** KMP_TEST 전체, 건수 기록.
-- [ ] **Step 6: 커밋.** `feature(kmp): 공유 수신·로컬 대기 전송 조정기 구현` + 본문.
+- [x] **Step 3: RED 확인.** 각 test 클래스 필터 실행, 실패 원인 기록.
+- [x] **Step 4: 구현.** 위 Interfaces와 알고리즘대로. single-flight는 `Mutex` + `AtomicBoolean rerun`(kotlinx `MutableStateFlow<Boolean>` CAS) 없이 `Channel<FlushTrigger>(CONFLATED)`를 하나의 consumer coroutine이 소비하는 방식으로 구현해도 된다(어느 쪽이든 테스트 기준을 지킨다). `view`는 각 쓰기 후와 `session.state` 변경 시 `store.pending()`+`processingItems()`로 다시 계산. receive의 key는 `ids.newId()`, `sharedAt = clock.now()`, binding = 현재 `session.state.value.accountId`. 카드: binding null→LOCAL, INVALID/TooLong→INVALID, online→SAVED(+`requestFlush(SHARE_RECEIVED)`), 아니면 OFFLINE. `SAVED_OPEN_APP`은 iOS 확장이 Swift에서만 쓰지만 같은 enum으로 둔다. `FakeStore.completeDueAnalyses(now, minAge, outcome: (WishlistItem) -> AnalysisOutcome)`는 기존 `completeAnalysis` 경로를 재사용하고 timer를 두지 않는다. `DebugAnalysisDriver`는 DEBUG DI에서만 `beforeRefresh`로 주입. `FakeAuthFacade.signIn` 성공 끝에 `coordinator.requestFlush(SIGNED_IN)`(순환 의존을 피하려 DI에서 `onSignedIn: () -> Unit` 콜백으로 연결).
+- [x] **Step 5: GREEN.** KMP_TEST 전체, 건수 기록.
+- [x] **Step 6: 커밋.** `feature(kmp): 공유 수신·로컬 대기 전송 조정기 구현` + 본문.
 
 ## Task 3 이후 사용자 확인 지점
 
@@ -734,11 +734,11 @@ LoggedIn 줄: local `SUBMITTING`→SENDING, `PENDING`→WAITING_NETWORK, `FAILED
 | --- | --- | --- |
 | 두 Presenter와 상태 | 첫 실행 표시 조건, 로그인 중 중복 탭 무시, 로그아웃 후 상태, 줄 상태 매핑·정렬, close 뒤 intent 무시, 계정 전환 시 이전 줄이 섞이지 않음 | 플랫폼 UI 상태(펼침·확인창·wvDone) |
 
-- [ ] **Step 1: 실패하는 테스트(Turbine).** AccountPresenterTest: `firstRunShownOnlyWhenRestoredSignedOutAndNotSeen`, `skipMarksSeenAndHides`, `signInTwiceWhileSigningInCallsOnce`, `signInFailureSetsErrorAndClearsSigningIn`(RELEASE facade), `signOutReturnsToSignedOutWithoutFirstRun`, `closedPresenterIgnoresIntents`. HomePresenterTest: `loggedOutShowsUnboundOldestFirstWithLocalOnly`, `loggedInMapsLocalAndProcessingStatuses`, `refreshTogglesRefreshingAndResendsPending`, `accountSwitchNeverEmitsPreviousAccountRows`(B로 바뀐 뒤 첫 LoggedIn에 A key 없음), `relativeTimeRecomputedOnRefresh`, `closedPresenterStopsCollecting`.
-- [ ] **Step 2: RED 확인.**
-- [ ] **Step 3: 구현.** C2 `ItemDetailPresenter` 패턴(생성자 dispatcher, `SupervisorJob` scope, `close()` 멱등). 홈 state는 `combine(auth.account, coordinator.view)`에서 계정 일치하는 view만 사용.
-- [ ] **Step 4: GREEN.** KMP_TEST.
-- [ ] **Step 5: 커밋.** `feature(kmp): 로그인·홈 Presenter 구현`.
+- [x] **Step 1: 실패하는 테스트(Turbine).** AccountPresenterTest: `firstRunShownOnlyWhenRestoredSignedOutAndNotSeen`, `skipMarksSeenAndHides`, `signInTwiceWhileSigningInCallsOnce`, `signInFailureSetsErrorAndClearsSigningIn`(RELEASE facade), `signOutReturnsToSignedOutWithoutFirstRun`, `closedPresenterIgnoresIntents`. HomePresenterTest: `loggedOutShowsUnboundOldestFirstWithLocalOnly`, `loggedInMapsLocalAndProcessingStatuses`, `refreshTogglesRefreshingAndResendsPending`, `accountSwitchNeverEmitsPreviousAccountRows`(B로 바뀐 뒤 첫 LoggedIn에 A key 없음), `relativeTimeRecomputedOnRefresh`, `closedPresenterStopsCollecting`.
+- [x] **Step 2: RED 확인.**
+- [x] **Step 3: 구현.** C2 `ItemDetailPresenter` 패턴(생성자 dispatcher, `SupervisorJob` scope, `close()` 멱등). 홈 state는 `combine(auth.account, coordinator.view)`에서 계정 일치하는 view만 사용.
+- [x] **Step 4: GREEN.** KMP_TEST.
+- [x] **Step 5: 커밋.** `feature(kmp): 로그인·홈 Presenter 구현`.
 
 ## Task 5: Android 화면·공유 Activity·신호
 
@@ -751,9 +751,9 @@ LoggedIn 줄: local `SUBMITTING`→SENDING, `PENDING`→WAITING_NETWORK, `FAILED
 | --- | --- | --- |
 | FLogin·FHomeLoggedOut·FHome(분류 중만)·FSettings 4상태·공유 카드 4+1종, 신호, 웹뷰 삭제 | intent 글 추출(EXTRA_TEXT·EXTRA_SUBJECT 합치기), 문구 매핑, owner 수명, 에뮬레이터 실제 SQLite·공유 동작 | 오픈소스 라이선스 화면, 웹뷰 화면 |
 
-- [ ] **Step 1: 실패하는 단위 테스트.** `ShareIntentText.from(intent)`: `ACTION_SEND` text/plain의 `EXTRA_TEXT`가 우선, 없으면 `EXTRA_SUBJECT`, 둘 다 있고 TEXT에 링크가 없으면 `"$subject $text"`. `HomeRowText`: `RelativeTime`·`RowStatus` → 문구 표 키(문자열 리소스 id) 매핑 전수. `AccountPresenterOwner`: `onCleared`에서 Presenter close.
-- [ ] **Step 2: RED → 구현 → GREEN** (`:android:testDebugUnitTest --tests …`).
-- [ ] **Step 3: 공유 Activity.** Manifest:
+- [x] **Step 1: 실패하는 단위 테스트.** `ShareIntentText.from(intent)`: `ACTION_SEND` text/plain의 `EXTRA_TEXT`가 우선, 없으면 `EXTRA_SUBJECT`, 둘 다 있고 TEXT에 링크가 없으면 `"$subject $text"`. `HomeRowText`: `RelativeTime`·`RowStatus` → 문구 표 키(문자열 리소스 id) 매핑 전수. `AccountPresenterOwner`: `onCleared`에서 Presenter close.
+- [x] **Step 2: RED → 구현 → GREEN** (`:android:testDebugUnitTest --tests …`).
+- [x] **Step 3: 공유 Activity.** Manifest:
 
 ```xml
 <activity
@@ -772,10 +772,10 @@ LoggedIn 줄: local `SUBMITTING`→SENDING, `PENDING`→WAITING_NETWORK, `FAILED
 ```
 
 테마: `windowIsTranslucent=true`, `windowBackground=@android:color/transparent`, `windowNoTitle`, `windowAnimationStyle=@null`, `backgroundDimEnabled=false`. Activity는 `lifecycleScope`에서 `runtime.submissions().receiveShared(text, NetworkSignals.isOnline(context))` → 카드 표시 → 340ms `standard` 올라옴, 1500ms 유지, 260ms `accelerate` 내려감(아래 40dp·좌우 16dp, 버튼 없음) → `finish()` + `overridePendingTransition(0, 0)`(API 34+는 `overrideActivityTransition`). 카드 문구는 receive 결과로 정하므로 receive가 끝난 뒤 카드를 올린다. receive는 ready 대기 상한 1500ms 안에 끝나며(넘으면 STORE_FAILED), 로컬 저장은 수 ms라 실제 지연은 거의 없다.
-- [ ] **Step 4: 신호.** `NetworkSignals`: `ConnectivityManager.registerDefaultNetworkCallback`의 `onAvailable`/capabilities `VALIDATED` 전이에서 `requestFlush(NETWORK_RESTORED)`, `isOnline()`은 active network의 `INTERNET`+`VALIDATED`. `ForegroundSignals`: `ProcessLifecycleOwner`가 의존성에 없으면 추가하지 않고 `Application.ActivityLifecycleCallbacks`로 started 수 0→1 전이에서 `HomePresenterOwner`가 아닌 coordinator `refresh(FOREGROUND)`. `ACCESS_NETWORK_STATE` 권한을 Manifest에 추가.
-- [ ] **Step 5: 화면.** 각 보드 HTML의 px·색·문구를 토큰으로 옮긴다. 홈 오른쪽 위 원형 버튼 → `navigator.push(SettingsRoute, slide)`. 첫 실행 로그인은 `WishlistApp` 위 전체 화면 레이어(탭 바 없음), 홈 카드·설정의 "로그인"은 같은 화면을 push slide로 연다. 로그아웃(먹색 주 버튼)·웹뷰 삭제(빨강 `#C62828` 주 버튼) 확인창은 `WLConfirmDialog`. 당겨서 새로고침은 기존 의존성 안에서(`material3` `PullToRefreshBox`) 구현하고 없으면 사용자 확인. "원본"은 `Intent.ACTION_VIEW`. 버전은 `BuildConfig.VERSION_NAME`. 라이선스 줄 숨김. 웹뷰 삭제: `CookieManager.getInstance().removeAllCookies(null)`, `flush()`, `WebStorage.getInstance().deleteAllData()`, `WebView(context).apply { clearCache(true); destroy() }`(main thread).
-- [ ] **Step 6: ANDROID_CHECK.**
-- [ ] **Step 7: 에뮬레이터 smoke(실제 SQLite 첫 사용).** 포커스 확인 후 debug 설치·실행. 다음을 순서대로 확인하고 스크린샷을 scratchpad에 저장:
+- [x] **Step 4: 신호.** `NetworkSignals`: `ConnectivityManager.registerDefaultNetworkCallback`의 `onAvailable`/capabilities `VALIDATED` 전이에서 `requestFlush(NETWORK_RESTORED)`, `isOnline()`은 active network의 `INTERNET`+`VALIDATED`. `ForegroundSignals`: `ProcessLifecycleOwner`가 의존성에 없으면 추가하지 않고 `Application.ActivityLifecycleCallbacks`로 started 수 0→1 전이에서 `HomePresenterOwner`가 아닌 coordinator `refresh(FOREGROUND)`. `ACCESS_NETWORK_STATE` 권한을 Manifest에 추가.
+- [x] **Step 5: 화면.** 각 보드 HTML의 px·색·문구를 토큰으로 옮긴다. 홈 오른쪽 위 원형 버튼 → `navigator.push(SettingsRoute, slide)`. 첫 실행 로그인은 `WishlistApp` 위 전체 화면 레이어(탭 바 없음), 홈 카드·설정의 "로그인"은 같은 화면을 push slide로 연다. 로그아웃(먹색 주 버튼)·웹뷰 삭제(빨강 `#C62828` 주 버튼) 확인창은 `WLConfirmDialog`. 당겨서 새로고침은 기존 의존성 안에서(`material3` `PullToRefreshBox`) 구현하고 없으면 사용자 확인. "원본"은 `Intent.ACTION_VIEW`. 버전은 `BuildConfig.VERSION_NAME`. 라이선스 줄 숨김. 웹뷰 삭제: `CookieManager.getInstance().removeAllCookies(null)`, `flush()`, `WebStorage.getInstance().deleteAllData()`, `WebView(context).apply { clearCache(true); destroy() }`(main thread).
+- [x] **Step 6: ANDROID_CHECK.**
+- [x] **Step 7: 에뮬레이터 smoke(실제 SQLite 첫 사용).** 포커스 확인 후 debug 설치·실행. 다음을 순서대로 확인하고 스크린샷을 scratchpad에 저장:
   1. 첫 실행 FLogin → 나중에 하기 → FHomeLoggedOut(대기 0).
   2. `adb shell am start -n app.wishlist.android/.share.ShareReceiverActivity -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT "[무신사] 셔츠 https://www.musinsa.com/p/1"` → "이 기기에 저장했어요" 카드.
   3. 앱 강제 종료(`am force-stop`) 후 재실행 → 대기 1줄 유지(**Android Context SQLite 실기기 확인**).
@@ -784,7 +784,7 @@ LoggedIn 줄: local `SUBMITTING`→SENDING, `PENDING`→WAITING_NETWORK, `FAILED
   6. `adb shell svc wifi disable; svc data disable` 상태로 공유 → OFFLINE 카드 → 홈 "연결되면 보내요" → 네트워크 복구 → 자동 전송.
   7. 설정 → 로그아웃 확인 → 로그인 전 설정 → Apple로 로그인 → 이전 Google 계정의 미전송 항목이 보이지 않음.
   8. 설정 → 웹뷰 데이터 삭제 → "방금 삭제했어요".
-- [ ] **Step 8: 커밋.** `feature(android): 공유 수신·로그인·로그인 전 홈·설정 화면 구현` + 본문(smoke 결과).
+- [x] **Step 8: 커밋.** `feature(android): 공유 수신·로그인·로그인 전 홈·설정 화면 구현` + 본문(smoke 결과).
 
 ## Task 6: iOS 화면·Share Extension·inbox·신호
 
@@ -797,7 +797,7 @@ LoggedIn 줄: local `SUBMITTING`→SENDING, `PENDING`→WAITING_NETWORK, `FAILED
 | --- | --- | --- |
 | 확장 카드·inbox 쓰기, 앱 가져오기·삭제, 신호, 화면 4종 | Kotlin과 같은 parser 벡터, 원자적 쓰기, import 뒤에만 삭제, owner 수명, 시뮬레이터 Safari 공유 동작 | 확장 background 전송 활성화, Keychain 공유 |
 
-- [ ] **Step 1: 실패하는 XCTest.** `ShareTextExtractorTests`는 Task 3 벡터 표를 **같은 순서·값**으로 옮긴다(`NSRegularExpression` 패턴 `(?i)https?://[^\s<>"'\u{3000}]+`, 같은 trailing 제거, 2048 기준은 `String.utf16.count`가 아니라 Kotlin `String.length`와 같은 UTF-16 길이 `(url as NSString).length`). `InboxWriterReaderTests`(임시 디렉터리 주입):
+- [x] **Step 1: 실패하는 XCTest.** `ShareTextExtractorTests`는 Task 3 벡터 표를 **같은 순서·값**으로 옮긴다(`NSRegularExpression` 패턴 `(?i)https?://[^\s<>"'\u{3000}]+`, 같은 trailing 제거, 2048 기준은 `String.utf16.count`가 아니라 Kotlin `String.length`와 같은 UTF-16 길이 `(url as NSString).length`). `InboxWriterReaderTests`(임시 디렉터리 주입):
 
 ```swift
 func testWriteIsAtomicAndReadable()          // write → 디렉터리에 <key>.json 하나, 임시 파일 없음, decode 일치
@@ -806,17 +806,17 @@ func testCorruptFileIsReportedDeletable()    // "{" 파일 → 읽기 결과 cor
 func testUnknownVersionIsKept()              // v:2 파일 → 건드리지 않음(미래 확장 호환)
 ```
 
-- [ ] **Step 2: RED → 구현.** inbox JSON v1:
+- [x] **Step 2: RED → 구현.** inbox JSON v1:
 
 ```json
 {"v":1,"clientSubmissionId":"<lowercase uuid>","sourceUrl":"<extracted>","sharedAt":"2026-10-07T01:02:03.456Z","accountBinding":null}
 ```
 
 쓰기는 `Data.write(to: tmp, options: .atomic)` 후 `FileManager.moveItem`(`inbox/.tmp-<key>` → `inbox/<key>.json`). 확장 흐름: `extensionContext.inputItems`의 `NSItemProvider`에서 `UTType.url` 우선, 없으면 `UTType.plainText` → 추출 → 카드 종류(app group defaults `wl.session.accountBinding` 존재 → `SAVED_OPEN_APP`, 없으면 `LOCAL`, 링크 없음 → `INVALID`, 쓰기 실패 → `STORE_FAILED`) → 카드 340ms `standard` 올라옴·1500ms·260ms `accelerate` → `completeRequest(returningItems: nil)`. 확장 view 배경은 투명. `DisabledShareDirectSender.send(record:)`는 아무것도 하지 않으며 문서 주석에 활성화 조건(가입·Keychain 공유·토큰 만료 정책)을 적는다. 앱: `SessionMirror`가 `AccountPresenterOwner.account` 변화를 `UserDefaults(suiteName:)`에 쓴다. `ShareInboxReader`는 파일 목록을 이름순으로 읽어 `runtime.submissions().importInbox(records:)` 호출 후 `deletable`만 삭제하고, 이어서 `refresh(trigger:)`. scenePhase `.active` 진입마다 reader → refresh(첫 진입은 LAUNCH, 이후 FOREGROUND). `NetworkSignals`: `NWPathMonitor` `.satisfied` 전이 → `requestFlush(.networkRestored)`.
-- [ ] **Step 3: 화면.** Android와 같은 보드 기준. 홈 오른쪽 위 → `WLNavigator` push slide로 설정. 첫 실행 로그인은 `ContentView`의 탭 셸 위 레이어. 당겨서 새로고침은 `ScrollView.refreshable`(시스템 indicator 허용; 디자인 결정과 다르면 기록). "원본"은 `openURL`. 버전 `CFBundleShortVersionString`. 웹뷰 삭제 `WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)`. VoiceOver: 카드 등장 시 `UIAccessibility.post(.announcement, title+line)`, 펼치기 화살표 버튼 라벨.
-- [ ] **Step 4: GREEN.** IOS_TEST(새 테스트 포함 건수 기록), Release simulator build.
-- [ ] **Step 5: 시뮬레이터 확인.** Safari에서 상품 URL 공유 → 위시리스트 → 카드(로그인 전 "이 기기에 저장했어요") → 앱 열기 → 대기 1줄. 로그인 → 분류 중 → 5초 뒤 새로고침 → 사라짐. 로그인 상태 공유 → "앱을 열면 정보를 가져와요" → 앱 foreground → 전송. Notes 앱에서 링크 없는 글 공유 → 실패 카드. 공유 시트 조작 방법(사용자 수동 또는 computer-use)은 Task 0에서 정한 방식을 따른다.
-- [ ] **Step 6: 커밋.** `feature(ios): 공유 확장·로그인·로그인 전 홈·설정 화면 구현` + 본문.
+- [x] **Step 3: 화면.** Android와 같은 보드 기준. 홈 오른쪽 위 → `WLNavigator` push slide로 설정. 첫 실행 로그인은 `ContentView`의 탭 셸 위 레이어. 당겨서 새로고침은 `ScrollView.refreshable`(시스템 indicator 허용; 디자인 결정과 다르면 기록). "원본"은 `openURL`. 버전 `CFBundleShortVersionString`. 웹뷰 삭제 `WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)`. VoiceOver: 카드 등장 시 `UIAccessibility.post(.announcement, title+line)`, 펼치기 화살표 버튼 라벨.
+- [x] **Step 4: GREEN.** IOS_TEST(새 테스트 포함 건수 기록), Release simulator build.
+- [ ] **Step 5: 시뮬레이터 확인.** Safari에서 상품 URL 공유 → 위시리스트 → 카드(로그인 전 "이 기기에 저장했어요") → 앱 열기 → 대기 1줄. 로그인 → 분류 중 → 5초 뒤 새로고침 → 사라짐. 로그인 상태 공유 → "앱을 열면 정보를 가져와요" → 앱 foreground → 전송. Notes 앱에서 링크 없는 글 공유 → 실패 카드. 공유 시트 조작 방법(사용자 수동 또는 computer-use)은 Task 0에서 정한 방식을 따른다. — **부분 완료: Safari 공유(로그인 전·로그인 뒤)·가져오기·전송·새로고침은 확인했다. Notes 앱 공유는 자동화하지 못해 2048자 초과 URL로 INVALID 카드를 확인했다.**
+- [x] **Step 6: 커밋.** `feature(ios): 공유 확장·로그인·로그인 전 홈·설정 화면 구현` + 본문.
 
 ## Task 7: 화면 비교·예외 경로·성능 측정
 
@@ -829,10 +829,10 @@ func testUnknownVersionIsKept()              // v:2 파일 → 건드리지 않�
 | --- | --- | --- |
 | 두 플랫폼 라이트·다크 스크린샷 비교표, 예외 경로 체크, 대기 목록 20/100/300 측정 | 대상 보드 9종 + 실패 카드, 오프라인·계정 전환·강제 종료 복구·DB 실패 카드, 목록 프레임·메모리 | 임의 통과 기준 수치(실측 baseline만 기록) |
 
-- [ ] **Step 1: 스크린샷.** 390×844 기준(에뮬레이터는 해당 해상도 AVD 또는 크기 조정, 시뮬레이터는 iPhone 17 Pro를 그대로 쓰고 차이를 표기). 라이트·다크 각각 FLogin, FHomeLoggedOut(접힘·펼침), FHome 분류 중, FSettings, FSettingsLoggedOut, FSettingsLogout, FSettingsWebviewClear, FShareSaved, FShareSavedLocal, FShareSavedOffline(Android), iOS SAVED_OPEN_APP, 실패 카드. 핸드오프 `shots/*.png`와 나란히 놓고 차이를 표로 기록(차이를 고치면 해당 플랫폼 task 범위의 `bugfix` 커밋).
-- [ ] **Step 2: 예외 경로.** Review Focus 1·2를 실제 앱에서: 전송 중(`FakeStore.delayNext(ITEM_01, 5000)`을 DEBUG 메뉴 없이 쓰려면 debug 전용 intent extra나 launch argument `-wl.fake.delayItem01 5000`을 추가) 로그아웃→다른 계정 로그인→원래 계정 재로그인, 전송 중 강제 종료 후 재실행.
-- [ ] **Step 3: 성능.** debug launch argument `-wl.fake.pendingCount N`(N=20/100/300, 로그인 전 미귀속 행 생성)으로 FHomeLoggedOut 펼침 목록을 연다. Android: `adb shell dumpsys gfxinfo app.wishlist.android framestats` 스크롤 10회·`dumpsys meminfo`. iOS: Instruments Time Profiler·Allocations(사용자 승인 후) 또는 `xcrun xctrace`. 결과를 기기/OS·항목 수·글자 배율과 함께 기록. 입력 관련 항목은 C5/C6으로 넘긴다고 적는다.
-- [ ] **Step 4: 커밋.** `docs: C3 화면 비교·예외 경로·성능 측정 기록`.
+- [ ] **Step 1: 스크린샷.** 390×844 기준(에뮬레이터는 해당 해상도 AVD 또는 크기 조정, 시뮬레이터는 iPhone 17 Pro를 그대로 쓰고 차이를 표기). 라이트·다크 각각 FLogin, FHomeLoggedOut(접힘·펼침), FHome 분류 중, FSettings, FSettingsLoggedOut, FSettingsLogout, FSettingsWebviewClear, FShareSaved, FShareSavedLocal, FShareSavedOffline(Android), iOS SAVED_OPEN_APP, 실패 카드. 핸드오프 `shots/*.png`와 나란히 놓고 차이를 표로 기록(차이를 고치면 해당 플랫폼 task 범위의 `bugfix` 커밋). — **부분 완료: 13개 보드 × 라이트·다크를 비교했다(`91729a7`). Android 온라인 FShareSaved는 에뮬레이터 DNS 문제로 찍지 못했다(사용자 확인 필요).**
+- [x] **Step 2: 예외 경로.** Review Focus 1·2를 실제 앱에서: 전송 중(`FakeStore.delayNext(ITEM_01, 5000)`을 DEBUG 메뉴 없이 쓰려면 debug 전용 intent extra나 launch argument `-wl.fake.delayItem01 5000`을 추가) 로그아웃→다른 계정 로그인→원래 계정 재로그인, 전송 중 강제 종료 후 재실행.
+- [ ] **Step 3: 성능.** debug launch argument `-wl.fake.pendingCount N`(N=20/100/300, 로그인 전 미귀속 행 생성)으로 FHomeLoggedOut 펼침 목록을 연다. Android: `adb shell dumpsys gfxinfo app.wishlist.android framestats` 스크롤 10회·`dumpsys meminfo`. iOS: Instruments Time Profiler·Allocations(사용자 승인 후) 또는 `xcrun xctrace`. 결과를 기기/OS·항목 수·글자 배율과 함께 기록. 입력 관련 항목은 C5/C6으로 넘긴다고 적는다. — **부분 완료: Android gfxinfo·meminfo와 iOS XCTest `measure`로 baseline을 기록했다. Instruments·xctrace는 `DevToolsSecurity` 승인 대기라 미실행.**
+- [x] **Step 4: 커밋.** `docs: C3 화면 비교·예외 경로·성능 측정 기록`.
 
 ## Task 8: 전체 검증·문서·draft PR
 
@@ -844,21 +844,46 @@ func testUnknownVersionIsKept()              // v:2 파일 → 건드리지 않�
 | --- | --- | --- |
 | 최종 로컬 검증, 문서, develop 대상 draft PR | 전체 명령 건수·fail/skip, 문서 링크, `git diff --check`, 브랜치 이름 확인 | merge |
 
-- [ ] **Step 1: 전체 검증.** C2 Task 10 Step 2 명령 세트 전부(토큰 테스트·check, Gradle 전체 + `linkReleaseFrameworkIosArm64`, IOS_TEST, iOS Release build). 건수·로그 경로 기록. 하나라도 실패·미실행이면 완료로 표시하지 않는다.
-- [ ] **Step 2: 문서.** kmp.md: Coordinator·AuthFacade·schema v2·알려진 한계 표에서 C3 항목 해결 표시(해결 안 된 것은 사유와 다음 단계). android.md·ios.md: 공유 수신 구조, 신호, app group, 확장 target, 모듈 분리 보류(C3-D10). server-integration-status: ITEM-01 fake 사용 경로와 "인증 연결" 단계 인계. Q&A: "iOS는 공유만으로 분석이 시작되나? — B는 앱을 열 때 시작, C는 background URLSession으로 확장 종료 뒤에도 전송, 비용(Keychain·토큰 만료)". 로드맵 C3 행 상태와 미결정 표의 공유 확장 항목을 "C3에서 C안으로 결정"으로 갱신하고 "인증 연결" 단계를 C12 전 별도 행으로 추가할지 사용자에게 확인.
+- [x] **Step 1: 전체 검증.** C2 Task 10 Step 2 명령 세트 전부(토큰 테스트·check, Gradle 전체 + `linkReleaseFrameworkIosArm64`, IOS_TEST, iOS Release build). 건수·로그 경로 기록. 하나라도 실패·미실행이면 완료로 표시하지 않는다.
+- [x] **Step 2: 문서.** kmp.md: Coordinator·AuthFacade·schema v2·알려진 한계 표에서 C3 항목 해결 표시(해결 안 된 것은 사유와 다음 단계). android.md·ios.md: 공유 수신 구조, 신호, app group, 확장 target, 모듈 분리 보류(C3-D10). server-integration-status: ITEM-01 fake 사용 경로와 "인증 연결" 단계 인계. Q&A: "iOS는 공유만으로 분석이 시작되나? — B는 앱을 열 때 시작, C는 background URLSession으로 확장 종료 뒤에도 전송, 비용(Keychain·토큰 만료)". 로드맵 C3 행 상태와 미결정 표의 공유 확장 항목을 "C3에서 C안으로 결정"으로 갱신하고 "인증 연결" 단계를 C12 전 별도 행으로 추가할지 사용자에게 확인.
 - [ ] **Step 3: 리뷰.** 선택한 실행 방식의 전체 브랜치 독립 리뷰, 중요 결함 수정·재검증.
-- [ ] **Step 4: 커밋.** `docs: C3 공유 저장 구조와 검증 결과 기록`.
+- [x] **Step 4: 커밋.** `docs: C3 공유 저장 구조와 검증 결과 기록`.
 - [ ] **Step 5: 브랜치·PR.** 사용자에게 `client/c3-share-save`로 이름을 바꿀지 확인 → push → base develop draft PR. 설명: 결정 C3-D1~D10, 범위, 로컬 검증 건수·환경·미실행, 스크린샷 비교, "인증 연결" 인계. merge는 하지 않는다.
 
 ## C3 완료 기준
 
-- [ ] 대상 보드 9종(라이트·다크)과 실패 카드가 두 플랫폼에서 동작하고 스크린샷 비교가 PR에 있다.
-- [ ] 로그인 전 공유 → 로그인 → 전송 → `PROCESSING` → 새로고침 후 완료까지 fake로 두 플랫폼 시연 가능.
-- [ ] Review Focus 1~5가 테스트로 고정돼 Android host·iOS simulator에서 통과.
-- [ ] kmp.md 알려진 한계의 C3 항목(정렬·accept 검사·key 가드·DB 열기 시점·seed 실패·`changeAccount` 노출)이 해결되거나 사유와 함께 이관됨.
-- [ ] Android Context SQLite 실제 동작(강제 종료 후 유지)을 에뮬레이터에서 확인.
-- [ ] iOS 확장이 서명 없는 시뮬레이터에서 app group inbox를 쓰고 앱이 가져온다(Task 0이 실패했으면 사용자와 합의한 대체 기준).
-- [ ] 문서·INDEX·로드맵·server-integration-status 최신화, draft PR 생성.
+- [ ] 대상 보드 9종(라이트·다크)과 실패 카드가 두 플랫폼에서 동작하고 스크린샷 비교가 PR에 있다. — **화면 비교는 끝났고(Android 온라인 FShareSaved 제외) PR 첨부는 Step 5에서 한다.**
+- [x] 로그인 전 공유 → 로그인 → 전송 → `PROCESSING` → 새로고침 후 완료까지 fake로 두 플랫폼 시연 가능. (Android Task 5 smoke, iOS Task 6 시뮬레이터)
+- [x] Review Focus 1~5가 테스트로 고정돼 Android host·iOS simulator에서 통과. (Task 8: host 364 · simulator 361 · XCTest 116, 실패·skip 0)
+- [x] kmp.md 알려진 한계의 C3 항목(정렬·accept 검사·key 가드·DB 열기 시점·seed 실패·`changeAccount` 노출)이 해결되거나 사유와 함께 이관됨. (6개 모두 해결: `fff233a`·`108a07f`·`c791412`)
+- [x] Android Context SQLite 실제 동작(강제 종료 후 유지)을 에뮬레이터에서 확인. (Task 5 smoke 3단계)
+- [ ] iOS 확장이 서명 없는 시뮬레이터에서 app group inbox를 쓰고 앱이 가져온다(Task 0이 실패했으면 사용자와 합의한 대체 기준). — **`CODE_SIGNING_ALLOWED=NO`에서는 app group이 없다(Task 0). 대체 기준(Ruling 4: 팀 없는 기본 "Sign to Run Locally" 서명)으로 확장 쓰기·앱 가져오기를 확인했다(Task 0 수동 공유, Task 6). 이 대체 기준을 사용자가 명시적으로 합의했는지는 PR 전에 확인한다.**
+- [ ] 문서·INDEX·로드맵·server-integration-status 최신화, draft PR 생성. — **문서는 Task 8 Step 2에서 갱신했고 draft PR은 대기.**
+
+## 실행 중 결정(ruling) 요약
+
+실행 중 계획이 정하지 않았거나 계획과 달라진 판단이다. 근거와 비용은 실행 기록(ledger)에 있다.
+
+| Ruling | 판단 |
+| --- | --- |
+| 1 | `HomePresenter.onForeground()`를 만들지 않는다. 앱 수준 foreground 신호가 `submissions().refresh(FOREGROUND)`를 부르고 HomePresenter는 `view`만 구독한다(같은 refresh 중복 방지) |
+| 2 | Kotlin `ShareCardKind`에서 `SAVED_OPEN_APP`을 빼고 Swift 확장 자체 enum에 둔다(확장은 Shared를 링크하지 않음) |
+| 3 | Task 0은 `xcodeproj` gem을 설치하지 않고 pbxproj를 손으로 편집한다. 공유 시트 수동 조작은 사용자에게 한 번 요청하고 그동안 Task 1을 진행한다 |
+| 4 | app group 확인·공유 시연 빌드는 기본 "Sign to Run Locally"(팀 없음), IOS_TEST·CI는 `CODE_SIGNING_ALLOWED=NO`. app group 코드는 container를 주입받고 nil이면 inbox만 끈다 |
+| 5 | 계획 코드의 `LazyDriver`를 고쳐 첫 open이 취소돼도 driver를 한 번만 연다(driver를 io 블록 안에서 저장) |
+| 6 | Task 1 리뷰 minor 중 bootstrap `CoroutineExceptionHandler` 범위·Android open 실패 driver 누수·문서/KDoc 문구를 fix round에 넣는다 |
+| 7 | 로그인 중 signIn은 signOut 경로를 먼저, seed 예외 처리, 순서 고정 테스트를 Task 2 fix round에 넣는다 |
+| 8 | RELEASE `UnavailableAuthFacade.hasSeenFirstRunLogin()`은 true(실제 인증 전까지 첫 실행 로그인 안내 숨김) |
+| 9 | ITEM-01 `NOT_FOUND`는 PENDING + 오류 기록(URL을 잃지 않음) |
+| 10 | flush는 NETWORK·TIMEOUT·RATE_LIMITED 뒤에도 멈춘다(오프라인에서 timeout N번 직렬 방지) |
+| 11 | SUBMITTING commit과 POST 사이 계정 전환 경합을 internal snapshot-aware create(`create(command, expected)`)로 막는다. 공개 `CreateItemRepository`는 그대로 |
+| 12 | coordinator의 refresh 대기 hang, 새는 `CancellationException`, view 게시 원자성 minor를 Task 3 fix round에 넣는다 |
+| 13 | 로그인 뒤 홈 머리 보조 줄은 보드의 "할 일 N개"(새 키 `home_todo_count`, N = 분류 중 줄 수) |
+| 14 | `row_processing`은 보드 FHome의 "상품 정보 추출 중" / "Extracting product info" |
+| 15 | 로그인 뒤 분류 중 줄에는 오른쪽 동작이 없다(보드의 삭제는 C4/C8, Android가 넣었던 원본 제거) |
+| 16 | Task 7을 7a(리뷰 bugfix 묶음)와 7b(화면 비교·예외 경로·성능·iOS 표시)로 나눈다 |
+| 17 | iOS 확장 표시는 사용자 답 전까지 권장안 A: 시스템 시트를 받아들이고 시트 안을 보드 바탕색(#E9E9E9 / #2A2A2A)으로 칠한다, 그림자 없음 |
+| 18 | runtime close와 진행 중 DB query의 SIGSEGV 경합을 Task 8 전에 Task 7c로 고친다(store lease) |
 
 ## 후속 단계 인계(초안)
 

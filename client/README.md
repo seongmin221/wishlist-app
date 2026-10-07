@@ -4,14 +4,14 @@ iOS는 SwiftUI, Android는 Jetpack Compose, 공통 비즈니스 계층은 KMP로
 
 ## 현재 범위
 
-C1은 디자인 토큰 생성기, 서체·글자 스타일, 공통 컴포넌트, 시트·확인창·메뉴 overlay, 탭 셸과 자체 라우터(공유 요소 화면 이동, 끌어서 뒤로)를 두 앱에 구현했다. 탭 첫 화면은 debug 빌드에서 이것들을 보여 주는 데모다. C2는 화면 없이 공통 KMP 핵심(상품 모델·상태 정책·가격 표기, Fake/Remote(ITEM-01·03)·계정별 SQLDelight 캐시, API별 backend 조립 `SharedRuntime`, 상품 상세 Presenter 기반)을 구현했다. 로그인, 상품 저장, 공유 수신과 실제 기능 화면은 아직 구현하지 않았다. 구조는 [디자인 시스템과 앱 뼈대](../docs/architecture/client/design-system.md)와 [KMP 구조](../docs/architecture/client/kmp.md)를 따른다.
+C1은 디자인 토큰 생성기, 서체·글자 스타일, 공통 컴포넌트, 시트·확인창·메뉴 overlay, 탭 셸과 자체 라우터(공유 요소 화면 이동, 끌어서 뒤로)를 두 앱에 구현했다. 탭 첫 화면은 debug 빌드에서 이것들을 보여 주는 데모다. C2는 화면 없이 공통 KMP 핵심(상품 모델·상태 정책·가격 표기, Fake/Remote(ITEM-01·03)·계정별 SQLDelight 캐시, API별 backend 조립 `SharedRuntime`, 상품 상세 Presenter 기반)을 구현했다. C3는 첫 실제 기능인 공유 저장을 두 앱에 구현했다: Android 공유 Activity·iOS Share Extension(app group inbox), fake 로그인(실제 Firebase 연결 전), 로그인 전 홈·분석 대기, 로그인 뒤 "분류 중" 카드, 설정(로그아웃·웹뷰 데이터 삭제). 상품 상세·카테고리·목적 등 나머지 기능 화면은 아직 없다. 구조는 [디자인 시스템과 앱 뼈대](../docs/architecture/client/design-system.md)와 [KMP 구조](../docs/architecture/client/kmp.md)를 따른다.
 
 | 위치 | 역할 |
 | --- | --- |
 | `android/` | Compose application, AGP 내장 Kotlin |
 | `shared/` | Android·iOS Kotlin library, UI 의존성 없음 |
 | `localdb/` | SQLDelight plugin·schema·생성 코드만 담은 내부 모듈(`:shared`가 `implementation`으로 사용, Swift에 노출하지 않음) |
-| `ios/` | SwiftUI app, Xcode project와 공유 scheme(`WishlistTests` 단위 테스트 포함) |
+| `ios/` | SwiftUI app과 `ShareExtension` target(`AppGroupShared/`는 앱·확장 공용), Xcode project와 공유 scheme(`WishlistTests` 단위 테스트 포함) |
 | `tools/` | 디자인 토큰 원본(`design-tokens.json`)과 생성기 |
 | `gradle/libs.versions.toml` | 클라이언트 dependency·plugin 버전 |
 
@@ -77,6 +77,21 @@ xcodebuild -project ios/Wishlist.xcodeproj -scheme Wishlist \
 
 2026-10-05 Xcode 26.6에서 Debug/Release arm64 simulator build와 Release arm64 device build를 확인했다. iPhone 17 Pro / iOS 26.5 simulator에서 Debug 앱을 설치·실행하고 라이트·다크 화면의 공통 코드 문구를 확인했다. device build는 서명 없이 수행했으며 실제 iPhone 설치·실행과 배포 서명은 검증하지 않았다. shared iOS test는 `:shared:iosSimulatorArm64Test`로 simulator에서 실행한다.
 
+### 공유 확장 확인 빌드(iOS)
+
+`CODE_SIGNING_ALLOWED=NO` 빌드에는 entitlements가 들어가지 않아 app group이 없다(확장이 inbox를 쓸 수 없고 앱은 inbox 가져오기를 끈다). 시뮬레이터에서 공유 확장을 확인할 때는 서명 override 없이 빌드해 프로젝트 기본 "Sign to Run Locally"(개발자 팀 불필요)로 설치한다. `xcodebuild test`가 같은 bundle id의 서명 없는 앱을 다시 설치하므로 테스트 뒤에도 이 빌드를 다시 설치한다.
+
+```sh
+# repository root에서
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+xcodebuild build -project client/ios/Wishlist.xcodeproj -scheme Wishlist \
+  -destination 'platform=iOS Simulator,id=<기기 id>' -derivedDataPath /tmp/wishlist-signed-dd
+xcrun simctl install <기기 id> /tmp/wishlist-signed-dd/Build/Products/Debug-iphonesimulator/Wishlist.app
+xcrun simctl get_app_container <기기 id> app.wishlist.ios groups   # group.app.wishlist 경로가 나와야 한다
+```
+
+Safari 등에서 공유 → "위시리스트"를 고른다(앱 줄에 없으면 "더 보기"에서 켠다). 실기기 설치·배포는 개발자 팀과 app group 등록이 필요하다. 근거는 [ADR-030](../docs/history/architecture/client/ADR-030-share-receipt-mode.md).
+
 ## 디자인 토큰
 
 색·모서리·간격·모션 상수는 `python3 client/tools/gen_tokens.py`로 생성한다(`--check`는 생성물이 오래됐는지 검사). 생성물은 손으로 고치지 않는다.
@@ -107,8 +122,9 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
 
 - `/usr/libexec/java_home -v 17`이 다른 JDK를 가리키는 환경에서는 JDK 17 경로를 직접 `JAVA_HOME`에 지정하고 `-Porg.gradle.java.installations.paths="$JAVA_HOME"`를 Gradle에 넘긴다.
 - Android 단위 테스트는 가격 형식, 시트 끌기 판단, overlay 상태 기계, `WLNavigator`를 다룬다. iOS `WishlistTests`는 같은 사례를 Swift로 확인한다. iOS 17 확인은 iOS 17.5 simulator를 `-destination 'platform=iOS Simulator,id=<기기 id>'`로 지정한다.
-- `:shared:allTests`는 Android host(246개)와 iOS simulator(243개) commonTest를 실행한다(2026-10-07 C2 기준, 실패·skip 0). 결과는 `shared/build/test-results`의 XML 건수로 확인하고 `NO-SOURCE`/`SKIPPED`를 통과로 세지 않는다. 최종 검증은 [C2 검증 기록](../docs/history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.
-- 데모: debug 빌드를 실행하면 탭 첫 화면에 시트·확인창·메뉴, 사진·면 화면 이동, 가장 긴 이름·긴 가격 예시가 나온다. release 빌드는 탭 이름만 있는 빈 첫 화면이다.
+- `:shared:allTests`는 Android host(364개)와 iOS simulator(361개) commonTest를 실행한다(2026-10-07 C3 기준, 실패·skip 0). Android 단위 테스트는 debug/release 각 87개, iOS XCTest는 116개다. 결과는 `shared/build/test-results`의 XML 건수로 확인하고 `NO-SOURCE`/`SKIPPED`/`UP-TO-DATE`를 실행으로 세지 않는다(필요하면 `--rerun-tasks`). 최종 검증은 [C3 검증 기록](../docs/history/architecture/client/c3-verification-2026-10-07.md#최종-로컬-검증-task-8)과 [C2 검증 기록](../docs/history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.
+- 데모·기능: 홈 탭은 실제 홈(로그인 전 / fake 로그인 뒤)이고 오른쪽 위에서 설정을 연다. 카테고리·목적 탭 첫 화면은 debug 데모(시트·확인창·메뉴, 사진·면 화면 이동, 긴 이름·가격 예시)다. release 빌드는 홈·설정·로그인만 실제 화면이고(로그인 버튼은 실제 인증 전이라 동작하지 않는다) 나머지 탭은 이름만 있는 빈 첫 화면이다.
+- debug 시연 hook(cold start에서만 적용): Android `adb shell am start -S -n app.wishlist.android/.MainActivity --el wl.fake.delayItem01 5000`(다음 fake 전송 지연) 또는 `--ei wl.fake.pendingCount 100`(로그인 전 대기 줄 N개), iOS `xcrun simctl launch --terminate-running-process <기기 id> app.wishlist.ios -wl.fake.pendingCount 100`. 공유는 Android `adb shell am start -a android.intent.action.SEND -t text/plain --es android.intent.extra.TEXT 'https://example.com/p/1' -n app.wishlist.android/.share.ShareReceiverActivity`로도 보낼 수 있다. 자세한 내용은 [Android](../docs/architecture/client/android.md)·[iOS](../docs/architecture/client/ios.md) 구조 문서.
 
 ## 기능 개발 기준
 

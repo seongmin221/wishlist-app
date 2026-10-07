@@ -27,7 +27,7 @@
 - 클라이언트는 `client/` 독립 Gradle build이며 `:android`, `:shared`, `:localdb` 모듈이다(`:localdb`는 C2 Task 7에서 추가, 아래 "모듈 구성").
 - shared target은 Android, `iosArm64`, `iosSimulatorArm64`다. Android는 공식 KMP library plugin, iOS는 static `Shared.framework` direct integration을 사용한다.
 - 지원 하한은 Android 8(API 26), iOS 17이다.
-- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드, Fake·Remote(ITEM-01·03)·로컬 캐시와 이를 조립하는 `SharedRuntime`, 그리고 C4가 확장할 상품 상세 Presenter 기반(아래 마지막 두 절)도 포함한다. 화면 비즈니스 기능은 후속 구현 대상이다.
+- 현재 공통 코드는 두 앱 연결을 확인하는 `AppInfo`와 아래 공통 결과·인증 세션 계약을 포함한다. 상품 모델·상태 정책, Create/Get 저장소 인터페이스와 보드 시드, Fake·Remote(ITEM-01·03)·로컬 캐시와 이를 조립하는 `SharedRuntime`, C4가 확장할 상품 상세 Presenter 기반을 포함한다. C3에서 fake 인증 facade(`AuthFacade`), 공유 수신·전송 조정기(`SubmissionCoordinator`), 로컬 schema v2, 로그인·홈 Presenter를 더했다(아래 C3 절). 나머지 화면 비즈니스 기능은 단계별 후속 구현 대상이다.
 
 ## 구현 구조
 
@@ -40,7 +40,7 @@
 | DI | Koin(`:shared` 안 internal 조립, runtime별 격리 `koinApplication`. 앱은 `SharedRuntimeFactory`만 호출) |
 | Swift 연결 | SKIE(Flow·suspend → AsyncSequence·async). 미지원 시 KMP-NativeCoroutines |
 | 인증 | 플랫폼별 Firebase 공식 SDK가 공개 콜백 `PlatformTokenSource`를 구현해 `RemoteConfig`로 전달(KMP 내부 `AuthTokenProvider`는 `internal`) |
-| 설정 저장 | multiplatform-settings |
+| 설정 저장 | multiplatform-settings(C5 도입 예정). C3의 기기 상태(fake 계정·첫 실행 안내)는 SQLDelight `app_state` 표에 둔다(C3-D7) |
 | 테스트 | kotlin.test, Turbine, Ktor MockEngine |
 
 공유 코드는 `:shared`의 패키지로 경계를 나눈다. SQLDelight plugin·schema·생성 코드만 내부 모듈 `:localdb`에 둔다.
@@ -109,7 +109,7 @@ core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  pres
 
 > 2026-10-07 Task 5 구현. Fake 공개 저장소는 ITEM-01 Create·ITEM-03 Get과 시드 조회이며, mutation wire API는 후속 범위다.
 
-`FakeStore(session, clock, ids)`가 owner별 상품·submission key·재분석 attempt·분석 generation을 보관하고 모든 비즈니스 규칙을 적용한다. `FakeItemRepository`, `FakeCatalogRepository`, `FakeControls`는 이를 위임한다. 개발 세션 조립은 먼저 `MutableAuthSession.changeAccount`를 호출한 다음 `store.seed`로 현재 owner namespace를 초기화한다. seed 자체도 같은 session gate를 통과하며, 미인증이면 실패한다. 재초기화로 사용자 변경을 덮어쓰지 않는다.
+`FakeStore(session, clock, ids)`가 owner별 상품·submission key·재분석 attempt·분석 generation을 보관하고 모든 비즈니스 규칙을 적용한다. `FakeItemRepository`, `FakeCatalogRepository`, `FakeControls`는 이를 위임한다. 개발 세션은 먼저 계정을 바꾸고(C3부터 `FakeAuthFacade`의 restore·signIn이 internal `MutableAuthSession.changeAccount`를 부른다) 그다음 `store.seed`로 현재 owner namespace를 초기화한다. seed 자체도 같은 session gate를 통과하며, 미인증이면 실패한다. 재초기화로 사용자 변경을 덮어쓰지 않는다.
 
 요청 시작의 `SessionSnapshot`을 보관하고 주입한 delay를 gate 밖에서 실행한다. 이후 `AuthSession.withCurrent` → Store Mutex 순서로 commit하며, 결과 공개 직전 snapshot도 비교한다. A→B와 A→logout→A 모두 이전 generation의 응답과 쓰기를 SESSION_CHANGED로 거절한다. `failNext`/`delayNext`는 다음 한 요청에만 적용하고 coroutine test scheduler로 실제 지연·취소 경계를 검증할 수 있다. 자동 분석·wall-clock 타이머는 없다.
 
@@ -152,12 +152,16 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 > 2026-10-07 Task 7 구현. D7 범위는 최소 schema·계정별 `LocalStore`·accept 원자성·GET 캐시 동기화다. 다중 프로세스, pending 전송, window/settings는 제외한다. token은 저장하지 않는다.
 
 - **모듈:** SQLDelight 2.4.1 plugin은 별도 `:localdb` 모듈에만 적용한다. 생성 코드(`WishlistDatabase`·query·row 타입)는 public만 가능해서 `:shared`에 두면 ObjC header에 노출되기 때문이다. `:shared`는 이를 `implementation`으로만 쓰고 `SqlLocalStore`·`CachedGetItemRepository`·`DriverFactory`는 `internal`이다. 링크한 `Shared.h`에서 SQLDelight/SqlLocalStore 계열 심볼 0건을 확인했다. plugin이 `:localdb`에 있으므로 native binary의 `-lsqlite3`는 `:shared` iOS binary에서 직접 지정한다. 공개 면은 `repository/LocalStore`뿐이다.
-- **schema v2(`Wishlist.sq`, C3 Task 1):** `local_submission`(UUID `client_submission_id` PK, `source_url`, `shared_at_us` epoch µs 정수, nullable `account_binding`, `status`, `retry_after_us`, ClientError 분해 컬럼)와 `app_state(key, value)`. 대기 목록은 `(shared_at_us, client_submission_id)` 정수 정렬이다. µs 미만은 저장 때 절삭한다(서버 정밀도와 같음). **v1→v2 migration(`1.sqm`):** v1 ISO text를 SQLite `strftime`으로 변환하므로 **ms 정밀도까지만 보존**하고 ms 미만 자릿수는 잃는다(v1 데이터는 개발 기기에만 있어 허용, C2 v1이 ms 미만을 쓰지 않았다는 근거는 없다). v1 `SUBMITTING`·`ACCEPTED`는 `PENDING`으로 바꿔 같은 key 재전송으로 복구하고 `server_item_id`는 버린다. 아래는 C2 당시 v1 설명이다. 이전 `local_submission`(UUID `client_submission_id` PK, `source_url`, `created_at` 정확한 ISO text, nullable `account_binding`, `status`, `server_item_id`, ClientError 분해 컬럼)과 `item_cache`(PK `(account_id, item_id)`, `version`, 상품·카테고리·목적·분석 상태 컬럼 전부 평탄화, 가격은 `DecimalAmount.canonical` text, Instant는 ISO text, `allowed_actions`는 정렬된 쉼표 text). 사용 query는 insert/select/delete 위주이며 조건은 `version <= ?` 삭제뿐이었다. 현재 schema 버전은 2이고 v1 DB는 위 `1.sqm`으로 올라간다.
+- **schema v2(`Wishlist.sq`, C3 Task 1·C3-D7):** 현재 schema 버전은 2다.
+  - `local_submission`: UUID `client_submission_id` PK, `source_url`, `shared_at_us`(epoch µs 정수), nullable `account_binding`, `status`(`PENDING`/`SUBMITTING`/`FAILED`), `retry_after_us`, `ClientError` 분해 컬럼. 대기 목록은 `(shared_at_us, client_submission_id)` 정수 정렬이고 µs 미만은 저장 때 절삭한다(서버 정밀도와 같음).
+  - `app_state(key, value)`: 계정과 무관한 기기 상태(`auth.account`, `onboarding.login.seen`).
+  - `item_cache`: C2와 같다. PK `(account_id, item_id)`, `version`, 상품·카테고리·목적·분석 상태 컬럼 평탄화, 가격은 `DecimalAmount.canonical` text, Instant는 ISO text, `allowed_actions`는 정렬된 쉼표 text. 조건부 쓰기는 `version <= ?` 삭제뿐이다.
+  - **v1→v2 migration(`1.sqm`):** v1 `local_submission`은 `created_at` ISO text와 `server_item_id`를 가졌다. migration은 ISO text를 SQLite `strftime`으로 바꾸므로 **ms 정밀도까지만 보존**한다(v1 데이터는 개발 기기에만 있어 허용, C2 v1이 ms 미만을 쓰지 않았다는 근거는 없다). v1 `SUBMITTING`·`ACCEPTED`는 `PENDING`으로 바꿔 같은 key 재전송으로 복구하고 `server_item_id`는 버린다. `SchemaMigrationTest`가 같은 초 안의 순서와 오류 컬럼 보존을 검증한다(Review Focus 5).
 - **계정 규칙:** 캐시 key는 (accountId, itemId)다. 같은 계정 재로그인은 캐시 행을 유지하되 이전 snapshot의 쓰기는 `SESSION_CHANGED`로 거절한다. `pending()`은 현재 계정 귀속분+미귀속분(로그아웃 상태는 미귀속만), `saveSubmission`은 binding이 null이거나 현재 계정일 때만 허용하고 나머지는 `VALIDATION/ACCOUNT_BINDING_MISMATCH`다. 같은 key를 다시 저장하면 기존 행을 그대로 두며 binding을 바꾸지 않는다(C3 Task 1부터 미귀속→계정 귀속은 `prepareFlush`에서만 일어난다). 예외로, 이미 귀속된 행에 다른 binding으로 다시 저장하면 같은 URL이어도 `ACCOUNT_BINDING_MISMATCH`다. 현재 계정에 귀속된 행에 binding null로 다시 저장하는 경우도 여기에 해당한다. `accept`는 pending이 snapshot 계정에 귀속된 경우에만 받는다(미귀속·타 계정은 같은 code).
 - **transaction 계약:** 계정에 의존하는 연산은 session gate(`withCurrent`) → DB transaction 순서이며(계정과 무관한 `importSubmission`·`readAppState`·`writeAppState`는 gate 없이 DB만 쓴다) gate 안에는 짧은 DB commit만 둔다(네트워크·delay 없음). `accept`는 한 transaction에서 캐시 upsert(또는 DELETED replay면 tombstone version 이하 캐시 삭제)와 pending 삭제를 수행하고, 중간 오류는 둘 다 rollback한다. 낮은·같은 version의 upsert는 건너뛰고 더 높은 version만 교체한다. `removeCachedItem`은 `throughVersion` 이하만 지우고 `clearCurrentCache`는 현재 계정 캐시만 지우며 pending은 보존한다. DB/driver 예외는 `UNAVAILABLE/LOCAL_STORE_FAILURE`로 바꾸고 취소는 항상 전파한다. rollback 오류 주입은 `SqlLocalStore`의 internal 생성자 hook(테스트 전용)이다.
 - **C3 저장 계약 추가(Task 1):** `saveSubmission`·`importSubmission`은 key 가드를 공유한다. 새 key는 `INSERT OR IGNORE`, 같은 key·같은 URL은 기존 행 유지(no-op Success, 상태·binding 그대로), 같은 key·다른 URL은 `CONFLICT/SUBMISSION_KEY_REUSED`다. `saveSubmission`은 현재 계정 기준 binding 규칙(null 또는 현재 계정, 기존 binding과 다르면 `ACCOUNT_BINDING_MISMATCH`)을 유지한다. 그래서 현재 계정에 이미 귀속된 행에 같은 key·같은 URL을 binding null로 다시 저장하면 no-op이 아니라 `ACCOUNT_BINDING_MISMATCH`다. 그리고 `importSubmission`(iOS inbox)은 공유 시점 binding을 그대로 받으며 session gate를 거치지 않는다. `prepareFlush(snapshot)`는 한 transaction에서 그 계정(과 미귀속)의 `SUBMITTING`→`PENDING`, 미귀속→그 계정 binding, 그 계정 전체 대기 목록 반환을 한다. `markSubmission`은 snapshot 계정에 묶인 행만 바꾼다(미귀속·다른 계정은 `ACCOUNT_BINDING_MISMATCH`, 없으면 `NOT_FOUND/SUBMISSION_NOT_FOUND`). `accept`는 `Uuid.parse`로 `item.clientSubmissionId`와 key를 대소문자 무관 비교해 다르면(또는 UUID가 아니면) `VALIDATION/SUBMISSION_ITEM_MISMATCH`로 아무것도 쓰지 않는다. `processingItems`는 그 계정 캐시의 `ACTIVE`+`PROCESSING`만, `readAppState`·`writeAppState`(null=삭제)는 계정과 무관한 기기 상태다.
 - **decorator 계약:** `CachedGetItemRepository(delegate, localStore, session)`는 snapshot→cache read(version 관찰)→snapshot 확인→delegate→cache write→동일 snapshot 확인→반환 순서다. 성공은 upsert, `NOT_FOUND`는 관찰한 version 이하만 제거(캐시가 없었으면 no-op)해 늦은 404가 새 version을 지우지 않는다. 일반 오류는 캐시를 유지한다. 반환은 항상 delegate 응답이라 같은 version 캐시를 건너뛰어도 최신 표시명을 받는다. 캐시 read/write 실패는 ClientError로 반환하고, 계정/세대가 바뀌면 결과와 commit을 거절한다. 로그아웃 상태에서는 캐시 없이 delegate 결과를 그대로 반환한다. Presenter는 `GetItemRepository`만 소비한다.
-- **driver·검증 범위:** Android는 `AndroidSqliteDriver`(앱 sandbox, `DriverFactory(context)`), iOS는 `NativeSqliteDriver`다. 동작 suite는 같은 commonTest를 JDBC SQLite(androidHostTest, 임시 파일)와 Native SQLite(iosSimulatorArm64Test, 임시 파일)에서 `expect` 테스트 driver factory로 실행하며 close/reopen을 검증한다. Robolectric/에뮬레이터가 없어 Android Context driver는 컴파일만 확인했고 실기기 runtime smoke는 C3로 넘긴다.
+- **driver·검증 범위:** Android는 `AndroidSqliteDriver`(앱 sandbox, `DriverFactory(context)`), iOS는 `NativeSqliteDriver`다. 동작 suite는 같은 commonTest를 JDBC SQLite(androidHostTest, 임시 파일)와 Native SQLite(iosSimulatorArm64Test, 임시 파일)에서 `expect` 테스트 driver factory로 실행하며 close/reopen을 검증한다. Android Context driver는 C2에서 컴파일만 확인했고, C3 Task 5 에뮬레이터 smoke(API 36)에서 공유 → `am force-stop` → 재실행 뒤 대기 줄이 남는 것으로 실제 `wishlist.db` 동작을 확인했다. v1→v2 migration을 Android 기기 driver로 실행해 보지는 않았다(JDBC·Native에서만 검증).
 
 ## API별 backend·SharedRuntime 조립
 
@@ -167,16 +171,30 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - **앱이 넘기는 값(C2):** DEBUG는 ITEM-01·03만 FAKE, 나머지 35개 UNAVAILABLE. RELEASE는 37개 모두 UNAVAILABLE. 두 앱 모두 remote config가 없다. REMOTE(ITEM-01·03)는 MockEngine 테스트에서만 조립한다.
 - **graph:** runtime 하나에 `MutableAuthSession` 하나를 두고 Fake store·SQL 저장소·token adapter·transport·Remote가 모두 그 session을 받는다. Fake 부품은 DEBUG에만 있고(RELEASE graph에는 `FakeStore` 정의가 없다), HTTP 부품은 REMOTE가 있을 때만 있다. ITEM-01/03 delegate는 binding대로 Fake·Remote·`UnavailableItemRepository` 중 하나이며, 테스트 helper `resolvedBackend`는 binding이 아니라 graph에 실제 연결된 delegate를 확인한다.
 - **facade:** `createItemRepository()`(ITEM-01), `getItemRepository()`(ITEM-03), `catalogRepository()`, `localStore()`는 구체 accessor다. Get facade는 선택한 delegate를 `CachedGetItemRepository`로 정확히 한 번 감싼다. UNAVAILABLE delegate의 오류(`UNAVAILABLE/API_UNAVAILABLE`)는 일반 오류이므로 캐시를 유지한다. `catalogRepository()`는 DEBUG에서만 seed 조회(Fake)이고 RELEASE에서는 UNAVAILABLE이다. 이는 CAT/PUR/ITEM-02 wire API의 Fake 완료가 아니다.
-- **ready·debug bootstrap:** 모든 facade 요청은 `ready`가 false면 `UNAVAILABLE/RUNTIME_NOT_READY`다. RELEASE는 조립 직후 ready=true이고 `startDebugSession()` 호출은 오류다. DEBUG는 로그인 전(`accountId == null`)으로 시작하고, 앱의 `DebugSessionBootstrap`이 `startDebugSession()`을 부르면 runtime scope가 `FakeAuthFacade.restore()`(app_state `auth.account` 읽기 → 깨진 값은 삭제 후 로그아웃 상태 → `changeAccount` → 그 계정 namespace에 `BoardSeeds` 주입) 뒤 ready=true를 게시한다(중복 호출은 무시). 저장된 계정이 없으면 seed 없이 ready다. C3 Task 1부터 seed 실패나 예외도 ready=true를 게시하고 원인을 공개 `bootstrapFailure: StateFlow<ClientError?>`에 둔다(실패 결과면 그 error, 예외면 `UNAVAILABLE/BOOTSTRAP_FAILURE`; 같은 처리를 하는 `CoroutineExceptionHandler`는 bootstrap launch에만 달려 있어 runtime scope의 다른 job 실패는 bootstrap 실패로 보고되지 않는다). seed 항목의 `createdAt`은 보드 순서대로 1분씩 앞서므로 seed 목록은 무작위 UUID와 무관하게 l1..l8 순서다.
-- **AuthFacade(C3 Task 2):** `runtime.auth()`는 DEBUG에서 `FakeAuthFacade`(ready 게이트), RELEASE·close 후에서는 `UnavailableAuthFacade`(restored=true, account=null, signIn=`UNAVAILABLE`, `hasSeenFirstRunLogin()`=true로 실제 인증 전까지 첫 실행 로그인 안내를 숨김)다. DEBUG의 `restored`는 ready 게시 직후에 true가 되므로 `restored`를 본 호출자는 게이트에 거절당하지 않는다. `restore`·`signIn`·`signOut`은 하나의 Mutex로 직렬화하고(락은 store/session gate보다 먼저 잡는다), 로그인 상태에서 `signIn`하면 먼저 signOut 경로(캐시 삭제 → 저장 계정 삭제)를 수행한다. seed 예외는 잡아서 signIn에서는 무시하고 restore에서는 `UNAVAILABLE/BOOTSTRAP_FAILURE`로 보고하며 계정은 로그인 상태를 유지한다. `account`/`restored` StateFlow, `signIn(provider)`/`signOut()`, `hasSeenFirstRunLogin()`/`markFirstRunLoginSeen()`을 제공하고 상태는 app_state 키 `auth.account`(`<PROVIDER>|<accountId>|<email>`)와 `onboarding.login.seen`(`1`)에 둔다. signIn 순서는 계정 저장 → `changeAccount` → 그 namespace seed → `account` 게시 → `onSignedIn` 콜백(runtime이 `submissions().requestFlush(SIGNED_IN)`으로 연결, C3 Task 3)이고, seed 실패는 signIn 실패가 아니다. signOut 순서는 `clearCurrentCache()`(미전송 submission 보존) → 저장 계정 삭제 → `changeAccount(null)`이다. 복원 중 seed 실패/읽기 실패는 계정을 유지한 채 `bootstrapFailure`로 보고한다. fake 계정은 GOOGLE `fake-google-0001`/`user@example.com`, APPLE `fake-apple-0001`/`apple@example.com`이다. `MutableAuthSession`은 `internal`이라 앱 코드는 `changeAccount`를 호출할 수 없다(공개 `SharedRuntime.session`은 읽기 전용 `AuthSession`).
+- **ready·debug bootstrap:** 모든 facade 요청은 `ready`가 false면 `UNAVAILABLE/RUNTIME_NOT_READY`다. RELEASE는 조립 직후 ready=true이고 `startDebugSession()` 호출은 오류다. DEBUG는 로그인 전(`accountId == null`)으로 시작하고, 앱의 `DebugSessionBootstrap`이 `startDebugSession()`을 부르면 runtime scope가 `FakeAuthFacade.restore()`(저장 계정 복원 → 그 계정 namespace에 `BoardSeeds` 주입, 아래 인증 facade 절) 뒤 ready=true를 게시한다(중복 호출은 무시). 저장된 계정이 없으면 seed 없이 ready다. C3 Task 1부터 seed 실패나 예외도 ready=true를 게시하고 원인을 공개 `bootstrapFailure: StateFlow<ClientError?>`에 둔다(실패 결과면 그 error, 예외면 `UNAVAILABLE/BOOTSTRAP_FAILURE`; 같은 처리를 하는 `CoroutineExceptionHandler`는 bootstrap launch에만 달려 있어 runtime scope의 다른 job 실패는 bootstrap 실패로 보고되지 않는다). seed 항목의 `createdAt`은 보드 순서대로 1분씩 앞서므로 seed 목록은 무작위 UUID와 무관하게 l1..l8 순서다.
+- **AuthFacade:** `runtime.auth()`의 구현과 순서는 아래 [인증 facade](#인증-facadeauthfacade-c3) 절에 있다.
 - **자원 수명:** HTTP engine은 처음 필요한 facade를 얻을 때 연다. SQL driver는 C3 Task 1부터 `LazyDriver`가 store의 첫 실제 사용 때 `RuntimeDispatchers.io`에서 한 번만 연다(facade 조회만으로는 열지 않으며 RELEASE의 `getItemRepository()`도 열지 않는다). Android `DriverFactory`는 `AndroidSqliteDriver`가 파일을 첫 statement 때 여는 점 때문에 생성 직후 `PRAGMA user_version`을 읽어 그 io 호출 안에서 열고 migration한다. driver는 실제로 열렸을 때만 `ResourceRegistry`에 등록한다. graph 조회, debug ready 게시, 그리고 `SqlLocalStore`의 모든 DB 작업은 lock 없는 close guard(`CloseGuard`, 사용 중 수 + closing 상태를 한 StateFlow에서 CAS)의 사용자다. DB 작업은 store 안의 `leased` 한 곳에서 guard를 `StoreLease`로 잡는다: `enter()` → (첫 driver open) → session gate → SQL → gate 해제 → `exit()`(취소돼도 finally). lease는 기다리지 않는 계수기일 뿐 lock이 아니므로 lock 순서(session gate → DB transaction)에 새 간선을 만들지 않고, 정리는 session gate 밖에서만 돈다. lease가 store 안에 있으므로 gated facade를 거치지 않고 graph의 store를 직접 쓰는 `CachedGetItemRepository`·`FakeAuthFacade`도 같은 보호를 받는다. `close()`는 어느 스레드에서든 한 번만 동작하고 기다리지 않는다. 즉시 ready=false, 새 graph 조회와 새 DB 작업 거절(DB를 건드리지 않고 `UNAVAILABLE/RUNTIME_NOT_READY`), runtime scope 취소를 한다. 실제 정리(만든 자원만 생성 역순으로 닫기, HttpClient는 넘겨받은 engine을 닫지 않으므로 둘 다 닫음 → Koin 종료 → ready=false)는 이미 진행 중인 graph 조회·ready 게시·DB 작업(첫 driver open 포함)이 모두 끝난 뒤 정확히 한 번, 마지막으로 나간 호출의 스레드(io 스레드일 수 있음)에서 실행된다. 그래서 닫힌 Koin을 조회하거나, 실행 중인 SQLite 호출 밑에서 driver가 닫히거나(C3 검증 중 iOS XCTest의 `selectItem` SIGSEGV 원인, Task 7c), close 뒤 ready가 true로 남지 않는다. close가 기다리지 않는 것은 진행 중인 HTTP 요청과 store 밖의 호출자 작업이다. 진행 중인 작업에서 close 뒤에 시작하는 다음 DB 단계(예: GET 뒤 캐시 쓰기)는 `RUNTIME_NOT_READY`로 끝난다. driver 등록 직후의 closed-registry 검사는 lease 밖 open이 없으므로 backstop일 뿐이다. close 이후 facade는 graph를 다시 열지 않고 `RUNTIME_NOT_READY`를 반환한다. `RuntimeCloseLeaseTest`가 실제 스레드 io dispatcher에서 driver 안에 멈춘 query(LocalStore 경로·캐시 GET 경로)와 close를 경합시켜 driver close가 query 뒤에 일어나는지, close 뒤 graph store 호출이 driver를 열지 않고 거절되는지 Android host·iOS simulator에서 검증한다. 닫기 횟수와 경합은 internal test seam(`PlatformResources`, bootstrap 게시 직전 hook)으로 검증한다.
 - **공개 면:** 진입점은 `SharedRuntimeFactory.create(context, bindings, remote)`(androidMain)와 `SharedRuntimeFactory.shared.create(bindings:remote:)`(iosMain)이고, 공개 타입은 `SharedRuntime`·`RepositoryBindings`·`RemoteConfig`·`Backend`·`ClientBuildMode`와 기존 repository interface다. 링크한 debug simulator·release device `Shared.h`에서 Koin/Ktor/SQLDelight·HttpClient·SqlDriver·내부 DI 타입 0건을 확인했다. Swift에서는 SKIE가 `RepositoryBindings(buildMode:backends:)`의 map을 `[ApiId: Backend]`로, `ready`를 `for await` 가능한 Flow로 노출한다(RELEASE 상수는 Swift에서 `.theRelease`).
 - **static framework 링크:** runtime factory가 Native SQLite driver를 참조하므로 iOS 앱 target은 `-lsqlite3`를 직접 링크한다(static `Shared.framework`의 linker 옵션은 소비자에게 전달되지 않는다).
-- **남은 점:** `SqlLocalStore`는 DB I/O를 호출자 dispatcher에서 실행한다. Presenter 경로는 Task 9에서 runtime이 `RuntimeDispatchers.io`를 주입해 UI 스레드 밖에서 실행한다(아래 절). facade를 직접 부르는 다른 호출자는 호출 측 dispatcher를 따른다.
+- **남은 점:** `SqlLocalStore`는 DB I/O를 호출자 dispatcher에서 실행한다. Presenter(`itemDetailPresenter()`·`accountPresenter()`·`homePresenter()`)와 `SubmissionCoordinator`는 runtime이 `RuntimeDispatchers.io`를 주입해 UI 스레드 밖에서 실행한다. facade를 직접 부르는 다른 호출자는 호출 측 dispatcher를 따른다.
+
+## 인증 facade(AuthFacade, C3)
+
+> 2026-10-07 C3 Task 2(C3-D2). 실제 Firebase·Apple·Google 연결은 "인증 연결" 단계에서 같은 `AuthFacade` 뒤에 붙인다.
+
+- **공개 면:** `runtime.auth()`는 `account`/`restored` StateFlow, `signIn(provider)`/`signOut()`, `hasSeenFirstRunLogin()`/`markFirstRunLoginSeen()`을 제공한다. `MutableAuthSession`은 `internal`이라 앱 코드는 `changeAccount`를 호출할 수 없다(공개 `SharedRuntime.session`은 읽기 전용 `AuthSession`, `Shared.h`에 `MutableAuthSession` 0건).
+- **구현 선택:** DEBUG는 `FakeAuthFacade`(ready 게이트를 거침), RELEASE·close 뒤는 `UnavailableAuthFacade`다. 후자는 restored=true, account=null, signIn=`UNAVAILABLE`이고 `hasSeenFirstRunLogin()`=true라 실제 인증 전까지 첫 실행 로그인 안내를 숨긴다(Ruling 8). RELEASE도 로그인 전 로컬 공유 저장은 동작한다.
+- **상태 저장:** app_state 키 `auth.account`(`<PROVIDER>|<accountId>|<email>`)와 `onboarding.login.seen`(`1`). fake 계정은 GOOGLE `fake-google-0001`/`user@example.com`, APPLE `fake-apple-0001`/`apple@example.com`이다(C3-D5 i).
+- **순서:** `restore`·`signIn`·`signOut`은 하나의 Mutex로 직렬화한다(이 락은 store/session gate보다 먼저 잡는다).
+  - restore: 저장 계정 읽기 → 깨진 값은 삭제 후 로그아웃 상태 → `changeAccount` → 그 namespace seed → ready 게시 직후 `restored=true`. 그래서 `restored`를 본 호출자는 ready 게이트에 거절당하지 않는다.
+  - signIn: (로그인 상태면 먼저 signOut 경로) → 계정 저장 → `changeAccount` → 그 namespace seed → `account` 게시 → `onSignedIn` 콜백. runtime이 콜백을 `submissions().requestFlush(SIGNED_IN)`으로 연결한다(순환 의존을 피하려 DI에서 람다로 연결).
+  - signOut: `clearCurrentCache()`(미전송 submission은 보존·숨김, C3-D5 d) → 저장 계정 삭제 → `changeAccount(null)`.
+- **실패:** seed 실패·예외는 signIn 실패가 아니다(signIn에서는 무시, 계정은 로그인 상태 유지). restore 중 seed·읽기 실패는 계정을 유지한 채 `bootstrapFailure`(`UNAVAILABLE/BOOTSTRAP_FAILURE`)로 보고한다.
+- **검증:** `AuthFacadeTest`(복원·순서 고정·직렬화·seed 예외·RELEASE facade)와 `SharedModulesTest`(로그인 전 시작, ready 전 복원)를 Android host·iOS simulator에서 실행한다.
 
 ## 공유 수신·전송 조정기(SubmissionCoordinator)
 
-> 2026-10-07 C3 Task 3 구현(C3-D4·D6·D8·D9). 패키지 `submission/`, 공유 글 규칙은 `domain/ShareTextParser`·`domain/DisplayFormat`.
+> 2026-10-07 C3 Task 3 구현(C3-D4·D6·D8·D9). 패키지 `submission/`, 공유 글 규칙은 `domain/ShareTextParser`·`domain/DisplayFormat`. 공유 수신 방식(C3-D1, iOS inbox·Android 즉시 전송)은 [ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md).
 
 - **공개 면:** `SharedRuntime.submissions()`가 runtime당 하나의 `SubmissionCoordinator`를 처음 쓸 때 만든다(gated store·ITEM-01·ITEM-03 facade, runtime scope, io dispatcher). `view: StateFlow<SubmissionView(accountId, local, processing, flushing)>`, `receiveShared(text, online): ShareCardKind`(Android), `importInbox(records): InboxImportResult`(iOS inbox), `requestFlush(trigger)`(fire-and-forget), `refresh(trigger)`(당겨서 새로고침·foreground가 기다림). `ShareCardKind`는 `SAVED·LOCAL·OFFLINE·INVALID·STORE_FAILED`이고 iOS 확장의 `SAVED_OPEN_APP`은 Swift enum에만 있다(확장은 Shared를 링크하지 않는다). 앱 수준 foreground 신호는 `refresh(FOREGROUND)`를 부르며 HomePresenter는 `view`만 구독한다.
 - **공유 글 parser:** `(?i)https?://[^\s<>"'　]+`의 첫 매치에서 끝의 `.,;:!?`와 짝 없는 `) ] } > 」 』 ' "`를 반복 제거하고, host가 비면 `NoLink`, UTF-16 길이 2048 초과면 `TooLong`이다. 대소문자·percent-encoding은 그대로 둔다. Swift extractor(Task 6)와 같은 벡터 표로 검증한다. `DisplayFormat.host`는 소문자·`www.` 제거(host가 없으면 앞 40자), `relative(from, now, utcOffsetSeconds)`는 1분 미만(미래 포함) `JustNow`, 그다음 달력 날짜 차이(≥2 `Days`, 1 `Yesterday`)가 경과 시간보다 우선하고, 같은 날이면 `Minutes`/`Hours`다. kotlinx-datetime 없이 플랫폼이 준 UTC offset으로 날짜를 계산한다.
@@ -193,6 +211,8 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 | SESSION_CHANGED | binding 유지(store 쓰기가 거절되어 SUBMITTING으로 남음) | 중단 |
 | UNAUTHENTICATED | PENDING | 중단 |
 | VALIDATION·CONFLICT | FAILED(자동 재전송 없음) | 계속 |
+
+`accept`가 `VALIDATION/SUBMISSION_ITEM_MISMATCH`를 돌려주면(서버가 다른 key의 항목을 돌려준 비정상 응답) 그 행도 FAILED가 된다. 이때는 서버에 항목이 이미 있을 수 있는데 줄은 "보낼 수 없는 링크예요"로 남는다. 실서버 연결 때 다시 본다(아래 알려진 한계).
 
 - **실패 격리:** 조정기 안의 모든 단계는 typed 결과다. ITEM-01/03·store·`beforeRefresh`가 예외를 던지면(조정기 coroutine이 아직 active인데 새어 나온 `CancellationException` 포함, 실제 취소는 전파) `UNAVAILABLE/SUBMISSION_STEP_FAILURE`(전송이면 그 행에 PENDING으로 기록) 또는 생략으로 바꾸고 consumer는 계속 산다. runtime scope로 예외가 새지 않아 `bootstrapFailure`도 바뀌지 않는다.
 - **view:** session·ready 변경과 각 쓰기 뒤에 `pending()`(로그인: 이 계정+미귀속, 로그아웃: 미귀속만)과 `processingItems(snapshot)`(Kotlin에서 `createdAt`, id 순 정렬)으로 다시 계산한다. 게시는 `session.withCurrent(snapshot)` 안에서 하므로(lock 순서 viewLock → session gate) 계산 도중 계정이 바뀌면 결과를 버리고 새 계정이 된 뒤 이전 계정 view가 게시되지 않으며, 읽기 실패 때는 같은 계정이면 이전 목록을 유지하고 다른 계정이면 비운다. 그래서 다른 계정의 미전송은 보이지 않는다.
@@ -217,6 +237,8 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 
 ## 로그인·홈 Presenter (C3)
 
+> 2026-10-07 C3 Task 4. 화면 쪽 소유자는 [Android](android.md)·[iOS](ios.md)의 C3 절.
+
 `SharedRuntime.accountPresenter()`와 `homePresenter()`는 호출마다 새 인스턴스를 만들며(runtime io dispatcher 위), 플랫폼 소유자가 `close()`한다. 둘 다 `ItemDetailPresenter`처럼 단일 레인 scope, 멱등 `close()`, close 뒤 intent 무시를 따르고 생성자는 `internal`이다.
 
 - `AccountPresenter`: `AccountState(restored, account, showFirstRunLogin, signingIn, error)`. 첫 실행 로그인은 복원이 끝난 뒤 저장 플래그를 읽고, 로그인 중 `signIn` 중복 탭은 무시하며, 한 번이라도 로그인했거나 건너뛰면 다시 보이지 않는다(로그아웃 뒤에도).
@@ -229,24 +251,50 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 
 - 의존성 baseline(Kotlin 2.3.21·AGP 9.0.0·Gradle 9.3.0·catalog)은 Task 1 이후 변경이 없다([호환성 기록](../../history/architecture/client/c2-dependency-compatibility-2026-10-07.md)).
 - shared commonTest는 Android host 246개·iOS simulator 243개(차이 3개는 Android host 전용 `OkHttpRedirectTest`), Android 단위 테스트는 debug/release 각 66개, iOS XCTest 81개를 실행했고 실패·오류·skip은 0이다.
-- Android Context SQLite driver는 compile/assemble만 확인했고 기기 runtime smoke는 C3로 넘긴다. Darwin redirect는 Ktor 3.4.3 delegate 소스 검토만 했고 실제 검증은 C12다. 실서버 호출은 어디에서도 실행하지 않았다.
-- 각 Task 리뷰에서 남긴 경미한 결함(deferred minor)은 수정하지 않았다. 남은 한계는 아래 [알려진 한계와 인계 단계](#알려진-한계와-인계-단계)에 단계별로 모았다.
+- Android Context SQLite driver는 compile/assemble만 확인했고 기기 runtime smoke는 C3로 넘겼다(C3 Task 5에서 확인). Darwin redirect는 Ktor 3.4.3 delegate 소스 검토만 했고 실제 검증은 C12다. 실서버 호출은 어디에서도 실행하지 않았다.
+
+## C3 최종 검증 요약
+
+> 2026-10-07 C3 Task 8. 명령·건수·로그 경로는 [C3 검증 기록](../../history/architecture/client/c3-verification-2026-10-07.md#최종-로컬-검증-task-8)에 있다.
+
+- 의존성 추가 없음. shared commonTest는 Android host 364개·iOS simulator 361개(C3 시작 246·243), Android 단위 테스트 debug/release 각 87개(66), iOS XCTest 116개(81)이고 실패·오류·skip 0이다. `gen_tokens` 테스트·`--check`, Android assemble·lint(오류 0), `linkReleaseFrameworkIosArm64`, iOS Release simulator build가 통과했다.
+- Review Focus 1~5는 commonTest(`SubmissionCoordinatorTest`·`LocalStoreContractTest`·`SchemaMigrationTest`·`ShareTextParserTest`)와 XCTest(`InboxWriterReaderTests`·`ShareTextExtractorTests`)로 고정했다. 계정 전환·강제 종료 복구는 두 앱에서 debug hook으로 직접 확인했다.
+- 실서버·실제 인증·실기기 공유 확장은 실행하지 않았다("인증 연결" 단계).
 
 ## 알려진 한계와 인계 단계
 
-> C2 최종 리뷰 시점의 미해결 경미 결함이다. 아래 항목은 **수정되지 않았다.** 해당 단계가 시작될 때 먼저 처리한다. 후속 단계 표는 [C2 계획의 후속 단계 인계](../../superpowers/plans/2026-10-07-client-c2-kmp-core.md#후속-단계-인계)에 있다.
+> C2 최종 리뷰와 C3 각 task 리뷰에서 수정하지 않고 남긴 경미한 결함이다. "상태"가 비어 있는 행은 **수정되지 않았다.** 해당 단계가 시작될 때 먼저 처리한다. 후속 단계 표는 [C2 계획의 후속 단계 인계](../../superpowers/plans/2026-10-07-client-c2-kmp-core.md#후속-단계-인계)와 [C3 계획의 후속 단계 인계](../../superpowers/plans/2026-10-07-client-c3-share-save.md#후속-단계-인계초안)에 있다. 플랫폼 화면 쪽 한계는 [Android](android.md#c3-남은-점)·[iOS](ios.md#c3-남은-점) 문서에 있다.
+
+### C2에서 넘어온 항목
+
+| 한계 | 담당 단계 | 상태 |
+|--|--|--|
+| `pending()`이 ISO 텍스트로 정렬되어 같은 초 안에서 순서가 틀린다 | C3 | 해결(`fff233a`): v2 `shared_at_us` 정수 정렬 |
+| `accept`가 `item.clientSubmissionId == submissionId`를 확인하지 않는다 | C3 | 해결(`fff233a`): `Uuid.parse` 비교, 다르면 `SUBMISSION_ITEM_MISMATCH` |
+| `saveSubmission`이 기존 key를 다른 URL로 다시 저장하면 조용히 덮어쓴다 | C3 | 해결(`fff233a`): 같은 key·다른 URL은 `CONFLICT/SUBMISSION_KEY_REUSED` |
+| 첫 facade 호출이 호출 스레드에서 SQLite driver를 연다. RELEASE도 `getItemRepository`용 DB를 연다 | C3 | 해결(`fff233a`, 첫 open 취소 `108a07f`): `LazyDriver`가 첫 실제 사용 때 io에서 한 번만 연다 |
+| DEBUG seed가 실패하면 runtime이 조용히 ready가 되지 않는다 | C3 | 해결(`fff233a`, handler 범위 `108a07f`): ready 게시 + `bootstrapFailure` |
+| `changeAccount`가 공개 `MutableAuthSession`을 통해 Swift에서 보인다 | C3 | 해결(`c791412`): `MutableAuthSession` internal, 앱은 `auth()`만 쓴다 |
+| Swift 테스트가 호스트 앱의 실제 `wishlist.db`를 공유한다 | 테스트 격리 후속 | 일부(`5846212`): XCTest host에서 앱 신호(inbox·refresh·네트워크)는 끈다. host 앱은 여전히 runtime을 만들고 debug 복원·seed를 같은 DB에 실행하며 여러 테스트 runtime도 그 파일을 연다. 테스트 전용 DB 경로가 필요하다 |
+| Fake는 UUID를 소문자로 정규화하지만 cache·LocalStore는 호출자의 원본 ID를 쓴다(대문자 ID는 stale cache row를 남기고, Presenter는 refresh 때 표시 중인 item을 버린다) | C4 | |
+| 계정이 바뀐 뒤 `retry()`가 이전 계정의 마지막 ID를 다시 요청한다(서버가 owner 범위라 누출은 없음) | C4 정책 결정 | |
+| repository의 의도치 않은 `CancellationException`이 `loading=true`를 남긴다. `close()` 뒤 state는 마지막 값을 유지한다 | C4 | |
+| 해독할 수 없는 cache row 하나가 그 item의 네트워크 GET을 막는다(계획대로의 동작) | C4에서 cache miss 처리 검토 | |
+| `ScriptedItemServer`가 UUID가 아닌 id에 404를 돌려주지만 서버·Fake는 400이다 | fixture를 다시 만질 때(C4) | |
+| Swift enum 이름 `.theRelease`가 어색하고, `RemoteConfig`는 https·path prefix를 검사하지 않는다 | 다듬기(C4/C12) | |
+
+### C3에서 생긴 항목
 
 | 한계 | 담당 단계 |
 |--|--|
-| Fake는 UUID를 소문자로 정규화하지만 cache·LocalStore는 호출자의 원본 ID를 쓴다(대문자 ID는 stale cache row를 남기고, Presenter는 refresh 때 표시 중인 item을 버린다) | C4 |
-| 계정이 바뀐 뒤 `retry()`가 이전 계정의 마지막 ID를 다시 요청한다(서버가 owner 범위라 누출은 없음) | C4 정책 결정 |
-| repository의 의도치 않은 `CancellationException`이 `loading=true`를 남긴다. `close()` 뒤 state는 마지막 값을 유지한다 | C4 |
-| 해독할 수 없는 cache row 하나가 그 item의 네트워크 GET을 막는다(계획대로의 동작) | C4에서 cache miss 처리 검토 |
-| Swift 테스트가 호스트 앱의 실제 `wishlist.db`를 공유한다 | 테스트 격리 후속 |
-| `ScriptedItemServer`가 UUID가 아닌 id에 404를 돌려주지만 서버·Fake는 400이다 | fixture를 다시 만질 때(C4) |
-| `changeAccount`가 공개 `MutableAuthSession`을 통해 Swift에서 보인다 | C3 Task 2에서 `MutableAuthSession`을 `internal`로 바꿔 해소(`Shared.h`에 0건). 앱은 `auth()`만 쓴다 |
-| Swift enum 이름 `.theRelease`가 어색하고, `RemoteConfig`는 https·path prefix를 검사하지 않는다 | 다듬기(C4/C12) |
+| ITEM-01 `NOT_FOUND`는 표에 없어 PENDING + 오류 기록으로 둔다(Ruling 9). 항상 404인 endpoint면 계속 재전송한다 | 인증 연결(실서버 ITEM-01 검증) |
+| `accept`의 `SUBMISSION_ITEM_MISMATCH`가 행을 FAILED로 두지만 서버에는 항목이 있을 수 있다 | 인증 연결(실서버 ITEM-01 검증) |
+| `close()`는 진행 중인 HTTP 요청을 기다리지 않는다(HttpClient·engine도 같은 정리에서 닫힘). 정리가 마지막 store 호출의 `finally`에서 돌아 `koinApplication.close()` 예외가 그 호출로 새어 나올 수 있다 | 인증 연결(REMOTE 활성화 전 정리 best-effort화) |
+| signIn이 seed 중 취소되면 저장 계정·session은 새 계정인데 `account`는 null로 남는다(취소에서만). 계정 전환 때 두 계정 사이에 잠깐 로그아웃 상태가 게시된다(화면 깜빡임 가능, 화면은 `Loading`으로 가림) | 인증 연결(Firebase facade로 교체할 때) |
+| 첫 실행 플래그 읽기 실패는 "안 봄", 쓰기 실패는 버린다. signIn의 seed 실패는 기록 없이 무시한다(logger 없음) | 인증 연결 |
+| 전송된 행마다 view 재계산을 따로 launch해 N개 전송에 재계산 N번이 더 돈다. NETWORK·TIMEOUT·RATE_LIMITED에서 flush를 멈춰 실패 행 하나가 다음 신호까지 나머지를 늦춘다(Ruling 10, 의도) | C7(목록 규모가 커질 때) |
+| 테스트 보강: `HomePresenterTest`의 정렬 단언이 입력을 정렬해 비교해 실패할 수 없다. `homePresenter()`/`accountPresenter()` runtime 연결 smoke 테스트가 없다. 닫힌 store 호출 테스트가 close 뒤 DB 미접촉을 단언하지 않는다 | 다음 Presenter 변경 때(C4) |
+| 계층: `data.fake.FakeAuthFacade`가 `di.BOOTSTRAP_FAILURE`를, `data.local.SqlLocalStore`가 `di.RUNTIME_NOT_READY`를 가져온다. release `Shared.h`에 DEBUG 전용 `DebugControls`가 남는다(같은 Kotlin binary) | 다듬기(C12) |
+| DEBUG Fake 전용: `failNext`/`delayNext`가 `SESSION_CHANGED` 거절 전에 소비되고, DEBUG 분석 진행이 대기 중인 `failNext(CAT_01)`를 소비할 수 있다 | debug 도구를 다시 만질 때 |
 
-C3 Task 1(2026-10-07)에서 해결해 표에서 뺀 항목: `pending()` 정수 정렬(v2 `shared_at_us`), `accept`의 submission 일치 검사, 같은 key·다른 URL 가드, driver를 facade 조회가 아닌 첫 사용 때 io에서 열기, DEBUG seed 실패·예외 시 ready 게시와 `bootstrapFailure` 노출.
-
-참고: `ItemDetailPresenter`의 `CoroutineDispatcher` 생성자는 Android 단위 테스트가 쓰므로 Kotlin에서는 공개로 두며(`@HiddenFromObjC`는 생성자에 적용할 수 없다), Swift는 `SharedRuntime.itemDetailPresenter()`만 쓴다. C3 이후 필요하면 factory로 감싸 숨긴다. `data.fake` 계층과 `RuntimeDispatchers`는 `internal`이라 RELEASE `Shared.h`에 나오지 않는다.
+참고: `ItemDetailPresenter`의 `CoroutineDispatcher` 생성자는 Android 단위 테스트가 쓰므로 Kotlin에서는 공개로 두며(`@HiddenFromObjC`는 생성자에 적용할 수 없다), Swift는 `SharedRuntime.itemDetailPresenter()`만 쓴다. C3의 `AccountPresenter`·`HomePresenter` 생성자는 `internal`이다(Android 소유자 테스트는 그래서 reflection을 쓴다). `data.fake` 계층과 `RuntimeDispatchers`는 `internal`이라 RELEASE `Shared.h`에 나오지 않는다.

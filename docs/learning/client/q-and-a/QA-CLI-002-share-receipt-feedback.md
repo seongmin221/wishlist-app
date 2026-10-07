@@ -16,6 +16,8 @@
 
 카드는 저장 확인과 상태 한 줄만 두고 버튼 없이 1~2초 뒤 자동으로 닫는다. 로그인 상태에서 "정보를 가져오는 중이에요"라고 쓰려면 확장이 공유된 로그인 토큰으로 직접 서버에 저장 요청을 보내야 한다. 확장이 로컬 저장만 하고 전송을 앱에 맡길지는 아직 정하지 않았다.
 
+2026-10-07 C3에서 결정했다([ADR-030](../../../history/architecture/client/ADR-030-share-receipt-mode.md)): iOS 확장은 app group inbox에 기록만 하고 앱이 전송한다(직접 전송 자리는 인증 연결 단계에서 켬). iOS 로그인 상태 문구는 "앱을 열면 정보를 가져와요"다. 후속 질문은 [QA-CLI-012](QA-CLI-012-ios-share-starts-analysis.md).
+
 ## 관련 문서
 
 - [상품 저장](../../../product/save-a-product.md)

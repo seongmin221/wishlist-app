@@ -1,4 +1,4 @@
-# C3 화면 비교·예외 경로·성능 측정 (Task 7)
+# C3 화면 비교·예외 경로·성능 측정·최종 검증 (Task 7·8)
 
 > 2026-10-07 · 브랜치 `seongmin221/client-c3-share-save` · 코드 기준 `de01ded` · 스크린샷은 저장소에 넣지 않고 PR에 첨부한다
 
@@ -107,3 +107,21 @@ iOS는 `xcrun xctrace record`(Time Profiler, attach)가 기록을 시작한 뒤 
 - **수정:** `SqlLocalStore`의 모든 DB 작업이 runtime의 `CloseGuard`를 `StoreLease`로 잡는다. close 뒤 시작하는 작업은 DB를 건드리지 않고 `UNAVAILABLE/RUNTIME_NOT_READY`이고, 정리는 마지막 작업이 나갈 때 그 스레드에서 실행된다. lease는 lock이 아니라 계수기라 lock 순서는 그대로다. 공개 API는 바뀌지 않았다. 계약은 [KMP 문서의 자원 수명](../../../architecture/client/kmp.md)에 있다.
 - **테스트:** `RuntimeCloseLeaseTest`(3개)가 실제 스레드 io dispatcher에서 driver 안에 멈춘 query와 close를 경합시킨다. 수정 전에는 3개 모두 두 runtime에서 실패했다(driver가 query 중에 닫힘, close 뒤 graph store가 `LOCAL_STORE_FAILURE`). `SharedInteropTests`의 retry 대기는 다른 계정으로 바꾼 뒤 retry가 만든 NOT_FOUND를 기다리도록 고쳤다. `RuntimeDebugControlsTest`에 close 뒤 null 검사를 더했다.
 - **결과:** host 364, simulator 361, Android unit 87, IOS_TEST 116을 3회 연속 통과했다.
+
+## 최종 로컬 검증 (Task 8)
+
+> 2026-10-07 23:18~23:23 KST · 코드 기준 `c4320ce` · JDK 17(`/opt/homebrew/opt/openjdk@17`), Xcode 26.6(`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`), iPhone 17 Pro 시뮬레이터 `AFBA9C17-206B-4EA6-A508-EF6E0CE2D7B0` iOS 26.5. 로그는 저장소 밖 세션 scratchpad(`…/scratchpad/t8/`)에 있다.
+
+| 명령 | 결과 |
+| --- | --- |
+| `python3 -m unittest client/tools/test_gen_tokens.py` | 8개 통과 |
+| `python3 client/tools/gen_tokens.py --check` | 통과(생성물 최신) |
+| `./gradlew --rerun-tasks … :shared:testAndroidHostTest :shared:iosSimulatorArm64Test :shared:allTests :android:testDebugUnitTest :android:testReleaseUnitTest :android:assembleDebug :android:assembleRelease :android:lintDebug` | BUILD SUCCESSFUL, 162 task 모두 실행. XML 기준 host 364 · simulator 361 · Android debug 87 · release 87, 실패·오류·skip 0. lint 오류 0·경고 24(C3 전과 같은 종류: 버전 알림·`ModifierParameter`·`ComposableNaming` 등) |
+| `./gradlew --rerun-tasks … :shared:linkReleaseFrameworkIosArm64` | BUILD SUCCESSFUL |
+| IOS_TEST(접근성 defaults 쓰기 후 `xcodebuild test … CODE_SIGNING_ALLOWED=NO`) | TEST SUCCEEDED. xcresult `Test-Wishlist-2026.10.07_23-20-34-+0900`: total 116, passed 116, failed 0, skipped 0 |
+| iOS Release simulator build(`-configuration Release -sdk iphonesimulator … CODE_SIGNING_ALLOWED=NO build`) | BUILD SUCCEEDED, `PlugIns/ShareExtension.appex` 포함, 경고는 appintents 안내 2건뿐 |
+
+- 처음 같은 Gradle 명령은 test task가 UP-TO-DATE라 실제로 돌지 않았다. 결과 XML을 지우고 `--rerun-tasks`로 다시 실행해 위 건수를 얻었다.
+- C3 시작 baseline(host 246 · simulator 243 · Android 66 · XCTest 81) 대비 +118 · +118 · +21 · +35.
+- IOS_TEST 뒤 기본 서명 Debug 빌드(`-derivedDataPath /tmp/wishlist-signed-dd`, 앱·확장 `__entitlements` 있음)를 시뮬레이터에 다시 설치했다. `get_app_container … groups`가 `group.app.wishlist` 경로를 돌려준다.
+- 미실행: 실서버·실제 인증·실기기(인증 연결 단계), Android FShareSaved 온라인 촬영·iOS Instruments(위 "미실행·인계").

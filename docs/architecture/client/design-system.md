@@ -1,6 +1,6 @@
 # 디자인 시스템과 앱 뼈대 (C1)
 
-> 상태: **확정** · 2026-10-06 · Android(Compose)와 iOS(SwiftUI)가 같은 이름·같은 규칙으로 구현한다.
+> 상태: **확정** · 2026-10-06(C3 기능 화면 반영 2026-10-07) · Android(Compose)와 iOS(SwiftUI)가 같은 이름·같은 규칙으로 구현한다.
 
 디자인 값의 원본은 [디자인 결정](../../design/decisions.md), [모션 명세](../../../design/handoff/interactions/motion.md), 완성 화면 보드다. 이 문서는 그 값을 코드로 옮긴 구조를 설명한다. 플랫폼별 세부는 [android.md](android.md)·[ios.md](ios.md)의 "탭 셸과 화면 이동 (C1)" 절에 있다.
 
@@ -12,6 +12,7 @@
 | overlay(시트·확인창·메뉴) | `designsystem/overlay/` | `DesignSystem/Overlay/` |
 | 탭 셸·라우터 | `navigation/` | `Navigation/` |
 | 데모 화면 | `src/debug/kotlin/…/feature/demo/` | `Features/Demo/` (`#if DEBUG`) |
+| 기능 화면(C3) | `feature/{home,login,settings,session}/`, `share/`, `platform/` | `Features/{Home,Login,Settings,Session}/`, `Platform/`, 확장 `client/ios/ShareExtension/`·`client/ios/AppGroupShared/`(확장도 토큰·`WLTheme`·`WLCard`·`WLIconTile`·`WLLineIcon`을 함께 컴파일) |
 | 단위 테스트 | `src/test/kotlin/…` | `WishlistTests/` |
 
 ## 토큰 생성
@@ -157,17 +158,20 @@ Navigation Compose·`NavigationStack`·`TabView`를 쓰지 않는다. 두 플랫
 
 ## 알려진 한계
 
-C1에서 고치지 않고 남긴 것. C3 첫 실제 화면 전에 다시 본다.
+C1에서 고치지 않고 남긴 것과 C3 첫 실제 화면에서 드러난 것이다.
 
 - **navigation 복원 계약:** Android feature route는 `AppRouteCodec`에 등록해야 한다. 버전 변경 뒤 route 데이터 migration 정책은 실제 기능 모델과 함께 정한다. iOS navigator 저장·복원은 아직 없다.
 - **overlay 저장·복원:** `SheetEntry.content`·확인 콜백 등 UI 람다는 저장 가능한 데이터가 아니다. 프로세스 종료 복원을 구현할 때 overlay의 종류·id·입력 데이터만 저장하고 화면 content와 동작은 현재 feature 상태에서 다시 연결해야 한다. 오래된 상태를 capture하지 않도록 열린 overlay의 데이터 갱신도 함께 설계한다.
-- **외부 진입:** 두 플랫폼 모두 앱 루트 navigator 제공을 완료했다. C3 공유 intent/Share Extension의 pending URL 복구와 구체적인 목적지 연결은 별도 기능이다.
+- **외부 진입:** 두 플랫폼 모두 앱 루트 navigator 제공을 완료했다. C3 공유 수신은 navigator를 거치지 않는다(Android는 별도 투명 Activity, iOS는 확장 + app group inbox). 공유한 항목으로 바로 이동하는 목적지 연결은 아직 없다.
 - `WLScrollToTopEffect`는 `ScrollState`만 받는다. Lazy 목록은 `LazyListState` 오버로드가 필요하다.
 - `Masonry2Col`은 lazy가 아니다. 긴 목록에서는 바꾼다. Android는 유한한 폭이 필수이며 가로 스크롤에 넣을 때 호출부에서 `width`를 지정해야 한다(잘못된 제약은 명시적 오류). iOS의 제안 폭이 없으면 자식의 intrinsic 폭으로 계산하고 Layout cache로 sizeThatFits/placeSubviews 측정을 재사용한다.
 - `sheetStepResize` 토큰을 아직 쓰지 않는다. 단계가 있는 시트에서 내용 높이가 바뀌면 시트 높이가 튄다.
 - `WLMenu`는 화면 아래 가까이에서 위로 뒤집히지 않는다.
 - 메뉴 anchor는 Android `WLMenuAnchor`·iOS `WLAnchor` 참조 객체다. 레이아웃 좌표는 등록만 하고 누를 때 window 좌표를 읽는다. 사진 이동 원래 쪽의 `sourceKey`는 Android 인자, iOS environment다.
 - iOS의 모든 탭·스택 칸 유지, 입력 responder cache와 겹친 입력 소유, Android 공유 요소 비용과 Gradle 모듈 경계는 [C3 성능·구조 확인](c3-performance-checks.md)을 따른다.
+- **(C3) 한글 줄바꿈:** 보드는 `word-break: keep-all`이다. iOS는 보드와 같게 보이지만 Android Compose는 글자 단위로 끊는다(설정 "다른 기기에/서도"). `WLText` 전체의 줄바꿈 정책으로 한 번에 정한다(`LineBreak.WordBreak.Phrase`는 API 33+라 API 26~32 대안 필요).
+- **(C3) 확인창 버튼 비율:** 보드 FSettingsLogout·FSettingsWebviewClear는 취소·주 버튼이 1 : 1이고 `WLButtonPair`는 1 : 1.4다. 두 플랫폼 모두 1 : 1.4로 두었고 디자인 결정이 필요하다.
+- **(C3) iOS 공유 확장 표시:** iOS 26은 확장을 불투명 시스템 시트로 감싸 "원래 앱 위의 카드"(보드)가 되지 않는다. 시트 안에 보드 바탕색을 칠해 대비를 맞췄다([디자인 결정](../../design/decisions.md) 2026-10-07 행, [ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)).
 - 실기기 한글 IME·TalkBack: 39/40자 근처 조합·삭제·커서 이동·초과 붙여넣기, 입력칸이 라벨뿐 아니라 입력한 내용과 선택을 읽는지 확인한다.
 - 실기기 VoiceOver 확인 목록: 시트 트리의 라벨 없는 Group, 칸 `ZStack`의 숨은 형제 escape 우회, push 뒤 포커스가 안 옮겨 가면 `.screenChanged` 보완([spike 기록](../../history/architecture/client/ios-router-spike-2026-10-05.md) 권고).
 

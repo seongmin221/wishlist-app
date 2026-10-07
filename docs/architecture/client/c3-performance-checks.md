@@ -77,6 +77,7 @@ iPhone 17 Pro 시뮬레이터 iOS 26.5(Apple M4 Pro 호스트), Dynamic Type Lar
 - 두 플랫폼 모두 메모리가 N에 비례해 늘었다. iOS CPU는 N보다 빠르게 늘었다(20→300에서 약 19배).
 - 원인은 lazy 아닌 목록일 가능성이 있고, iOS는 접근성 트리 비용과 섞여 있다. 프로파일러로 나누어 보아야 한다.
 - 대기 행이 수백 개가 되는 일이 실제로 흔한지, lazy 목록으로 바꿀지는 실기기 Instruments·Android profiler 결과를 본 뒤 정한다. 지금은 기준선만 둔다.
+- Android N=100의 legacy jank 40.85%가 N=300(17.40%)보다 높은 것은 한 번만 측정한 값이라 원인을 설명하지 못했다. deadline 기준 jank는 N에 따라 늘었다. 다시 잴 때 반복 측정한다.
 
 ### 이번에 측정하지 않은 항목
 
@@ -99,3 +100,5 @@ iPhone 17 Pro 시뮬레이터 iOS 26.5(Apple M4 Pro 호스트), Dynamic Type Lar
 | application | feature 등록·route rendering·DI·variant 데모 조립 |
 
 분리하면 host 전용 완료 API를 module 내부로 제한하고 feature→core 역의존을 컴파일러가 막을 수 있다. 지금 즉시 나누면 아직 없는 feature를 위한 Gradle 설정과 공개 API만 늘어날 수 있다. C2 Presenter/domain 계약과 C3 첫 feature 경계가 확정될 때 이동 범위·공개 API·모듈별 테스트 시간을 비교해 결정한다. 그 전에는 `finishTransition`을 feature에서 호출하지 않고 route codec/renderer를 앱이 연결하는 규칙을 유지한다.
+
+**C3 결정(C3-D10, 2026-10-07):** C3에서는 나누지 않았다. C3 화면은 로그인·홈·설정·공유 카드 네 개뿐이라 지금 분리하면 Gradle 설정과 공개 API만 늘어난다. `feature/*` 폴더 경계와 "feature는 `finishTransition`을 호출하지 않는다" 규칙을 유지하고, 카테고리 feature가 들어오는 C5에서 위 표대로 다시 검토한다. Android 쪽 배치는 [Android 구조](android.md#공유-수신로그인홈설정-c3)에 있다.
