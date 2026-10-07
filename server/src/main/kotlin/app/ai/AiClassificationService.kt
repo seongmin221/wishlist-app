@@ -1,11 +1,11 @@
 package app.ai
 
-import app.wishlist.AnalysisFailureCode
 import app.analysis.AnalysisClaim
 import app.analysis.AnalysisPendingResultRepository
 import app.analysis.ProcessingOutcome
 import app.budget.LlmBudgetService
 import app.budget.ReserveResult
+import app.wishlist.AnalysisFailureCode
 import app.budget.BudgetReservation
 import app.extraction.Metadata
 import java.util.UUID

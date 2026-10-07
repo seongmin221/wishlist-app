@@ -1,6 +1,8 @@
 package app.wishlist
 
 import kotlinx.coroutines.CancellationException
+import org.slf4j.LoggerFactory
+import java.net.InetAddress
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.time.Instant
@@ -52,6 +54,7 @@ class CreateWishlistItemService(
             try { dispatchAfterCommit(result.outboxEventId) } catch (cause: Exception) {
                 if (cause is CancellationException) throw cause
                 // The committed item snapshot and durable outbox remain valid even if publication fails.
+                logger.warn("Post-commit dispatch failed eventId={} exceptionType={}", result.outboxEventId, cause.javaClass.name)
             }
         }
         return result
@@ -62,7 +65,26 @@ class CreateWishlistItemService(
         // JDBC replaces unpaired surrogates, so the stored URL would stop matching its own key replay.
         if (!StandardCharsets.UTF_8.newEncoder().canEncode(sourceUrl)) return false
         return runCatching {
-            URI(sourceUrl).let { it.scheme in setOf("http", "https") && !it.host.isNullOrBlank() && it.host !in setOf("localhost", "127.0.0.1", "::1") }
+            URI(sourceUrl).let { it.scheme in setOf("http", "https") && !it.host.isNullOrBlank() && !isLocalHost(it.host) }
         }.getOrDefault(false)
+    }
+
+    /** Cheap creation-time filter; extraction's UrlSafetyPolicy remains the network boundary. */
+    private fun isLocalHost(rawHost: String): Boolean {
+        // URI keeps the host's case and IPv6 brackets.
+        val host = rawHost.lowercase().removeSurrounding("[", "]")
+        if (host == "localhost" || host.endsWith(".localhost")) return true
+        val octets = host.split('.')
+        if (octets.size == 4 && octets.all { it.length in 1..3 && it.all(Char::isDigit) && it.toInt() <= 255 }) {
+            return octets[0].toInt() == 127 || octets.all { it.toInt() == 0 }
+        }
+        // A host with ':' is only parsed as an IPv6 literal, so this never reaches DNS.
+        if (':' !in host) return false
+        val address = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return true
+        return address.isLoopbackAddress || address.isAnyLocalAddress
+    }
+
+    private companion object {
+        val logger = LoggerFactory.getLogger(CreateWishlistItemService::class.java)
     }
 }

@@ -1,9 +1,9 @@
 package app.analysis
 
-import app.wishlist.AnalysisFailureCode
 import app.ai.CandidateSnapshot
 import app.ai.ClassificationResult
 import app.extraction.Metadata
+import app.wishlist.AnalysisFailureCode
 import java.sql.Connection
 import java.util.UUID
 import javax.sql.DataSource

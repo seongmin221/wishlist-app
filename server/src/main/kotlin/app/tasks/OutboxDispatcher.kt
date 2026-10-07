@@ -1,6 +1,7 @@
 package app.tasks
 
 import kotlinx.coroutines.CancellationException
+import org.slf4j.LoggerFactory
 import java.util.UUID
 import javax.sql.DataSource
 
@@ -44,6 +45,8 @@ class OutboxDispatcher(private val dataSource: DataSource, private val gateway: 
                 throw cleanup
             }
             if (cause is CancellationException) throw cause
+            // Messages may carry request data; type and event ID are enough to trace the stranded event.
+            logger.warn("Outbox publication failed eventId={} exceptionType={}", event.id, cause.javaClass.name)
             false
         }
     }
@@ -81,4 +84,8 @@ class OutboxDispatcher(private val dataSource: DataSource, private val gateway: 
     }
 
     private data class ClaimedEvent(val id: UUID, val task: AnalysisTask)
+
+    private companion object {
+        val logger = LoggerFactory.getLogger(OutboxDispatcher::class.java)
+    }
 }

@@ -26,7 +26,7 @@ object WishlistItemViewMapper {
         val known = AnalysisFailureCode.fromStored(code)
         return when {
             status == AnalysisStatus.PROCESSING || status == AnalysisStatus.READY -> null
-            known?.isPublic == true -> known
+            known != null -> known
             status == AnalysisStatus.FAILED_RETRYABLE -> AnalysisFailureCode.ANALYSIS_RETRYABLE_FAILURE
             status == AnalysisStatus.FAILED_TERMINAL || code != null -> AnalysisFailureCode.ANALYSIS_FAILED
             else -> null

@@ -92,8 +92,16 @@ class CreateWishlistItemServiceTest {
 
     @Test
     fun `unsafe url is rejected before any database write`() = withDatabase { database, service ->
-        assertIs<CreateResult.InvalidUrl>(service.create(UUID.randomUUID(), UUID.randomUUID(), "http://127.0.0.1/private"))
+        for (url in listOf("http://127.0.0.1/private", "http://127.0.0.2/private", "http://0.0.0.0/private",
+            "http://LOCALHOST/private", "http://shop.localhost/private", "http://[::1]/private",
+            "http://[0:0:0:0:0:0:0:1]/private", "http://[::ffff:127.0.0.1]/private", "http://[::]/private")) {
+            assertIs<CreateResult.InvalidUrl>(service.create(UUID.randomUUID(), UUID.randomUUID(), url), url)
+        }
         assertEquals(0, databaseCount(database, "wishlist_items"))
+        // Public literals and DNS names that merely resemble loopback are left to extraction's network policy.
+        for (url in listOf("http://128.0.0.1/item", "http://127.example.com/item", "http://[2001:db8::1]/item")) {
+            assertIs<CreateResult.Created>(service.create(UUID.randomUUID(), UUID.randomUUID(), url), url)
+        }
     }
 
     @Test
