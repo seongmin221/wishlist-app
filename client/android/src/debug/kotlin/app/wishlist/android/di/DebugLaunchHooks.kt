@@ -12,9 +12,11 @@ import kotlinx.coroutines.launch
  * menu (C3 Task 7). Release has no such code.
  *
  * ```
- * adb shell am start -n app.wishlist.android/.MainActivity --el wl.fake.delayItem01 5000
- * adb shell am start -n app.wishlist.android/.MainActivity --ei wl.fake.pendingCount 100
+ * adb shell am start -S -n app.wishlist.android/.MainActivity --el wl.fake.delayItem01 5000
+ * adb shell am start -S -n app.wishlist.android/.MainActivity --ei wl.fake.pendingCount 100
  * ```
+ * Cold start only: an intent delivered to a running MainActivity, or a recreated one, is not
+ * read, so `-S` force-stops the app first.
  * - `wl.fake.delayItem01` (ms): the next Fake ITEM-01 send waits that long.
  * - `wl.fake.pendingCount` (N): saves N unbound pending shares once the runtime is ready.
  */

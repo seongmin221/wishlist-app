@@ -38,7 +38,7 @@
 ## 공유 runtime 연결 (C2)
 
 - `WishlistApp`이 `init()`에서 `SharedRuntimeFactory.shared.create(bindings:remote:)`로 프로세스당 `SharedRuntime` 하나를 만들어 보유한다. `AppRuntimeConfig.bindings()`가 `#if DEBUG`로 mode와 37개 map을 고른다(DEBUG: ITEM-01·03 FAKE, 나머지 UNAVAILABLE / Release: 모두 UNAVAILABLE). C2에는 remote config가 없다.
-- `Wishlist/Debug/DebugSessionBootstrap.swift`는 파일 전체가 `#if DEBUG`이며 `startDebugSession()`을 호출한 뒤 `DebugLaunchHooks`로 launch argument `-wl.fake.delayItem01 <ms>`·`-wl.fake.pendingCount <N>`을 `runtime.debugControls()`에 넘긴다(C3 Task 7 시연용). Release 바이너리에는 이 타입의 심볼과 `wl.fake` 문자열이 없다.
+- `Wishlist/Debug/DebugSessionBootstrap.swift`는 파일 전체가 `#if DEBUG`이며 `startDebugSession()`을 호출한 뒤 `DebugLaunchHooks`로 launch argument `-wl.fake.delayItem01 <ms>`·`-wl.fake.pendingCount <N>`을 `runtime.debugControls()`에 넘긴다(C3 Task 7 시연용). 인자는 runtime을 조립하는 프로세스 시작 때만 읽으므로 cold start에서만 적용된다. 이미 실행 중이면 `xcrun simctl launch --terminate-running-process <udid> app.wishlist.ios -wl.fake.pendingCount 100`처럼 먼저 종료하고 띄운다. Release 바이너리에는 이 타입의 심볼과 `wl.fake` 문자열이 없다.
 - static `Shared.framework`가 SQLite driver를 포함하므로 앱 target `OTHER_LDFLAGS`에 `-lsqlite3`를 둔다.
 - `SharedRuntimeTests`가 앱 설정(Debug)의 binding, 실제 factory로 만든 runtime의 `ready`가 SKIE `for await`로 true가 되는 흐름과 debug owner 계정, close 후 ready=false, RELEASE binding의 즉시 ready를 검증한다.
 - `Features/Detail/ItemDetailPresenterOwner.swift`는 `@MainActor @Observable` 수명 소유자다(UI 없음). Presenter의 `state`를 main actor `Task`에서 SKIE `for await`로 수집해 구체 타입 `item: WishlistItem?`·`error: ClientError?`·`loading`으로 다시 게시한다. Task는 owner를 약하게 잡아 순환 참조가 없고, `close()`(멱등)와 `deinit`이 수집을 취소하고 Presenter를 닫는다. `init(runtime:)`은 `runtime.itemDetailPresenter()`를 쓴다.

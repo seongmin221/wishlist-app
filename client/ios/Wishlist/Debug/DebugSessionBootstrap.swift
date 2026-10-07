@@ -16,8 +16,10 @@ enum DebugSessionBootstrap {
 /// Debug-only demo hooks read from launch arguments, for on-device checks without a debug menu
 /// (C3 Task 7):
 ///
-///     xcrun simctl launch <udid> app.wishlist.ios -wl.fake.delayItem01 5000
-///     xcrun simctl launch <udid> app.wishlist.ios -wl.fake.pendingCount 100
+///     xcrun simctl launch --terminate-running-process <udid> app.wishlist.ios -wl.fake.delayItem01 5000
+///     xcrun simctl launch --terminate-running-process <udid> app.wishlist.ios -wl.fake.pendingCount 100
+///
+/// Cold start only: the arguments are read once, when the process assembles its runtime.
 ///
 /// - `-wl.fake.delayItem01 <ms>`: the next Fake ITEM-01 send waits that long.
 /// - `-wl.fake.pendingCount <N>`: saves N unbound pending shares once the runtime is ready.

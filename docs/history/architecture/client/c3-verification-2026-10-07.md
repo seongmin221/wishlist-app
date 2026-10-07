@@ -24,6 +24,7 @@
 - 앱 연결
   - Android: debug `MainActivity`의 launch intent extra `--el wl.fake.delayItem01`, `--ei wl.fake.pendingCount`
   - iOS: DEBUG launch argument `-wl.fake.delayItem01`, `-wl.fake.pendingCount`
+  - 두 플랫폼 모두 cold start에서만 적용된다(Android `am start -S`, iOS `simctl launch --terminate-running-process`).
 - Release 확인
   - iOS Release app 바이너리에 `wl.fake` 문자열이 0건이다.
   - release `Shared.h`에는 `DebugControls`가 남는다. DEBUG와 RELEASE가 같은 Kotlin binary를 쓰기 때문이며, KDoc에 DEBUG 전용이라고 적었다.
@@ -98,4 +99,11 @@ iOS는 `xcrun xctrace record`(Time Profiler, attach)가 기록을 시작한 뒤 
   - Android keep-all 줄바꿈(디자인 시스템 전체)
   - 확인창 버튼 비율: 보드 1:1, `WLButtonPair` 1:1.4
 - 입력·IME 성능 항목은 C3에 입력 칸이 없어 C5/C6으로 넘긴다.
-- IOS_TEST 첫 실행에서 `SharedInteropTests.testPresenterStateFlowDeliversInitialLoadingAndItemThenCollectorCancels`가 SQLite `sqlite3_column_type` 안에서 SIGSEGV로 한 번 실패했다. 같은 class를 10회 반복하면 통과했고, 전체를 다시 실행해도 116/116 통과했다. runtime close와 진행 중 query가 경합하는 것으로 보이며, 따로 추적한다.
+- IOS_TEST 첫 실행에서 `SharedInteropTests.testPresenterStateFlowDeliversInitialLoadingAndItemThenCollectorCancels`가 SQLite `sqlite3_column_type` 안에서 SIGSEGV로 한 번 실패했다. 같은 class를 10회 반복하면 통과했고, 전체를 다시 실행해도 116/116 통과했다. 원인과 수정은 아래 Task 7c 절에 있다.
+
+## 런타임 종료 중 DB 조회 충돌 (Task 7c)
+
+- **원인:** `CloseGuard`는 graph 조회와 ready 게시만 보호했다. gated facade는 진입 때 ready를 한 번 읽을 뿐이고, `CachedGetItemRepository`는 graph의 `SqlLocalStore`를 직접 쓴다. 그래서 `presenter.close()`(협조적 취소) 직후 `runtime.close()`가 main 스레드에서 driver를 닫는 동안 io 스레드는 아직 `selectItem` 안에 있을 수 있었다(use-after-free). 위 테스트는 retry를 보낸 뒤 이미 참인 상태(같은 item, loading=false)를 기다려 retry가 끝나기 전에 끝나므로 이 경합을 만들었다. 같은 DB 파일을 여는 두 driver(설치된 앱과 테스트 runtime)는 원인이 아니다(최악이 SQLITE_BUSY).
+- **수정:** `SqlLocalStore`의 모든 DB 작업이 runtime의 `CloseGuard`를 `StoreLease`로 잡는다. close 뒤 시작하는 작업은 DB를 건드리지 않고 `UNAVAILABLE/RUNTIME_NOT_READY`이고, 정리는 마지막 작업이 나갈 때 그 스레드에서 실행된다. lease는 lock이 아니라 계수기라 lock 순서는 그대로다. 공개 API는 바뀌지 않았다. 계약은 [KMP 문서의 자원 수명](../../../architecture/client/kmp.md)에 있다.
+- **테스트:** `RuntimeCloseLeaseTest`(3개)가 실제 스레드 io dispatcher에서 driver 안에 멈춘 query와 close를 경합시킨다. 수정 전에는 3개 모두 두 runtime에서 실패했다(driver가 query 중에 닫힘, close 뒤 graph store가 `LOCAL_STORE_FAILURE`). `SharedInteropTests`의 retry 대기는 다른 계정으로 바꾼 뒤 retry가 만든 NOT_FOUND를 기다리도록 고쳤다. `RuntimeDebugControlsTest`에 close 뒤 null 검사를 더했다.
+- **결과:** host 364, simulator 361, Android unit 87, IOS_TEST 116을 3회 연속 통과했다.
