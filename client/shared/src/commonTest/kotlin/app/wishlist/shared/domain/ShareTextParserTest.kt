@@ -27,6 +27,19 @@ class ShareTextParserTest {
         assertEquals(expected, ShareTextParser.parse(input), "input=$input")
     }
 
+    /** Mirrors Swift `testOnlyAsciiWhitespaceAndIdeographicSpaceEndALink` on both Kotlin runtimes. */
+    @Test fun onlyAsciiWhitespaceAndIdeographicSpaceEndALink() {
+        for (separator in listOf(" ", "\t", "\n", "\u000B", "\u000C", "\r", "<", ">", "\"", "'", "\u3000")) {
+            assertEquals(
+                ParsedShare.Link("https://a.example/1"),
+                ShareTextParser.parse("https://a.example/1${separator}x"),
+                "separator=${separator.map { it.code }}",
+            )
+        }
+        assertEquals(ParsedShare.Link("https://a.example/1\u00A0x"), ShareTextParser.parse("https://a.example/1\u00A0x"))
+        assertEquals(ParsedShare.Link("https://a.example/1\u2003x"), ShareTextParser.parse("https://a.example/1\u2003x"))
+    }
+
     @Test fun trailingPunctuationAndUnpairedClosersAreTrimmedRepeatedly() {
         assertEquals(ParsedShare.Link("https://a.example/p"), ShareTextParser.parse("「https://a.example/p」!"))
         assertEquals(ParsedShare.Link("https://a.example/p(1)"), ShareTextParser.parse("https://a.example/p(1))."))

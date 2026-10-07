@@ -102,18 +102,25 @@ class HomePresenterTest {
                 local("s", T0 + 1.minutes, SubmissionStatus.SUBMITTING, "A"),
                 local("p", T0, SubmissionStatus.PENDING, "A"),
             ),
-            listOf(processing("i2", T0 + 2.minutes), processing("i1", T0 + 1.minutes)),
+            listOf(
+                processing("i3", T0 + 2.minutes),
+                processing("i2", T0 + 2.minutes),
+                processing("i1", T0 + 1.minutes),
+            ),
             flushing = false,
         )
         val p = presenter()
         advanceUntilIdle()
         val state = assertIs<HomeState.LoggedIn>(p.state.value)
         assertEquals(
-            listOf(RowStatus.WAITING_NETWORK, RowStatus.SENDING, RowStatus.FAILED, RowStatus.PROCESSING, RowStatus.PROCESSING),
+            listOf(RowStatus.WAITING_NETWORK, RowStatus.SENDING, RowStatus.FAILED, RowStatus.PROCESSING, RowStatus.PROCESSING, RowStatus.PROCESSING),
             state.processing.map { it.status },
         )
-        // Processing rows are ordered by createdAt, not by list order.
-        assertEquals(listOf("i1", "i2"), view.value.processing.sortedBy { it.createdAt }.map { it.id })
+        // Local rows (oldest first) then processing rows by createdAt, ties by id; input order is deliberately unsorted.
+        assertEquals(
+            listOf("local-p", "local-s", "local-f", "item-i1", "item-i2", "item-i3"),
+            state.processing.map { it.key },
+        )
         assertEquals(state.processing.size, state.processing.map { it.key }.toSet().size)
         assertFalse(state.refreshing)
         p.close()

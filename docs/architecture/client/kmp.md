@@ -293,7 +293,7 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 | signIn이 seed 중 취소되면 저장 계정·session은 새 계정인데 `account`는 null로 남는다(취소에서만). 계정 전환 때 두 계정 사이에 잠깐 로그아웃 상태가 게시된다(화면 깜빡임 가능, 화면은 `Loading`으로 가림) | 인증 연결(Firebase facade로 교체할 때) |
 | 첫 실행 플래그 읽기 실패는 "안 봄", 쓰기 실패는 버린다. signIn의 seed 실패는 기록 없이 무시한다(logger 없음) | 인증 연결 |
 | 전송된 행마다 view 재계산을 따로 launch해 N개 전송에 재계산 N번이 더 돈다. NETWORK·TIMEOUT·RATE_LIMITED에서 flush를 멈춰 실패 행 하나가 다음 신호까지 나머지를 늦춘다(Ruling 10, 의도) | C7(목록 규모가 커질 때) |
-| 테스트 보강: `HomePresenterTest`의 정렬 단언이 입력을 정렬해 비교해 실패할 수 없다. `homePresenter()`/`accountPresenter()` runtime 연결 smoke 테스트가 없다. 닫힌 store 호출 테스트가 close 뒤 DB 미접촉을 단언하지 않는다 | 다음 Presenter 변경 때(C4) |
+| 테스트 보강: `homePresenter()`/`accountPresenter()` runtime 연결 smoke 테스트가 없다. 닫힌 store 호출 테스트가 close 뒤 DB 미접촉을 단언하지 않는다 | 다음 Presenter 변경 때(C4) |
 | 계층: `data.fake.FakeAuthFacade`가 `di.BOOTSTRAP_FAILURE`를, `data.local.SqlLocalStore`가 `di.RUNTIME_NOT_READY`를 가져온다. release `Shared.h`에 DEBUG 전용 `DebugControls`가 남는다(같은 Kotlin binary) | 다듬기(C12) |
 | DEBUG Fake 전용: `failNext`/`delayNext`가 `SESSION_CHANGED` 거절 전에 소비되고, DEBUG 분석 진행이 대기 중인 `failNext(CAT_01)`를 소비할 수 있다 | debug 도구를 다시 만질 때 |
 

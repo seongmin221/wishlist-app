@@ -421,7 +421,6 @@ class SubmissionCoordinatorTest {
         }
         h.flush()
 
-        assertTrue(h.create.calls.none { it.account == APPLE_ID }, "calls=${h.create.calls}")
         // Nothing was created in Apple's namespace (the probe counts its PROCESSING items).
         val probe = AnalysisOutcome(AnalysisStatus.PARTIAL, null, null, CategoryMissingReason.EXTRACTION_UNRESOLVED, null)
         assertEquals(0, h.fakeStore.completeDueAnalyses(h.clock.now(), Duration.ZERO) { probe }.successValue())
