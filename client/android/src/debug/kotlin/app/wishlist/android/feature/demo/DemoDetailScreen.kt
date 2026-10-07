@@ -41,7 +41,11 @@ import app.wishlist.android.designsystem.WLTopBarMetrics
 import app.wishlist.android.designsystem.wlSafeTop
 import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
+import app.wishlist.android.designsystem.WLButtonKind
 import app.wishlist.android.designsystem.overlay.LocalOverlayHostState
+import app.wishlist.android.designsystem.overlay.OverlayHostState
+import app.wishlist.android.designsystem.overlay.WLDialogSpec
+import app.wishlist.android.designsystem.overlay.WLMenuItem
 import app.wishlist.android.designsystem.overlay.rememberWLMenuAnchor
 import app.wishlist.android.designsystem.overlay.wlAnchor
 import app.wishlist.android.navigation.LocalWLNavigator
@@ -196,3 +200,18 @@ private fun DemoInfoRow(label: String, value: @Composable () -> Unit) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { value() }
     }
 }
+
+// 상품 상세 데모의 ⋯ 메뉴와 삭제 확인창(홈 데모가 C3에서 실제 홈으로 바뀌어 이곳으로 옮겼다).
+internal fun demoDeleteDialog() = WLDialogSpec(
+    title = "상품을 삭제할까요?",
+    bullets = listOf("'${DemoContent.LONGEST_PURPOSE_NAME}' 목적의 비교 후보에서도 빠져요.", "삭제한 상품은 되돌릴 수 없어요."),
+    cancelText = "취소",
+    confirmText = "삭제",
+    confirmKind = WLButtonKind.Danger,
+    onConfirm = {},
+)
+
+internal fun demoMenuItems(overlay: OverlayHostState) = listOf(
+    WLMenuItem("편집") {},
+    WLMenuItem("삭제") { overlay.showDialog(demoDeleteDialog()) },
+)
