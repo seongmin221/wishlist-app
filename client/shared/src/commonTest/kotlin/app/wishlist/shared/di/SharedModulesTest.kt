@@ -291,6 +291,40 @@ class SharedModulesTest {
         assertEquals(1, probe.drivers.single().closes)
     }
 
+    @Test fun close_between_seed_and_ready_publication_leaves_the_runtime_not_ready() = runTest {
+        val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
+        // close() lands after the bootstrap decided to publish but before it writes ready.
+        runtime.beforeReadyPublished = { runtime.close() }
+        runtime.startDebugSession()
+        advanceUntilIdle()
+
+        assertFalse(runtime.ready.value)
+        assertEquals(RUNTIME_NOT_READY, runtime.getItemRepository().get(remoteItemId).error().code)
+        assertEquals(RUNTIME_NOT_READY, runtime.catalogRepository().items(null, null).error().code)
+    }
+
+    @Test fun close_during_facade_resolution_does_not_throw_and_still_closes_the_driver_once() = runTest {
+        val probe = RuntimeResourcesProbe()
+        val runtime = createRuntime(debugBindings(), probe = probe)
+        runtime.startDebugSession()
+        runtime.ready.first { it }
+        var closes = 0
+        // close() arrives while the Get facade is being resolved (its first lookup opens the driver).
+        probe.onDriverOpen = { if (closes++ == 0) runtime.close() }
+
+        val facade = runtime.getItemRepository()
+        assertFalse(runtime.ready.value)
+        assertEquals(RUNTIME_NOT_READY, facade.get(remoteItemId).error().code)
+        assertEquals(1, probe.drivers.size)
+        assertEquals(1, probe.drivers.single().closes)
+        // Everything after close stays a typed failure, never an exception.
+        assertEquals(RUNTIME_NOT_READY, runtime.localStore().pending().error().code)
+        runtime.startDebugSession()
+        runtime.close()
+        assertFalse(runtime.ready.value)
+        assertEquals(1, probe.drivers.single().closes)
+    }
+
     @Test fun closing_an_unused_runtime_opens_nothing() {
         val probe = RuntimeResourcesProbe()
         createRuntime(RepositoryBindings(RELEASE, allBackends(Backend.UNAVAILABLE)), probe = probe).close()

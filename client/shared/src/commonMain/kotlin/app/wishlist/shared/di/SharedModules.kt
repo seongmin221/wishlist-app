@@ -75,6 +75,60 @@ internal class ResourceRegistry {
     }
 }
 
+/**
+ * Lock-free close guard. Graph lookups and ready publication run inside [use]; [close] refuses
+ * new users at once, but the actual teardown ([onClosed]) runs exactly once, when the last active
+ * user leaves (or immediately if there is none). So no lookup ever meets a closed graph, and the
+ * teardown's `ready = false` is the last ready write.
+ */
+internal class CloseGuard(private val onClosed: () -> Unit) {
+    private data class State(val users: Int, val closing: Boolean)
+
+    private val state = MutableStateFlow(State(users = 0, closing = false))
+
+    /** Runs [block] and returns its value, or null without running it once closing has begun. */
+    inline fun <T : Any> use(block: () -> T): T? {
+        if (!enter()) return null
+        try {
+            return block()
+        } finally {
+            exit()
+        }
+    }
+
+    fun enter(): Boolean {
+        while (true) {
+            val current = state.value
+            if (current.closing) return false
+            if (state.compareAndSet(current, current.copy(users = current.users + 1))) return true
+        }
+    }
+
+    fun exit() {
+        while (true) {
+            val current = state.value
+            val next = current.copy(users = current.users - 1)
+            if (state.compareAndSet(current, next)) {
+                if (next.closing && next.users == 0) onClosed()
+                return
+            }
+        }
+    }
+
+    /** Starts closing; false if it had already started. */
+    fun close(): Boolean {
+        while (true) {
+            val current = state.value
+            if (current.closing) return false
+            val next = current.copy(closing = true)
+            if (state.compareAndSet(current, next)) {
+                if (next.users == 0) onClosed()
+                return true
+            }
+        }
+    }
+}
+
 /** Delegate qualifiers: the selected backend for one API, before any facade decoration. */
 internal val ITEM_01_DELEGATE = named("ITEM_01")
 internal val ITEM_03_DELEGATE = named("ITEM_03")

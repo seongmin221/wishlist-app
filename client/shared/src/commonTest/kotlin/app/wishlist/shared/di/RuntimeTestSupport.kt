@@ -51,8 +51,14 @@ internal class RuntimeResourcesProbe(
     val drivers = mutableListOf<CountingDriver>()
     val engines = mutableListOf<CountingEngine>()
 
+    /** Runs inside the graph's driver creation, i.e. in the middle of a facade resolution. */
+    var onDriverOpen: () -> Unit = {}
+
     val platform = PlatformResources(
-        openDriver = { newTestDbPath().let { path -> CountingDriver(openTestDriver(path), path).also { drivers += it } } },
+        openDriver = {
+            onDriverOpen()
+            newTestDbPath().let { path -> CountingDriver(openTestDriver(path), path).also { drivers += it } }
+        },
         createEngine = { CountingEngine(engineFactory()).also { engines += it } },
     )
 }

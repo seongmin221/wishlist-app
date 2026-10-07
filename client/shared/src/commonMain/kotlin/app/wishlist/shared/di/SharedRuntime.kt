@@ -64,11 +64,16 @@ class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
     private val mutableSession: MutableAuthSession = koin.get()
     private val scope = CoroutineScope(SupervisorJob() + env.dispatchers.default)
     private val debugStarted = MutableStateFlow(false)
-    private val closed = MutableStateFlow(false)
     private val mutableReady = MutableStateFlow(env.bindings.buildMode == ClientBuildMode.RELEASE)
+
+    /** Test seam: runs in the bootstrap right before ready is published (close-race tests). */
+    internal var beforeReadyPublished: () -> Unit = {}
 
     val session: AuthSession get() = mutableSession
     val ready: StateFlow<Boolean> = mutableReady.asStateFlow()
+
+    // Every graph lookup and the ready publication run inside the guard; teardown waits for them.
+    private val guard = CloseGuard(onClosed = ::tearDown)
 
     /**
      * DEBUG only, idempotent: account → debug owner, seed that same namespace, then ready=true.
@@ -76,13 +81,20 @@ class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
      */
     fun startDebugSession() {
         check(env.bindings.buildMode == ClientBuildMode.DEBUG) { "startDebugSession is DEBUG only" }
-        if (closed.value || !debugStarted.compareAndSet(expect = false, update = true)) return
-        // Resolved before launching so a concurrent close never meets a closed Koin mid-bootstrap.
-        val store = koin.get<FakeStore>()
+        if (!debugStarted.compareAndSet(expect = false, update = true)) return
+        // Inside the guard, a concurrent close() cannot tear the graph down under this lookup.
+        val store = guard.use { koin.get<FakeStore>() } ?: return
         scope.launch {
             mutableSession.changeAccount(DEBUG_ACCOUNT_ID)
             val seeded = store.seed(BoardSeeds.create(env.clock, env.ids))
-            if (seeded is ClientResult.Success && !closed.value) mutableReady.value = true
+            if (seeded is ClientResult.Success) {
+                // Refused once closing began; a close() during the write defers teardown (and its
+                // ready = false) until this block has left the guard.
+                guard.use {
+                    beforeReadyPublished()
+                    mutableReady.value = true
+                }
+            }
         }
     }
 
@@ -100,13 +112,21 @@ class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
 
     fun localStore(): LocalStore = GatedLocalStore(ready, resolveOr<LocalStore>(ClosedLocalStore) { get() })
 
-    /** Releases the HTTP client, its engine and the SQL driver once (if created). Idempotent. */
+    /**
+     * Releases the HTTP client, its engine and the SQL driver once (if created). Idempotent and
+     * safe from any thread: new lookups are refused at once, and teardown runs when the last
+     * in-flight lookup or ready publication finishes, ending with ready = false.
+     */
     fun close() {
-        if (!closed.compareAndSet(expect = false, update = true)) return
+        if (!guard.close()) return
         mutableReady.value = false
         scope.cancel()
+    }
+
+    private fun tearDown() {
         koin.get<ResourceRegistry>().closeAll()
         koinApplication.close()
+        mutableReady.value = false
     }
 
     /** The backend the graph actually connected for [apiId]; APIs without a facade stay UNAVAILABLE. */
@@ -117,6 +137,6 @@ class SharedRuntime internal constructor(private val env: RuntimeEnvironment) {
     }
 
     // Facades are resolved on request; the first one that needs the driver/engine opens it.
-    private inline fun <T> resolveOr(closedFallback: T, resolve: Koin.() -> T): T =
-        if (closed.value) closedFallback else koin.resolve()
+    private inline fun <T : Any> resolveOr(closedFallback: T, resolve: Koin.() -> T): T =
+        guard.use { koin.resolve() } ?: closedFallback
 }
