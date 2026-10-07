@@ -167,4 +167,22 @@ final class InboxWriterReaderTests: XCTestCase {
         try Data("file, not a folder".utf8).write(to: blocker)
         XCTAssertThrowsError(try ShareInboxWriter(directory: directory).write(sourceUrl: "https://a.example/1", accountBinding: nil))
     }
+
+    /// IOS_TEST runs inside the host app, which shares the installed debug app's container: the app's
+    /// signals (inbox import, refresh, network flush) stay off under XCTest so tests never import or send.
+    @MainActor
+    func testAppSignalsDoNothingUnderXCTest() async throws {
+        XCTAssertTrue(AppSignals.runningUnderXCTest)
+        let written = try ShareInboxWriter(directory: directory).write(sourceUrl: "https://a.example/1", accountBinding: nil)
+        let runtime = SharedRuntimeFactory.shared.create(
+            bindings: RepositoryBindings(buildMode: .theRelease, backends: AppRuntimeConfig.allBackends(.unavailable)),
+            remote: nil
+        )
+        defer { runtime.close() }
+        let signals = AppSignals(runtime: runtime, inboxDirectory: directory)
+        signals.start()
+        signals.sceneBecameActive()
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(try names(), ["\(written.clientSubmissionId).json"], "the inbox file was not imported")
+    }
 }

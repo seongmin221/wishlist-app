@@ -72,6 +72,9 @@
         E10000000000000000000011 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* AppGroup.swift */; };
         E10000000000000000000012 /* InboxRecordFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* InboxRecordFile.swift */; };
         E10000000000000000000013 /* InboxRecordFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* InboxRecordFile.swift */; };
+        E10000000000000000000050 /* ShareInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000050 /* ShareInput.swift */; };
+        E10000000000000000000051 /* ShareInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000050 /* ShareInput.swift */; };
+        E10000000000000000000052 /* ShareInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000051 /* ShareInputTests.swift */; };
         E10000000000000000000014 /* ShareTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* ShareTextExtractor.swift */; };
         E10000000000000000000015 /* ShareTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* ShareTextExtractor.swift */; };
         E10000000000000000000016 /* ShareInboxWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* ShareInboxWriter.swift */; };
@@ -177,6 +180,8 @@
         C20000000000000000000005 /* Wishlist.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wishlist.entitlements; sourceTree = "<group>"; };
         E20000000000000000000001 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
         E20000000000000000000002 /* InboxRecordFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxRecordFile.swift; sourceTree = "<group>"; };
+        E20000000000000000000050 /* ShareInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareInput.swift; sourceTree = "<group>"; };
+        E20000000000000000000051 /* ShareInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareInputTests.swift; sourceTree = "<group>"; };
         E20000000000000000000003 /* ShareTextExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareTextExtractor.swift; sourceTree = "<group>"; };
         E20000000000000000000004 /* ShareInboxWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareInboxWriter.swift; sourceTree = "<group>"; };
         E20000000000000000000005 /* ShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardView.swift; sourceTree = "<group>"; };
@@ -254,7 +259,7 @@
         };
         A40000000000000000000020 /* WishlistTests */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000036 /* SharedInteropTests.swift */, A20000000000000000000037 /* SharedRuntimeTests.swift */, A20000000000000000000038 /* ItemDetailPresenterOwnerTests.swift */, A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */, A20000000000000000000035 /* WLHeaderSheetTests.swift */, E20000000000000000000024 /* ShareTextExtractorTests.swift */, E20000000000000000000025 /* InboxWriterReaderTests.swift */, E20000000000000000000026 /* HomeRowTextTests.swift */, E20000000000000000000027 /* AccountPresenterOwnerTests.swift */);
+            children = (A20000000000000000000036 /* SharedInteropTests.swift */, A20000000000000000000037 /* SharedRuntimeTests.swift */, A20000000000000000000038 /* ItemDetailPresenterOwnerTests.swift */, A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */, A20000000000000000000035 /* WLHeaderSheetTests.swift */, E20000000000000000000024 /* ShareTextExtractorTests.swift */, E20000000000000000000051 /* ShareInputTests.swift */, E20000000000000000000025 /* InboxWriterReaderTests.swift */, E20000000000000000000026 /* HomeRowTextTests.swift */, E20000000000000000000027 /* AccountPresenterOwnerTests.swift */);
             path = WishlistTests;
             sourceTree = "<group>";
         };
@@ -290,7 +295,7 @@
         };
         C40000000000000000000001 /* ShareExtension */ = {
             isa = PBXGroup;
-            children = (C20000000000000000000001 /* ShareViewController.swift */, C20000000000000000000002 /* Info.plist */, C20000000000000000000003 /* ShareExtension.entitlements */, E20000000000000000000003 /* ShareTextExtractor.swift */, E20000000000000000000004 /* ShareInboxWriter.swift */, E20000000000000000000005 /* ShareCardView.swift */, E20000000000000000000006 /* ShareDirectSender.swift */, E20000000000000000000007 /* Localizable.xcstrings */);
+            children = (C20000000000000000000001 /* ShareViewController.swift */, C20000000000000000000002 /* Info.plist */, C20000000000000000000003 /* ShareExtension.entitlements */, E20000000000000000000003 /* ShareTextExtractor.swift */, E20000000000000000000050 /* ShareInput.swift */, E20000000000000000000004 /* ShareInboxWriter.swift */, E20000000000000000000005 /* ShareCardView.swift */, E20000000000000000000006 /* ShareDirectSender.swift */, E20000000000000000000007 /* Localizable.xcstrings */);
             path = ShareExtension;
             sourceTree = "<group>";
         };
@@ -446,13 +451,13 @@
         A60000000000000000000003 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000036 /* SharedInteropTests.swift in Sources */, A10000000000000000000037 /* SharedRuntimeTests.swift in Sources */, A10000000000000000000038 /* ItemDetailPresenterOwnerTests.swift in Sources */, A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */, A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */, E10000000000000000000015 /* ShareTextExtractor.swift in Sources */, E10000000000000000000017 /* ShareInboxWriter.swift in Sources */, E10000000000000000000038 /* ShareTextExtractorTests.swift in Sources */, E10000000000000000000039 /* InboxWriterReaderTests.swift in Sources */, E10000000000000000000040 /* HomeRowTextTests.swift in Sources */, E10000000000000000000041 /* AccountPresenterOwnerTests.swift in Sources */);
+            files = (A10000000000000000000036 /* SharedInteropTests.swift in Sources */, A10000000000000000000037 /* SharedRuntimeTests.swift in Sources */, A10000000000000000000038 /* ItemDetailPresenterOwnerTests.swift in Sources */, A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */, A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */, E10000000000000000000015 /* ShareTextExtractor.swift in Sources */, E10000000000000000000051 /* ShareInput.swift in Sources */, E10000000000000000000017 /* ShareInboxWriter.swift in Sources */, E10000000000000000000038 /* ShareTextExtractorTests.swift in Sources */, E10000000000000000000052 /* ShareInputTests.swift in Sources */, E10000000000000000000039 /* InboxWriterReaderTests.swift in Sources */, E10000000000000000000040 /* HomeRowTextTests.swift in Sources */, E10000000000000000000041 /* AccountPresenterOwnerTests.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
         C60000000000000000000001 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (C10000000000000000000001 /* ShareViewController.swift in Sources */, E10000000000000000000001 /* WishlistTokens.swift in Sources */, E10000000000000000000002 /* WLTypography.swift in Sources */, E10000000000000000000003 /* WLTheme.swift in Sources */, E10000000000000000000004 /* WLCard.swift in Sources */, E10000000000000000000005 /* WLIconTile.swift in Sources */, E10000000000000000000011 /* AppGroup.swift in Sources */, E10000000000000000000013 /* InboxRecordFile.swift in Sources */, E10000000000000000000014 /* ShareTextExtractor.swift in Sources */, E10000000000000000000016 /* ShareInboxWriter.swift in Sources */, E10000000000000000000018 /* ShareCardView.swift in Sources */, E10000000000000000000019 /* ShareDirectSender.swift in Sources */, E10000000000000000000022 /* WLLineIcon.swift in Sources */);
+            files = (C10000000000000000000001 /* ShareViewController.swift in Sources */, E10000000000000000000001 /* WishlistTokens.swift in Sources */, E10000000000000000000002 /* WLTypography.swift in Sources */, E10000000000000000000003 /* WLTheme.swift in Sources */, E10000000000000000000004 /* WLCard.swift in Sources */, E10000000000000000000005 /* WLIconTile.swift in Sources */, E10000000000000000000011 /* AppGroup.swift in Sources */, E10000000000000000000013 /* InboxRecordFile.swift in Sources */, E10000000000000000000014 /* ShareTextExtractor.swift in Sources */, E10000000000000000000050 /* ShareInput.swift in Sources */, E10000000000000000000016 /* ShareInboxWriter.swift in Sources */, E10000000000000000000018 /* ShareCardView.swift in Sources */, E10000000000000000000019 /* ShareDirectSender.swift in Sources */, E10000000000000000000022 /* WLLineIcon.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXSourcesBuildPhase section */

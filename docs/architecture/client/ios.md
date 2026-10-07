@@ -60,20 +60,20 @@
 
 ### 확장 흐름과 화면
 
-- `ShareViewController`: `extensionContext.inputItems`의 `NSItemProvider`에서 `UTType.url` 먼저, 없으면 `UTType.plainText`(각 3초 상한) → `ShareTextExtractor` → 카드 종류(Ruling 2, Swift 자체 enum `ShareCardKind`): 링크 없음·2048 초과 `invalid`, container 없음·쓰기 실패 `storeFailed`, 미러된 계정이 있으면 `savedOpenApp`("위시리스트에 저장했어요 / 앱을 열면 정보를 가져와요"), 없으면 `local`("이 기기에 저장했어요 / 로그인하면 정보를 가져와요"). 쓰기 뒤 `DisabledShareDirectSender.send`(아무것도 하지 않음, 활성화 조건은 문서 주석: 가입·Keychain 공유·토큰 만료 정책).
+- `ShareViewController`: `extensionContext.inputItems`의 `NSItemProvider`에서 `UTType.url` 먼저, 없거나 웹 링크가 아니면(앱 scheme URL 등) `UTType.plainText`(각 3초 상한, 글은 필요할 때만 읽음) → `ShareTextExtractor`(결정은 `ShareExtension/ShareInput.swift`의 순수 함수 `decide`·`string(_:type:)`로 테스트한다. `Data`는 `url`로 요청한 값만 `URL(dataRepresentation:)`으로 읽고 글은 UTF-8로 읽는다 — 글을 URL로 읽으면 공백이 `%20`이 되어 링크가 글 끝까지 늘어난다) → 카드 종류(Ruling 2, Swift 자체 enum `ShareCardKind`): 링크 없음·2048 초과 `invalid`, container 없음·쓰기 실패 `storeFailed`, 미러된 계정이 있으면 `savedOpenApp`("위시리스트에 저장했어요 / 앱을 열면 정보를 가져와요"), 없으면 `local`("이 기기에 저장했어요 / 로그인하면 정보를 가져와요"). 쓰기 뒤 `DisabledShareDirectSender.send`(아무것도 하지 않음, 활성화 조건은 문서 주석: 가입·Keychain 공유·토큰 만료 정책).
 - `ShareTextExtractor`는 Kotlin `ShareTextParser`의 Swift 사본이다. 패턴의 공백은 Kotlin `\s`와 같은 ASCII 6자(space·\t·\n·\x0B·\f·\r)를 직접 적는다(ICU `\s`는 NBSP 등까지 잡아 Android와 달라진다). 길이·자르기는 UTF-16 단위다. `ShareTextExtractorTests`가 Kotlin `ShareTextParserTest`와 같은 벡터를 같은 순서로 검사한다. Kotlin의 따옴표·`>` 자르기는 패턴이 이미 제외해 도달하지 않으므로 옮기지 않았다.
 - 카드(`ShareCardView`): motion.md 6절 — 340 `standard`로 올라오고 1500 유지, 260 `accelerate`로 내려간 뒤 `completeRequest`. 저장이 끝나고 **`viewDidAppear` 뒤에만** 시작한다(`viewDidLoad`의 `completeRequest`는 무시되어 시트가 닫히지 않았다, Task 0). 등장 때 VoiceOver announcement(제목, 보조 줄).
 - **표시 방식(Task 6 시뮬레이터 확인, iOS 26.5):** 확장 view와 hosting view는 투명이고 `modalPresentationStyle = .overFullScreen`을 주지만, iOS가 확장 window 안에서 우리 화면을 담는 page sheet(`UIDropShadowView`, `systemBackgroundColor`)를 그리고 그 뒤 Safari를 어둡게 한다. 그래서 보드처럼 "원래 앱 위의 카드"가 아니라 "불투명 시스템 시트 아래쪽의 카드"로 보인다. 시트 크기(`preferredContentSize`)는 반영되지 않고 `sheetPresentationController`는 nil이다. 시스템 view 배경을 직접 지우면 카드만 뜨지만 UIKit 내부 계층에 기대므로 쓰지 않는다. 카드가 내려간 뒤 시트는 저절로 닫힌다(탭 후 약 4초 안).
 
 ### 앱 쪽 신호·세션 미러
 
-- `Platform/AppSignals.swift`(Ruling 1): scene `.active`마다 inbox pass(앞 pass가 끝난 뒤 순서대로) → `refresh(LAUNCH)`(첫 번째) / `refresh(FOREGROUND)`(그 뒤). refresh는 다음 pass가 기다리지 않는다. `NetworkSignals`는 `NWPathMonitor`의 unsatisfied → satisfied 전이에서 `requestFlush(NETWORK_RESTORED)`(첫 갱신은 기준값).
+- `Platform/AppSignals.swift`(Ruling 1): scene `.active`마다 inbox pass(앞 pass가 끝난 뒤 순서대로) → `refresh(LAUNCH)`(첫 번째) / `refresh(FOREGROUND)`(그 뒤). refresh는 다음 pass가 기다리지 않는다. XCTest host(`XCTestConfigurationFilePath` 환경 변수)에서는 inbox·refresh·네트워크 신호를 모두 끈다(IOS_TEST host는 설치된 debug 앱과 같은 container·DB를 쓴다). `NetworkSignals`는 `NWPathMonitor`의 unsatisfied → satisfied 전이에서 `requestFlush(NETWORK_RESTORED)`(첫 갱신은 기준값).
 - `Platform/SessionMirror.swift`: `AccountPresenterOwner.binding`(복원 전 `unknown` / `signedOut` / `signedIn(id)`)이 바뀔 때마다 app group defaults에 `wl.session.accountBinding`을 쓰거나 지운다. 복원 전에는 지난 값을 그대로 둔다. 자격 증명이 아니다.
 
 ### 화면과 owner
 
 - `Features/Session/AccountPresenterOwner`·`HomePresenterOwner`: `ItemDetailPresenterOwner`와 같은 `@MainActor @Observable` 수명 소유자. `WishlistApp`이 하나씩 만들어 environment로 넣는다. `HomeState.Loading`(복원 전·계정 전환 중)은 머리만 그려 이전 계정 줄이 비치지 않는다. 당겨서 새로고침은 로그인 뒤에만 `.refreshable`(시스템 indicator)이고, Presenter의 `refreshing`이 true → false가 되면 끝난다(300ms 안에 true를 못 보면 이미 끝난 것으로 본다).
-- 첫 실행 로그인(FLogin)은 `ContentView`의 탭 셸 위 레이어다(`showFirstRunLogin`, 사라짐 opacity 260 `accelerate`, 뜨는 동안 아래는 접근성에서 가림). 홈 로그인 카드·설정 "로그인"은 같은 화면을 `AppDestination.login`(가로 밀기)으로 연다. 홈 오른쪽 위 설정은 `AppDestination.settings`. 로그인 중에는 로그인·로그아웃 버튼을 막고, 실패는 화면에 남기지 않는다.
+- 첫 실행 로그인(FLogin)은 `ContentView`의 탭 셸 위 레이어다(`showFirstRunLogin`, 사라짐 opacity 260 `accelerate` — 애니메이션은 이 레이어의 컨테이너에만 걸어 같은 갱신의 탭 셸 변화에 번지지 않게 한다, 뜨는 동안 아래는 접근성에서 가림). 홈 로그인 카드·설정 "로그인"은 같은 화면을 `AppDestination.login`(가로 밀기)으로 연다. 홈 오른쪽 위 설정은 `AppDestination.settings`. 로그인 중에는 로그인·로그아웃 버튼을 막고, 실패는 화면에 남기지 않는다.
 - 홈(FHomeLoggedOut·FHome): 로그인 전은 로그인 카드 + "분석 대기"(줄마다 "원본" → `openURL`). 로그인 뒤 머리 보조 줄은 "할 일 N개"(`home.todo.count`, N = 분류 중 줄 수, Ruling 13), "분류 중" 카드 줄 상태 줄은 "상품 정보 추출 중"(Ruling 14)이고 오른쪽 동작이 없다(Ruling 15). 할 일 카드는 머리 전체와 화살표 버튼이 같은 펼치기이며 화살표 VoiceOver 이름은 "펼치기"/"접기". 줄 key는 목록 정체성으로만 쓴다.
 - 설정(FSettings·FSettingsLoggedOut): 로그아웃(먹색)·웹뷰 데이터 삭제(빨강) 확인창은 `WLConfirmDialog`. 웹뷰 삭제는 `WKWebsiteDataStore.default()`의 모든 형식, "방금 삭제했어요"는 화면 수명 동안만. 버전은 `CFBundleShortVersionString`. 라이선스 줄은 C12까지 숨긴다.
 - C1 홈 데모(`DemoHomeScreen`)는 지웠다. ⋯ 메뉴·삭제 확인창 데모는 상품 상세 데모에 있다.

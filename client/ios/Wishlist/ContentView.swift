@@ -27,13 +27,17 @@ struct ContentView: View {
                 .environment(\.wlNavigatorStorage, navigator)
                 .environment(\.wlNavMotionStorage, motion)
                 .wlAccessibilityCovered(firstRun)
-                if firstRun {
-                    LoginScreen(mode: .firstRun)
-                        .transition(.asymmetric(insertion: .identity, removal: .opacity))
-                        .zIndex(1)
+                // The fade is scoped to this layer: the same update also changes the tab shell (home
+                // logged out → in, accessibility cover), and those changes must not pick up the 260ms fade.
+                ZStack {
+                    if firstRun {
+                        LoginScreen(mode: .firstRun)
+                            .transition(.asymmetric(insertion: .identity, removal: .opacity))
+                    }
                 }
+                .animation(reduceMotion ? nil : WishlistTokens.Curve.accelerate.animation(ms: WishlistTokens.Motion.sheetClose), value: firstRun)
+                .zIndex(1)
             }
-            .animation(reduceMotion ? nil : WishlistTokens.Curve.accelerate.animation(ms: WishlistTokens.Motion.sheetClose), value: firstRun)
         }
     }
 }
