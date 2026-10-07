@@ -28,4 +28,4 @@
 | B0 외부 리뷰의 실행 시간·동시 발행·오류·복구 보완 | [보완 기록](../../history/architecture/server/b0-review-hardening-2026-10-05.md) |
 | B0 후속 리뷰의 queue claim·LLM 예산/마감·최종 version 복구·DB 시각 | [후속 기록](../../history/architecture/server/b0-followup-review-2026-10-06.md) |
 
-- [B4 상품 목록·홈 조회 설계 제안](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 제품 정책 확정, 사용자 spec 검토 전
+- [B4 상품 목록·홈 조회 설계](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 설계 승인·구현 계획 검토 전

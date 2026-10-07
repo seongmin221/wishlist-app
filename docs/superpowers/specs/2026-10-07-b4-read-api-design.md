@@ -1,12 +1,12 @@
 # B4 상품 목록·홈·연속 처리 조회 설계
 
-> 2026-10-07 · **설계 제안 · 피드백 반영 후 재검토 전** · 제품 정책 확정 · 구현 미착수
+> 2026-10-07 · **설계 승인 · 2026-10-07 · 계획 검토 전** · 제품 정책 확정 · 구현 미착수
 
 ## 목표와 범위
 
 사용자는 category/목적별 후보를 최근 저장순으로 보고, 홈의 조치 영역에서 같은 대상들을 연속 처리하며, 진입·foreground·새로고침 때 현재 카드 주변을 복구한다. ITEM-02 → HOME-02 → HOME-01 순서로 구현한다. owner 격리, 같은 시점의 count/preview, 위치 복구, B1~B3·Worker 회귀가 통과 조건이다.
 
-[제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md)은 확정됐다. 이 문서의 parameter·페이지 크기·cursor·구조·index는 승인받을 설계다. mutation, restart 명령, polling/push, 검색, archive, Scheduler/browser runtime은 추가하지 않는다. client/와 design/handoff/는 수정하지 않는다.
+[제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md)은 확정됐다. 2026-10-07 사용자 지시 ‘계획 진행해’로 이 조회 설계를 승인받아 [작업별 계획](../plans/2026-10-07-b4-read-api.md)을 작성했다. mutation, restart 명령, polling/push, 검색, archive, Scheduler/browser runtime은 추가하지 않는다. client/와 design/handoff/는 수정하지 않는다.
 
 ## 접근 방식
 
@@ -105,7 +105,7 @@ owner digest는 token 소유자/조회 범위 검사이며 암호학적 진위 �
 
 ### 기존 조회 계약과 비교
 
-[상품 상태 API](../../architecture/wishlist-item-state-api.md#카테고리-목록-window)의 ITEM-02와 HOME-02를 함께 갱신한다. 아래는 승인받을 변경이며 현재 실행 API가 구현됐다는 뜻은 아니다.
+[상품 상태 API](../../architecture/wishlist-item-state-api.md#카테고리-목록-window)의 ITEM-02와 HOME-02를 함께 갱신한다. 아래는 승인된 변경이며 현재 실행 API가 구현됐다는 뜻은 아니다.
 
 | 항목 | 기존 상태 API 문서 | B4 수정안 |
 |---|---|---|
@@ -117,7 +117,7 @@ owner digest는 token 소유자/조회 범위 검사이며 암호학적 진위 �
 | HOME-02 위치 복구 | cursor/limit만 명시 | ITEM-02와 같은 anchor/before/after 및 요청/대체 id·anchorResolved 추가 |
 | 카드/목록 | items와 앞뒤 cursor | items의 item은 B1~B3 DTO 재사용, 카드별 anchorCursor·totalCount 제공 |
 
-spec 승인 후 상태 API의 요청 예시·응답·‘가장 가까운 항목’ 본문을 이 규칙으로 함께 갱신한다. 클라이언트 메모리의 anchorItemId/anchorCursor는 유지할 수 있지만 서버 query에는 anchor cursor 하나만 보낸다.
+구현 단계에서 상태 API의 요청 예시·응답·‘가장 가까운 항목’ 본문을 이 규칙으로 함께 갱신한다. 클라이언트 메모리의 anchorItemId/anchorCursor는 유지할 수 있지만 서버 query에는 anchor cursor 하나만 보낸다.
 
 ## 응답 계약과 카드 projection
 
@@ -299,4 +299,4 @@ TDD로 아래 실패를 확인한 뒤 구현한다. 리뷰 지적도 재현 테�
 
 B10에서 목적 archive가 생기면 ARCHIVED 목적에 연결된 ACTIVE 상품은 purposeUnassigned(null만)에도 특정 목적 목록(비활성 목적 404)에도 나타나지 않을 수 있다. 목적/상품 lifecycle 전이와 조회 predicate를 B10에서 함께 검증·갱신한다. B4가 목적 archive 동작을 추가하지 않는다.
 
-spec 승인 후 작업별 plan을 작성해 구현·독립 리뷰·보완·전체 테스트를 진행한다. architecture의 read API/state API/category 계약, inventory, implementation order, 각 INDEX와 의미 있는 구현 이력을 최종 구현에 맞춰 갱신한다. 전체 테스트는 `--rerun-tasks`의 완료 결과만 기록한다. 현재 baseline은 295 통과·RealUrlPilot 1 skip이며 B4 구현 완료를 뜻하지 않는다.
+작업별 plan 검토·실행 방식 선택 후 구현·독립 리뷰·보완·전체 테스트를 진행한다. architecture의 read API/state API/category 계약, inventory, implementation order, 각 INDEX와 의미 있는 구현 이력을 최종 구현에 맞춰 갱신한다. 전체 테스트는 `--rerun-tasks`의 완료 결과만 기록한다. 현재 baseline은 295 통과·RealUrlPilot 1 skip이며 B4 구현 완료를 뜻하지 않는다.

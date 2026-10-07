@@ -1,8 +1,8 @@
 # 제품 결정: B4 상품 목록과 홈 조회
 
-> 상태: **제품 정책 확정 · 설계 spec 검토 전** · 날짜: 2026-10-07 · 영역: **제품·서버**
+> 상태: **제품 정책 확정 · 설계 spec 승인** · 날짜: 2026-10-07 · 영역: **제품·서버**
 
-제품 문서와 B1~B3 계약을 대조해 B4의 제품 정책을 확정했다. 이 문서는 구현 완료나 설계 spec 승인을 의미하지 않는다.
+제품 문서와 B1~B3 계약을 대조해 B4의 제품 정책을 확정했다. 이 문서는 제품 결정을 기록하며 구현 완료를 의미하지 않는다. 설계 승인과 실행 상태는 연결된 spec·계획·구현 이력에서 관리한다.
 
 ## 결정 — 사용자 확인 완료
 
@@ -65,7 +65,7 @@ HOME-01 inventory에는 서버 할 일 수가 제안돼 있지만, [디자인 �
 
 ## 관련 문서
 
-- [B4 조회 설계 제안](../../../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 입력·응답·cursor·snapshot·검증 규칙, 사용자 검토 전
+- [B4 조회 설계](../../../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 입력·응답·cursor·snapshot·검증 규칙, 2026-10-07 설계 승인
 - [B4 구현 순서](../../../../architecture/server/mvp-api-implementation-order.md#b4--상품-목록홈연속-처리-조회)
 - [상품 상태와 조회 위치 유지](../../../../architecture/wishlist-item-state-api.md)
 - [B3 목적 API 정책](b3-purpose-api-policy-2026-10-07.md)

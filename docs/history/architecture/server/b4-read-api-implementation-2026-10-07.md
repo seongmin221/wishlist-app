@@ -1,6 +1,6 @@
 # B4 상품 목록·홈 조회 구현 이력
 
-> 2026-10-07 · 제품 정책 확정·설계 spec 검토 전 · 제품 코드 구현 미착수
+> 2026-10-07 · 설계 승인·구현 계획 검토 전 · 제품 코드 구현 미착수
 
 ## 수신과 baseline
 
@@ -22,4 +22,4 @@ HOME-02의 기존 action/cursor/limit 예시에 없는 anchor 입력·응답, �
 
 [상품 목록·홈 조회 설계](../../../superpowers/specs/2026-10-07-b4-read-api-design.md)에 group query, page/window 크기, 삭제·이동 anchor 복구, 카드와 cursor, snapshot·index·검증을 제안했다.
 
-설계 피드백을 반영해 B3 형태의 구조/범위 검증 cursor로 단순화하고 신규 secret 제안을 제거했다. ITEM-02의 기존 anchor query와 requestedAnchorItemId를 유지하며 HOME-02 확장과 대체 항목 우선순위를 계약 비교표에 구분했다. 표시용 count와 B8 삭제 영향의 집계를 분리하고, 홈 SQL·index 교체 검토·Unicode 공백 상수·DB 유효 조합 parity·반대 방향 EXISTS를 구체화했다. 상세 설계와 근거는 spec에 모았다. 제품 정책은 확정됐지만 설계 spec 승인은 아직 받지 않았다. B4 제품 코드와 테스트는 미착수다.
+설계 피드백을 반영해 B3 형태의 구조/범위 검증 cursor로 단순화하고 신규 secret 제안을 제거했다. ITEM-02의 기존 anchor query와 requestedAnchorItemId를 유지하며 HOME-02 확장과 대체 항목 우선순위를 계약 비교표에 구분했다. 표시용 count와 B8 삭제 영향의 집계를 분리하고, 홈 SQL·index 교체 검토·Unicode 공백 상수·DB 유효 조합 parity·반대 방향 EXISTS를 구체화했다. 상세 설계와 근거는 spec에 모았다. 2026-10-07 사용자 지시 ‘계획 진행해’로 수정한 설계를 승인받았다. [작업별 계획](../../../superpowers/plans/2026-10-07-b4-read-api.md)은 Task1~9의 인터페이스·RED/GREEN·회귀·EXPLAIN·독립 리뷰와 커밋을 정의했다. 계획 검토와 실행 방식 선택은 아직 진행 전이며 B4 제품 코드와 테스트는 미착수다.
