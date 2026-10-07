@@ -16,13 +16,15 @@ import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.repository.CreateItemCommand
-import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
+import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,7 +56,7 @@ internal const val SUBMISSION_STEP_FAILURE = "SUBMISSION_STEP_FAILURE"
  */
 class SubmissionCoordinator internal constructor(
     private val store: LocalStore,
-    private val create: CreateItemRepository,
+    private val create: SnapshotCreateItemRepository,
     private val get: GetItemRepository,
     private val session: AuthSession,
     private val clock: Clock,
@@ -136,8 +138,10 @@ class SubmissionCoordinator internal constructor(
 
     private suspend fun consumeRequests() {
         while (true) {
-            val batch = mutableListOf(requests.receive())
+            // Wait before taking a request: until then requests stay in the channel, where a close
+            // releases them (a request held here would never be completed).
             ready.first { it }
+            val batch = mutableListOf(requests.receive())
             while (true) batch += requests.tryReceive().getOrNull() ?: break
             try {
                 guarded(Unit) { if (batch.any { it.refresh }) refreshOnce() else flushOnce() }
@@ -171,8 +175,11 @@ class SubmissionCoordinator internal constructor(
     private suspend fun send(snapshot: SessionSnapshot, row: LocalSubmission): Boolean {
         val id = row.clientSubmissionId
         if (store.markSubmission(snapshot, id, SubmissionStatus.SUBMITTING, null, null) is ClientResult.Failure) return false
-        publishView()
-        return when (val result = guarded(STEP_FAILURE) { create.create(CreateItemCommand(id, row.sourceUrl, row.sharedAt)) }) {
+        // Shown as sending without suspending here; ITEM-01 itself is bound to the flush snapshot, so
+        // an account change at any point is SESSION_CHANGED and never a POST for the other account.
+        scope.launch(dispatcher) { guarded(Unit) { publishView() } }
+        val command = CreateItemCommand(id, row.sourceUrl, row.sharedAt)
+        return when (val result = guarded(STEP_FAILURE) { create.create(command, snapshot) }) {
             is ClientResult.Success -> accept(snapshot, id, result)
             is ClientResult.Failure -> recordFailure(snapshot, id, result.error)
         }
@@ -207,7 +214,7 @@ class SubmissionCoordinator internal constructor(
         publishView()
     }
 
-    /** Recomputes the view for the current session; a result read across an account change is dropped. */
+    /** Recomputes the view for the current session. Lock order: viewLock → session gate (held only to publish). */
     private suspend fun publishView(): Unit = viewLock.withLock {
         val snapshot = session.state.value
         val previous = mutableView.value
@@ -219,14 +226,19 @@ class SubmissionCoordinator internal constructor(
             else -> (store.processingItems(snapshot) as? ClientResult.Success)?.value
                 ?.sortedWith(compareBy({ it.createdAt }, { it.id }))
         }
-        if (session.state.value != snapshot) return@withLock // the newer session publishes its own view
-        mutableView.update {
-            it.copy(
-                accountId = snapshot.accountId,
-                local = local ?: if (sameAccount) it.local else emptyList(),
-                processing = processing ?: if (sameAccount) it.processing else emptyList(),
-            )
+        // Published inside the session gate, so it cannot land after a newer account is current;
+        // a stale snapshot publishes nothing (the newer session publishes its own view).
+        session.withCurrent(snapshot) {
+            mutableView.update {
+                it.copy(
+                    accountId = snapshot.accountId,
+                    local = local ?: if (sameAccount) it.local else emptyList(),
+                    processing = processing ?: if (sameAccount) it.processing else emptyList(),
+                )
+            }
+            ClientResult.Success(Unit)
         }
+        Unit
     }
 
     /** Saves a new key under the current account; the value is the binding used. */
@@ -257,11 +269,15 @@ class SubmissionCoordinator internal constructor(
         return LocalSubmission(clientSubmissionId, link.url, sharedAt, accountBinding?.takeIf { it.isNotBlank() })
     }
 
-    /** Runs [block]; a non-cancellation exception becomes [fallback] instead of escaping. */
-    private inline fun <T> guarded(fallback: T, block: () -> T): T = try {
+    /**
+     * Runs [block]; an exception becomes [fallback] instead of escaping. Cancellation of this
+     * coroutine propagates; a stray CancellationException while still active is just a failure.
+     */
+    private suspend inline fun <T> guarded(fallback: T, block: () -> T): T = try {
         block()
     } catch (e: CancellationException) {
-        throw e
+        currentCoroutineContext().ensureActive()
+        fallback
     } catch (e: Exception) {
         fallback
     }

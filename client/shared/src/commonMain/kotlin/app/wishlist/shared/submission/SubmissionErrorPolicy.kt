@@ -15,11 +15,13 @@ internal object SubmissionErrorPolicy {
     fun decide(error: ClientError, now: Instant): Decision = when (error.kind) {
         // Transient: keep it queued with the error recorded. NOT_FOUND is not in C3-D8 and is
         // treated the same way, so a misrouted endpoint never loses a share.
-        ErrorKind.NETWORK, ErrorKind.TIMEOUT, ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE,
-        ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND -> Decision(SubmissionStatus.PENDING, null, stopFlush = false)
+        ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND ->
+            Decision(SubmissionStatus.PENDING, null, stopFlush = false)
+        // Ruling 10: the next rows would fail the same way (offline, timing out, throttled), so stop.
+        ErrorKind.NETWORK, ErrorKind.TIMEOUT -> Decision(SubmissionStatus.PENDING, null, stopFlush = true)
         ErrorKind.RATE_LIMITED -> {
             val wait = (error.retryAfterSeconds ?: DEFAULT_RETRY_AFTER_SECONDS).coerceAtLeast(0)
-            Decision(SubmissionStatus.PENDING, now + wait.seconds, stopFlush = false)
+            Decision(SubmissionStatus.PENDING, now + wait.seconds, stopFlush = true)
         }
         // The account changed: no store write for this snapshot can succeed; the row keeps its binding.
         ErrorKind.SESSION_CHANGED -> Decision(SubmissionStatus.PENDING, null, stopFlush = true)

@@ -21,6 +21,7 @@ import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
+import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.SubmissionCoordinator
 import kotlinx.coroutines.CancellationException
@@ -154,8 +155,10 @@ class SharedRuntime internal constructor(
     }
 
     /** ITEM-01 facade over the explicitly bound backend. */
-    fun createItemRepository(): CreateItemRepository =
-        GatedCreateItemRepository(ready, resolveOr<CreateItemRepository>(UnavailableItemRepository) { get(ITEM_01_DELEGATE) })
+    fun createItemRepository(): CreateItemRepository = gatedCreate()
+
+    private fun gatedCreate() =
+        GatedCreateItemRepository(ready, resolveOr<SnapshotCreateItemRepository>(UnavailableItemRepository) { get(ITEM_01_DELEGATE) })
 
     /** ITEM-03 facade: the bound backend wrapped once by the local cache decorator. */
     fun getItemRepository(): GetItemRepository =
@@ -183,7 +186,7 @@ class SharedRuntime internal constructor(
         }
         SubmissionCoordinator(
             store = localStore(),
-            create = createItemRepository(),
+            create = gatedCreate(),
             get = getItemRepository(),
             session = session,
             clock = env.clock,
@@ -228,7 +231,7 @@ class SharedRuntime internal constructor(
 
     /** The backend the graph actually connected for [apiId]; APIs without a facade stay UNAVAILABLE. */
     internal fun resolvedBackend(apiId: ApiId): Backend = when (apiId) {
-        ApiId.ITEM_01 -> backendOf(koin.get<CreateItemRepository>(ITEM_01_DELEGATE))
+        ApiId.ITEM_01 -> backendOf(koin.get<SnapshotCreateItemRepository>(ITEM_01_DELEGATE))
         ApiId.ITEM_03 -> backendOf(koin.get<GetItemRepository>(ITEM_03_DELEGATE))
         else -> Backend.UNAVAILABLE
     }

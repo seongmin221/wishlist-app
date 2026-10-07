@@ -14,6 +14,7 @@ import app.wishlist.shared.repository.CreateItemCommand
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
+import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Instant
 
@@ -26,8 +27,10 @@ internal const val RUNTIME_NOT_READY = "RUNTIME_NOT_READY"
 internal fun unavailable(code: String) = ClientResult.Failure(ClientError(ErrorKind.UNAVAILABLE, code))
 
 /** The UNAVAILABLE backend for ITEM-01/ITEM-03: a typed failure, never an exception. */
-internal object UnavailableItemRepository : CreateItemRepository, GetItemRepository {
+internal object UnavailableItemRepository : SnapshotCreateItemRepository, GetItemRepository {
     override suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> = unavailable(API_UNAVAILABLE)
+    override suspend fun create(command: CreateItemCommand, expected: SessionSnapshot): ClientResult<WishlistItem> =
+        unavailable(API_UNAVAILABLE)
     override suspend fun get(id: String): ClientResult<WishlistItem> = unavailable(API_UNAVAILABLE)
 }
 
@@ -45,10 +48,12 @@ internal object UnavailableCatalogRepository : CatalogRepository {
  */
 internal class GatedCreateItemRepository(
     private val ready: StateFlow<Boolean>,
-    internal val delegate: CreateItemRepository,
-) : CreateItemRepository {
+    internal val delegate: SnapshotCreateItemRepository,
+) : SnapshotCreateItemRepository {
     override suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> =
         if (ready.value) delegate.create(command) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun create(command: CreateItemCommand, expected: SessionSnapshot): ClientResult<WishlistItem> =
+        if (ready.value) delegate.create(command, expected) else unavailable(RUNTIME_NOT_READY)
 }
 
 internal class GatedGetItemRepository(

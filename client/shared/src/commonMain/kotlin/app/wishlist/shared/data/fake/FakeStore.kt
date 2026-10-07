@@ -46,8 +46,13 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         injections.update { it + (apiId to (it[apiId] ?: Injection()).copy(millis = millis)) }
     }
 
-    private suspend fun <T> request(apiId: ApiId?, operation: (OwnerStore) -> ClientResult<T>): ClientResult<T> {
-        val snapshot = session.state.value
+    /** [expected]: the snapshot the call is for (default: the current one); a stale one touches no owner. */
+    private suspend fun <T> request(
+        apiId: ApiId?,
+        expected: SessionSnapshot? = null,
+        operation: (OwnerStore) -> ClientResult<T>,
+    ): ClientResult<T> {
+        val snapshot = expected ?: session.state.value
         val injection = if (apiId == null) null else injections.getAndUpdate { it - apiId }[apiId]
         if (injection != null && injection.millis > 0) delay(injection.millis)
         val result = session.withCurrent(snapshot) {
@@ -64,7 +69,8 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         return if (session.state.value == snapshot) result else failure(ErrorKind.SESSION_CHANGED)
     }
 
-    suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> = request(ApiId.ITEM_01) { owner ->
+    suspend fun create(command: CreateItemCommand, expected: SessionSnapshot? = null): ClientResult<WishlistItem> =
+        request(ApiId.ITEM_01, expected) { owner ->
         val key = uuidOrNull(command.submissionId)
             ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
         val previous = owner.submissionIds[key]?.let { owner.entries.getValue(it).item }

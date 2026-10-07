@@ -15,7 +15,9 @@ import app.wishlist.shared.submission.InboxRecord
 import app.wishlist.shared.submission.SUBMISSION_STEP_FAILURE
 import app.wishlist.shared.submission.ShareCardKind
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -118,6 +120,17 @@ class RuntimeSubmissionsTest {
         unused.close()
         assertEquals(ShareCardKind.STORE_FAILED, unused.submissions().receiveShared(LINK, online = true))
         unused.submissions().refresh(FlushTrigger.LAUNCH)
+    }
+
+    @Test fun refreshBeforeReadyReturnsWhenTheRuntimeCloses() = runTest {
+        val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
+        val waiter = launch { runtime.submissions().refresh(FlushTrigger.LAUNCH) } // bootstrap never started
+        runCurrent()
+        runtime.close()
+        advanceUntilIdle()
+        val returned = waiter.isCompleted
+        waiter.cancel()
+        assertTrue(returned)
     }
 
     @Test fun releaseSharesStayLocalAndUnsent() = runTest {

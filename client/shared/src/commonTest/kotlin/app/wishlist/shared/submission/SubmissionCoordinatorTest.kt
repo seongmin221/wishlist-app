@@ -25,12 +25,14 @@ import app.wishlist.shared.data.local.UUID_C
 import app.wishlist.shared.data.local.submission
 import app.wishlist.shared.data.local.withHarness
 import app.wishlist.shared.model.AnalysisStatus
+import app.wishlist.shared.model.CategoryMissingReason
 import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.repository.CreateItemCommand
-import app.wishlist.shared.repository.CreateItemRepository
+import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import app.wishlist.shared.repository.LocalStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +54,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -62,11 +65,14 @@ private const val LINK = "https://shop.example/p/1"
 private const val SHARED_ISO = "2026-10-06T23:00:00.123456Z"
 private val baseTime = Instant.parse("2026-10-07T00:00:00Z")
 
-/** One ITEM-01 call: its key and the session account at the moment it was made. */
+/** One ITEM-01 call: its key and the account it was made for (the expected snapshot's). */
 internal data class CreateCall(val key: String, val account: String?)
 
 /** Scripted ITEM-01 over the real Fake backend: records calls and concurrency, replays scripted steps in order. */
-internal class ScriptedCreate(private val real: CreateItemRepository, private val session: AuthSession) : CreateItemRepository {
+internal class ScriptedCreate(
+    private val real: SnapshotCreateItemRepository,
+    private val session: AuthSession,
+) : SnapshotCreateItemRepository {
     val calls = mutableListOf<CreateCall>()
     val results = mutableListOf<ClientResult<WishlistItem>>()
     var maxActive = 0
@@ -84,14 +90,17 @@ internal class ScriptedCreate(private val real: CreateItemRepository, private va
 
     fun fail(error: ClientError) = then { ClientResult.Failure(error) }
 
-    override suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> {
-        calls += CreateCall(command.submissionId, session.state.value.accountId)
+    override suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> =
+        create(command, session.state.value)
+
+    override suspend fun create(command: CreateItemCommand, expected: SessionSnapshot): ClientResult<WishlistItem> {
+        calls += CreateCall(command.submissionId, expected.accountId)
         active++
         maxActive = maxOf(maxActive, active)
         try {
             onCall(command)
             val step = script.removeFirstOrNull()
-            val result = if (step == null) real.create(command) else step { real.create(command) }
+            val result = if (step == null) real.create(command, expected) else step { real.create(command, expected) }
             results += result
             return result
         } finally {
@@ -100,15 +109,22 @@ internal class ScriptedCreate(private val real: CreateItemRepository, private va
     }
 }
 
-/** Counts flush runs: every flush with an account starts with exactly one prepareFlush. */
+/** Counts flush runs (every flush with an account starts with exactly one prepareFlush); hooks marks. */
 internal class CountingStore(private val delegate: LocalStore) : LocalStore by delegate {
     var prepareFlushCalls = 0
         private set
+
+    /** Runs right after a markSubmission has committed (outside the session gate). */
+    var afterMark: suspend (SubmissionStatus) -> Unit = {}
 
     override suspend fun prepareFlush(snapshot: SessionSnapshot): ClientResult<List<LocalSubmission>> {
         prepareFlushCalls++
         return delegate.prepareFlush(snapshot)
     }
+
+    override suspend fun markSubmission(
+        snapshot: SessionSnapshot, id: String, status: SubmissionStatus, error: ClientError?, retryAfter: Instant?,
+    ): ClientResult<Unit> = delegate.markSubmission(snapshot, id, status, error, retryAfter).also { afterMark(status) }
 }
 
 /** Real SQLite store + scripted ITEM-01 over FakeStore + fake login, on virtual time. */
@@ -392,6 +408,34 @@ class SubmissionCoordinatorTest {
         assertEquals(ids.toSet(), h.view.processing.map { it.id }.toSet())
     }
 
+    @Test fun accountSwitchBetweenSubmittingCommitAndPostNeverSendsToOtherOwner() = runCoordinatorTest { h ->
+        h.signIn(AuthProvider.GOOGLE)
+        h.share(online = false)
+        val key = h.pending().single().clientSubmissionId
+        // The account changes right after SUBMITTING is committed, before ITEM-01 is called.
+        h.store.afterMark = { status ->
+            if (status == SubmissionStatus.SUBMITTING) {
+                h.store.afterMark = {}
+                h.session.changeAccount(APPLE_ID)
+            }
+        }
+        h.flush()
+
+        assertTrue(h.create.calls.none { it.account == APPLE_ID }, "calls=${h.create.calls}")
+        // Nothing was created in Apple's namespace (the probe counts its PROCESSING items).
+        val probe = AnalysisOutcome(AnalysisStatus.PARTIAL, null, null, CategoryMissingReason.EXTRACTION_UNRESOLVED, null)
+        assertEquals(0, h.fakeStore.completeDueAnalyses(h.clock.now(), Duration.ZERO) { probe }.successValue())
+        val row = assertNotNull(h.storeHarness.row(key))
+        assertEquals(GOOGLE_ID, row.account_binding)
+
+        h.session.changeAccount(GOOGLE_ID)
+        h.flush()
+        assertTrue(h.create.calls.all { it == CreateCall(key, GOOGLE_ID) })
+        assertEquals(1, h.create.results.count { it is ClientResult.Success })
+        assertTrue(h.pending().isEmpty())
+        assertEquals(1, h.view.processing.size)
+    }
+
     // --- Review Focus 2: process death ------------------------------------------------------
 
     @Test fun staleSubmittingIsResentWithSameKey() = runCoordinatorTest { h ->
@@ -452,6 +496,46 @@ class SubmissionCoordinatorTest {
         h.flush()
         assertEquals(2, h.create.calls.size)
         assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun networkTimeoutAndRateLimitStopTheFlushLeavingLaterRowsUntouched() = runCoordinatorTest { h ->
+        h.signIn()
+        h.share(online = false)
+        h.share(online = false)
+        for (kind in listOf(ErrorKind.NETWORK, ErrorKind.TIMEOUT, ErrorKind.RATE_LIMITED)) {
+            val before = h.create.calls.size
+            h.create.fail(ClientError(kind))
+            advanceTimeBy(120_000) // past any retryAfter from the previous round
+            h.flush()
+            assertEquals(before + 1, h.create.calls.size, "kind=$kind")
+            val (first, second) = h.pending()
+            assertEquals(kind, first.lastSubmissionError?.kind)
+            assertEquals(SubmissionStatus.PENDING, second.submissionStatus)
+            assertNull(second.lastSubmissionError)
+        }
+    }
+
+    @Test fun strayCancellationFromCreateIsRecordedAndTheConsumerSurvives() = runCoordinatorTest { h ->
+        h.signIn()
+        h.create.then { throw CancellationException("stray") }
+        h.share()
+        val row = h.pending().single()
+        assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
+        assertEquals(ErrorKind.UNAVAILABLE, row.lastSubmissionError?.kind)
+        assertEquals(SUBMISSION_STEP_FAILURE, row.lastSubmissionError?.code)
+        h.flush()
+        assertTrue(h.pending().isEmpty())
+        assertEquals(1, h.view.processing.size)
+    }
+
+    @Test fun refreshBeforeReadyReturnsWhenTheScopeCloses() = runCoordinatorTest(ready = false) { h ->
+        val waiter = launch { h.coordinator.refresh(FlushTrigger.LAUNCH) }
+        runCurrent()
+        h.scope.cancel()
+        advanceUntilIdle()
+        val returned = waiter.isCompleted
+        waiter.cancel()
+        assertTrue(returned)
     }
 
     @Test fun validationAndConflictBecomeFailedAndAreNotResent() = runCoordinatorTest { h ->

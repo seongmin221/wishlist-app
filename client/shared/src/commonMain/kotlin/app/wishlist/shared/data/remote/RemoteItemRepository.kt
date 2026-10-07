@@ -10,6 +10,7 @@ import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.repository.CreateItemCommand
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
+import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.setBody
@@ -33,10 +34,13 @@ import kotlinx.serialization.json.put
 internal class RemoteItemRepository(
     private val session: AuthSession,
     private val transport: AuthenticatedTransport,
-) : CreateItemRepository, GetItemRepository {
+) : SnapshotCreateItemRepository, GetItemRepository {
 
-    override suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> {
-        val snapshot = session.state.value
+    override suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> = create(command, session.state.value)
+
+    /** The transport rejects a stale [expected] before sending and again after the token. */
+    override suspend fun create(command: CreateItemCommand, expected: SessionSnapshot): ClientResult<WishlistItem> {
+        val snapshot = expected
         if (snapshot.accountId == null) return unauthenticated()
         // Everything is computed outside the request lambda; the transport also builds it only once.
         val body = buildJsonObject {

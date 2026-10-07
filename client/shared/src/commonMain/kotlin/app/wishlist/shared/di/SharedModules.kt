@@ -23,6 +23,7 @@ import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
+import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -170,7 +171,7 @@ private fun coreModule(env: RuntimeEnvironment) = module {
         )
     }
     single<LocalStore> { SqlLocalStore(get(), get()) }
-    single<CreateItemRepository>(ITEM_01_DELEGATE) { itemBackend(env.bindings.backendOf(ApiId.ITEM_01)) }
+    single<SnapshotCreateItemRepository>(ITEM_01_DELEGATE) { itemBackend(env.bindings.backendOf(ApiId.ITEM_01)) }
     single<GetItemRepository>(ITEM_03_DELEGATE) { itemBackend(env.bindings.backendOf(ApiId.ITEM_03)) }
     // The Get facade owns cache sync: the selected delegate is wrapped exactly once.
     single<GetItemRepository> { CachedGetItemRepository(get(ITEM_03_DELEGATE), get(), get()) }
