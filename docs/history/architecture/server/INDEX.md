@@ -87,3 +87,5 @@
 - [B1 리뷰 경계 보완](b1-review-boundaries-2026-10-06.md) — 생성 snapshot·HTTP presenter·명시 주입·실패 enum·UTC/JDBC·200개 회귀
 
 - [B1 코드 리뷰 후속 보완](b1-code-review-followup-2026-10-06.md) — URL 인코딩·길이 상한·생성 결과 타입·발행 실패 원인 보존
+
+- [B1 2차 코드 리뷰 후속 보완](b1-second-review-followup-2026-10-07.md) — 즉시 발행 실패 로그·생성 시점 loopback 정규화·failure code 공개 플래그 제거

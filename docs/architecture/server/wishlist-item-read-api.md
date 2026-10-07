@@ -12,7 +12,7 @@
 
 ## 공유 시각과 생성 key
 
-`sourceUrl`은 최대 2048자(UTF-16 길이)이며 UTF-8로 인코딩할 수 없는 문자열(짝 없는 surrogate)도 거절한다. 둘 다 새 오류 code 없이 기존 `422 INVALID_URL`이며 DB에 쓰기 전에 검사한다. JDBC가 짝 없는 surrogate를 `?`로 바꿔 저장하면 같은 key의 재전송이 저장 URL과 달라져 409가 되기 때문이다. 정상 surrogate 쌍(예: 이모지)은 허용하며 재전송이 일치한다. 요청 body 전체 상한은 여전히 운영 설정 범위의 후속 항목이다.
+`sourceUrl`은 최대 2048자(UTF-16 길이)이며 UTF-8로 인코딩할 수 없는 문자열(짝 없는 surrogate)도 거절한다. 둘 다 새 오류 code 없이 기존 `422 INVALID_URL`이며 DB에 쓰기 전에 검사한다. JDBC가 짝 없는 surrogate를 `?`로 바꿔 저장하면 같은 key의 재전송이 저장 URL과 달라져 409가 되기 때문이다. 정상 surrogate 쌍(예: 이모지)은 허용하며 재전송이 일치한다. 요청 body 전체 상한은 여전히 운영 설정 범위의 후속 항목이다. 생성 시점에는 대소문자와 IPv6 괄호를 정규화해 `localhost`/`*.localhost`, IPv4 `127.0.0.0/8`·`0.0.0.0`, IPv6 loopback·unspecified literal을 DNS 조회 없이 거절한다. 사설·link-local 대역과 DNS 결과 판정은 extraction의 `UrlSafetyPolicy`가 계속 담당한다.
 
 `clientCreatedAt`은 선택 문자열이며 생략과 JSON null은 동일하게 null로 저장한다. 순수 `parseCreateRequest` 함수가 JSON wire 타입과 시각을 검증하고 URL의 허용 여부는 생성 서비스가 검사한다. 시간대가 있는 ISO 8601 날짜/시각을 Instant로 변환하며, 현지 시각과 UTC Instant 양쪽 연도가 1~9999여야 한다. 날짜만·offset 없는 시각·잘못된 날짜·문자열 이외의 값은 `422 INVALID_CLIENT_CREATED_AT`다. 기기 시계 오차를 이유로 미래 시각을 거절하지 않는다.
 
@@ -20,7 +20,7 @@ V10은 `client_created_at timestamptz`만 추가하고 기존 행은 null로 유
 
 ## 공개 실패 코드
 
-도메인 `AnalysisFailureCode` enum이 공개 여부와 category 누락 사유를 정의한다. Worker의 새 실패 저장은 enum을 받고, 최종 반영의 category 사유와 HTTP 응답도 같은 enum을 사용한다. V8 SQL은 당시 migration 기록이므로 수정하지 않는다. PROCESSING/READY의 failureCode는 null이다. PARTIAL·실패에는 아래 허용 code를 반환한다.
+도메인 `AnalysisFailureCode` enum이 공개 failure code 어휘와 category 누락 사유를 정의한다. enum의 모든 값은 공개 계약이며, 내부 전용 진단은 enum 밖의 저장 문자열로만 남는다. Worker의 새 실패 저장은 enum을 받고, 최종 반영의 category 사유와 HTTP 응답도 같은 enum을 사용한다. V8 SQL은 당시 migration 기록이므로 수정하지 않는다. PROCESSING/READY의 failureCode는 null이다. PARTIAL·실패에는 아래 허용 code를 반환한다.
 
 - `BLOCKED_ADDRESS`, `UNSUPPORTED_CONTENT`, `ACCESS_DENIED`
 - `AI_ABSTAINED`, `AI_UNUSABLE_RESPONSE`, `AI_INVALID_CANDIDATE`, `AI_USAGE_OUT_OF_RANGE`
@@ -34,7 +34,7 @@ V10은 `client_created_at timestamptz`만 추가하고 기존 행은 null로 유
 
 생성 transaction은 item·job·outbox event를 함께 commit한다. 생성 연결을 반환한 뒤 event ID를 callback에 전달하고 `OutboxDispatcher.dispatchEvent(id)`가 해당 event만 claim한다. 오래된 retry backlog가 새 생성의 즉시 발행을 대신 소비하지 않는다. 지정 발행과 batch 발행은 DB 시각 기반 120초 lease·SKIP LOCKED·결정적 task 이름을 공유한다. 없는 event·발행 완료·살아 있는 lease는 발행하지 않는다.
 
-발행 실패는 가능한 경우 lease를 해제하고 item과 미발행 event를 보존한다. 취소도 lease 해제 후 전파한다. key 재전송은 저장된 API 결과를 복구하며 발행을 다시 시도하지 않는다. 미발행 event의 queue 전달 복구는 B5 Scheduler에서 연결한다. 생성 응답은 transaction 안에서 읽고 성공적으로 commit한 snapshot을 반환하며 발행 후 재조회하지 않는다. post-commit 재조회 장애로 201/Location을 잃는 경로를 없앤다. 성공적인 생성·즉시 발행의 pool 대여는 생성 transaction, claim, published update의 세 번이다. Worker가 그 사이 완료하면 이후 GET/재전송에서 최신 결과를 읽는다. runtime 종료 gate와 작은 connection pool을 유지한다.
+발행 실패는 가능한 경우 lease를 해제하고 item과 미발행 event를 보존한다. gateway 실패는 dispatcher가, lease 해제·claim 실패처럼 생성 서비스까지 올라온 예외는 생성 서비스가 event ID와 예외 타입만 warn 로그로 남긴다. Scheduler가 연결되기 전에는 이 로그가 PROCESSING에 남은 상품을 추적하는 유일한 신호다. 취소도 lease 해제 후 전파한다. key 재전송은 저장된 API 결과를 복구하며 발행을 다시 시도하지 않는다. 미발행 event의 queue 전달 복구는 B5 Scheduler에서 연결한다. 생성 응답은 transaction 안에서 읽고 성공적으로 commit한 snapshot을 반환하며 발행 후 재조회하지 않는다. post-commit 재조회 장애로 201/Location을 잃는 경로를 없앤다. 성공적인 생성·즉시 발행의 pool 대여는 생성 transaction, claim, published update의 세 번이다. Worker가 그 사이 완료하면 이후 GET/재전송에서 최신 결과를 읽는다. runtime 종료 gate와 작은 connection pool을 유지한다.
 
 B0의 production createTask RPC 5초 상한과 batch 발행 메서드를 유지한다. B5의 Scheduler·장기 PENDING 복구·batch의 후보별 시간/실패 격리·generation 전체 retry 예산은 후속 범위다.
 
