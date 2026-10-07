@@ -5,12 +5,16 @@ import app.analysis.AnalysisClaim
 import app.analysis.AnalysisClaimRepository
 import app.analysis.AnalysisLane
 import app.analysis.ClaimResult
+import app.wishlist.CreateResult
 import app.wishlist.CreateWishlistItemService
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
+
+/** Fixture creations must produce a fresh item; any other outcome fails the test here. */
+val CreateResult.createdItemId: UUID get() = kotlin.test.assertIs<CreateResult.Created>(this).itemId
 
 fun withAnalysisDatabase(block: (DataSource) -> Unit) = PostgresTestContainer().use { db ->
     db.start()
@@ -22,7 +26,7 @@ fun claimJob(source: DataSource, jobId: UUID, lane: AnalysisLane = AnalysisLane.
     (AnalysisClaimRepository(source).claim(jobId, 1, lane) as ClaimResult.Claimed).claim
 
 fun newAnalysisClaim(source: DataSource, lane: AnalysisLane = AnalysisLane.GENERAL): AnalysisClaim {
-    val item = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item").itemId
+    val item = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item").createdItemId
     val job = UUID.fromString(analysisScalar(source, "select id from analysis_jobs where wishlist_item_id='$item'"))
     if (lane == AnalysisLane.BROWSER) analysisSql(source, "update analysis_jobs set stage='BROWSER_PENDING',browser_attempted=true where id='$job'")
     return claimJob(source, job, lane)

@@ -5,6 +5,7 @@ import app.analysis.AnalysisPendingResultRepository
 import app.analysis.ProcessingOutcome
 import app.budget.LlmBudgetService
 import app.budget.ReserveResult
+import app.wishlist.AnalysisFailureCode
 import app.budget.BudgetReservation
 import app.extraction.Metadata
 import java.util.UUID
@@ -23,7 +24,7 @@ class AiClassificationService(
         val reservation = when (val result = budget.reserveBeforeCall(claim, UUID.randomUUID())) {
             is ReserveResult.Reserved -> result.reservation
             ReserveResult.Stale -> return ProcessingOutcome.Stale
-            ReserveResult.Exceeded -> return failure(claim, "AI_BUDGET_EXCEEDED", ProcessingOutcome.Partial)
+            ReserveResult.Exceeded -> return failure(claim, AnalysisFailureCode.AI_BUDGET_EXCEEDED, ProcessingOutcome.Partial)
         }
         var inFlight = false
         var notSent = false
@@ -74,21 +75,21 @@ class AiClassificationService(
         }
         // Actual usage is accounted for even when this execution lost ownership during the call.
         if (result.classification is ClassificationResult.Assigned && !usageWithinLimit)
-            return failure(claim, "AI_USAGE_OUT_OF_RANGE", ProcessingOutcome.Partial)
+            return failure(claim, AnalysisFailureCode.AI_USAGE_OUT_OF_RANGE, ProcessingOutcome.Partial)
         return when (val classification = result.classification) {
             is ClassificationResult.Assigned -> {
                 if (classification.categoryId !in candidates.categoryIds ||
                     (classification.purposeId != null && classification.purposeId !in candidates.purposeIds)) {
-                    failure(claim, "AI_INVALID_CANDIDATE", ProcessingOutcome.Partial)
+                    failure(claim, AnalysisFailureCode.AI_INVALID_CANDIDATE, ProcessingOutcome.Partial)
                 } else if (pending.saveAssignment(claim, classification)) ProcessingOutcome.Complete else ProcessingOutcome.Stale
             }
-            ClassificationResult.Abstained -> failure(claim, "AI_ABSTAINED", ProcessingOutcome.Partial)
-            is ClassificationResult.Unusable -> failure(claim, "AI_UNUSABLE_RESPONSE", ProcessingOutcome.Partial)
+            ClassificationResult.Abstained -> failure(claim, AnalysisFailureCode.AI_ABSTAINED, ProcessingOutcome.Partial)
+            is ClassificationResult.Unusable -> failure(claim, AnalysisFailureCode.AI_UNUSABLE_RESPONSE, ProcessingOutcome.Partial)
             ClassificationResult.Retryable -> if (pending.isCurrent(claim)) ProcessingOutcome.Retryable else ProcessingOutcome.Stale
-            is ClassificationResult.Terminal -> failure(claim, "AI_CONFIGURATION_ERROR", ProcessingOutcome.Terminal)
+            is ClassificationResult.Terminal -> failure(claim, AnalysisFailureCode.AI_CONFIGURATION_ERROR, ProcessingOutcome.Terminal)
         }
     }
 
-    private fun failure(claim: AnalysisClaim, code: String, outcome: ProcessingOutcome): ProcessingOutcome =
+    private fun failure(claim: AnalysisClaim, code: AnalysisFailureCode, outcome: ProcessingOutcome): ProcessingOutcome =
         if (pending.saveFailure(claim, code)) outcome else ProcessingOutcome.Stale
 }

@@ -151,7 +151,7 @@ allowedActions의 제안 key는 EDIT·DELETE·REVIEW·MANUAL_COMPLETE·REANALYZE
 
 PATCH의 필드 누락은 변경 없음, 명시적 null은 optional 값 해제다. category null은 일반 편집에서 허용하지 않고 category 삭제 use case에서만 발생시킨다. price·currency·sourceUrl은 사용자 편집 대상으로 받지 않는다. 이미지 업로드 후 mediaId를 연결하며, 서버가 해당 owner의 READY 자원인지 확인한다.
 
-상품 목록은 기존 최근 저장순 `(created_at,id)`을 유지한다. 생성 응답은 commit된 최신 item을 읽는다. clientCreatedAt은 별도 sharedAt으로 검증·보관할 수 있지만 서버 정렬 기준을 조용히 바꾸지 않는다. cursor는 owner·필터·정렬 key를 묶어 검증하고 limit과 before/after에 상한을 둔다.
+상품 목록은 기존 최근 저장순 `(created_at,id)`을 유지한다. B1 생성 응답은 생성 transaction의 commit된 item snapshot을 반환하며 발행 후 재조회하지 않는다. 상세 GET과 key 재전송이 이후의 최신 상태를 읽는다. clientCreatedAt은 별도로 검증·보관하고 서버 정렬 기준을 바꾸지 않는다. [B1 조회 계약](wishlist-item-read-api.md)을 따른다. cursor는 owner·필터·정렬 key를 묶어 검증하고 limit과 before/after에 상한을 둔다.
 
 홈 미리보기·연속 처리·일반 목록은 같은 requiredAction predicate와 visibility predicate를 사용한다. 홈의 요약/미리보기는 단일 SQL 또는 짧은 동일 snapshot 읽기로 집계해 내부 불일치를 줄인다. 갱신 중 항목이 사라지면 다음 최신 window로 이어가며 목록 전체를 내려주지 않는다.
 

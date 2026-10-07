@@ -10,6 +10,7 @@ import app.tasks.CloudTasksConfig
 import app.tasks.CloudTasksGateway
 import app.tasks.OutboxDispatcher
 import app.wishlist.CreateWishlistItemService
+import app.wishlist.GetWishlistItemService
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.tasks.v2.CloudTasksClient
 import com.google.firebase.FirebaseApp
@@ -74,11 +75,12 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val client = resources.own(CloudTasksClient.create(CloudTasksGateway.clientSettings()))
         OutboxDispatcher(source, CloudTasksGateway(client, config))
     } else null
-    val service = CreateWishlistItemService(source) {
-        resources.runIfOpen { dispatcher?.dispatchPending(1) }
+    val service = CreateWishlistItemService(source) { eventId ->
+        resources.runIfOpen { dispatcher?.dispatchEvent(eventId) }
     }
+    val detailService = GetWishlistItemService(source)
     routing {
         get("/health") { call.respondText("ok") }
-        wishlistRoutes(service) { resolver.resolve(it) }
+        wishlistRoutes(service, detailService) { resolver.resolve(it) }
     }
 }

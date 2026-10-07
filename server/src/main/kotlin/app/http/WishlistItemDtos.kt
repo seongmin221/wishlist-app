@@ -1,5 +1,6 @@
 package app.http
 
+import app.wishlist.AnalysisFailureCode
 import app.wishlist.AnalysisStatus
 import app.wishlist.CategoryMissingReason
 import app.wishlist.ItemAction
@@ -27,6 +28,7 @@ data class WishlistItemDto(
     val updatedAt: String,
     val manualCompletionAt: String? = null,
     val allowedActions: Set<ItemAction> = emptySet(),
+    val clientCreatedAt: String? = null,
 )
 
 @Serializable
@@ -39,6 +41,8 @@ data class ProductDto(
     val brand: String? = null,
     val merchant: String? = null,
     val metadataCheckedAt: String? = null,
+    val nameSource: ValueSource? = null,
+    val imageSource: ValueSource? = null,
 )
 
 @Serializable
@@ -55,4 +59,4 @@ data class PurposeDto(
 )
 
 @Serializable
-data class AnalysisDto(val status: AnalysisStatus, val failureCode: String? = null)
+data class AnalysisDto(val status: AnalysisStatus, val failureCode: AnalysisFailureCode? = null)

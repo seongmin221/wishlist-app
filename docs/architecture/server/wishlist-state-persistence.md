@@ -26,9 +26,9 @@ legacy GENERAL_RUNNING/BROWSER_RUNNING은 execution token과 claimed version을 
 
 ## 사용자 범위 조회
 
-`WishlistItemStateRepository.findOwned(ownerId, itemId)`는 owner와 item ID를 SQL에서 함께 조건으로 사용한다. 다른 사용자의 항목과 없는 항목은 모두 null이다. 내부에서는 ARCHIVED/DELETED도 읽을 수 있으며 공개 상세 조회 정책은 B1에서 적용한다. 읽은 row를 상태 enum, 출처, nullable 시각과 override 집합으로 매핑한다.
+`WishlistItemRepository.findOwned(ownerId, itemId)`는 owner와 item ID를 SQL에서 함께 조건으로 사용한다. 다른 사용자의 항목과 없는 항목은 모두 null이다. 전체 상품 projection의 `.storedState`에 상태 enum·현재 generation·출처·nullable 시각·override 집합을 담는다. 내부에서는 ARCHIVED/DELETED도 읽을 수 있으며 공개 GET의 DELETED 404는 `GetWishlistItemService` 경계에서 적용한다.
 
-B0 Task 4~7에서 중간·최종 반영과 복구에 현재 상태·출처·실행 보호를 연결했다. 이 repository는 상태 projection이며 원본 URL·전체 metadata·시각을 포함한 공개 상세 DTO 조회와 mapper는 B1에서 확장한다.
+B0 Task 4~7에서 중간·최종 반영과 복구에 현재 상태·출처·실행 보호를 연결했다. B1 repository는 생성 SQL과 owner/key 조회 및 원본 URL·metadata·시각을 포함한 공통 projection을 담당한다. 상태만 반환하는 미사용 API는 제거했고 HTTP presenter는 [B1 조회 계약](wishlist-item-read-api.md)의 `app.http.WishlistItemViewMapper`다.
 
 
 ## 원자 claim과 쓰기 보호

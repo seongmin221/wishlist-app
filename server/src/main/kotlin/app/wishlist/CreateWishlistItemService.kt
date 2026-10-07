@@ -1,113 +1,90 @@
 package app.wishlist
 
 import kotlinx.coroutines.CancellationException
+import org.slf4j.LoggerFactory
+import java.net.InetAddress
 import java.net.URI
-import java.sql.Connection
+import java.nio.charset.StandardCharsets
+import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
 
 sealed interface CreateResult {
-    val item: WishlistItem?
-    val itemId: UUID get() = requireNotNull(item).id
+    /** Outcomes backed by a stored item; only these expose an item ID. */
+    sealed interface Stored : CreateResult {
+        val item: WishlistItem
+        val itemId: UUID get() = item.id
+    }
 
-    data class Created(override val item: WishlistItem) : CreateResult
-    data class Replayed(override val item: WishlistItem) : CreateResult
-    data class IdempotencyKeyReused(override val item: WishlistItem) : CreateResult
-    data object InvalidUrl : CreateResult { override val item: WishlistItem? = null }
+    data class Created(override val item: WishlistItem, val outboxEventId: UUID) : Stored
+    data class Replayed(override val item: WishlistItem) : Stored
+    data class IdempotencyKeyReused(override val item: WishlistItem) : Stored
+    data object InvalidUrl : CreateResult
 }
+
+private const val MAX_SOURCE_URL_LENGTH = 2048
 
 class CreateWishlistItemService(
     private val dataSource: DataSource,
-    private val dispatchAfterCommit: () -> Unit = {},
+    private val dispatchAfterCommit: (UUID) -> Unit = {},
 ) {
-    fun create(ownerId: UUID, key: UUID, sourceUrl: String): CreateResult {
-        if (!isPublicHttpUrl(sourceUrl)) return CreateResult.InvalidUrl
+    private val items = WishlistItemRepository(dataSource)
 
+    fun create(ownerId: UUID, key: UUID, sourceUrl: String, clientCreatedAt: Instant? = null): CreateResult {
+        if (!isPublicHttpUrl(sourceUrl)) return CreateResult.InvalidUrl
         val result = dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
                 val itemId = UUID.randomUUID()
-                val jobId = UUID.randomUUID()
-                if (!connection.insertWishlistItem(itemId, ownerId, key, sourceUrl)) {
-                    val existing = connection.prepareStatement(
-                        "select id, source_url from wishlist_items where owner_id = ? and client_submission_id = ?",
-                    ).use { statement ->
-                        statement.setObject(1, ownerId)
-                        statement.setObject(2, key)
-                        statement.executeQuery().use { rows ->
-                            check(rows.next()) { "conflicting wishlist item missing" }
-                            UUID.fromString(rows.getString("id")) to rows.getString("source_url")
-                        }
-                    }
-                    val item = connection.loadItem(existing.first)
-                    connection.commit()
-                    return@use if (existing.second == sourceUrl) CreateResult.Replayed(item)
-                    else CreateResult.IdempotencyKeyReused(item)
+                val result = if (items.insertItem(connection, itemId, ownerId, key, sourceUrl, clientCreatedAt)) {
+                    val eventId = items.insertInitialAnalysis(connection, itemId)
+                    CreateResult.Created(checkNotNull(items.findOwned(connection, ownerId, itemId)), eventId)
+                } else {
+                    val item = checkNotNull(items.findBySubmission(connection, ownerId, key)) { "conflicting wishlist item missing" }
+                    if (item.sourceUrl == sourceUrl) CreateResult.Replayed(item) else CreateResult.IdempotencyKeyReused(item)
                 }
-                connection.prepareStatement(
-                    "insert into analysis_jobs (id, wishlist_item_id, generation, stage) values (?, ?, 1, 'GENERAL_PENDING')",
-                ).use { statement ->
-                    statement.setObject(1, jobId)
-                    statement.setObject(2, itemId)
-                    statement.executeUpdate()
-                }
-                connection.prepareStatement(
-                    "insert into outbox_events (id, analysis_job_id, event_type, task_name) values (?, ?, 'GENERAL_ANALYSIS', ?)",
-                ).use { statement ->
-                    statement.setObject(1, UUID.randomUUID())
-                    statement.setObject(2, jobId)
-                    statement.setString(3, "analysis-$jobId-1")
-                    statement.executeUpdate()
-                }
-                val item = connection.loadItem(itemId)
                 connection.commit()
-                CreateResult.Created(item)
-            } catch (error: Exception) {
+                result
+            } catch (cause: Exception) {
                 connection.rollback()
-                throw error
+                throw cause
             }
         }
         if (result is CreateResult.Created) {
-            try { dispatchAfterCommit() } catch (cause: Exception) {
+            try { dispatchAfterCommit(result.outboxEventId) } catch (cause: Exception) {
                 if (cause is CancellationException) throw cause
-                // The committed outbox remains available to the scheduled dispatcher.
+                // The committed item snapshot and durable outbox remain valid even if publication fails.
+                logger.warn("Post-commit dispatch failed eventId={} exceptionType={}", result.outboxEventId, cause.javaClass.name)
             }
         }
         return result
     }
 
-    private fun Connection.loadItem(itemId: UUID): WishlistItem = prepareStatement(
-        "select id, client_submission_id, source_url, version, analysis_status, lifecycle_status, created_at, updated_at from wishlist_items where id = ?",
-    ).use { statement ->
-        statement.setObject(1, itemId)
-        statement.executeQuery().use { rows ->
-            check(rows.next()) { "wishlist item missing" }
-            WishlistItem(
-                id = rows.getObject("id", UUID::class.java),
-                clientSubmissionId = rows.getObject("client_submission_id", UUID::class.java),
-                sourceUrl = rows.getString("source_url"),
-                version = rows.getInt("version"),
-                analysisStatus = rows.getString("analysis_status"),
-                lifecycleStatus = rows.getString("lifecycle_status"),
-                createdAt = rows.getTimestamp("created_at").toInstant(),
-                updatedAt = rows.getTimestamp("updated_at").toInstant(),
-            )
-        }
+    private fun isPublicHttpUrl(sourceUrl: String): Boolean {
+        if (sourceUrl.length > MAX_SOURCE_URL_LENGTH) return false
+        // JDBC replaces unpaired surrogates, so the stored URL would stop matching its own key replay.
+        if (!StandardCharsets.UTF_8.newEncoder().canEncode(sourceUrl)) return false
+        return runCatching {
+            URI(sourceUrl).let { it.scheme in setOf("http", "https") && !it.host.isNullOrBlank() && !isLocalHost(it.host) }
+        }.getOrDefault(false)
     }
 
-    private fun Connection.insertWishlistItem(itemId: UUID, ownerId: UUID, key: UUID, sourceUrl: String): Boolean {
-        prepareStatement(
-            "insert into wishlist_items (id, owner_id, client_submission_id, source_url, analysis_status, lifecycle_status, current_generation, category_missing_reason) values (?, ?, ?, ?, 'PROCESSING', 'ACTIVE', 1, 'EXTRACTION_UNRESOLVED') on conflict (owner_id, client_submission_id) do nothing",
-        ).use { statement ->
-            statement.setObject(1, itemId)
-            statement.setObject(2, ownerId)
-            statement.setObject(3, key)
-            statement.setString(4, sourceUrl)
-            return statement.executeUpdate() == 1
+    /** Cheap creation-time filter; extraction's UrlSafetyPolicy remains the network boundary. */
+    private fun isLocalHost(rawHost: String): Boolean {
+        // URI keeps the host's case and IPv6 brackets.
+        val host = rawHost.lowercase().removeSurrounding("[", "]")
+        if (host == "localhost" || host.endsWith(".localhost")) return true
+        val octets = host.split('.')
+        if (octets.size == 4 && octets.all { it.length in 1..3 && it.all(Char::isDigit) && it.toInt() <= 255 }) {
+            return octets[0].toInt() == 127 || octets.all { it.toInt() == 0 }
         }
+        // A host with ':' is only parsed as an IPv6 literal, so this never reaches DNS.
+        if (':' !in host) return false
+        val address = runCatching { InetAddress.getByName(host) }.getOrNull() ?: return true
+        return address.isLoopbackAddress || address.isAnyLocalAddress
     }
 
-    private fun isPublicHttpUrl(sourceUrl: String): Boolean = runCatching {
-        URI(sourceUrl).let { it.scheme in setOf("http", "https") && !it.host.isNullOrBlank() && it.host !in setOf("localhost", "127.0.0.1", "::1") }
-    }.getOrDefault(false)
+    private companion object {
+        val logger = LoggerFactory.getLogger(CreateWishlistItemService::class.java)
+    }
 }

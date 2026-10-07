@@ -81,3 +81,11 @@
 - [B0 외부 리뷰 보완](b0-review-hardening-2026-10-05.md) — 시간 상한·동시 발행·오류 관측·DB 시각·PENDING 복구 설계
 
 - [B0 후속 리뷰 보완](b0-followup-review-2026-10-06.md) — queue claim·LLM 마감·예산 계약·최종 version 복구·DB 시각·중복 저장 정리
+
+- [B1 상품 상세·생성 응답 구현](b1-item-read-and-create-2026-10-06.md) — owner 조회·공통 mapper·공유 시각·신규 event 지정 발행·190개 전체 회귀
+
+- [B1 리뷰 경계 보완](b1-review-boundaries-2026-10-06.md) — 생성 snapshot·HTTP presenter·명시 주입·실패 enum·UTC/JDBC·200개 회귀
+
+- [B1 코드 리뷰 후속 보완](b1-code-review-followup-2026-10-06.md) — URL 인코딩·길이 상한·생성 결과 타입·발행 실패 원인 보존
+
+- [B1 2차 코드 리뷰 후속 보완](b1-second-review-followup-2026-10-07.md) — 즉시 발행 실패 로그·생성 시점 loopback 정규화·failure code 공개 플래그 제거

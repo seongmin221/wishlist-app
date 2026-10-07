@@ -3,6 +3,7 @@ package app.analysis
 import app.ai.CandidateSnapshot
 import app.ai.ClassificationResult
 import app.extraction.Metadata
+import app.wishlist.AnalysisFailureCode
 import java.sql.Connection
 import java.util.UUID
 import javax.sql.DataSource
@@ -33,9 +34,9 @@ class AnalysisPendingResultRepository(private val dataSource: DataSource) {
         true
     } ?: false
 
-    fun saveFailure(claim: AnalysisClaim, code: String): Boolean = guarded(claim) { c ->
+    fun saveFailure(claim: AnalysisClaim, code: AnalysisFailureCode): Boolean = guarded(claim) { c ->
         c.prepareStatement("update analysis_jobs set pending_failure_code=? where id=?").use { s ->
-            s.setString(1, code); s.setObject(2, claim.jobId); check(s.executeUpdate() == 1)
+            s.setString(1, code.name); s.setObject(2, claim.jobId); check(s.executeUpdate() == 1)
         }
         true
     } ?: false

@@ -2,13 +2,14 @@ package app.wishlist
 
 import app.DatabaseFactory
 import app.testutil.PostgresTestContainer
+import app.testutil.createdItemId
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-class WishlistItemStateRepositoryTest {
+class WishlistItemRepositoryTest {
     @Test
     fun `owned lookup maps state and cannot read another owner or item`() {
         PostgresTestContainer().use { database ->
@@ -16,7 +17,7 @@ class WishlistItemStateRepositoryTest {
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
             val owner = UUID.randomUUID()
-            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").itemId
+            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
             source.connection.use { connection ->
                 connection.createStatement().use { it.executeUpdate("""
                     update wishlist_items set analysis_status='PARTIAL', review_status='CONFIRMED',
@@ -27,8 +28,8 @@ class WishlistItemStateRepositoryTest {
                     where id='$item'
                 """.trimIndent()) }
             }
-            val repository = WishlistItemStateRepository(source)
-            val stored = assertNotNull(repository.findOwned(owner, item))
+            val repository = WishlistItemRepository(source)
+            val stored = assertNotNull(repository.findOwned(owner, item)).storedState
             assertEquals(item, stored.id)
             assertEquals(owner, stored.ownerId)
             assertEquals(7, stored.version)
@@ -51,7 +52,7 @@ class WishlistItemStateRepositoryTest {
             source.connection.use { connection ->
                 connection.createStatement().use { it.executeUpdate("update wishlist_items set lifecycle_status='DELETED' where id='$item'") }
             }
-            assertEquals(LifecycleStatus.DELETED, repository.findOwned(owner, item)!!.state.lifecycleStatus)
+            assertEquals(LifecycleStatus.DELETED, repository.findOwned(owner, item)!!.storedState.state.lifecycleStatus)
         }
     }
 
@@ -62,8 +63,8 @@ class WishlistItemStateRepositoryTest {
             DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
             val owner = UUID.randomUUID()
-            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").itemId
-            val stored = assertNotNull(WishlistItemStateRepository(source).findOwned(owner, item))
+            val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
+            val stored = assertNotNull(WishlistItemRepository(source).findOwned(owner, item)).storedState
             assertEquals(1, stored.currentGeneration)
             assertEquals(1, stored.version)
             assertEquals(ReviewStatus.NOT_REQUIRED, stored.state.reviewStatus)

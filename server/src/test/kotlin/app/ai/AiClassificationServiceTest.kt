@@ -198,7 +198,7 @@ class AiClassificationServiceTest {
         val pending = AnalysisPendingResultRepository(source)
         kotlin.test.assertFalse(pending.saveMetadata(claim, Metadata("stale", null, null, "https://example.com/item")))
         kotlin.test.assertFalse(pending.saveAssignment(claim, ClassificationResult.Assigned("CAT_HOME", null)))
-        kotlin.test.assertFalse(pending.saveFailure(claim, "stale"))
+        kotlin.test.assertFalse(pending.saveFailure(claim, app.wishlist.AnalysisFailureCode.AI_ABSTAINED))
         assertNull(pending.candidateSnapshot(claim) { error("stale provider must not run") })
         val classifier = AiClassificationService(source, LlmBudgetService(source), { error("candidate supply must not run") }, { _, _, _ -> error("gateway must not run") })
         assertEquals(ProcessingOutcome.Stale, classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")))

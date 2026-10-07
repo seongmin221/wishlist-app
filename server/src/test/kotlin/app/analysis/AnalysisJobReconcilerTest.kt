@@ -67,7 +67,7 @@ class AnalysisJobReconcilerTest {
             val pending = AnalysisPendingResultRepository(source)
             assertFalse(pending.saveMetadata(old, Metadata("stale", null, null, "https://example.com/stale")))
             assertFalse(pending.saveAssignment(old, ClassificationResult.Assigned("STALE", null)))
-            assertFalse(pending.saveFailure(old, "ACCESS_DENIED"))
+            assertFalse(pending.saveFailure(old, app.wishlist.AnalysisFailureCode.ACCESS_DENIED))
             for (outcome in listOf(ProcessingOutcome.Complete, ProcessingOutcome.Partial, ProcessingOutcome.Terminal, ProcessingOutcome.Retryable, ProcessingOutcome.NeedsBrowser)) {
                 assertEquals(WorkerDisposition.ACKNOWLEDGE, AnalysisResultRepository(source).finish(old, outcome))
                 assertEquals(before, finishSnapshot(source, FinishJob(old.itemId, old.jobId)))

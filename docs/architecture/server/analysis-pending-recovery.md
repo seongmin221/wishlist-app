@@ -22,7 +22,7 @@ B0 보완은 유효 실행의 Retryable→PENDING 전환에 재시도 outbox를 
 
 ## 생성 직후 발행과 backlog
 
-현재 API의 `dispatchPending(1)`은 방금 생성한 event가 아닌 가장 오래된 event를 고른다. **신규 event 지정 발행은 B1의 생성 응답 작업에 앞당긴다.** 생성 transaction이 반환한 event ID의 지정 발행과 Scheduler의 오래된 event 발행을 분리한다. 지정 발행 실패/종료 거부도 저장 응답과 durable outbox를 보존한다. B1 통과에는 오래된 retry backlog가 있어도 새 상품의 event를 발행하는 회귀를 포함한다. maintenance runtime과 오래된 PENDING 복구는 B5에서 연결한다. Worker도 retry/fallback 후 제한된 발행을 시도할 수 있지만 진행 보장은 Scheduler가 담당한다.
+B0 API의 `dispatchPending(1)`은 방금 생성한 event가 아닌 가장 오래된 event를 골랐다. **B1에서 생성 transaction이 반환한 event ID를 `dispatchEvent(id)`로 발행하도록 연결했다.** Scheduler의 batch 발행과 claim/lease 규칙은 공유한다. 지정 발행 실패/종료 거부도 저장 응답과 durable outbox를 보존한다. B1 회귀에는 오래된 retry backlog가 있어도 새 상품의 event만 발행하는 경우를 포함한다. maintenance runtime과 오래된 PENDING 복구는 B5에서 연결한다. Worker도 retry/fallback 후 제한된 발행을 시도할 수 있지만 진행 보장은 Scheduler가 담당한다.
 
 Retryable의 HTTP 503 재전달과 retry outbox는 같은 job에 전달 기회를 중복 제공한다. 원자 claim이 같은 실행의 중복 분석을 막지만, 두 task가 서로 다른 PENDING 시점에 도착하면 다음 attempt를 소비할 수 있다. 현재 lane별 3회·30분 한도를 유지하며 B5의 generation 전체 한도와 발행 관측에서 이 경로를 포함한다. ACK만 반환하도록 바꾸면 maintenance가 아직 없는 현재 runtime에서 진행 보장이 약해지므로 이번 보완에서는 503을 유지한다.
 
@@ -33,4 +33,4 @@ Retryable의 HTTP 503 재전달과 retry outbox는 같은 job에 전달 기회�
 - 살아 있는 task/backlog와 task 조회 장애는 중복 재예약·상품 실패를 만들지 않음.
 - 동시 Scheduler와 claim/finish/edit/delete 경합에서 재예약 1건, 옛 발견 무효, generation 전체 3회·30분 예산 보존.
 - 삭제/보관/수동 완료 상품은 job만 취소; 예산 정산·사용자 값·item version 보호.
-- 신규 event 지정 발행, backlog 복구, RPC 제한 시간, 후보 1개 실패 후 다음 후보 진행.
+- B1에서 연결한 신규 event 지정 발행을 유지하고, backlog 복구·RPC 제한 시간·후보 1개 실패 후 다음 후보 진행을 검증한다. 생성의 즉시 발행은 [B1 조회 계약](wishlist-item-read-api.md)을 따른다.

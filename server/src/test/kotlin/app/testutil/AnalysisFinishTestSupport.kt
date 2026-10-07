@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonObject
 data class FinishJob(val itemId: UUID, val jobId: UUID)
 
 fun newFinishJob(source: DataSource, lane: AnalysisLane): FinishJob {
-    val item = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item").itemId
+    val item = CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item").createdItemId
     val job = UUID.fromString(analysisScalar(source, "select id from analysis_jobs where wishlist_item_id='$item'"))
     if (lane == AnalysisLane.BROWSER) analysisSql(source, "update analysis_jobs set stage='BROWSER_PENDING',browser_attempted=true where id='$job'")
     return FinishJob(item, job)
@@ -24,7 +24,7 @@ fun seedFinishResult(source: DataSource, claim: AnalysisClaim) {
     val pending = AnalysisPendingResultRepository(source)
     check(pending.saveMetadata(claim, Metadata("AI name", "AI description", "https://example.com/ai-image", "https://example.com/canonical")))
     check(pending.saveAssignment(claim, ClassificationResult.Assigned("C026", "AI_PURPOSE")))
-    check(pending.saveFailure(claim, "AI_ABSTAINED"))
+    check(pending.saveFailure(claim, app.wishlist.AnalysisFailureCode.AI_ABSTAINED))
 }
 
 fun finishSnapshot(source: DataSource, job: FinishJob): List<String?> = listOf(
