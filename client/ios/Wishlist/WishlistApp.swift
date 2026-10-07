@@ -11,10 +11,6 @@ struct WishlistApp: App {
         let runtime = SharedRuntimeFactory.shared.create(bindings: AppRuntimeConfig.bindings(), remote: nil)
         #if DEBUG
         DebugSessionBootstrap.start(runtime)
-        // C3 Task 0 spike — remove after verification
-        let groupContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.app.wishlist")
-        print("C3 spike: app group container = \(groupContainer?.path ?? "nil")")
-        // End C3 Task 0 spike
         #endif
         self.runtime = runtime
     }
