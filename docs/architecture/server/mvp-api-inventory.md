@@ -77,6 +77,10 @@ READY 항목에서 사용자 category 삭제 때문에 category가 빈 경우에
 
 ## 앱 서버 API — 카테고리 6개
 
+B2는 [CAT-01~04 계약·설계 초안](category-management-api.md)을 준비 중이다.
+입력 정책·parent registry·순수 요청 파서는 선행 작업이며 HTTP API 구현 완료를 의미하지 않는다.
+생성 key 보존·진행 중 AI stale 처리·생성 rate limit 수치는 사용자 확인 후 확정한다.
+
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
 | CAT-01 | `GET /v1/categories` | category 탭, 전체 category 선택, 생성 상위 선택 · S3/S6/S7 | scope=BROWSE/SELECT, 선택 parentId | stable ID·이름·상위·공용/사용자 구분·순서·활성 item count, customUsedCount/limit. BROWSE는 상품/빈 custom이 있는 상위, SELECT는 전체 taxonomy | 없음: 공용 리소스만 존재 |

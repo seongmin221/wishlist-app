@@ -1,5 +1,7 @@
 # Server 의사결정
 
+- [B2 작업 수신·카테고리 입력 기반](b2-category-foundation-2026-10-07.md) — 독립 worktree baseline·계약 초안·입력/parent registry·미확정 정책
+
 ## 초기 결정
 
 - **확정**: 상품 저장 API는 비동기 분석 완료를 기다리지 않고 `PROCESSING` 상태를 즉시 응답한다.
