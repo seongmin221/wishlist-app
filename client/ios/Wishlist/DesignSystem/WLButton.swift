@@ -9,15 +9,18 @@ struct WLButton: View {
     let kind: WLButtonKind
     var enabled = true
     var fillHeight = false
+    /// 보드 기본 52. 로그인 화면의 계정 버튼은 56이다.
+    var minHeight: CGFloat = 52
     let action: () -> Void
 
     @Environment(\.wlColors) private var c
     @Environment(\.wlOnSheet) private var onSheet
 
-    init(_ title: String, kind: WLButtonKind, enabled: Bool = true, action: @escaping () -> Void) {
+    init(_ title: String, kind: WLButtonKind, enabled: Bool = true, minHeight: CGFloat = 52, action: @escaping () -> Void) {
         self.title = title
         self.kind = kind
         self.enabled = enabled
+        self.minHeight = minHeight
         self.action = action
     }
 
@@ -42,7 +45,7 @@ struct WLButton: View {
             WLText(title, kind == .secondary ? .buttonMedium : .button, color: fg, alignment: .center, maxLines: 1)
                 .padding(.horizontal, WishlistTokens.Space.s20)
                 .padding(.vertical, WishlistTokens.Space.s12)
-                .frame(maxWidth: .infinity, minHeight: 52, maxHeight: fillHeight ? .infinity : nil)
+                .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: fillHeight ? .infinity : nil)
                 .background(bg, in: Capsule())
                 .contentShape(Capsule())
         }

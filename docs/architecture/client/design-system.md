@@ -58,7 +58,7 @@ client/tools/design-tokens.json          (색·모서리·간격·목적 색) �
 | `PriceText`(`formatPrice`), `PurposeDot`(`WLPurposeColor`) | 가격, 목적 색 점 |
 | `EmptyState`, `ExpandableGroup`(`WLChevron`), `Masonry2Col`(`verticalGap`) | 빈 상태(시트 위에서는 타일이 `sheetField`), 접고 펴는 묶음, 2열 엇갈림 배치(열 간격과 세로 간격을 따로 줄 수 있음) |
 | `WLTopBar`(`WLTopBarMetrics`) | 하위 화면 위쪽 바(뒤로·제목·⋯). 아래 "위쪽 바" 절 |
-| `WLLineIcon`·`WLIcon`, `WLCircleButton` | (C3, Android 먼저) 기능 화면의 보드 24 격자 선 아이콘(설정·사람·시계·분류 중·원본·하트·체크·오프라인·경고 등), 44 원형 아이콘 버튼(뒤로, 홈 설정). debug 데모의 `DemoIcon`과 같은 방식 |
+| `WLLineIcon`·`WLIcon`, `WLCircleButton` | (C3) 기능 화면의 보드 24 격자 선 아이콘(설정·사람·시계·분류 중·원본·하트·체크·오프라인·경고 등), 44 원형 아이콘 버튼(뒤로, 홈 설정). debug 데모의 `DemoIcon`과 같은 방식. iOS는 path를 손으로 옮겼고(오프라인 아이콘은 iOS 카드에 없어 빼었다) 공유 확장도 컴파일한다 |
 | `WLHeaderSheet`(`WLHeaderSheetState`, `WLSheetDetent`) | 고정된 위 면 + 끌어 올리는 목록 시트(목적 상세·아카이브 상세). 아래 "머리 시트" 절 |
 
 iOS에는 Android `.copy(...)`에 해당하는 `WLTextStyle.resized`와 파생 스타일 `buttonMedium`·`bodyBold`·`buttonRegular`가 더 있다.
@@ -173,5 +173,5 @@ C1에서 고치지 않고 남긴 것. C3 첫 실제 화면 전에 다시 본다.
 
 ## 데모
 
-- 탭 첫 화면이 곧 데모다. (C3부터 Android 홈 탭은 실제 `HomeScreen`이고 홈 데모는 없다. 상품 상세 데모의 ⋯ 메뉴·삭제 확인창은 `DemoDetailScreen`으로 옮겼다. iOS는 Task 6에서 같은 변경.) 홈은 컴포넌트 데모(시트 → 확인창 → `dismissAll`, ⋯ 메뉴, 사진 카드, 칩, 가장 긴 목적 이름, 긴 가격 `KRW 1,190,000`)이고, 카테고리·목적 탭과 그 하위 화면은 보드(FCategoryHome·FCategoryList·FProductDetail·FPurposeHome·FPurposeDetail)를 따른다: 카테고리 세로 페이징, 2열 엇갈림 목록, 상품 상세, 겹쳐 쌓인 목적 카드, 머리 시트를 쓰는 목적 상세. 데모 경로는 상품(사진 이동, 탭 바 숨김)·세부 유형 목록·목적 상세(가로 밀기, 탭 바 보임)로 나뉜다. 상품 사진 자리 표시 색은 UI 토큰이 아닌 이미지 견본이라 보드 값을 그대로 쓴다.
+- 탭 첫 화면이 곧 데모다. (C3부터 Android 홈 탭은 실제 `HomeScreen`이고 홈 데모는 없다. 상품 상세 데모의 ⋯ 메뉴·삭제 확인창은 `DemoDetailScreen`으로 옮겼다. iOS도 C3에서 홈 데모를 지웠고 ⋯ 메뉴·삭제 확인창은 원래 상품 상세 데모에 있다.) 홈은 컴포넌트 데모(시트 → 확인창 → `dismissAll`, ⋯ 메뉴, 사진 카드, 칩, 가장 긴 목적 이름, 긴 가격 `KRW 1,190,000`)이고, 카테고리·목적 탭과 그 하위 화면은 보드(FCategoryHome·FCategoryList·FProductDetail·FPurposeHome·FPurposeDetail)를 따른다: 카테고리 세로 페이징, 2열 엇갈림 목록, 상품 상세, 겹쳐 쌓인 목적 카드, 머리 시트를 쓰는 목적 상세. 데모 경로는 상품(사진 이동, 탭 바 숨김)·세부 유형 목록·목적 상세(가로 밀기, 탭 바 보임)로 나뉜다. 상품 사진 자리 표시 색은 UI 토큰이 아닌 이미지 견본이라 보드 값을 그대로 쓴다.
 - 데모는 Android debug source set, iOS `#if DEBUG`에만 있다. release에는 데모 경로·화면 코드가 포함되지 않으며 탭 이름만 보이는 빈 첫 화면이다.

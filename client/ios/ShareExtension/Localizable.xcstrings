@@ -1,0 +1,142 @@
+{
+  "sourceLanguage": "ko",
+  "strings": {
+    "share.saved.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "위시리스트에 저장했어요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved to your wishlist"
+          }
+        }
+      }
+    },
+    "share.saved.open.app": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱을 열면 정보를 가져와요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details arrive when you open the app"
+          }
+        }
+      }
+    },
+    "share.local.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 기기에 저장했어요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved on this device"
+          }
+        }
+      }
+    },
+    "share.local.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인하면 정보를 가져와요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in to fetch details"
+          }
+        }
+      }
+    },
+    "share.invalid.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "링크를 찾지 못했어요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No link found"
+          }
+        }
+      }
+    },
+    "share.invalid.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "상품 페이지에서 다시 공유해 주세요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share again from the product page"
+          }
+        }
+      }
+    },
+    "share.failed.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장하지 못했어요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save"
+          }
+        }
+      }
+    },
+    "share.failed.line": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 공유해 주세요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please share again"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

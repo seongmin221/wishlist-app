@@ -54,12 +54,52 @@
         A10000000000000000000206 /* WLSharedElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000206 /* WLSharedElement.swift */; };
         A10000000000000000000207 /* WLEdgeBackGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000207 /* WLEdgeBackGesture.swift */; };
         A10000000000000000000211 /* DemoContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000211 /* DemoContent.swift */; };
-        A10000000000000000000212 /* DemoHomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000212 /* DemoHomeScreen.swift */; };
         A10000000000000000000213 /* DemoCategoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000213 /* DemoCategoryScreen.swift */; };
         A10000000000000000000214 /* DemoPurposeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000214 /* DemoPurposeScreen.swift */; };
         A10000000000000000000215 /* DemoDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000215 /* DemoDetailScreen.swift */; };
         C10000000000000000000001 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* ShareViewController.swift */; };
         C10000000000000000000002 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+        E10000000000000000000001 /* WishlistTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* WishlistTokens.swift */; };
+        E10000000000000000000002 /* WLTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* WLTypography.swift */; };
+        E10000000000000000000003 /* WLTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000101 /* WLTheme.swift */; };
+        E10000000000000000000004 /* WLCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000103 /* WLCard.swift */; };
+        E10000000000000000000005 /* WLIconTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000104 /* WLIconTile.swift */; };
+        E10000000000000000000006 /* do_hyeon.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* do_hyeon.ttf */; };
+        E10000000000000000000007 /* ibm_plex_sans_kr_regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* ibm_plex_sans_kr_regular.ttf */; };
+        E10000000000000000000008 /* ibm_plex_sans_kr_medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* ibm_plex_sans_kr_medium.ttf */; };
+        E10000000000000000000009 /* ibm_plex_sans_kr_bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* ibm_plex_sans_kr_bold.ttf */; };
+        E10000000000000000000010 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* AppGroup.swift */; };
+        E10000000000000000000011 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* AppGroup.swift */; };
+        E10000000000000000000012 /* InboxRecordFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* InboxRecordFile.swift */; };
+        E10000000000000000000013 /* InboxRecordFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* InboxRecordFile.swift */; };
+        E10000000000000000000014 /* ShareTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* ShareTextExtractor.swift */; };
+        E10000000000000000000015 /* ShareTextExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* ShareTextExtractor.swift */; };
+        E10000000000000000000016 /* ShareInboxWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* ShareInboxWriter.swift */; };
+        E10000000000000000000017 /* ShareInboxWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000004 /* ShareInboxWriter.swift */; };
+        E10000000000000000000018 /* ShareCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000005 /* ShareCardView.swift */; };
+        E10000000000000000000019 /* ShareDirectSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000006 /* ShareDirectSender.swift */; };
+        E10000000000000000000020 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000007 /* Localizable.xcstrings */; };
+        E10000000000000000000021 /* WLLineIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000008 /* WLLineIcon.swift */; };
+        E10000000000000000000022 /* WLLineIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000008 /* WLLineIcon.swift */; };
+        E10000000000000000000023 /* WLCircleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000009 /* WLCircleButton.swift */; };
+        E10000000000000000000024 /* AppRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000010 /* AppRoutes.swift */; };
+        E10000000000000000000025 /* ShareInboxReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000011 /* ShareInboxReader.swift */; };
+        E10000000000000000000026 /* SessionMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000012 /* SessionMirror.swift */; };
+        E10000000000000000000027 /* NetworkSignals.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000013 /* NetworkSignals.swift */; };
+        E10000000000000000000028 /* WebViewDataCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000014 /* WebViewDataCleaner.swift */; };
+        E10000000000000000000029 /* AppSignals.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000015 /* AppSignals.swift */; };
+        E10000000000000000000030 /* LoginScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000016 /* LoginScreen.swift */; };
+        E10000000000000000000031 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000017 /* HomeScreen.swift */; };
+        E10000000000000000000032 /* HomeLoggedOutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000018 /* HomeLoggedOutView.swift */; };
+        E10000000000000000000033 /* HomeLoggedInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000019 /* HomeLoggedInView.swift */; };
+        E10000000000000000000034 /* HomeRowText.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000020 /* HomeRowText.swift */; };
+        E10000000000000000000035 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000021 /* SettingsScreen.swift */; };
+        E10000000000000000000036 /* AccountPresenterOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000022 /* AccountPresenterOwner.swift */; };
+        E10000000000000000000037 /* HomePresenterOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000023 /* HomePresenterOwner.swift */; };
+        E10000000000000000000038 /* ShareTextExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000024 /* ShareTextExtractorTests.swift */; };
+        E10000000000000000000039 /* InboxWriterReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000025 /* InboxWriterReaderTests.swift */; };
+        E10000000000000000000040 /* HomeRowTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000026 /* HomeRowTextTests.swift */; };
+        E10000000000000000000041 /* AccountPresenterOwnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000027 /* AccountPresenterOwnerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -127,7 +167,6 @@
         A20000000000000000000206 /* WLSharedElement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLSharedElement.swift; sourceTree = "<group>"; };
         A20000000000000000000207 /* WLEdgeBackGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLEdgeBackGesture.swift; sourceTree = "<group>"; };
         A20000000000000000000211 /* DemoContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoContent.swift; sourceTree = "<group>"; };
-        A20000000000000000000212 /* DemoHomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoHomeScreen.swift; sourceTree = "<group>"; };
         A20000000000000000000213 /* DemoCategoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCategoryScreen.swift; sourceTree = "<group>"; };
         A20000000000000000000214 /* DemoPurposeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPurposeScreen.swift; sourceTree = "<group>"; };
         A20000000000000000000215 /* DemoDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoDetailScreen.swift; sourceTree = "<group>"; };
@@ -136,6 +175,33 @@
         C20000000000000000000003 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
         C20000000000000000000004 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
         C20000000000000000000005 /* Wishlist.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wishlist.entitlements; sourceTree = "<group>"; };
+        E20000000000000000000001 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
+        E20000000000000000000002 /* InboxRecordFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxRecordFile.swift; sourceTree = "<group>"; };
+        E20000000000000000000003 /* ShareTextExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareTextExtractor.swift; sourceTree = "<group>"; };
+        E20000000000000000000004 /* ShareInboxWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareInboxWriter.swift; sourceTree = "<group>"; };
+        E20000000000000000000005 /* ShareCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareCardView.swift; sourceTree = "<group>"; };
+        E20000000000000000000006 /* ShareDirectSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareDirectSender.swift; sourceTree = "<group>"; };
+        E20000000000000000000007 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+        E20000000000000000000008 /* WLLineIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLLineIcon.swift; sourceTree = "<group>"; };
+        E20000000000000000000009 /* WLCircleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WLCircleButton.swift; sourceTree = "<group>"; };
+        E20000000000000000000010 /* AppRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoutes.swift; sourceTree = "<group>"; };
+        E20000000000000000000011 /* ShareInboxReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareInboxReader.swift; sourceTree = "<group>"; };
+        E20000000000000000000012 /* SessionMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionMirror.swift; sourceTree = "<group>"; };
+        E20000000000000000000013 /* NetworkSignals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSignals.swift; sourceTree = "<group>"; };
+        E20000000000000000000014 /* WebViewDataCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewDataCleaner.swift; sourceTree = "<group>"; };
+        E20000000000000000000015 /* AppSignals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSignals.swift; sourceTree = "<group>"; };
+        E20000000000000000000016 /* LoginScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginScreen.swift; sourceTree = "<group>"; };
+        E20000000000000000000017 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+        E20000000000000000000018 /* HomeLoggedOutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLoggedOutView.swift; sourceTree = "<group>"; };
+        E20000000000000000000019 /* HomeLoggedInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLoggedInView.swift; sourceTree = "<group>"; };
+        E20000000000000000000020 /* HomeRowText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRowText.swift; sourceTree = "<group>"; };
+        E20000000000000000000021 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
+        E20000000000000000000022 /* AccountPresenterOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPresenterOwner.swift; sourceTree = "<group>"; };
+        E20000000000000000000023 /* HomePresenterOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomePresenterOwner.swift; sourceTree = "<group>"; };
+        E20000000000000000000024 /* ShareTextExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareTextExtractorTests.swift; sourceTree = "<group>"; };
+        E20000000000000000000025 /* InboxWriterReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxWriterReaderTests.swift; sourceTree = "<group>"; };
+        E20000000000000000000026 /* HomeRowTextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRowTextTests.swift; sourceTree = "<group>"; };
+        E20000000000000000000027 /* AccountPresenterOwnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountPresenterOwnerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -147,18 +213,18 @@
 /* Begin PBXGroup section */
         A40000000000000000000001 = {
             isa = PBXGroup;
-            children = (A40000000000000000000002 /* Wishlist */, C40000000000000000000001 /* ShareExtension */, A40000000000000000000020 /* WishlistTests */, A40000000000000000000003 /* Products */);
+            children = (A40000000000000000000002 /* Wishlist */, C40000000000000000000001 /* ShareExtension */, A40000000000000000000020 /* WishlistTests */, A40000000000000000000003 /* Products */, E40000000000000000000001 /* AppGroupShared */);
             sourceTree = "<group>";
         };
         A40000000000000000000002 /* Wishlist */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000301 /* AppRuntimeConfig.swift */, A20000000000000000000002 /* ContentView.swift */, A40000000000000000000008 /* Debug */, A40000000000000000000004 /* DesignSystem */, A40000000000000000000007 /* Navigation */, A40000000000000000000030 /* Features */, A40000000000000000000005 /* Resources */, A20000000000000000000011 /* Info.plist */, C20000000000000000000005 /* Wishlist.entitlements */);
+            children = (A20000000000000000000001 /* WishlistApp.swift */, A20000000000000000000301 /* AppRuntimeConfig.swift */, A20000000000000000000002 /* ContentView.swift */, A40000000000000000000008 /* Debug */, A40000000000000000000004 /* DesignSystem */, A40000000000000000000007 /* Navigation */, A40000000000000000000030 /* Features */, A40000000000000000000005 /* Resources */, A20000000000000000000011 /* Info.plist */, C20000000000000000000005 /* Wishlist.entitlements */, E20000000000000000000010 /* AppRoutes.swift */, E40000000000000000000002 /* Platform */);
             path = Wishlist;
             sourceTree = "<group>";
         };
         A40000000000000000000004 /* DesignSystem */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000004 /* WishlistTokens.swift */, A20000000000000000000005 /* WLTypography.swift */, A20000000000000000000101 /* WLTheme.swift */, A20000000000000000000102 /* WLButton.swift */, A20000000000000000000103 /* WLCard.swift */, A20000000000000000000104 /* WLIconTile.swift */, A20000000000000000000105 /* WLChip.swift */, A20000000000000000000106 /* WLInput.swift */, A20000000000000000000107 /* WLUnderlineField.swift */, A20000000000000000000108 /* PriceText.swift */, A20000000000000000000109 /* PurposeDot.swift */, A20000000000000000000110 /* EmptyState.swift */, A20000000000000000000111 /* ExpandableGroup.swift */, A20000000000000000000112 /* Masonry2Col.swift */, A20000000000000000000118 /* WLHeaderSheet.swift */, A20000000000000000000119 /* WLTopBar.swift */, A40000000000000000000021 /* Overlay */);
+            children = (A20000000000000000000004 /* WishlistTokens.swift */, A20000000000000000000005 /* WLTypography.swift */, A20000000000000000000101 /* WLTheme.swift */, A20000000000000000000102 /* WLButton.swift */, A20000000000000000000103 /* WLCard.swift */, A20000000000000000000104 /* WLIconTile.swift */, A20000000000000000000105 /* WLChip.swift */, A20000000000000000000106 /* WLInput.swift */, A20000000000000000000107 /* WLUnderlineField.swift */, A20000000000000000000108 /* PriceText.swift */, A20000000000000000000109 /* PurposeDot.swift */, A20000000000000000000110 /* EmptyState.swift */, A20000000000000000000111 /* ExpandableGroup.swift */, A20000000000000000000112 /* Masonry2Col.swift */, A20000000000000000000118 /* WLHeaderSheet.swift */, A20000000000000000000119 /* WLTopBar.swift */, A40000000000000000000021 /* Overlay */, E20000000000000000000008 /* WLLineIcon.swift */, E20000000000000000000009 /* WLCircleButton.swift */);
             path = DesignSystem;
             sourceTree = "<group>";
         };
@@ -188,7 +254,7 @@
         };
         A40000000000000000000020 /* WishlistTests */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000036 /* SharedInteropTests.swift */, A20000000000000000000037 /* SharedRuntimeTests.swift */, A20000000000000000000038 /* ItemDetailPresenterOwnerTests.swift */, A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */, A20000000000000000000035 /* WLHeaderSheetTests.swift */);
+            children = (A20000000000000000000036 /* SharedInteropTests.swift */, A20000000000000000000037 /* SharedRuntimeTests.swift */, A20000000000000000000038 /* ItemDetailPresenterOwnerTests.swift */, A20000000000000000000030 /* PriceFormatTests.swift */, A20000000000000000000031 /* SheetDragDecisionTests.swift */, A20000000000000000000032 /* OverlayHostStateTests.swift */, A20000000000000000000033 /* WLNavigatorTests.swift */, A20000000000000000000034 /* WLTypographyTests.swift */, A20000000000000000000035 /* WLHeaderSheetTests.swift */, E20000000000000000000024 /* ShareTextExtractorTests.swift */, E20000000000000000000025 /* InboxWriterReaderTests.swift */, E20000000000000000000026 /* HomeRowTextTests.swift */, E20000000000000000000027 /* AccountPresenterOwnerTests.swift */);
             path = WishlistTests;
             sourceTree = "<group>";
         };
@@ -200,13 +266,13 @@
         };
         A40000000000000000000030 /* Features */ = {
             isa = PBXGroup;
-            children = (A40000000000000000000031 /* Demo */, A40000000000000000000032 /* Detail */);
+            children = (A40000000000000000000031 /* Demo */, A40000000000000000000032 /* Detail */, E40000000000000000000003 /* Login */, E40000000000000000000004 /* Home */, E40000000000000000000005 /* Settings */, E40000000000000000000006 /* Session */);
             path = Features;
             sourceTree = "<group>";
         };
         A40000000000000000000031 /* Demo */ = {
             isa = PBXGroup;
-            children = (A20000000000000000000211 /* DemoContent.swift */, A20000000000000000000212 /* DemoHomeScreen.swift */, A20000000000000000000213 /* DemoCategoryScreen.swift */, A20000000000000000000214 /* DemoPurposeScreen.swift */, A20000000000000000000215 /* DemoDetailScreen.swift */);
+            children = (A20000000000000000000211 /* DemoContent.swift */, A20000000000000000000213 /* DemoCategoryScreen.swift */, A20000000000000000000214 /* DemoPurposeScreen.swift */, A20000000000000000000215 /* DemoDetailScreen.swift */);
             path = Demo;
             sourceTree = "<group>";
         };
@@ -224,8 +290,44 @@
         };
         C40000000000000000000001 /* ShareExtension */ = {
             isa = PBXGroup;
-            children = (C20000000000000000000001 /* ShareViewController.swift */, C20000000000000000000002 /* Info.plist */, C20000000000000000000003 /* ShareExtension.entitlements */);
+            children = (C20000000000000000000001 /* ShareViewController.swift */, C20000000000000000000002 /* Info.plist */, C20000000000000000000003 /* ShareExtension.entitlements */, E20000000000000000000003 /* ShareTextExtractor.swift */, E20000000000000000000004 /* ShareInboxWriter.swift */, E20000000000000000000005 /* ShareCardView.swift */, E20000000000000000000006 /* ShareDirectSender.swift */, E20000000000000000000007 /* Localizable.xcstrings */);
             path = ShareExtension;
+            sourceTree = "<group>";
+        };
+        E40000000000000000000001 /* AppGroupShared */ = {
+            isa = PBXGroup;
+            children = (E20000000000000000000001 /* AppGroup.swift */, E20000000000000000000002 /* InboxRecordFile.swift */);
+            path = AppGroupShared;
+            sourceTree = "<group>";
+        };
+        E40000000000000000000002 /* Platform */ = {
+            isa = PBXGroup;
+            children = (E20000000000000000000011 /* ShareInboxReader.swift */, E20000000000000000000012 /* SessionMirror.swift */, E20000000000000000000013 /* NetworkSignals.swift */, E20000000000000000000014 /* WebViewDataCleaner.swift */, E20000000000000000000015 /* AppSignals.swift */);
+            path = Platform;
+            sourceTree = "<group>";
+        };
+        E40000000000000000000003 /* Login */ = {
+            isa = PBXGroup;
+            children = (E20000000000000000000016 /* LoginScreen.swift */);
+            path = Login;
+            sourceTree = "<group>";
+        };
+        E40000000000000000000004 /* Home */ = {
+            isa = PBXGroup;
+            children = (E20000000000000000000017 /* HomeScreen.swift */, E20000000000000000000018 /* HomeLoggedOutView.swift */, E20000000000000000000019 /* HomeLoggedInView.swift */, E20000000000000000000020 /* HomeRowText.swift */);
+            path = Home;
+            sourceTree = "<group>";
+        };
+        E40000000000000000000005 /* Settings */ = {
+            isa = PBXGroup;
+            children = (E20000000000000000000021 /* SettingsScreen.swift */);
+            path = Settings;
+            sourceTree = "<group>";
+        };
+        E40000000000000000000006 /* Session */ = {
+            isa = PBXGroup;
+            children = (E20000000000000000000022 /* AccountPresenterOwner.swift */, E20000000000000000000023 /* HomePresenterOwner.swift */);
+            path = Session;
             sourceTree = "<group>";
         };
 /* End PBXGroup section */
@@ -316,7 +418,7 @@
 /* Begin PBXResourcesBuildPhase section */
         A60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A100000000000000000000FA /* Localizable.xcstrings in Resources */, A10000000000000000000005 /* do_hyeon.ttf in Resources */, A10000000000000000000006 /* ibm_plex_sans_kr_regular.ttf in Resources */, A10000000000000000000007 /* ibm_plex_sans_kr_medium.ttf in Resources */, A10000000000000000000008 /* ibm_plex_sans_kr_bold.ttf in Resources */, A10000000000000000000009 /* OFL.txt in Resources */); runOnlyForDeploymentPostprocessing = 0; };
         A60000000000000000000004 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-        C60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        C60000000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (E10000000000000000000006 /* do_hyeon.ttf in Resources */, E10000000000000000000007 /* ibm_plex_sans_kr_regular.ttf in Resources */, E10000000000000000000008 /* ibm_plex_sans_kr_medium.ttf in Resources */, E10000000000000000000009 /* ibm_plex_sans_kr_bold.ttf in Resources */, E10000000000000000000020 /* Localizable.xcstrings in Resources */); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
@@ -338,19 +440,19 @@
         A60000000000000000000001 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000301 /* AppRuntimeConfig.swift in Sources */, A10000000000000000000302 /* DebugSessionBootstrap.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */, A10000000000000000000004 /* WLTypography.swift in Sources */, A10000000000000000000101 /* WLTheme.swift in Sources */, A10000000000000000000102 /* WLButton.swift in Sources */, A10000000000000000000103 /* WLCard.swift in Sources */, A10000000000000000000104 /* WLIconTile.swift in Sources */, A10000000000000000000105 /* WLChip.swift in Sources */, A10000000000000000000106 /* WLInput.swift in Sources */, A10000000000000000000107 /* WLUnderlineField.swift in Sources */, A10000000000000000000108 /* PriceText.swift in Sources */, A10000000000000000000109 /* PurposeDot.swift in Sources */, A10000000000000000000110 /* EmptyState.swift in Sources */, A10000000000000000000111 /* ExpandableGroup.swift in Sources */, A10000000000000000000112 /* Masonry2Col.swift in Sources */, A10000000000000000000118 /* WLHeaderSheet.swift in Sources */, A10000000000000000000119 /* WLTopBar.swift in Sources */, A10000000000000000000113 /* OverlayHost.swift in Sources */, A10000000000000000000114 /* Scrim.swift in Sources */, A10000000000000000000115 /* WLBottomSheet.swift in Sources */, A10000000000000000000116 /* WLConfirmDialog.swift in Sources */, A10000000000000000000117 /* WLMenu.swift in Sources */, A10000000000000000000201 /* WLRoute.swift in Sources */, A10000000000000000000202 /* WLNavigator.swift in Sources */, A10000000000000000000203 /* WLNavHost.swift in Sources */, A10000000000000000000204 /* WLTabBar.swift in Sources */, A10000000000000000000205 /* WLNavMotion.swift in Sources */, A10000000000000000000206 /* WLSharedElement.swift in Sources */, A10000000000000000000207 /* WLEdgeBackGesture.swift in Sources */, A10000000000000000000211 /* DemoContent.swift in Sources */, A10000000000000000000212 /* DemoHomeScreen.swift in Sources */, A10000000000000000000213 /* DemoCategoryScreen.swift in Sources */, A10000000000000000000214 /* DemoPurposeScreen.swift in Sources */, A10000000000000000000215 /* DemoDetailScreen.swift in Sources */, A10000000000000000000311 /* ItemDetailPresenterOwner.swift in Sources */);
+            files = (A10000000000000000000001 /* WishlistApp.swift in Sources */, A10000000000000000000301 /* AppRuntimeConfig.swift in Sources */, A10000000000000000000302 /* DebugSessionBootstrap.swift in Sources */, A10000000000000000000002 /* ContentView.swift in Sources */, A10000000000000000000003 /* WishlistTokens.swift in Sources */, A10000000000000000000004 /* WLTypography.swift in Sources */, A10000000000000000000101 /* WLTheme.swift in Sources */, A10000000000000000000102 /* WLButton.swift in Sources */, A10000000000000000000103 /* WLCard.swift in Sources */, A10000000000000000000104 /* WLIconTile.swift in Sources */, A10000000000000000000105 /* WLChip.swift in Sources */, A10000000000000000000106 /* WLInput.swift in Sources */, A10000000000000000000107 /* WLUnderlineField.swift in Sources */, A10000000000000000000108 /* PriceText.swift in Sources */, A10000000000000000000109 /* PurposeDot.swift in Sources */, A10000000000000000000110 /* EmptyState.swift in Sources */, A10000000000000000000111 /* ExpandableGroup.swift in Sources */, A10000000000000000000112 /* Masonry2Col.swift in Sources */, A10000000000000000000118 /* WLHeaderSheet.swift in Sources */, A10000000000000000000119 /* WLTopBar.swift in Sources */, A10000000000000000000113 /* OverlayHost.swift in Sources */, A10000000000000000000114 /* Scrim.swift in Sources */, A10000000000000000000115 /* WLBottomSheet.swift in Sources */, A10000000000000000000116 /* WLConfirmDialog.swift in Sources */, A10000000000000000000117 /* WLMenu.swift in Sources */, A10000000000000000000201 /* WLRoute.swift in Sources */, A10000000000000000000202 /* WLNavigator.swift in Sources */, A10000000000000000000203 /* WLNavHost.swift in Sources */, A10000000000000000000204 /* WLTabBar.swift in Sources */, A10000000000000000000205 /* WLNavMotion.swift in Sources */, A10000000000000000000206 /* WLSharedElement.swift in Sources */, A10000000000000000000207 /* WLEdgeBackGesture.swift in Sources */, A10000000000000000000211 /* DemoContent.swift in Sources */, A10000000000000000000213 /* DemoCategoryScreen.swift in Sources */, A10000000000000000000214 /* DemoPurposeScreen.swift in Sources */, A10000000000000000000215 /* DemoDetailScreen.swift in Sources */, A10000000000000000000311 /* ItemDetailPresenterOwner.swift in Sources */, E10000000000000000000010 /* AppGroup.swift in Sources */, E10000000000000000000012 /* InboxRecordFile.swift in Sources */, E10000000000000000000021 /* WLLineIcon.swift in Sources */, E10000000000000000000023 /* WLCircleButton.swift in Sources */, E10000000000000000000024 /* AppRoutes.swift in Sources */, E10000000000000000000025 /* ShareInboxReader.swift in Sources */, E10000000000000000000026 /* SessionMirror.swift in Sources */, E10000000000000000000027 /* NetworkSignals.swift in Sources */, E10000000000000000000028 /* WebViewDataCleaner.swift in Sources */, E10000000000000000000029 /* AppSignals.swift in Sources */, E10000000000000000000030 /* LoginScreen.swift in Sources */, E10000000000000000000031 /* HomeScreen.swift in Sources */, E10000000000000000000032 /* HomeLoggedOutView.swift in Sources */, E10000000000000000000033 /* HomeLoggedInView.swift in Sources */, E10000000000000000000034 /* HomeRowText.swift in Sources */, E10000000000000000000035 /* SettingsScreen.swift in Sources */, E10000000000000000000036 /* AccountPresenterOwner.swift in Sources */, E10000000000000000000037 /* HomePresenterOwner.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
         A60000000000000000000003 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (A10000000000000000000036 /* SharedInteropTests.swift in Sources */, A10000000000000000000037 /* SharedRuntimeTests.swift in Sources */, A10000000000000000000038 /* ItemDetailPresenterOwnerTests.swift in Sources */, A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */, A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */);
+            files = (A10000000000000000000036 /* SharedInteropTests.swift in Sources */, A10000000000000000000037 /* SharedRuntimeTests.swift in Sources */, A10000000000000000000038 /* ItemDetailPresenterOwnerTests.swift in Sources */, A10000000000000000000030 /* PriceFormatTests.swift in Sources */, A10000000000000000000031 /* SheetDragDecisionTests.swift in Sources */, A10000000000000000000032 /* OverlayHostStateTests.swift in Sources */, A10000000000000000000033 /* WLNavigatorTests.swift in Sources */, A10000000000000000000034 /* WLTypographyTests.swift in Sources */, A10000000000000000000035 /* WLHeaderSheetTests.swift in Sources */, E10000000000000000000015 /* ShareTextExtractor.swift in Sources */, E10000000000000000000017 /* ShareInboxWriter.swift in Sources */, E10000000000000000000038 /* ShareTextExtractorTests.swift in Sources */, E10000000000000000000039 /* InboxWriterReaderTests.swift in Sources */, E10000000000000000000040 /* HomeRowTextTests.swift in Sources */, E10000000000000000000041 /* AccountPresenterOwnerTests.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
         C60000000000000000000001 /* Sources */ = {
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
-            files = (C10000000000000000000001 /* ShareViewController.swift in Sources */);
+            files = (C10000000000000000000001 /* ShareViewController.swift in Sources */, E10000000000000000000001 /* WishlistTokens.swift in Sources */, E10000000000000000000002 /* WLTypography.swift in Sources */, E10000000000000000000003 /* WLTheme.swift in Sources */, E10000000000000000000004 /* WLCard.swift in Sources */, E10000000000000000000005 /* WLIconTile.swift in Sources */, E10000000000000000000011 /* AppGroup.swift in Sources */, E10000000000000000000013 /* InboxRecordFile.swift in Sources */, E10000000000000000000014 /* ShareTextExtractor.swift in Sources */, E10000000000000000000016 /* ShareInboxWriter.swift in Sources */, E10000000000000000000018 /* ShareCardView.swift in Sources */, E10000000000000000000019 /* ShareDirectSender.swift in Sources */, E10000000000000000000022 /* WLLineIcon.swift in Sources */);
             runOnlyForDeploymentPostprocessing = 0;
         };
 /* End PBXSourcesBuildPhase section */
@@ -454,6 +556,7 @@
                 PRODUCT_BUNDLE_IDENTIFIER = app.wishlist.ios.tests;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WISHLIST_TESTS";
                 SWIFT_VERSION = 5.0;
                 TARGETED_DEVICE_FAMILY = "1,2";
                 TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wishlist.app/Wishlist";
@@ -474,6 +577,7 @@
                 PRODUCT_BUNDLE_IDENTIFIER = app.wishlist.ios.tests;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+                SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) WISHLIST_TESTS";
                 SWIFT_VERSION = 5.0;
                 TARGETED_DEVICE_FAMILY = "1,2";
                 TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wishlist.app/Wishlist";
