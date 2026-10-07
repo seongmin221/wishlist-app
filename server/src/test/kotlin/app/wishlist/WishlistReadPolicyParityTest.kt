@@ -29,8 +29,8 @@ class WishlistReadPolicyParityTest {
         val expected = fixtures.associateBy { it.position.id }
         val action = WishlistReadPredicates.requiredAction()
         val visible = WishlistReadPredicates.categoryVisible()
-        source.connection.use { c -> c.prepareStatement("""select id, required, visible, ${WishlistReadPredicates.homeGroup("required")} grp
-            from (select i.id, ${action.sql} required, ${visible.sql} visible from wishlist_items i where owner_id=?) evaluated""").use { s ->
+        source.connection.use { c -> c.prepareStatement("""select evaluated.*, ${WishlistReadPredicates.homeGroup("required")} grp
+            from (select ${WishlistItemRowMapper.columns}, ${action.sql} required, ${visible.sql} visible from wishlist_items i ${WishlistItemRowMapper.joins} where i.owner_id=?) evaluated""").use { s ->
             var parameter = 1
             for (v in action.parameters + visible.parameters) s.setObject(parameter++, v)
             s.setObject(parameter, owner)
@@ -42,6 +42,9 @@ class WishlistReadPolicyParityTest {
                     assertEquals(policy.requiredAction.name, r.getString("required"), state.toString())
                     assertEquals(policy.homeActionGroup?.name, r.getString("grp"), state.toString())
                     assertEquals(state.lifecycleStatus == LifecycleStatus.ACTIVE && !state.productName.isNullOrBlank(), r.getBoolean("visible"), state.toString())
+                    val item = WishlistItemRowMapper.map(r)
+                    assertEquals(state, item.storedState.state)
+                    assertEquals(policy.allowedActions, app.http.WishlistItemViewMapper.map(item).allowedActions)
                     checked++
                 }
                 assertEquals(fixtures.size, checked)
