@@ -106,14 +106,22 @@ class LlmBudgetServiceTest {
         assertEquals(2, service.pendingAlerts().size)
     }
 
-    @Test fun `a window created with an older release ceiling adopts the configured ceiling`() = withAnalysisDatabase { source ->
+    @Test fun `reservations use the lower of the stored and configured ceiling without rewriting it`() = withAnalysisDatabase { source ->
         val claim = newAnalysisClaim(source)
-        analysisSql(source, """insert into llm_budget_windows(id,window_type,window_start,reserved_microusd,settled_microusd,ceiling_microusd) values
-            ('${UUID.randomUUID()}','DAILY',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,599500,600000),
-            ('${UUID.randomUUID()}','MONTHLY',date_trunc('month',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,0,6000000)""")
-        assertIs<ReserveResult.Reserved>(LlmBudgetService(source).reserveBeforeCall(claim, UUID.randomUUID()))
-        assertEquals("721000", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='DAILY'"))
-        assertEquals("7210000", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='MONTHLY'"))
+        fun window(ceiling: Long, settled: Long) {
+            analysisSql(source, "delete from llm_budget_windows")
+            analysisSql(source, """insert into llm_budget_windows(id,window_type,window_start,reserved_microusd,settled_microusd,ceiling_microusd) values
+                ('${UUID.randomUUID()}','DAILY',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,$settled,$ceiling)""")
+        }
+        val budget = LlmBudgetService(source)
+        // An older release's window keeps working up to its lower ceiling instead of blocking the whole day.
+        window(600_000, 0); assertIs<ReserveResult.Reserved>(budget.reserveBeforeCall(claim, UUID.randomUUID()))
+        assertEquals("600000", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='DAILY'"))
+        window(600_000, 599_500); assertEquals(ReserveResult.Exceeded, budget.reserveBeforeCall(claim, UUID.randomUUID()))
+        // An operator stop (0) and a later release's lower ceiling are respected; a higher stored value cannot exceed this release.
+        window(0, 0); assertEquals(ReserveResult.Exceeded, budget.reserveBeforeCall(claim, UUID.randomUUID()))
+        assertEquals("0", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='DAILY'"))
+        window(900_000, 720_500); assertEquals(ReserveResult.Exceeded, budget.reserveBeforeCall(claim, UUID.randomUUID()))
     }
 
     private fun withBudget(block: (LlmBudgetService, AnalysisClaim) -> Unit) {
