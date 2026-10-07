@@ -116,7 +116,7 @@ private struct DemoProductDetail: View {
                 WLText(product.brand, .bodyBold, maxLines: 1)
                 WLText(product.name, .title, maxLines: 1).wlArrivalFocus()
                     .padding(.top, WishlistTokens.Space.s8)
-                PriceText(amount: product.price, currency: product.currency, style: WLTextStyle.price.resized(24))
+                PriceText(amountText: product.price, currency: product.currency, style: WLTextStyle.price.resized(24))
                     .padding(.top, 10)
                 WLText("2일 전 확인한 가격이에요. 지금 가격은 원본에서 확인해 주세요.", WLTextStyle.body.resized(13, lineHeight: 13 * 1.5),
                        color: c.textSecondary)

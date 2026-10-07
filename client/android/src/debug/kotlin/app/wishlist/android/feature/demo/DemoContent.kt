@@ -39,7 +39,6 @@ import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
 import app.wishlist.android.navigation.WLTabBarHeight
 import app.wishlist.android.navigation.wlTabBarBottomPadding
-import java.math.BigDecimal
 
 /**
  * 보드 견본 사진의 모습(바탕·헤드폰 선·귀컵 색). 실제 앱에서는 상품 사진(이미지)이 들어갈 자리라
@@ -71,7 +70,7 @@ internal data class DemoItem(
     val id: String,
     val brand: String,
     val model: String,
-    val price: BigDecimal,
+    val price: String,
     val look: DemoPhotoLook,
     val ratio: Float,
     val purposeId: String?,
@@ -118,23 +117,23 @@ internal object DemoContent {
 
     /** FCategoryListL `items` 8개(헤드폰). 가장 긴 가격 `KRW 1,190,000`(Beoplay H95)이 들어 있다. */
     val items = listOf(
-        DemoItem("l1", "소니", "WH-1000XM6", BigDecimal(549000), DemoPhotoLook.White, 1f, "commute", "2일 전", "무신사"),
-        DemoItem("l2", "보스", "QuietComfort Ultra", BigDecimal(499000), DemoPhotoLook.Brown, 1.25f, "commute", "2일 전", "보스 공식몰"),
-        DemoItem("l3", "젠하이저", "MOMENTUM 4", BigDecimal(389000), DemoPhotoLook.Gray, 4f / 3f, null, "5일 전", "젠하이저"),
-        DemoItem("l4", "애플", "AirPods Max", BigDecimal(769000), DemoPhotoLook.White, 1f, "commute", "1주 전", "애플"),
-        DemoItem("l5", "마샬", "MAJOR V", BigDecimal(229000), DemoPhotoLook.Green, 1.25f, null, "1주 전", "29CM", pending = true),
-        DemoItem("l6", "뱅앤올룹슨", "Beoplay H95", BigDecimal(1190000), DemoPhotoLook.Gray, 4f / 3f, null, "2주 전", "뱅앤올룹슨"),
-        DemoItem("l7", "소니", "ULT WEAR", BigDecimal(279000), DemoPhotoLook.White, 1f, "commute", "2주 전", "11번가"),
-        DemoItem("l8", "오디오테크니카", "ATH-M50x", BigDecimal(219000), DemoPhotoLook.Brown, 1.25f, null, "3주 전", "오디오테크니카"),
+        DemoItem("l1", "소니", "WH-1000XM6", "549000", DemoPhotoLook.White, 1f, "commute", "2일 전", "무신사"),
+        DemoItem("l2", "보스", "QuietComfort Ultra", "499000", DemoPhotoLook.Brown, 1.25f, "commute", "2일 전", "보스 공식몰"),
+        DemoItem("l3", "젠하이저", "MOMENTUM 4", "389000", DemoPhotoLook.Gray, 4f / 3f, null, "5일 전", "젠하이저"),
+        DemoItem("l4", "애플", "AirPods Max", "769000", DemoPhotoLook.White, 1f, "commute", "1주 전", "애플"),
+        DemoItem("l5", "마샬", "MAJOR V", "229000", DemoPhotoLook.Green, 1.25f, null, "1주 전", "29CM", pending = true),
+        DemoItem("l6", "뱅앤올룹슨", "Beoplay H95", "1190000", DemoPhotoLook.Gray, 4f / 3f, null, "2주 전", "뱅앤올룹슨"),
+        DemoItem("l7", "소니", "ULT WEAR", "279000", DemoPhotoLook.White, 1f, "commute", "2주 전", "11번가"),
+        DemoItem("l8", "오디오테크니카", "ATH-M50x", "219000", DemoPhotoLook.Brown, 1.25f, null, "3주 전", "오디오테크니카"),
     )
 
     /** FPurposeDetailL `items` 5개(출퇴근 헤드폰 후보). 다른 목적은 앞에서부터 후보 수만큼 쓴다(데모). */
     val candidates = listOf(
-        DemoItem("c1", "소니", "WH-1000XM6", BigDecimal(549000), DemoPhotoLook.White, 1f, "commute", "2일 전", "무신사"),
-        DemoItem("c2", "보스", "QuietComfort Ultra", BigDecimal(499000), DemoPhotoLook.Brown, 1.25f, "commute", "2일 전", "보스 공식몰"),
-        DemoItem("c3", "애플", "AirPods Max", BigDecimal(769000), DemoPhotoLook.Gray, 4f / 3f, "commute", "1주 전", "애플"),
-        DemoItem("c4", "소니", "ULT WEAR", BigDecimal(279000), DemoPhotoLook.White, 1f, "commute", "2주 전", "11번가"),
-        DemoItem("c5", "마샬", "MAJOR V", BigDecimal(229000), DemoPhotoLook.Green, 1.25f, "commute", "1주 전", "29CM", pending = true),
+        DemoItem("c1", "소니", "WH-1000XM6", "549000", DemoPhotoLook.White, 1f, "commute", "2일 전", "무신사"),
+        DemoItem("c2", "보스", "QuietComfort Ultra", "499000", DemoPhotoLook.Brown, 1.25f, "commute", "2일 전", "보스 공식몰"),
+        DemoItem("c3", "애플", "AirPods Max", "769000", DemoPhotoLook.Gray, 4f / 3f, "commute", "1주 전", "애플"),
+        DemoItem("c4", "소니", "ULT WEAR", "279000", DemoPhotoLook.White, 1f, "commute", "2주 전", "11번가"),
+        DemoItem("c5", "마샬", "MAJOR V", "229000", DemoPhotoLook.Green, 1.25f, "commute", "1주 전", "29CM", pending = true),
     )
 
     /** FCategoryHomeL `home` 8개 상위와 세부 유형. */

@@ -60,7 +60,7 @@ struct DemoProduct: Hashable {
     let id: String
     let brand: String
     let name: String
-    let price: Decimal
+    let price: String
     let currency: String
     let top: String
     let category: String
@@ -116,45 +116,45 @@ enum DemoContent {
 
     /// 보드 FCategoryListL `items` 8개(디지털·IT > 헤드폰).
     static let headphones: [DemoProduct] = [
-        DemoProduct(id: "h1", brand: "소니", name: "WH-1000XM6", price: 549_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h1", brand: "소니", name: "WH-1000XM6", price: "549000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .white, photoRatio: 1, meta: "출퇴근 헤드폰 · 2일 전 확인"),
-        DemoProduct(id: "h2", brand: "보스", name: "QuietComfort Ultra", price: 499_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h2", brand: "보스", name: "QuietComfort Ultra", price: "499000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .brown, photoRatio: 1.25, meta: "출퇴근 헤드폰 · 2일 전 확인"),
-        DemoProduct(id: "h3", brand: "젠하이저", name: "MOMENTUM 4", price: 389_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h3", brand: "젠하이저", name: "MOMENTUM 4", price: "389000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: nil, art: .light, photoRatio: 4.0 / 3, meta: "목적 미지정 · 5일 전 확인"),
-        DemoProduct(id: "h4", brand: "애플", name: "AirPods Max", price: 769_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h4", brand: "애플", name: "AirPods Max", price: "769000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .white, photoRatio: 1, meta: "출퇴근 헤드폰 · 1주 전 확인"),
-        DemoProduct(id: "h5", brand: "마샬", name: "MAJOR V", price: 229_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h5", brand: "마샬", name: "MAJOR V", price: "229000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: nil, art: .green, photoRatio: 1.25, meta: "목적 미지정 · 1주 전 확인", pending: true),
         // 가장 긴 가격(보드 FPurposeAddCategoryFilterL). 가장 좁은 상품 카드에서도 한 줄이어야 한다(디자인 결정 2026-10-04).
-        DemoProduct(id: "h6", brand: "뱅앤올룹슨", name: "Beoplay H95", price: 1_190_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h6", brand: "뱅앤올룹슨", name: "Beoplay H95", price: "1190000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: nil, art: .light, photoRatio: 4.0 / 3, meta: "목적 미지정 · 2주 전 확인"),
-        DemoProduct(id: "h7", brand: "소니", name: "ULT WEAR", price: 279_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h7", brand: "소니", name: "ULT WEAR", price: "279000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .white, photoRatio: 1, meta: "출퇴근 헤드폰 · 2주 전 확인"),
-        DemoProduct(id: "h8", brand: "오디오테크니카", name: "ATH-M50x", price: 219_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "h8", brand: "오디오테크니카", name: "ATH-M50x", price: "219000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: nil, art: .brown, photoRatio: 1.25, meta: "목적 미지정 · 3주 전 확인"),
     ]
 
     /// 보드 FPurposeDetailL `items` 5개(출퇴근 헤드폰 후보). 메타가 판매처라 목록과 따로 둔다.
     static let candidates: [DemoProduct] = [
-        DemoProduct(id: "c1", brand: "소니", name: "WH-1000XM6", price: 549_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "c1", brand: "소니", name: "WH-1000XM6", price: "549000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .white, photoRatio: 1, meta: "무신사 · 2일 전 확인", showsDot: false),
-        DemoProduct(id: "c2", brand: "보스", name: "QuietComfort Ultra", price: 499_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "c2", brand: "보스", name: "QuietComfort Ultra", price: "499000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .brown, photoRatio: 1.25, meta: "보스 공식몰 · 2일 전 확인", showsDot: false),
-        DemoProduct(id: "c3", brand: "애플", name: "AirPods Max", price: 769_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "c3", brand: "애플", name: "AirPods Max", price: "769000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .light, photoRatio: 4.0 / 3, meta: "애플 · 1주 전 확인", showsDot: false),
-        DemoProduct(id: "c4", brand: "소니", name: "ULT WEAR", price: 279_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "c4", brand: "소니", name: "ULT WEAR", price: "279000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .white, photoRatio: 1, meta: "11번가 · 2주 전 확인", showsDot: false),
-        DemoProduct(id: "c5", brand: "마샬", name: "MAJOR V", price: 229_000, currency: "KRW", top: "디지털·IT", category: "헤드폰",
+        DemoProduct(id: "c5", brand: "마샬", name: "MAJOR V", price: "229000", currency: "KRW", top: "디지털·IT", category: "헤드폰",
                     purpose: commute, art: .green, photoRatio: 1.25, meta: "29CM · 1주 전 확인", showsDot: false, pending: true),
     ]
 
     /// 홈 데모의 사진 카드. USD 소수 가격과 가장 긴 목적 이름·가격을 함께 본다.
     static let homeProducts: [DemoProduct] = [
         headphones[0], headphones[1],
-        DemoProduct(id: "p3", brand: "살로몬", name: "Speedcross 6", price: Decimal(string: "159.99")!, currency: "USD", top: "스포츠·아웃도어·여행",
+        DemoProduct(id: "p3", brand: "살로몬", name: "Speedcross 6", price: "159.99", currency: "USD", top: "스포츠·아웃도어·여행",
                     category: "러닝 용품", purpose: purposes[1], art: .light, photoRatio: 1.25, meta: "가을 트레일 러닝 · 3일 전 확인"),
-        DemoProduct(id: "p4", brand: "헬리녹스", name: "체어 원 라이트", price: 139_000, currency: "KRW", top: "스포츠·아웃도어·여행",
+        DemoProduct(id: "p4", brand: "헬리녹스", name: "체어 원 라이트", price: "139000", currency: "KRW", top: "스포츠·아웃도어·여행",
                     category: "캠핑 용품", purpose: longestPurpose, art: .green, photoRatio: 1, meta: "\(longestPurposeName) · 1주 전 확인"),
         headphones[5],
     ]
@@ -564,7 +564,7 @@ struct DemoProductCard: View {
                 }
                 VStack(alignment: .leading, spacing: WishlistTokens.Space.s4) {
                     WLText(product.fullName, .body)
-                    PriceText(amount: product.price, currency: product.currency)
+                    PriceText(amountText: product.price, currency: product.currency)
                     HStack(spacing: 6) {
                         if product.showsDot, let purpose = product.purpose { PurposeDot(color: purpose.color) }
                         WLText(product.meta, .label, color: c.textSecondary, maxLines: 1)
