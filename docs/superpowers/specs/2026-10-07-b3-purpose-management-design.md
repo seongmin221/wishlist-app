@@ -214,8 +214,8 @@ key는 짧게 `{"id":"P01","n":이름,"d":설명,"i":[상품명]}`로 쓰고 고
 
 유료 입력 상한을 2,000에서 2,500으로 올리고 출력 80을 유지한다. `PriceTable` 최대 예약액은 496→596 micro USD다.
 일·월 ceiling은 같은 최대 처리 건수(일 약 1,209·월 약 12,096건)가 되도록 일 721,000·월 7,210,000 micro USD로 올린다.
-V14는 이미 생성된 `llm_budget_windows`의 ceiling도 새 값으로 갱신한다. 코드는 window ceiling 일치를 검사하므로
-갱신하지 않으면 현재 일·월 window가 끝날 때까지 모든 예약이 Exceeded가 된다.
+V14는 이미 생성된 `llm_budget_windows`의 ceiling도 새 값으로 갱신한다. 예약은 저장 ceiling이 현재 release 값과 다르면
+사용량을 유지한 채 현재 값으로 맞춘 뒤 판정하므로, 다른 release가 만든 window 때문에 하루 예약 전체가 막히지 않는다.
 원화 hard cap(1 USD=1,600원)은 일 약 1,160원·월 약 11,600원으로 AI·운영 문서에 반영한다.
 
 단계마다 token-count endpoint로 같은 요청을 검사하고 통과한 단계 하나만 유료 호출한다.
@@ -232,12 +232,12 @@ V14는 이미 생성된 `llm_budget_windows`의 ceiling도 새 값으로 갱신�
 | T6 | 160 | 제외 | 활동순 5개 이름만 | 1,355 | — | — |
 | T7 | 160 | 제외 | 제외(공용 최소) | 1,107 | — | — |
 
-입력 형태별 실행 단계(직전 단계와 같은 본문은 다시 검사하지 않는다):
+입력 형태별 단계 목록(같은 본문인 단계는 하나로 합친다). 첫 단계를 검사하고 넘으면 나머지를 이분 탐색해 들어가는 가장 앞 단계를 고르므로 token-count는 최대 4회다:
 
 - custom·목적 모두 없음: T0 → T7. B2 공용-only의 tier 0 → 3과 같다.
 - custom만 있음: T0 → T3 → T4 → T7. B2 tier 0~3(전체 → 이름 → 최소 → 공용 fallback)과 1:1이다.
 - 목적만 있음: T0 → T1 → T2 → T5 → T6 → T7. 상품 800·custom 단계(T3/T4)는 custom이 있을 때만 쓴다.
-- 둘 다 있음: T0 → T7 전체. token-count 호출은 최대 8회이며 Worker의 남은 처리 시간을 공유한다.
+- 둘 다 있음: T0~T7 전체. token-count는 Worker의 남은 처리 시간을 공유한다.
 
 추정 기준: 실제 `ai/taxonomy/v1.json` 공용 compact와 지시문·schema를 고정분 ≈947 token으로 두고
 한글 1자=1 token, ASCII 2.5자=1 token으로 계산했다. 최악은 custom 20개·목적 10개·모든 입력 최대 길이,

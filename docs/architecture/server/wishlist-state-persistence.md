@@ -156,7 +156,7 @@ V13은 다음 순서로 legacy 값을 전환한다.
 `mutation_receipts`는 category_id를 nullable로 바꾸고 `purpose_id`와 복합 FK, `num_nonnulls(category_id,purpose_id)=1` CHECK를 추가했다.
 목적 생성 receipt는 계정 수명 동안 보존하므로 **목적 row는 hard delete하지 않는다**. B8 삭제와 B10 archive/restore도 lifecycle 전환만 사용한다.
 V14는 입력 상한 2,500에 맞춰 기본값으로 만들어진 기존 `llm_budget_windows` ceiling(일 600,000·월 6,000,000)을 721,000·7,210,000으로 올린다.
-reservation은 저장 ceiling과 코드 값의 일치를 요구하므로, 갱신하지 않으면 현재 window가 끝날 때까지 예약이 Exceeded가 된다.
+예약 transaction은 잠근 window의 저장 ceiling이 현재 release 값과 다르면 사용량은 유지한 채 ceiling을 현재 값으로 맞춘 뒤 판정한다. 배포 중 다른 release가 window를 먼저 만들어도 그날 예약 전체가 Exceeded로 막히지 않는다. V14는 기존 데이터를 미리 맞춰 두는 정리다.
 
 **잠금 순서.**
 - 사용자 구조 변경은 owner → purpose(ID순) → item(ID순) → job 순서다. PUR-02/04는 owner 잠금 뒤 목적 row를 잠근다.

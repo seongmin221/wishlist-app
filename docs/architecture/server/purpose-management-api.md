@@ -83,7 +83,7 @@ description 생략과 null은 같은 null로 정규화한다.
 **cursor**
 - 마지막 항목의 `(activityAt, id)`와 projection·owner 식별 hash를 담은 opaque 값이다.
 - 다른 projection·owner의 cursor와 해석할 수 없는 값은 400 `INVALID_PURPOSE_CURSOR`다.
-- 페이지 사이에 활동이 바뀐 목적은 빠지거나 반복될 수 있다. 진입·foreground·새로고침 때 처음부터 다시 읽는다.
+- 정렬 key인 activityAt은 후보가 들어올 때(AI 연결 포함) 갱신된다. 그래서 페이지 사이에 앞으로 올라간 목적은 다음 페이지에서 빠지고, 뒤로 간 목적은 반복될 수 있다. 의도한 동작이다. ACTIVE 목적은 최대 30개이고 limit 기본·최대값도 30이므로, limit을 생략하면 한 번의 snapshot 응답으로 전체 목록을 받는다. 클라이언트는 limit을 생략하고, 진입·foreground·새로고침 때 처음부터 다시 읽는다.
 
 **archiveSummary `{count, recentTitles}`**: B3에는 archive를 만드는 경로가 없다. 그래서 count는 ARCHIVED 목적의 실제 수(현재 0)이고 recentTitles는 `[]`다. B10에서 archive 기록의 수·최근 종료 제목으로 출처를 바꾼다.
 

@@ -49,6 +49,20 @@ opus 독립 리뷰의 판정은 "With fixes"였다(Critical 0, Important 1, Mino
 
 **rollout 주의.** V13/V14 적용 전에 구 API/Worker를 멈춰야 한다(B0 drain과 같음). 구 버전이 uuid 컬럼에 문자열 목적을 쓰거나, 600,000 ceiling으로 새 window를 만들면 실패하거나 해당 window가 Exceeded가 된다.
 
+## PR #11 코드리뷰 반영
+
+PR #11 리뷰 9건을 코드와 대조했다. 정확성·운영 항목은 재현 테스트의 실패를 확인한 뒤 고쳤다.
+
+1. **V13의 review 재계산.** 카테고리가 USER이고 AI 목적 때문에만 PENDING이던 상품은 목적을 비우면서 NOT_REQUIRED로 바꾼다. B3 이전 provider는 목적 후보를 공급하지 않았으므로 실제로 영향받는 데이터는 없을 것으로 본다. V13은 아직 병합·배포 전이라 V13 자체를 고쳤다.
+2. **predicted_purpose_id.** 판단 결과만 기록한다. 판단하지 않은 단계(T6/T7·legacy)와 guard가 거부한 결과는 마지막 예측을 유지한다.
+3. **`Assigned.purposeJudged` 기본값.** false(판단 없음)로 바꿔, 별도 gateway·테스트 더블이 기존 연결을 끊지 않게 했다.
+4. **목록 cursor의 누락·반복.** 의도한 동작으로 판단해 계약에 명시했다. activityAt이 바뀌면 페이지 사이에서 빠지거나 반복될 수 있지만, ACTIVE ≤ 30이고 limit 기본·최대가 30이므로 limit을 생략하면 한 번의 snapshot으로 전체를 받는다.
+5. **token-count 호출.** 단계는 내용을 빼기만 하므로 token 수가 늘지 않는다. 첫 단계 검사 뒤 나머지를 이분 탐색해 최대 4회로 줄였다. B2 custom-only 회귀의 count 순서 기대값은 이에 맞춰 바꿨다.
+6. **예산 한도.** 예약 transaction이 저장 ceiling을 현재 release 값으로 맞춘 뒤 판정한다. 다른 release가 만든 window 때문에 하루 예약 전체가 Exceeded로 막히지 않는다.
+7. **상품 조회.** 목적 표시값을 상관 서브쿼리 3개 대신 left join 하나로 읽는다.
+8. **공용 helper.** code point 자르기는 `UserTextRules.truncate`, 정규 UUID 파싱은 `app.common.parseCanonicalUuid`로 합쳤다.
+9. **검증 분리와 중립 타입.** 설명 검증을 `validateDescription`으로 분리하고, PATCH 필드 의도는 중립 패키지의 `app.common.FieldChange`로 옮겨 category와 목적이 함께 쓴다.
+
 ## 전체 검증
 
 실행 명령(server/):
@@ -62,6 +76,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home DOCKER_
 | 실행 | 결과 |
 | --- | --- |
 | 리뷰 전 | BUILD SUCCESSFUL, tests=289, failures=0, errors=0, skipped=1 |
-| 보완 후 최종 | BUILD SUCCESSFUL, 5분25초, tests=292, failures=0, errors=0, skipped=1 → **291 통과·RealUrlPilot 1 skip** |
+| 독립 리뷰 보완 후 | BUILD SUCCESSFUL, 5분25초, tests=292, failures=0, errors=0, skipped=1 → 291 통과·RealUrlPilot 1 skip |
+| PR #11 리뷰 반영 후 최종 | BUILD SUCCESSFUL, 5분31초, tests=295, failures=0, errors=0, skipped=1 → **294 통과·RealUrlPilot 1 skip** |
 
 실행하지 않은 범위: 실제 OpenAI 호출, production 배포, RealUrlPilot(opt-in), B4~B11. push·PR·병합은 하지 않았다.
