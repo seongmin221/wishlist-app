@@ -101,3 +101,18 @@ core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  pres
 - test-only `RepositoryContractFixture`는 같은 store의 owner context를 바꾸고 분석 완료·삭제를 제어한다. abstract `RepositoryContractTest`는 생성/replay의 같은 ID·최초 공유 시각·최신 상태, 새 key의 새 상품, 원문 URL 충돌, owner 격리, 없는 항목/삭제 GET 404와 replay tombstone 시나리오를 제공한다. 신규 201/replay 200은 도메인 결과에 넣지 않고 Task 6b transport 테스트가 검사한다. Task 4에는 concrete factory가 없어 이 contract suite는 실행되지 않았다.
 
 시드 테스트 8개와 기존 공통 테스트를 Android host·iOS simulator에서 각각 실제 실행했다(각 55개, 실패/오류/skip 0). API별 서버 B단계·클라이언트 C단계·Fake/Remote/MockEngine/실서버의 진행과 미실행은 [연동 상태](server-integration-status.md)에서 분리한다.
+
+
+## Fake 상태 저장소와 계정 경쟁
+
+> 2026-10-07 Task 5 구현. Fake 공개 저장소는 ITEM-01 Create·ITEM-03 Get과 시드 조회이며, mutation wire API는 후속 범위다.
+
+`FakeStore(session, clock, ids)`가 owner별 상품·submission key·재분석 attempt·분석 generation을 보관하고 모든 비즈니스 규칙을 적용한다. `FakeItemRepository`, `FakeCatalogRepository`, `FakeControls`는 이를 위임한다. 개발 세션 조립은 먼저 `MutableAuthSession.changeAccount`를 호출한 다음 `store.seed`로 현재 owner namespace를 초기화한다. seed 자체도 같은 session gate를 통과하며, 미인증이면 실패한다. 재초기화로 사용자 변경을 덮어쓰지 않는다.
+
+요청 시작의 `SessionSnapshot`을 보관하고 주입한 delay를 gate 밖에서 실행한다. 이후 `AuthSession.withCurrent` → Store Mutex 순서로 commit하며, 결과 공개 직전 snapshot도 비교한다. A→B와 A→logout→A 모두 이전 generation의 응답과 쓰기를 SESSION_CHANGED로 거절한다. `failNext`/`delayNext`는 다음 한 요청에만 적용하고 coroutine test scheduler로 실제 지연·취소 경계를 검증할 수 있다. 자동 분석·wall-clock 타이머는 없다.
+
+생성은 PROCESSING·version 1·analysisGeneration 1이다. owner와 submission UUID가 같은 재전송은 원본 URL 문자열을 비교하고, 최초 clientCreatedAt 및 최신 snapshot을 반환한다. 삭제는 version과 무관하고 반복 삭제도 성공한다. GET은 삭제 항목을 숨기지만 생성 key 재전송은 tombstone을 반환한다. 최종 분석·사용자 변경·삭제는 version을 증가시키며, 일반 편집·직접 보완·검토는 expectedVersion을 비교한다.
+
+Fake 전용 `Patch.Unchanged`/`Patch.Set(null)`은 생략과 명시적 삭제를 구별한다. 직접 보완은 이름·카테고리를 요구하고 원래 analysis status/failureCode를 유지하며 CONFIRMED·manualCompletionAt을 기록한다. 검토 CONFIRM/DEFER 이후 검토를 다시 열지 않는다. 같은 재분석 attempt는 generation을 한 번만 증가시키며 최신 상태를 재전송한다. 이전 generation·완료된 generation·삭제 후 분석 결과는 무시한다.
+
+host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 실행했다(기존 55개 포함 각 81개, 실패·오류·skipped 0). static simulator framework 링크도 확인했다. Remote HTTP 상태·서버 SSRF/URL 정규화·새 Fake API의 Swift 호출 동작은 이 검증 범위에 포함하지 않는다. 구현과 wire 공개 상태는 [서버 연동 상태](server-integration-status.md)에서 구분한다.

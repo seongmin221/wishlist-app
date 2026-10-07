@@ -15,7 +15,7 @@
 - 상태: **승인 v4 · 실행 중 (2026-10-07)**. 아래 제안 인터페이스와 기본값은 구현 계획이며 서버 신규 계약을 확정하지 않는다. 사용자 승인에 따라 Task 1부터 실행하며 Task 5 뒤 중간 확인을 받는다.
 - 브랜치 `client/c2-kmp-core`, PR base `develop`. 시작 HEAD: `e884d14fcd59be026886b2056f3e0e377a5c627f`.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. `iosArm64`/`iosSimulatorArm64`, static `Shared.framework` direct integration 유지. 공유 코드에 Compose/SwiftUI 의존성 없음.
-- 서버 최신 확인(2026-10-07 13:48 KST): B1 PR [#8](https://github.com/seongmin221/wishlist-app/pull/8)와 B2 PR [#9](https://github.com/seongmin221/wishlist-app/pull/9) merged. B2 브랜치 `origin/seongmin221/server-b2-category-management` tip `3df880e`, 최신 `origin/develop`은 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이며 열린 PR은 없다. B2 PR #9 mergedAt은 13:31:42 KST. 작업 HEAD는 시작 commit에 그대로 있다. Task 1 실행 전 최신 develop을 병합하고 서버 계약 기준을 고정한다.
+- 서버 최신 확인(2026-10-07 13:48 KST): B1 PR [#8](https://github.com/seongmin221/wishlist-app/pull/8)와 B2 PR [#9](https://github.com/seongmin221/wishlist-app/pull/9) merged. B2 브랜치 `origin/seongmin221/server-b2-category-management` tip `3df880e`, 최신 `origin/develop`은 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이며 열린 PR은 없다. B2 PR #9 mergedAt은 13:31:42 KST. 과거 시작 HEAD는 위 기록을 유지하며, Task 1 실행 전에 `origin/develop` `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0` 위로 승인된 rebase를 완료했다(실행 기준 계획 commit `dd62150`). 이 commit의 서버 계약을 기준으로 실행한다.
 - 서버 category 기준: B2 [PublicCategoryRegistry](https://github.com/seongmin221/wishlist-app/blob/3df880e/server/src/main/kotlin/app/category/PublicCategoryRegistry.kt)와 [registry test](https://github.com/seongmin221/wishlist-app/blob/3df880e/server/src/test/kotlin/app/category/PublicCategoryRegistryTest.kt)에서 상위 `G001`~`G011`, leaf `C001`~`C087`를 확인했다. custom은 UUID. B2 [category 계약](https://github.com/seongmin221/wishlist-app/blob/3df880e/docs/architecture/server/category-management-api.md)의 상품 mapper와 `CategoryDtos.kt`에서 nullable `name/parentId/kind`도 모델에 보존한다. CAT-01~04 서버 완료와 C2의 ITEM-01·03 Remote 범위를 구별한다.
 - C2 첫 구현 작업은 **SKIE Kotlin 2.3.21 연결 검증**. 실패 원인을 분리한 뒤 미지원이면 KMP-NativeCoroutines 대안을 비교·보고하고 전환안을 확인한다.
 - 모델 축: analysis/review/lifecycle/manualCompletion/categoryMissingReason/value source를 분리한다. 서버 내부 AnalysisJob·lease·예산은 클라이언트 모델로 옮기지 않는다.
@@ -338,11 +338,11 @@ interface FakeControls {
 
 `successValue()`는 commonTest helper로만 정의하며 실패면 test assertion을 발생시킨다.
 
-- [ ] **Step 1: 실패 테스트.** 같은 owner/key/URL→같은 ID, 다른 URL→409 IDEMPOTENCY_KEY_REUSED, 같은 URL/새 key→새 ID; replay는 최초 clientCreatedAt 보존·최신 상태 반환; 다른 owner GET→404; A→B 및 A→logout→A 도중 지연된 Fake 응답/쓰기→SESSION_CHANGED; 삭제 tombstone은 replay되지만 GET은404. PROCESSING 변경 거절/삭제만, version CAS 실패·동시 edit 한 건만 성공, 수동 완료 후 retry 거절/분석상태 보존, DEFERRED 미재노출.
-- [ ] **Step 2: RED.** KMP_TEST.
-- [ ] **Step 3: 핵심 구현.** UUID·Clock 주입, 최초 analysisGeneration 1, 최종 분석/사용자 변경은 version 증가; analysisGeneration N+1 후 N 결과·삭제 후 늦은 결과 무시. 자동 분석 진행·wall-clock sleep 대신 명시적 제어와 test scheduler.
-- [ ] **Step 4: 상태 전이 GREEN.** KMP_TEST와 Fake contract suite.
-- [ ] **Step 5: 문서·커밋.** integration-status에 fake 규칙과 API 공개 구현을 구별해서 적고 `feature(kmp): 가짜 저장소의 상태와 재전송 규칙 구현`.
+- [x] **Step 1: 실패 테스트.** 같은 owner/key/URL→같은 ID, 다른 URL→409 IDEMPOTENCY_KEY_REUSED, 같은 URL/새 key→새 ID; replay는 최초 clientCreatedAt 보존·최신 상태 반환; 다른 owner GET→404; A→B 및 A→logout→A 도중 지연된 Fake 응답/쓰기→SESSION_CHANGED; 삭제 tombstone은 replay되지만 GET은404. PROCESSING 변경 거절/삭제만, version CAS 실패·동시 edit 한 건만 성공, 수동 완료 후 retry 거절/분석상태 보존, DEFERRED 미재노출.
+- [x] **Step 2: RED.** KMP_TEST.
+- [x] **Step 3: 핵심 구현.** UUID·Clock 주입, 최초 analysisGeneration 1, 최종 분석/사용자 변경은 version 증가; analysisGeneration N+1 후 N 결과·삭제 후 늦은 결과 무시. 자동 분석 진행·wall-clock sleep 대신 명시적 제어와 test scheduler.
+- [x] **Step 4: 상태 전이 GREEN.** KMP_TEST와 Fake contract suite.
+- [x] **Step 5: 문서·커밋.** integration-status에 fake 규칙과 API 공개 구현을 구별해서 적고 `feature(kmp): 가짜 저장소의 상태와 재전송 규칙 구현`.
 
 ## Task 5 이후 사용자 확인 지점
 
