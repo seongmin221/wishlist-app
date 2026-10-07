@@ -32,3 +32,10 @@
 - 앱 루트가 `rememberWLNavigator(AppRouteCodec)`를 소유하고 `OverlayHost` 바깥에서 CompositionLocal로 제공한다. 시트·메뉴·확인창도 같은 navigator를 읽는다.
 - `WLRouteCodec`은 feature route를 저장 가능한 문자열 목록으로 변환한다. saver는 현재 탭·스택·칸 식별자·sourceKey·nextId를 저장하며 진행 중 전환은 복원 시 완료 상태로 정리한다. `SaveableStateHolder`의 정리 대상 칸 목록도 저장해 pop된 칸의 상태를 제거한다. 실제 기능을 추가할 때 codec 복원 계약을 함께 구현한다.
 - 입력은 부모 문자열 callback을 거치지 않는 단일 `TextFieldState`다. 조합 중에는 보존하고 commit 뒤 grapheme 제한을 적용한다. API 26 ICU·실기기 한글 IME 확인은 [C3 확인 목록](c3-performance-checks.md)에 있다.
+
+## 공유 runtime 연결 (C2)
+
+- `WishlistApplication`(manifest `android:name`)이 프로세스당 `SharedRuntime` 하나를 소유한다. `SharedRuntimeFactory.create(context, bindings, remote)`에 `AppRuntimeConfig.bindings(BuildConfig.DEBUG)`와 `remote = null`을 넘긴다. DEBUG는 ITEM-01·03 FAKE와 나머지 UNAVAILABLE, RELEASE는 37개 모두 UNAVAILABLE이다.
+- 조립 직후 variant별 `di/VariantStartup`을 부른다. debug는 `di/DebugSessionBootstrap`으로 `startDebugSession()`을 호출하고, release는 아무것도 하지 않는다(release APK dex에 `DebugSessionBootstrap` 없음). `VariantRoutes`와 같은 debug/release source set 방식이다.
+- Robolectric이 없어 Application은 JVM에서 실행하지 않는다. `testDebug`/`testRelease`의 `AppRuntimeConfig*Test`가 각 variant가 넘기는 mode·37개 map을 순수 함수로 검증하고, runtime 동작은 shared commonTest가 검증한다.
+- `feature/detail/ItemDetailPresenterOwner`는 `ItemDetailPresenter` 하나의 수명 소유자인 `ViewModel`이다(UI 없음). `factory(runtime)`가 `runtime.itemDetailPresenter()`로 Presenter를 만들고, 구성 변경 동안 유지하며 `onCleared()`에서 `close()`한다. `state`는 Presenter의 thread-safe StateFlow 그대로이고 repository 작업은 runtime의 background dispatcher에서 실행되므로 C4 화면은 main에서 수집만 한다. activity-compose가 가져오는 lifecycle-viewmodel(2.9.4)을 쓰며 catalog 항목은 추가하지 않았다. JVM 테스트 `ItemDetailPresenterOwnerTest`가 `ViewModelStore.clear()`로 Presenter 종료(진행 요청 취소·이후 intent 무시)를 Robolectric 없이 검증한다.

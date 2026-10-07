@@ -105,7 +105,7 @@ client/ios/      DesignSystem/, Navigation/, Features/<화면>/, ShareExtension/
 | --- | --- | --- | --- |
 | C0 | 셋업 미커밋 변경 커밋, `origin/main` 리베이스, 핸드오프 확보 확인, "핸드오프 사본 없음" 문구 정리, 이 spec과 C1 plan 커밋 | — | — |
 | C1 | 완료(2026-10-06, 목적 아이콘 key 초안은 C1 계획에 없어 남김). 토큰 생성기·서체·공통 컴포넌트, 탭 셸, 시트·확인창·push 전환 데모, iOS 라우터 spike, 목적 색·아이콘 key 초안 | 모션 보드 4종, 탭 바 | — |
-| C2 | KMP 핵심: 모델·상태 축, repository 인터페이스, fake·시드, SQLDelight, Ktor client 뼈대·오류 매핑, `AuthTokenProvider`, Koin, SKIE 연결 확인, Presenter 기반 | — | — |
+| C2 | 구현·로컬 검증 완료(2026-10-07, PR 대기; 실서버·Android Context SQLite 실기기·Darwin redirect는 C3/C12 인계). KMP 핵심: 모델·상태 축, repository 인터페이스, fake·시드, SQLDelight, Ktor client 뼈대·오류 매핑, `AuthTokenProvider`, Koin, SKIE 연결 확인, Presenter 기반 | — | — |
 | C3 | 저장: 공유 수신, LocalSubmission, 로그인 안내·건너뛰기, 로그인 전 홈·분석 대기, 전송·재전송, 설정(로그아웃·웹뷰 데이터 삭제) | FLogin, FHomeLoggedOut, FShareSaved*, FSettings* | ITEM-01 |
 | C4 | 상품 상세(보기)·분석 중·원본 링크 웹뷰 | FProductDetail, FProductProcessing, FWebView* | B1 |
 | C5 | 카테고리 탭·세부 유형 목록(fake 목록)·선택 시트·생성·편집 | FCategoryHome/AddSheet/List/ListCustom/ListCustomEmpty/EditSheet, FProductCategoryPicker/Create | B2 |

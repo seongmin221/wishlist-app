@@ -12,3 +12,6 @@
 | QA-CLI-006 | SwiftUI에서 가려진 화면을 VoiceOver에서 빼는 방법은? | [QA-CLI-006](QA-CLI-006-swiftui-accessibility-hiding.md) |
 | QA-CLI-007 | 가장자리 끌어 뒤로를 window 수준 UIKit pan으로 만든 이유는? | [QA-CLI-007](QA-CLI-007-swiftui-gesture-vs-scrollview.md) |
 | QA-CLI-008 | SwiftUI에서 글꼴보다 작은 줄 높이를 여러 줄에 주는 방법은(공개 API만)? | [QA-CLI-008](QA-CLI-008-swiftui-line-height-below-font.md) |
+| QA-CLI-009 | SKIE는 Kotlin 2.3.21을 지원하는가? | [QA-CLI-009](QA-CLI-009-skie-kotlin-compatibility.md) |
+| QA-CLI-010 | Ktor redirect 차단을 MockEngine만으로 확인할 수 있는가? | [QA-CLI-010](QA-CLI-010-ktor-native-redirects.md) |
+| QA-CLI-011 | ObjCName을 붙였는데 Swift getter 이름이 바뀌지 않는 이유는? | [QA-CLI-011](QA-CLI-011-objc-property-name.md) |

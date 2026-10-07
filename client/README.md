@@ -4,12 +4,13 @@ iOS는 SwiftUI, Android는 Jetpack Compose, 공통 비즈니스 계층은 KMP로
 
 ## 현재 범위
 
-C1까지 디자인 토큰 생성기, 서체·글자 스타일, 공통 컴포넌트, 시트·확인창·메뉴 overlay, 탭 셸과 자체 라우터(공유 요소 화면 이동, 끌어서 뒤로)를 두 앱에 구현했다. 탭 첫 화면은 debug 빌드에서 이것들을 보여 주는 데모다. 로그인, 상품 저장, 공유 수신, DB, API와 실제 기능 화면은 아직 구현하지 않았다. 구조는 [디자인 시스템과 앱 뼈대](../docs/architecture/client/design-system.md)를 따른다.
+C1은 디자인 토큰 생성기, 서체·글자 스타일, 공통 컴포넌트, 시트·확인창·메뉴 overlay, 탭 셸과 자체 라우터(공유 요소 화면 이동, 끌어서 뒤로)를 두 앱에 구현했다. 탭 첫 화면은 debug 빌드에서 이것들을 보여 주는 데모다. C2는 화면 없이 공통 KMP 핵심(상품 모델·상태 정책·가격 표기, Fake/Remote(ITEM-01·03)·계정별 SQLDelight 캐시, API별 backend 조립 `SharedRuntime`, 상품 상세 Presenter 기반)을 구현했다. 로그인, 상품 저장, 공유 수신과 실제 기능 화면은 아직 구현하지 않았다. 구조는 [디자인 시스템과 앱 뼈대](../docs/architecture/client/design-system.md)와 [KMP 구조](../docs/architecture/client/kmp.md)를 따른다.
 
 | 위치 | 역할 |
 | --- | --- |
 | `android/` | Compose application, AGP 내장 Kotlin |
 | `shared/` | Android·iOS Kotlin library, UI 의존성 없음 |
+| `localdb/` | SQLDelight plugin·schema·생성 코드만 담은 내부 모듈(`:shared`가 `implementation`으로 사용, Swift에 노출하지 않음) |
 | `ios/` | SwiftUI app, Xcode project와 공유 scheme(`WishlistTests` 단위 테스트 포함) |
 | `tools/` | 디자인 토큰 원본(`design-tokens.json`)과 생성기 |
 | `gradle/libs.versions.toml` | 클라이언트 dependency·plugin 버전 |
@@ -42,7 +43,7 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 
 APK: `android/build/outputs/apk/debug/android-debug.apk`. 연결된 emulator/기기에 설치하려면 `./gradlew :android:installDebug`를 실행한다.
 
-`shared`는 Android host test와 `commonTest`의 Kotlin test dependency를 준비했다. 아직 비즈니스 기능·테스트가 없으므로 test task는 `NO-SOURCE`다. 테스트 통과와 구분한다. 첫 공통 기능부터 `shared/src/commonTest/kotlin/`에 테스트를 추가한다.
+`shared`의 공통 테스트는 `shared/src/commonTest/kotlin/`에 있고 Android host와 iOS simulator에서 같은 suite를 실행한다.
 
 2026-10-05 Android Studio 2026.1.3으로 업데이트한 뒤 원본 로컬 저장소의 `client/` Gradle Sync 성공을 Studio 로그에서 확인했다. APK build·lint를 재검증했고 `Medium_Phone_API_36.0` emulator에서 설치·실행과 공통 코드 문구의 라이트·다크 표시를 확인했다. AGP 버전은 9.0.0을 유지한다. 최소 지원 API 26의 실제 실행은 이번 검증에 포함하지 않았다.
 
@@ -74,7 +75,7 @@ xcodebuild -project ios/Wishlist.xcodeproj -scheme Wishlist \
 ./gradlew :shared:iosSimulatorArm64Test
 ```
 
-2026-10-05 Xcode 26.6에서 Debug/Release arm64 simulator build와 Release arm64 device build를 확인했다. iPhone 17 Pro / iOS 26.5 simulator에서 Debug 앱을 설치·실행하고 라이트·다크 화면의 공통 코드 문구를 확인했다. device build는 서명 없이 수행했으며 실제 iPhone 설치·실행과 배포 서명은 검증하지 않았다. shared iOS test는 아직 테스트가 없어 compile/link가 `NO-SOURCE`, 실행 task가 `SKIPPED`다.
+2026-10-05 Xcode 26.6에서 Debug/Release arm64 simulator build와 Release arm64 device build를 확인했다. iPhone 17 Pro / iOS 26.5 simulator에서 Debug 앱을 설치·실행하고 라이트·다크 화면의 공통 코드 문구를 확인했다. device build는 서명 없이 수행했으며 실제 iPhone 설치·실행과 배포 서명은 검증하지 않았다. shared iOS test는 `:shared:iosSimulatorArm64Test`로 simulator에서 실행한다.
 
 ## 디자인 토큰
 
@@ -104,8 +105,9 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
   -derivedDataPath client/ios/DerivedData CODE_SIGNING_ALLOWED=NO
 ```
 
+- `/usr/libexec/java_home -v 17`이 다른 JDK를 가리키는 환경에서는 JDK 17 경로를 직접 `JAVA_HOME`에 지정하고 `-Porg.gradle.java.installations.paths="$JAVA_HOME"`를 Gradle에 넘긴다.
 - Android 단위 테스트는 가격 형식, 시트 끌기 판단, overlay 상태 기계, `WLNavigator`를 다룬다. iOS `WishlistTests`는 같은 사례를 Swift로 확인한다. iOS 17 확인은 iOS 17.5 simulator를 `-destination 'platform=iOS Simulator,id=<기기 id>'`로 지정한다.
-- `:shared:allTests`는 shared에 테스트가 아직 없어 `NO-SOURCE`(iOS 실행 task는 `SKIPPED`)다. 통과와 구분한다.
+- `:shared:allTests`는 Android host(246개)와 iOS simulator(243개) commonTest를 실행한다(2026-10-07 C2 기준, 실패·skip 0). 결과는 `shared/build/test-results`의 XML 건수로 확인하고 `NO-SOURCE`/`SKIPPED`를 통과로 세지 않는다. 최종 검증은 [C2 검증 기록](../docs/history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.
 - 데모: debug 빌드를 실행하면 탭 첫 화면에 시트·확인창·메뉴, 사진·면 화면 이동, 가장 긴 이름·긴 가격 예시가 나온다. release 빌드는 탭 이름만 있는 빈 첫 화면이다.
 
 ## 기능 개발 기준
