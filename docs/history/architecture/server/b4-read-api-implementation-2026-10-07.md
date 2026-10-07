@@ -29,3 +29,13 @@ HOME-02의 기존 action/cursor/limit 예시에 없는 anchor 입력·응답, �
 신규 코드 부재로 compile RED를 확인한 뒤 공통 scope/window 타입과 SQL requiredAction/group·표시용 visibility를 추가했다. JDK Char 전체와 공백 상수 28개를 대조하고 실제 DB 제약을 유지한 10,080개 상태 조합과 이름 공백 경계를 policy와 비교했다. 작업별 17개 테스트를 실행해 통과했다.
 
 첫 GREEN 실행은 공백 category fixture가 V11 public FK에 막혀 실패했다. spec의 ‘저장 가능한 공백 category’ 가정을 바로잡고 제약을 유지했다. 유효 DB 조합 parity와 별도의 SELECT-derived row 표현 parity로 구분해 검증했다. 실패 실행을 통과로 기록하지 않았다.
+
+## Task 2~3 — cursor와 목록 window
+
+Cursor/query 부재의 compile RED를 확인하고 owner·scope·endpoint·용도 검증과 입력 상한을 구현했다. Cursor/parser·B3 PurposeRoutes 8개 테스트가 통과했다. HMAC이나 신규 secret은 없다. 구조가 유효한 자기 범위 위치 조작을 인증 수단으로 다루지 않으며 SQL owner/scope가 권한을 강제한다.
+
+상품 row projection을 상세·replay·카드에 공유하고 목록 count·keyset·양방향 존재 확인·anchor 복구를 같은 snapshot으로 읽는다. 공통 mapper와 10,080개 상태 조합도 대조했다. 동일 created_at의 PostgreSQL UUID 순서와 Java signed 비교 경계, 앞뒤 페이지 왕복, anchor 삭제·category/목적 이동·맨 끝·빈 목록, PROCESSING 최소 정보 유지, 목적 count 일치, B1 상세·생성 회귀를 포함한 25개 테스트가 통과했다.
+
+## Task 4 — category 표시 count
+
+CAT-01/02의 공용/custom count에 ITEM-02와 같은 표시 predicate를 적용했다. B8 삭제 영향은 이름 누락을 포함한 ACTIVE 전체 집계이며 표시 count를 재사용하지 않는다. 기존 B2의 목록 count 테스트와 owner/FK 테스트는 이름 없는 ACTIVE를 count=1로 기대했으므로 확정 B4 정책에 따라 count=0 확인 후 이름을 넣어 count=1 확인을 추가했다. FK·owner 격리·version·중복 검증은 유지했다. 새 RED 테스트는 기존 전체 집계의 0/2와 1/3 불일치를 재현했고 category·HTTP 회귀는 최종 실행에서 통과했다.

@@ -1,6 +1,6 @@
 # B4 상품 목록·홈·연속 처리 조회 설계
 
-> 2026-10-07 · **설계 승인 · 2026-10-07 · 계획 검토 전** · 제품 정책 확정 · 구현 미착수
+> 2026-10-07 · **설계·계획 승인 · 2026-10-07 · Native 구현 중** · 제품 정책 확정 · 구현 미착수
 
 ## 목표와 범위
 
@@ -299,4 +299,4 @@ TDD로 아래 실패를 확인한 뒤 구현한다. 리뷰 지적도 재현 테�
 
 B10에서 목적 archive가 생기면 ARCHIVED 목적에 연결된 ACTIVE 상품은 purposeUnassigned(null만)에도 특정 목적 목록(비활성 목적 404)에도 나타나지 않을 수 있다. 목적/상품 lifecycle 전이와 조회 predicate를 B10에서 함께 검증·갱신한다. B4가 목적 archive 동작을 추가하지 않는다.
 
-작업별 plan 검토·실행 방식 선택 후 구현·독립 리뷰·보완·전체 테스트를 진행한다. architecture의 read API/state API/category 계약, inventory, implementation order, 각 INDEX와 의미 있는 구현 이력을 최종 구현에 맞춰 갱신한다. 전체 테스트는 `--rerun-tasks`의 완료 결과만 기록한다. 현재 baseline은 295 통과·RealUrlPilot 1 skip이며 B4 구현 완료를 뜻하지 않는다.
+승인된 작업별 plan에 따라 Native 구현·독립 리뷰·보완·전체 테스트를 진행한다. architecture의 read API/state API/category 계약, inventory, implementation order, 각 INDEX와 의미 있는 구현 이력을 최종 구현에 맞춰 갱신한다. 전체 테스트는 `--rerun-tasks`의 완료 결과만 기록한다. 현재 baseline은 295 통과·RealUrlPilot 1 skip이며 B4 구현 완료를 뜻하지 않는다.

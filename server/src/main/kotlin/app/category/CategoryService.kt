@@ -1,5 +1,6 @@
 package app.category
 
+import app.wishlist.WishlistReadPredicates
 import app.common.FieldChange
 import app.ai.TaxonomyCatalog
 import app.persistence.MutationReceipts
@@ -91,12 +92,16 @@ class CategoryService(private val dataSource: DataSource) {
         checkNotNull(categories.find(connection, owner, id))
     }
 
-    private fun publicCounts(connection: Connection, owner: UUID): Map<String, Long> = connection.prepareStatement("""
-        select category_id,count(*) from wishlist_items
-        where owner_id=? and lifecycle_status='ACTIVE' and category_id is not null group by category_id
-    """).use { statement ->
-        statement.setObject(1, owner)
-        statement.executeQuery().use { rows -> buildMap { while (rows.next()) put(rows.getString(1), rows.getLong(2)) } }
+    private fun publicCounts(connection: Connection, owner: UUID): Map<String, Long> {
+        val visible = WishlistReadPredicates.categoryVisible()
+        return connection.prepareStatement("""
+            select i.category_id,count(*) from wishlist_items i
+            where i.owner_id=? and ${visible.sql} and i.category_id is not null group by i.category_id
+        """).use { statement ->
+            statement.setObject(1, owner)
+            visible.parameters.forEachIndexed { n,v -> statement.setObject(n+2,v) }
+            statement.executeQuery().use { rows -> buildMap { while (rows.next()) put(rows.getString(1), rows.getLong(2)) } }
+        }
     }
 
     private fun checkDuplicate(connection: Connection, owner: UUID, parent: String, name: String, exceptId: UUID? = null) {
