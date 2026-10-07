@@ -4,7 +4,7 @@
 
 **질문:** Ktor의 `followRedirects=false`가 OkHttp/Darwin의 native redirect까지 막는가? MockEngine 테스트로 확인할 수 있는가?
 
-**답변:** MockEngine은 실제 engine을 실행하지 않으므로 native redirect 동작을 검증하지 못한다. Ktor 3.6.0의 [OkHttpConfig](https://github.com/ktorio/ktor/blob/3.6.0/ktor-client/ktor-client-okhttp/jvm/src/io/ktor/client/engine/okhttp/OkHttpConfig.kt)는 `followRedirects`와 `followSslRedirects`를 이미 false로 두며, [Darwin 기본 delegate](https://github.com/ktorio/ktor/blob/3.6.0/ktor-client/ktor-client-darwin/darwin/src/io/ktor/client/engine/darwin/KtorNSURLSessionDelegate.kt)는 redirect callback에 `completionHandler(null)`을 호출해 embedded redirect를 거부한다.
+**답변:** MockEngine은 실제 engine을 실행하지 않으므로 native redirect 동작을 검증하지 못한다. C2에서 선택한 Ktor 3.4.3의 [OkHttpConfig](https://github.com/ktorio/ktor/blob/3.4.3/ktor-client/ktor-client-okhttp/jvm/src/io/ktor/client/engine/okhttp/OkHttpConfig.kt)는 `followRedirects`와 `followSslRedirects`를 이미 false로 두며, [Darwin 기본 delegate](https://github.com/ktorio/ktor/blob/3.4.3/ktor-client/ktor-client-darwin/darwin/src/io/ktor/client/engine/darwin/KtorNSURLSessionDelegate.kt)는 redirect callback에 `completionHandler(null)`을 호출해 embedded redirect를 거부한다.
 
 따라서 기본 engine 구성을 유지하고 [Ktor 자체 redirect](https://ktor.io/docs/client-redirect.html)도 끄면 된다. Darwin에 별도 Boolean 설정이 있다고 가정하거나 custom delegate를 새로 만들 필요는 없다. preconfigured client/session 또는 다른 버전을 채택하면 해당 구성과 소스를 다시 확인한다.
 

@@ -4,8 +4,17 @@ agp = "9.0.0"
 compose-bom = "2026.02.01"
 activity-compose = "1.12.4"
 junit = "4.13.2"
-# Compose BOM이 실제로 끌어오는 kotlinx-coroutines-core와 같은 버전(debugRuntimeClasspath에서 1.9.0 확인)
-coroutines = "1.9.0"
+# 공통/Android 테스트 동일 버전. C2 compatibility gate의 resolved graph 기록 참조.
+coroutines = "1.10.2"
+skie = "0.10.12"
+# 3.6.0/3.5.0은 coroutines·serialization 1.11.0을 요구. 공식 3.4.3 catalog와 실제 graph로 검증.
+ktor = "3.4.3"
+serialization = "1.10.0"
+sqldelight = "2.4.1"
+koin = "4.2.2"
+turbine = "1.2.1"
+# Ktor 3.4.3 OkHttp engine의 resolved OkHttp와 MockWebServer를 일치시킨다.
+okhttp = "5.3.2"
 
 [libraries]
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
@@ -16,8 +25,29 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
+sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+skie = { id = "co.touchlab.skie", version.ref = "skie" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
