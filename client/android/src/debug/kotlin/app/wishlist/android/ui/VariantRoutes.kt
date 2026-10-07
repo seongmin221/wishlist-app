@@ -5,11 +5,22 @@ import app.wishlist.android.navigation.*
 import app.wishlist.android.feature.demo.*
 
 internal object VariantRoutes : WLRouteCodec {
-    override fun encode(route: WLRoute): List<String>? = (route as? DemoRoute.Detail)?.let {
-        listOf("demo", it.id, it.hasPhoto.toString())
+    override fun encode(route: WLRoute): List<String>? = when (route) {
+        is DemoRoute.Product -> listOf("demo", "product", route.itemId)
+        is DemoRoute.CategoryList -> listOf("demo", "list", route.top, route.type)
+        is DemoRoute.Purpose -> listOf("demo", "purpose", route.purposeId)
+        else -> null
     }
-    override fun decode(tokens: List<String>): WLRoute? =
-        if (tokens.size == 3 && tokens[0] == "demo") DemoRoute.Detail(tokens[1], tokens[2].toBooleanStrict()) else null
+
+    override fun decode(tokens: List<String>): WLRoute? {
+        if (tokens.firstOrNull() != "demo") return null
+        return when {
+            tokens.size == 3 && tokens[1] == "product" -> DemoRoute.Product(tokens[2])
+            tokens.size == 4 && tokens[1] == "list" -> DemoRoute.CategoryList(tokens[2], tokens[3])
+            tokens.size == 3 && tokens[1] == "purpose" -> DemoRoute.Purpose(tokens[2])
+            else -> null
+        }
+    }
 
     @Composable
     fun Content(route: WLRoute, sourceKey: String?): Boolean {
@@ -19,7 +30,9 @@ internal object VariantRoutes : WLRouteCodec {
                 WLTab.Category -> DemoCategoryScreen()
                 WLTab.Purpose -> DemoPurposeScreen()
             }
-            is DemoRoute.Detail -> DemoDetailScreen(route, sourceKey)
+            is DemoRoute.Product -> DemoProductDetailScreen(route, sourceKey)
+            is DemoRoute.CategoryList -> DemoCategoryListScreen(route, sourceKey)
+            is DemoRoute.Purpose -> DemoPurposeDetailScreen(route, sourceKey)
             else -> return false
         }
         return true

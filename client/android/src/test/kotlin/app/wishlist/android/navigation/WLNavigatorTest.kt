@@ -14,7 +14,7 @@ import org.junit.Test
 class WLNavigatorTest {
     private data class TestDetail(val id: String, val hasPhoto: Boolean) : WLRoute {
         override val showsTabBar = false
-        override val pushStyle get() = if (hasPhoto) WLPushStyle.Photo else WLPushStyle.Surface
+        override val pushStyle get() = if (hasPhoto) WLPushStyle.Photo else WLPushStyle.Slide
     }
 
     private val codec = object : WLRouteCodec {

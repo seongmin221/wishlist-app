@@ -1,5 +1,6 @@
 package app.wishlist.android.designsystem
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -55,7 +57,7 @@ fun WLChip(
     }
 }
 
-/** 점선 "+ 추가" 칩(1.5dp 점선 테두리). */
+/** 점선 "+ 추가" 칩(1.5dp 점선 테두리, + 아이콘 16·선 2, 간격 6). 출처: FCategoryHomeL 추가 칩. */
 @Composable
 fun WLAddChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalWLColors.current
@@ -79,7 +81,13 @@ fun WLAddChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        WLText("+", WLType.body, color = color, maxLines = 1)
+        Canvas(Modifier.size(16.dp)) {
+            // 보드 SVG `M12 5v14M5 12h14`(24 격자, 선 2)를 16 크기로 그린다.
+            val k = size.width / 24f
+            val w = 2f * k
+            drawLine(color, Offset(12f * k, 5f * k), Offset(12f * k, 19f * k), w)
+            drawLine(color, Offset(5f * k, 12f * k), Offset(19f * k, 12f * k), w)
+        }
         WLText(text, WLType.body, color = color, maxLines = 1)
     }
 }

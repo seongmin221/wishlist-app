@@ -10,8 +10,9 @@ interface WLRoute {
 
     data class TabRoot(val tab: WLTab) : WLRoute {
         override val showsTabBar = true
-        override val pushStyle = WLPushStyle.Surface
+        override val pushStyle = WLPushStyle.Slide
     }
 }
 
-enum class WLPushStyle { Photo, Surface }
+/** 화면 이동 방식: 사진이 커지는 공유 요소(Photo) 또는 가로 밀기(Slide, 사진 없는 이동). */
+enum class WLPushStyle { Photo, Slide }

@@ -15,6 +15,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
@@ -49,6 +52,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+import androidx.compose.ui.unit.IntOffset
 
 /** 화면이 `push`·`pop`을 부르기 위한 접근. */
 val LocalWLNavigator = staticCompositionLocalOf<WLNavigator> { error("WLNavHost 밖에서 LocalWLNavigator를 읽었다") }
@@ -61,7 +66,7 @@ typealias WLRouteContent = @Composable (route: WLRoute, sourceKey: String?) -> U
  *
  * - 탭 전환: 페이드 스루(이전 90 ease-in → 새 탭 210 fade-in + scale .97, 90 지연). 탭별 상태는 SaveableStateHolder.
  * - 화면 이동: `SharedTransitionLayout` + 탭마다 `SeekableTransitionState`로 움직이는 `AnimatedContent`.
- *   사진 있음은 `wlSharedPhoto`, 사진 없음은 `WLSharedSurfaceSource`/`WLSurfaceScreen`(자리 표시 면).
+ *   사진 있음은 `wlSharedPhoto`(공유 요소), 사진 없음은 가로 밀기(위 칸 W → 0, 아래 칸 0 → −0.25W, 360/300 `emphasized`).
  * - 뒤로: `PredictiveBackHandler`. 끄는 동안 같은 pop 전환을 진행값만큼 되감고, 놓을 때 50% 이상이거나 빠르게 놓았으면
  *   나머지를 재생, 아니면 되돌린다. 진행값 없이 끝나는 뒤로(API 33 미만, 3버튼 내비게이션, 화면의 뒤로 버튼)는 같은 pop
  *   전환을 처음부터 재생한다.
@@ -116,6 +121,8 @@ fun WLNavHost(
                         WLTabBar(
                             current = currentTab,
                             onSelect = { navigator.selectTab(it) },
+                            // 화면 내용 위에 따로 그려 밀기 전환에서도 움직이지 않는다. 두 화면 모두 탭 바가 있으면 그대로 있고,
+                            // 한쪽에만 있으면 전환 진행에 맞춰 옅어지거나 나타난다(tabBarSpec).
                             modifier = Modifier.graphicsLayer { this.alpha = tabBarAlphaNow() },
                         )
                     }
@@ -133,7 +140,7 @@ private fun tabFadeThrough(): ContentTransform {
 }
 
 /** push = 새 칸이 위(id가 더 큼). 상세(위 칸) 쪽의 이동 방식으로 고른다. */
-private fun stackTransform(initial: WLBackStackEntry, target: WLBackStackEntry): ContentTransform {
+private fun stackTransform(initial: WLBackStackEntry, target: WLBackStackEntry, interactive: Boolean): ContentTransform {
     val push = target.id > initial.id
     val upper = if (push) target else initial
     return when (upper.route.pushStyle) {
@@ -144,24 +151,33 @@ private fun stackTransform(initial: WLBackStackEntry, target: WLBackStackEntry):
             } else {
                 EnterTransition.None togetherWith fadeOut(tween(Motion.pushPhotoBackContent, easing = Curve.easeIn))
             }
-        // 내용 페이드는 WLSurfaceScreen이 자리 표시 면 위에서 직접 한다.
-        WLPushStyle.Surface -> EnterTransition.None togetherWith ExitTransition.None
+        // 가로 밀기: 위 칸이 오른쪽에서 들어오고 아래 칸은 0.25W만큼 왼쪽으로 밀린다(겹침 막·그림자·페이드 없음).
+        // 끌어서 뒤로는 손가락 진행값을 그대로 위치로 쓰도록 선형(위 칸 = p·W, 아래 칸 = −0.25W·(1 − p)).
+        WLPushStyle.Slide -> {
+            val spec = slideSpec<IntOffset>(push, interactive)
+            val parallax = { w: Int -> -(w * Motion.pushSlideParallax).roundToInt() }
+            if (push) {
+                slideInHorizontally(spec) { it } togetherWith slideOutHorizontally(spec, parallax)
+            } else {
+                slideInHorizontally(spec, parallax) togetherWith slideOutHorizontally(spec) { it }
+            }
+        }
     }.apply { targetContentZIndex = if (push) 1f else -1f }
 }
 
+/** 밀기 시간표: 열기 360, 뒤로 300 `emphasized`. 끌어서 뒤로는 선형(진행값 = 위치). */
+private fun <T> slideSpec(push: Boolean, interactive: Boolean) =
+    tween<T>(if (push) Motion.pushSlideOpen else Motion.pushSlideBack, easing = if (interactive) LinearEasing else Curve.emphasized)
+
 /** 탭 바 투명도: 다음 화면 내용과 함께 사라지고 나타난다(내용 페이드와 같은 시간표). */
-private fun tabBarSpec(initial: WLBackStackEntry, target: WLBackStackEntry) = run {
+private fun tabBarSpec(initial: WLBackStackEntry, target: WLBackStackEntry, interactive: Boolean) = run {
     val push = target.id > initial.id
     val upper = if (push) target else initial
     when (upper.route.pushStyle) {
         WLPushStyle.Photo ->
             if (push) tween(Motion.pushPhotoContent, easing = Curve.easeOut) else tween<Float>(Motion.pushPhotoBackContent, easing = Curve.easeIn)
-        WLPushStyle.Surface ->
-            if (push) {
-                tween(Motion.pushSurfaceContent, delayMillis = Motion.pushSurfaceLift + Motion.pushSurfaceContentDelay, easing = Curve.easeOut)
-            } else {
-                tween(Motion.pushSurfaceBackContent, easing = Curve.easeIn)
-            }
+        // 밀기: 한쪽에만 탭 바가 있으면 밀기와 같은 시간표로 옅어지거나 나타난다. 둘 다 있으면 값이 1 → 1이라 그대로다.
+        WLPushStyle.Slide -> slideSpec<Float>(push, interactive)
     }
 }
 
@@ -211,7 +227,7 @@ private fun SharedTransitionScope.TabStack(
     }
 
     val alpha = transition.animateFloat(
-        transitionSpec = { tabBarSpec(initialState, targetState) },
+        transitionSpec = { tabBarSpec(initialState, targetState, navigator.activeTransition is WLNavTransition.BackGesture) },
         label = "tabBar-$tab",
     ) { if (it.route.showsTabBar) 1f else 0f }
     if (isCurrent) SideEffect { tabBarAlpha.value = alpha }
@@ -253,7 +269,7 @@ private fun SharedTransitionScope.TabStack(
     }
 
     transition.AnimatedContent(
-        transitionSpec = { stackTransform(initialState, targetState) },
+        transitionSpec = { stackTransform(initialState, targetState, navigator.activeTransition is WLNavTransition.BackGesture) },
         contentKey = { it.id },
         modifier = Modifier.fillMaxSize(),
     ) { entry ->
@@ -280,7 +296,7 @@ private suspend fun revert(
                 val a = Animatable(progress)
                 val follower = launch { snapshotFlow { a.value }.collect { seek.seekTo(it.coerceIn(0f, 1f), to) } }
                 // 되돌림 길이 = 그 화면 종류(사진·면)의 뒤로 시간 × 남은 비율.
-                val back = if (from.route.pushStyle == WLPushStyle.Surface) Motion.pushSurfaceBack else Motion.pushPhotoBack
+                val back = if (from.route.pushStyle == WLPushStyle.Slide) Motion.pushSlideBack else Motion.pushPhotoBack
                 val ms = (back * progress).toInt().coerceAtLeast(RevertMinMillis)
                 a.animateTo(0f, tween(ms, easing = Curve.emphasized))
                 follower.cancel()

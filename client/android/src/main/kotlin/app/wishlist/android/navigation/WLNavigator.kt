@@ -35,7 +35,7 @@ internal sealed interface WLNavTransition {
  * - `push`·`pop`·`selectTab`(다른 탭)은 전환을 시작하고(`isTransitioning = true`) 바로 상태를 바꾼다.
  *   화면 쪽이 모션을 끝내면 `finishTransition()`을 부른다.
  * - 전환 중에는 `push`·`pop`·`selectTab`·`beginBackGesture`를 모두 무시한다(false). 공유 요소 전환 중 탭을 누르거나
- *   뒤로 가도 자리 표시 면이 남지 않는다.
+ *   뒤로 가도 사진이나 밀던 화면이 중간에 남지 않는다.
  * - 현재 탭을 다시 고르면 전환 없이 `scrollToTopRequests`로 그 탭을 내보낸다.
  * - 끌어서 뒤로: `beginBackGesture` → (`commitBackGesture` → 모션 끝에 `finishTransition`) 또는 `cancelBackGesture`.
  */
@@ -95,7 +95,7 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
         activeTransition = null
     }
 
-    /** Only settled navigation identity is saved; animation and surface probes are transient. */
+    /** Only settled navigation identity is saved; animation state is transient. */
     internal fun save(codec: WLRouteCodec): ArrayList<Any> = arrayListOf(
         currentTab.name,
         nextId,

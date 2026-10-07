@@ -210,15 +210,10 @@ object WishlistTokens {
         const val dialogOut: Int = 150
         const val pushPhotoOpen: Int = 420
         const val pushPhotoBack: Int = 360
-        const val pushSurfaceExpand: Int = 420
         const val pushPhotoContent: Int = 420
         const val pushPhotoBackContent: Int = 250
-        const val pushSurfaceLift: Int = 80
-        const val pushSurfaceContentDelay: Int = 190
-        const val pushSurfaceContent: Int = 230
-        const val pushSurfaceBack: Int = 360
-        const val pushSurfaceBackContent: Int = 180
-        const val pushSurfaceSettle: Int = 80
+        const val pushSlideOpen: Int = 360
+        const val pushSlideBack: Int = 300
         const val tabOutgoing: Int = 90
         const val tabIncoming: Int = 210
         const val tabIncomingDelay: Int = 90
@@ -232,9 +227,6 @@ object WishlistTokens {
         const val sheetDragDismissVelocity: Float = 1000f
         const val interactiveBackCommitProgress: Float = 0.5f
         const val tabIncomingScale: Float = 0.97f
-        const val pushSurfaceLiftOutset: Float = 3f
-        const val pushSurfaceLiftShadowY: Float = 8f
-        const val pushSurfaceLiftShadowBlur: Float = 24f
-        const val pushSurfaceLiftShadowAlpha: Float = 0.14f
+        const val pushSlideParallax: Float = 0.25f
     }
 }

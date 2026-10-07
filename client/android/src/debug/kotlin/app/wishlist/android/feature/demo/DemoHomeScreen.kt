@@ -46,7 +46,6 @@ import app.wishlist.android.designsystem.overlay.rememberWLMenuAnchor
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLRoute
 import app.wishlist.android.navigation.WLScrollToTopEffect
-import app.wishlist.android.navigation.WLSharedSurfaceSource
 import app.wishlist.android.navigation.WLTab
 import app.wishlist.android.navigation.wlSharedPhoto
 
@@ -72,7 +71,7 @@ fun DemoHomeScreen() {
                 "더 보기",
                 onClick = { menuAnchor.boundsInWindow()?.let { overlay.showMenu(it, demoMenuItems(overlay)) } },
                 modifier = Modifier.wlAnchor(menuAnchor),
-            ) { MoreDots() }
+            ) { DemoIconView(DemoIcon.More) }
         }
 
         DemoSectionLabel("overlay")
@@ -82,30 +81,28 @@ fun DemoHomeScreen() {
         }
 
         DemoSectionLabel("사진 카드 → 상세 (사진이 커짐)")
-        Row(horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12)) {
-            listOf(0, 1).forEach { col ->
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s16)) {
-                    DemoContent.products.filterIndexed { i, _ -> i % 2 == col }
-                        .forEach { DemoProductCard(it, sourceKey = "home/product/${it.id}") }
-                }
-            }
-        }
+        // 가장 긴 가격(KRW 1,190,000, Beoplay H95)도 가장 좁은 카드에서 한 줄이어야 한다(디자인 결정 2026-10-04).
+        DemoItemGrid(
+            DemoContent.items.filter { it.id in setOf("l1", "l2", "l5", "l6") },
+            sourceKeyPrefix = "home/product",
+            meta = { it.listMeta },
+            dot = { it.purpose?.color },
+        )
 
-        DemoSectionLabel("사진 없는 칩 → 목록 (면이 커짐)")
+        DemoSectionLabel("사진 없는 칩 → 목록 (가로 밀기)")
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8),
             verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8),
         ) {
-            DemoContent.chips.take(5).forEach { DemoSurfaceChip(it, sourceKey = "home/chip/${it.id}") }
+            val digital = DemoContent.tops.first { it.name == "디지털·IT" }
+            digital.types.take(5).forEach { DemoTypeChip(digital.name, it, sourceKey = "home/chip/${it.name}") }
         }
 
         DemoSectionLabel("비교 중인 목적")
         Column(verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12)) {
-            DemoContent.purposes.filter { it.id in setOf("commute", "trail", "longest") }.forEach { p ->
+            (DemoContent.purposes.take(2) + DemoContent.longestPurpose).forEach { p ->
                 val key = "home/purpose/${p.id}"
-                WLSharedSurfaceSource(key, p.color.face, WishlistTokens.Radius.xl, Modifier.fillMaxWidth()) {
-                    DemoPurposeRow(p) { nav.push(DemoRoute.Detail(DemoIds.purpose(p.id), hasPhoto = false), key) }
-                }
+                DemoPurposeRow(p) { nav.push(DemoRoute.Purpose(p.id), key) }
             }
         }
 
@@ -118,36 +115,6 @@ fun DemoHomeScreen() {
             }
         }
         TabBarSpacer()
-    }
-}
-
-@Composable
-internal fun DemoProductCard(product: DemoProduct, sourceKey: String) {
-    val nav = LocalWLNavigator.current
-    val c = LocalWLColors.current
-    Column(
-        Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4),
-    ) {
-        WLCard(
-            Modifier.fillMaxWidth(),
-            radius = WishlistTokens.Radius.m,
-            onClick = { nav.push(DemoRoute.Detail(DemoIds.product(product.id), hasPhoto = true), sourceKey) },
-        ) {
-            DemoPhoto(product.tint, Modifier.fillMaxWidth().aspectRatio(1f / product.photoRatio).wlSharedPhoto(sourceKey))
-        }
-        Spacer(Modifier.height(WishlistTokens.Space.s4))
-        WLText(product.brand, WLType.label, color = c.textSecondary)
-        WLText(product.name, WLType.bodyStrong, maxLines = 2)
-        PriceText(product.price, product.currency, style = WLType.price.copy(fontSize = WLType.body.fontSize))
-    }
-}
-
-@Composable
-internal fun DemoSurfaceChip(chip: DemoChip, sourceKey: String) {
-    val nav = LocalWLNavigator.current
-    WLSharedSurfaceSource(sourceKey, LocalWLColors.current.chip, 20.dp) {
-        WLChip(chip.name, onClick = { nav.push(DemoRoute.Detail(DemoIds.chip(chip.id), hasPhoto = false), sourceKey) }, count = chip.count)
     }
 }
 

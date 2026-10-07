@@ -8,4 +8,6 @@
     <string name="wl_tab_home">Home</string>
     <string name="wl_tab_category">Category</string>
     <string name="wl_tab_purpose">Purpose</string>
+    <string name="wl_header_sheet_expand">Expand list</string>
+    <string name="wl_header_sheet_collapse">Show header</string>
 </resources>

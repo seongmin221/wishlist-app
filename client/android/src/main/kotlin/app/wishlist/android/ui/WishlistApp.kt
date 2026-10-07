@@ -2,10 +2,7 @@ package app.wishlist.android.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import app.wishlist.android.navigation.LocalWLNavigator
-import app.wishlist.android.navigation.LocalWLSurfaceRegistry
-import app.wishlist.android.navigation.WLSurfaceRegistry
 import app.wishlist.android.navigation.rememberWLNavigator
 import app.wishlist.android.designsystem.WLTheme
 import app.wishlist.android.designsystem.overlay.OverlayHost
@@ -17,8 +14,7 @@ import app.wishlist.android.navigation.WLNavHost
 fun WishlistApp() {
     WLTheme {
         val navigator = rememberWLNavigator(AppRouteCodec)
-        val registry = remember { WLSurfaceRegistry() }
-        CompositionLocalProvider(LocalWLNavigator provides navigator, LocalWLSurfaceRegistry provides registry) {
+        CompositionLocalProvider(LocalWLNavigator provides navigator) {
             OverlayHost(rememberOverlayHostState()) {
                 WLNavHost(navigator = navigator) { route, sourceKey -> AppRoute(route, sourceKey) }
             }
