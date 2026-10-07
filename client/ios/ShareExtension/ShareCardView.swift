@@ -103,12 +103,29 @@ final class ShareCardModel {
     }
 }
 
-/// The extension's whole UI: a transparent surface with only the card, 40 above the bottom (or 16
+/// The "other app" backdrop of boards FShareSaved* (page background: light #E9E9E9, dark #2A2A2A).
+/// iOS 26 always wraps the extension in an opaque full-height system sheet (no public API makes it
+/// transparent), so the extension paints this behind the card to keep the board's card contrast
+/// (Ruling 17, a recorded board deviation). Not a design-system token. No shadow.
+enum ShareBackdrop {
+    static let light = Color(red: 0xE9 / 255, green: 0xE9 / 255, blue: 0xE9 / 255)
+    static let dark = Color(red: 0x2A / 255, green: 0x2A / 255, blue: 0x2A / 255)
+    static let uiColor = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0x2A / 255, green: 0x2A / 255, blue: 0x2A / 255, alpha: 1)
+            : UIColor(red: 0xE9 / 255, green: 0xE9 / 255, blue: 0xE9 / 255, alpha: 1)
+    }
+
+    static func color(dark: Bool) -> Color { dark ? Self.dark : Self.light }
+}
+
+/// The extension's whole UI: the board backdrop with only the card, 40 above the bottom (or 16
 /// above the home indicator if that is higher), 16 from the sides. The travel is the larger of 140
 /// and "card + bottom gap", so the card is fully off screen before and after.
 struct ShareCardHost: View {
     let model: ShareCardModel
 
+    @Environment(\.colorScheme) private var scheme
     @State private var cardHeight: CGFloat = 0
 
     var body: some View {
@@ -116,7 +133,7 @@ struct ShareCardHost: View {
             let bottom = max(WishlistTokens.Space.s40, proxy.safeAreaInsets.bottom + WishlistTokens.Space.s16)
             let distance = max(140, cardHeight + bottom)
             ZStack(alignment: .bottom) {
-                Color.clear
+                ShareBackdrop.color(dark: scheme == .dark)
                 if let kind = model.kind {
                     ShareCardView(kind: kind)
                         .frame(maxWidth: 480)

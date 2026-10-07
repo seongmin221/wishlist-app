@@ -7,9 +7,10 @@ import UIKit
 /// (`DisabledShareDirectSender`) and does not link Shared; the app imports the file on its next
 /// launch or foreground.
 ///
-/// Presentation: the view is transparent and only the card is drawn. `completeRequest` is called
-/// only after the view appeared and the card's down motion finished — called from `viewDidLoad`
-/// the request is ignored and the sheet stays open (Task 0).
+/// Presentation: iOS 26 shows the extension in its own opaque system sheet whatever we ask for, so the
+/// view paints the board's "other app" backdrop (`ShareBackdrop`, Ruling 17) and draws only the card
+/// at its bottom. `completeRequest` is called only after the view appeared and the card's down motion
+/// finished — called from `viewDidLoad` the request is ignored and the sheet stays open (Task 0).
 final class ShareViewController: UIViewController {
     private let model = ShareCardModel()
     private var appeared = false
@@ -30,11 +31,10 @@ final class ShareViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .clear
-        view.isOpaque = false
+        // Painted from the first frame, so the sheet never shows the system background while sliding up.
+        view.backgroundColor = ShareBackdrop.uiColor
         let host = UIHostingController(rootView: WLTheme { ShareCardHost(model: self.model) })
-        host.view.backgroundColor = .clear
-        host.view.isOpaque = false
+        host.view.backgroundColor = ShareBackdrop.uiColor
         addChild(host)
         host.view.frame = view.bounds
         host.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]

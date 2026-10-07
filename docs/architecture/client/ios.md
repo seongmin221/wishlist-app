@@ -64,6 +64,7 @@
 - `ShareTextExtractor`는 Kotlin `ShareTextParser`의 Swift 사본이다. 패턴의 공백은 Kotlin `\s`와 같은 ASCII 6자(space·\t·\n·\x0B·\f·\r)를 직접 적는다(ICU `\s`는 NBSP 등까지 잡아 Android와 달라진다). 길이·자르기는 UTF-16 단위다. `ShareTextExtractorTests`가 Kotlin `ShareTextParserTest`와 같은 벡터를 같은 순서로 검사한다. Kotlin의 따옴표·`>` 자르기는 패턴이 이미 제외해 도달하지 않으므로 옮기지 않았다.
 - 카드(`ShareCardView`): motion.md 6절 — 340 `standard`로 올라오고 1500 유지, 260 `accelerate`로 내려간 뒤 `completeRequest`. 저장이 끝나고 **`viewDidAppear` 뒤에만** 시작한다(`viewDidLoad`의 `completeRequest`는 무시되어 시트가 닫히지 않았다, Task 0). 등장 때 VoiceOver announcement(제목, 보조 줄).
 - **표시 방식(Task 6 시뮬레이터 확인, iOS 26.5):** 확장 view와 hosting view는 투명이고 `modalPresentationStyle = .overFullScreen`을 주지만, iOS가 확장 window 안에서 우리 화면을 담는 page sheet(`UIDropShadowView`, `systemBackgroundColor`)를 그리고 그 뒤 Safari를 어둡게 한다. 그래서 보드처럼 "원래 앱 위의 카드"가 아니라 "불투명 시스템 시트 아래쪽의 카드"로 보인다. 시트 크기(`preferredContentSize`)는 반영되지 않고 `sheetPresentationController`는 nil이다. 시스템 view 배경을 직접 지우면 카드만 뜨지만 UIKit 내부 계층에 기대므로 쓰지 않는다. 카드가 내려간 뒤 시트는 저절로 닫힌다(탭 후 약 4초 안).
+- **시트 바탕(Ruling 17, C3 Task 7):** 시트를 없앨 수 없으므로 확장 view·hosting view·`ShareCardHost`가 보드 FShareSaved*의 "다른 앱" 바탕색(`ShareBackdrop`: 라이트 #E9E9E9, 다크 #2A2A2A)을 칠해 카드 대비를 보드와 같게 유지한다. 카드는 시트 아래쪽에서 보드 motion대로 오르내리고 그림자는 없다. 디자인 토큰이 아니라 이 확장 전용 값이며, 보드와의 차이(전체 높이 불투명 시스템 시트)는 history에 보드 차이로 기록한다.
 
 ### 앱 쪽 신호·세션 미러
 
