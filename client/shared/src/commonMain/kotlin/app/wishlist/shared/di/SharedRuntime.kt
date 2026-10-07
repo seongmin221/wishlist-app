@@ -235,6 +235,23 @@ class SharedRuntime internal constructor(
     }
 
     /**
+     * **DEBUG only** (null in RELEASE and after [close]): demo hooks for on-device checks — delaying
+     * the next Fake ITEM-01 and creating unbound pending rows. Apps call it only from debug code paths.
+     */
+    fun debugControls(): DebugControls? {
+        if (env.bindings.buildMode != ClientBuildMode.DEBUG) return null
+        val fake = guard.use { koin.get<FakeStore>() } ?: return null
+        return DebugControls(
+            fake = fake,
+            store = localStore(),
+            ready = ready,
+            clock = env.clock,
+            ids = env.ids,
+            onPendingCreated = { submissions().requestFlush(FlushTrigger.LAUNCH) },
+        )
+    }
+
+    /**
      * Releases the HTTP client, its engine and the SQL driver once (if created). Idempotent and
      * safe from any thread: new lookups are refused at once, and teardown runs when the last
      * in-flight lookup or ready publication finishes, ending with ready = false.

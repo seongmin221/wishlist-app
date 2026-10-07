@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import app.wishlist.android.di.VariantStartup
 import app.wishlist.android.feature.home.HomePresenterOwner
 import app.wishlist.android.feature.session.AccountPresenterOwner
 import app.wishlist.android.ui.WishlistApp
@@ -19,7 +20,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val runtime = (application as WishlistApplication).runtime
+        val app = application as WishlistApplication
+        val runtime = app.runtime
+        // Debug: demo hooks from the launch intent (release: no-op). A recreated Activity skips them.
+        if (savedInstanceState == null) VariantStartup.onMainLaunch(runtime, intent, app.appScope)
         val account = ViewModelProvider(this, AccountPresenterOwner.factory(runtime))[AccountPresenterOwner::class.java]
         val home = ViewModelProvider(this, HomePresenterOwner.factory(runtime))[HomePresenterOwner::class.java]
         setContent { WishlistApp(account, home) }
