@@ -82,10 +82,12 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         resources.runIfOpen { dispatcher?.dispatchEvent(eventId) }
     }
     val detailService = GetWishlistItemService(source)
+    val readService = WishlistReadService(source)
     routing {
         get("/health") { call.respondText("ok") }
         wishlistRoutes(service, detailService) { resolver.resolve(it) }
-        wishlistReadRoutes(WishlistReadService(source)) { resolver.resolve(it) }
+        wishlistReadRoutes(readService) { resolver.resolve(it) }
+        homeActionRoutes(readService) { resolver.resolve(it) }
         categoryRoutes(CategoryService(source)) { resolver.resolve(it) }
         purposeRoutes(PurposeService(source)) { resolver.resolve(it) }
     }
