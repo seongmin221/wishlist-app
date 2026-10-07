@@ -631,6 +631,8 @@ xcodebuild -project client/ios/Wishlist.xcodeproj -scheme Wishlist \
 
 ## 후속 단계 인계
 
+> C2에서 고치지 않은 경미 결함과 담당 단계는 [KMP 아키텍처의 알려진 한계와 인계 단계](../../architecture/client/kmp.md#알려진-한계와-인계-단계)에 있다.
+
 | 단계 | 인계할 범위·조건 |
 | --- | --- |
 | C3 | 공유 수신/자동 전송·Share Extension 직접 전송 여부·app group/다중 프로세스·bind/recoverSubmitting. **최초 POST 전에 미귀속 pending의 accountBinding을 영속 commit**하고, 계정 전환으로 응답을 버려도 binding을 유지한다. 다른 owner가 같은 key를 보내는 계정 간 중복 생성을 막는다. iOS navigation 저장·Android 모듈·목록 성능 검토와 데모 seed 소비도 연결한다. |

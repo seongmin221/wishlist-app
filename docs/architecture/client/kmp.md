@@ -39,7 +39,7 @@
 | local DB | SQLDelight |
 | DI | Koin(`:shared` 안 internal 조립, runtime별 격리 `koinApplication`. 앱은 `SharedRuntimeFactory`만 호출) |
 | Swift 연결 | SKIE(Flow·suspend → AsyncSequence·async). 미지원 시 KMP-NativeCoroutines |
-| 인증 | 플랫폼별 Firebase 공식 SDK가 KMP `AuthTokenProvider` 구현 |
+| 인증 | 플랫폼별 Firebase 공식 SDK가 공개 콜백 `PlatformTokenSource`를 구현해 `RemoteConfig`로 전달(KMP 내부 `AuthTokenProvider`는 `internal`) |
 | 설정 저장 | multiplatform-settings |
 | 테스트 | kotlin.test, Turbine, Ktor MockEngine |
 
@@ -194,4 +194,26 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - 의존성 baseline(Kotlin 2.3.21·AGP 9.0.0·Gradle 9.3.0·catalog)은 Task 1 이후 변경이 없다([호환성 기록](../../history/architecture/client/c2-dependency-compatibility-2026-10-07.md)).
 - shared commonTest는 Android host 246개·iOS simulator 243개(차이 3개는 Android host 전용 `OkHttpRedirectTest`), Android 단위 테스트는 debug/release 각 66개, iOS XCTest 81개를 실행했고 실패·오류·skip은 0이다.
 - Android Context SQLite driver는 compile/assemble만 확인했고 기기 runtime smoke는 C3로 넘긴다. Darwin redirect는 Ktor 3.4.3 delegate 소스 검토만 했고 실제 검증은 C12다. 실서버 호출은 어디에서도 실행하지 않았다.
-- 각 Task 리뷰에서 남긴 경미한 결함(deferred minor)은 수정하지 않았다. 위 절들은 해당 한계(예: Presenter close 이후의 경합, DB I/O dispatcher, bootstrap 실패 시 DEBUG never-ready)를 숨기지 않는 범위로만 서술한다.
+- 각 Task 리뷰에서 남긴 경미한 결함(deferred minor)은 수정하지 않았다. 남은 한계는 아래 [알려진 한계와 인계 단계](#알려진-한계와-인계-단계)에 단계별로 모았다.
+
+## 알려진 한계와 인계 단계
+
+> C2 최종 리뷰 시점의 미해결 경미 결함이다. 아래 항목은 **수정되지 않았다.** 해당 단계가 시작될 때 먼저 처리한다. 후속 단계 표는 [C2 계획의 후속 단계 인계](../../superpowers/plans/2026-10-07-client-c2-kmp-core.md#후속-단계-인계)에 있다.
+
+| 한계 | 담당 단계 |
+|--|--|
+| `pending()`이 ISO 텍스트로 정렬되어 같은 초 안에서 순서가 틀린다(`…:00.500Z`가 `…:00Z`보다 앞). C3가 순서에 의존하기 전에 정수 timestamp 컬럼으로 바꾼다(schema는 아직 v1이고 배포 데이터 없음) | C3 |
+| `accept`가 `item.clientSubmissionId == submissionId`를 확인하지 않는다 | C3 |
+| `saveSubmission`이 기존 key를 다른 URL로 다시 저장하면 조용히 덮어쓴다 | C3 (같은 key·같은 URL 가드) |
+| 첫 facade 호출이 호출 스레드(주로 main)에서 SQLite driver를 연다. RELEASE는 ITEM-03이 UNAVAILABLE인데도 `getItemRepository`용 DB를 연다 | C3/C4 |
+| Fake는 UUID를 소문자로 정규화하지만 cache·LocalStore는 호출자의 원본 ID를 쓴다(대문자 ID는 stale cache row를 남기고, Presenter는 refresh 때 표시 중인 item을 버린다) | C4 |
+| 계정이 바뀐 뒤 `retry()`가 이전 계정의 마지막 ID를 다시 요청한다(서버가 owner 범위라 누출은 없음) | C4 정책 결정 |
+| repository의 의도치 않은 `CancellationException`이 `loading=true`를 남긴다. `close()` 뒤 state는 마지막 값을 유지한다 | C4 |
+| DEBUG seed가 실패하면 runtime이 조용히 ready가 되지 않는다. bootstrap scope에 `CoroutineExceptionHandler`가 없다 | C3 |
+| 해독할 수 없는 cache row 하나가 그 item의 네트워크 GET을 막는다(계획대로의 동작) | C4에서 cache miss 처리 검토 |
+| Swift 테스트가 호스트 앱의 실제 `wishlist.db`를 공유한다 | 테스트 격리 후속 |
+| `ScriptedItemServer`가 UUID가 아닌 id에 404를 돌려주지만 서버·Fake는 400이다 | fixture를 다시 만질 때(C4) |
+| `changeAccount`가 공개 `MutableAuthSession`을 통해 Swift에서 보인다 | C3가 auth facade를 추가할 때 숨김 |
+| Swift enum 이름 `.theRelease`가 어색하고, `RemoteConfig`는 https·path prefix를 검사하지 않는다 | 다듬기(C4/C12) |
+
+참고: `ItemDetailPresenter`의 `CoroutineDispatcher` 생성자는 Android 단위 테스트가 쓰므로 Kotlin에서는 공개로 두며(`@HiddenFromObjC`는 생성자에 적용할 수 없다), Swift는 `SharedRuntime.itemDetailPresenter()`만 쓴다. C3 이후 필요하면 factory로 감싸 숨긴다. `data.fake` 계층과 `RuntimeDispatchers`는 `internal`이라 RELEASE `Shared.h`에 나오지 않는다.
