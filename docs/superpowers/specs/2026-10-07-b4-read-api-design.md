@@ -50,7 +50,7 @@ JDK 17에서 Kotlin/JVM Char.isWhitespace는 Character.isWhitespace || Character
 
 blank 식은 `value IS NULL OR btrim(value, :whitespace) = ''`다. 비공백 이름 visibility는 이 식의 부정이다. NBSP(U+00A0)·U+2007·U+202F·U+2028/2029는 blank, U+0085·U+200B는 nonblank다. Kotlin 테스트가 0..0xFFFF 모든 Char의 isWhitespace 결과와 상수 포함 여부를 대조해 집합을 고정한다. 저장 원문은 변경하지 않는다.
 
-category 누락은 `coalesce(category_id, custom_category_id::text)`에 같은 blank 식을 적용한다. 공용 텍스트만 보거나 custom UUID 연결을 누락하지 않는다. DB에 허용된 공백 category_id도 policy와 대조한다.
+category 누락은 `coalesce(category_id, custom_category_id::text)`에 같은 blank 식을 적용한다. 공용 텍스트만 보거나 custom UUID 연결을 누락하지 않는다. 공백 category_id는 V11 public FK가 저장을 막으므로, 제약을 해제하지 않고 SELECT-derived row의 SQL 표현으로 policy와 대조한다.
 
 ### 표시용 count와 삭제 영향의 경계
 
@@ -285,7 +285,7 @@ DB 제약을 통과하는 모든 조합을 batch insert하고 행마다 공통 S
 - category: 미지정(두 컬럼 null), 공용 leaf, 같은 owner의 custom UUID(3개). manualCompletion: null/저장 시각(2개).
 - 조합은 analysis 5 × review 4 × missingReason 5 × 이름 12 × category 3 × manualCompletion 2 = 7,200개 후보이다. 공용/custom 연결이 있으면 missingReason=null, categorySource=AI 또는 USER여야 하는 category_assignment_check 때문에 유효 조합은 3,360개다. 미지정은 모든 missingReason을 허용한다. category source는 연결 시 AI, 미지정 시 UNASSIGNED로 고정해 이 축에서 중복시키지 않는다.
 - lifecycle ACTIVE/ARCHIVED/DELETED를 확장하면 10,080개 valid row다. inactive SQL 결과는 requiredAction=NONE/group=null/visibility=false로 대조하며, 다른 owner는 별도 조회 격리 테스트로 확인한다.
-- 별도 경계 row는 공백만 있는 공용 category_id(배타/assignment 제약 충족), custom UUID가 있을 때 category 누락 아님, 이름의 U+0085 nonblank를 확인한다. FK가 있는 custom은 실제 같은 owner category fixture를 생성한다.
+- 별도 경계 row는 공백 category_id의 SQL 표현(저장 fixture가 아니라 SELECT-derived row; public FK 유지), custom UUID가 있을 때 category 누락 아님, 이름의 U+0085 nonblank를 확인한다. FK가 있는 custom은 실제 같은 owner category fixture를 생성한다.
 
 ## 검증과 문서
 
