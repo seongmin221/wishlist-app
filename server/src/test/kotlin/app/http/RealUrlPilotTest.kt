@@ -46,7 +46,7 @@ class RealUrlPilotTest {
             val catalog = TaxonomyCatalog.loadV1()
             val gateway = OpenAiResponsesGateway(OpenAiConfig("gpt-5.6-luna", key, allowLocalAlias = true))
             val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = "gpt-5.6-luna", allowLocalAlias = true),
-                { catalog.snapshot(catalog.categories.map { it.id }.toSet()) }, gateway::classify)
+                { _, _ -> catalog.snapshot(catalog.categories.map { it.id }.toSet()) }, gateway::classify)
             val transport = SafeHttpTransport()
             val httpTrace = mutableListOf<String>()
             val extractor = HttpMetadataExtractor(UrlSafetyPolicy(), { url, addresses ->

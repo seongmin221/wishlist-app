@@ -36,10 +36,15 @@ class WishlistItemRepository(private val dataSource: DataSource) {
     private fun find(connection: Connection, ownerId: UUID, keyColumn: String, key: UUID): WishlistItem? =
         connection.prepareStatement("""
             select id, owner_id, version, current_generation, analysis_status, review_status,
-                   lifecycle_status, product_name, category_id, category_missing_reason,
+                   lifecycle_status, product_name, coalesce(category_id,custom_category_id::text) category_id, category_missing_reason,
                    manual_completion_at, category_source, purpose_id, purpose_source,
                    name_source, image_source, user_override_fields, client_submission_id, source_url,
-                   product_image_url, analysis_failure_code, client_created_at, created_at, updated_at
+                   product_image_url, analysis_failure_code, client_created_at, created_at, updated_at,
+                   coalesce((select name from public_categories c where c.id=wishlist_items.category_id),
+                     (select name from custom_categories c where c.id=wishlist_items.custom_category_id and c.owner_id=wishlist_items.owner_id and c.deleted_at is null)) category_name,
+                   coalesce((select parent_id from public_categories c where c.id=wishlist_items.category_id),
+                     (select parent_id from custom_categories c where c.id=wishlist_items.custom_category_id and c.owner_id=wishlist_items.owner_id and c.deleted_at is null)) category_parent,
+                   case when custom_category_id is not null then 'CUSTOM' when category_id is not null then 'PUBLIC' end category_kind
             from wishlist_items where owner_id = ? and $keyColumn = ?
         """.trimIndent()).use { statement ->
             statement.setObject(1, ownerId)
@@ -82,6 +87,7 @@ class WishlistItemRepository(private val dataSource: DataSource) {
                     clientCreatedAt = rows.getObject("client_created_at", OffsetDateTime::class.java)?.toInstant(),
                     createdAt = rows.getTimestamp("created_at").toInstant(),
                     updatedAt = rows.getTimestamp("updated_at").toInstant(),
+                    categoryName=rows.getString("category_name"),categoryParentId=rows.getString("category_parent"),categoryKind=rows.getString("category_kind"),
                 )
             }
         }

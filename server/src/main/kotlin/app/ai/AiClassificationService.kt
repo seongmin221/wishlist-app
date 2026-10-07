@@ -14,13 +14,14 @@ import javax.sql.DataSource
 class AiClassificationService(
     dataSource: DataSource,
     private val budget: LlmBudgetService,
-    private val candidatesForJob: (UUID) -> CandidateSnapshot,
+    private val candidates: CategoryCandidateSupply,
     private val gateway: (String, CandidateSnapshot, () -> Unit) -> GatewayResponse,
 ) {
     private val pending = AnalysisPendingResultRepository(dataSource)
 
     fun classify(claim: AnalysisClaim, metadata: Metadata): ProcessingOutcome {
-        val candidates = pending.candidateSnapshot(claim, candidatesForJob) ?: return ProcessingOutcome.Stale
+        val candidates = pending.candidateSnapshotWithConnection(claim, candidates::snapshot)
+            ?: return if (pending.isCurrent(claim)) ProcessingOutcome.Partial else ProcessingOutcome.Stale
         val reservation = when (val result = budget.reserveBeforeCall(claim, UUID.randomUUID())) {
             is ReserveResult.Reserved -> result.reservation
             ReserveResult.Stale -> return ProcessingOutcome.Stale

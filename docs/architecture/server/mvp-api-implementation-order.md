@@ -108,6 +108,16 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 
 ## B2 — 카테고리 기본 관리
 
+**현재 상태(2026-10-07):** develop `00577226`에서 별도 Orca worktree로 수신했다.
+[확정 계약](category-management-api.md)과 [작업별 계획](../../superpowers/plans/2026-10-07-b2-category-management.md)을 준비했다.
+생성 key는 계정 데이터 유지 동안 보존, 미확정 stale 실행만 예산 승계 재예약, 신규 생성은 owner별 60초 5건으로 확정했다.
+CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement를 구현·독립 리뷰했다.
+최초 B2 단독 전체는245개 중244 통과였으며, [후속 리뷰 보완](../../history/architecture/server/b2-review-followup-2026-10-07.md) 후 최종 단독 전체는252개 중251 통과·실패/오류0·RealUrlPilot1 skip이다.
+[구현·리뷰 이력](../../history/architecture/server/b2-category-implementation-2026-10-07.md)을 따른다.
+새 공간의 직접 baseline은 전체 `--rerun-tasks` 203개 중 202 통과·실패/오류 0·RealUrlPilot 1 skip이다.
+입력 기반 리뷰 보완 후 단독 전체 실행은 214개 중 213 통과·실패/오류 0·RealUrlPilot 1 skip이다.
+[수신·검증 기록](../../history/architecture/server/b2-category-foundation-2026-10-07.md)을 따른다.
+
 **산출물:** 공용/사용자 category 선택, 사용자 category 생성·상세·편집.
 
 **내부 순서:** taxonomy SELECT/BROWSE와 count 조회 → custom 테이블·생성 → 상세 → 편집. 사용자 category owner·고정 parent·normalized 이름·20개 제한을 DB transaction에서 검증한다. 아직 삭제 API는 공개하지 않는다.

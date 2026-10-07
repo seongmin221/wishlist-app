@@ -22,8 +22,8 @@ class AiClassificationServiceTest {
     @Test fun `missing flight callback with usage cannot store a free classification`() = withAnalysisDatabase { source ->
         val claim = newAnalysisClaim(source)
         val budget = LlmBudgetService(source)
-        val classifier = AiClassificationService(source, budget, { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
-            { _, _, _ -> GatewayResponse(ClassificationResult.Assigned("CAT_HOME", null), 500, 20) })
+        val classifier = AiClassificationService(source, budget, { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
+            { _, _, _ -> GatewayResponse(ClassificationResult.Assigned("C026", null), 500, 20) })
         kotlin.test.assertFailsWith<IllegalStateException> { classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")) }
         assertEquals("SETTLED", analysisScalar(source, "select state from llm_budget_reservations"))
         assertEquals(496L, budget.windowTotals("DAILY").settled)
@@ -48,7 +48,7 @@ class AiClassificationServiceTest {
             }
         }
         val budget = LlmBudgetService(observed)
-        val classifier = AiClassificationService(source, budget, { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+        val classifier = AiClassificationService(source, budget, { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
             { _, _, beforeSend -> beforeSend(); error("send must not occur") })
         val caught = kotlin.test.assertFailsWith<java.sql.SQLException> { classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")) }
         kotlin.test.assertSame(original, caught)
@@ -75,7 +75,7 @@ class AiClassificationServiceTest {
         server.start()
         try {
             val gateway = OpenAiResponsesGateway(OpenAiConfig("test-snapshot", "secret"), baseUri = java.net.URI("http://127.0.0.1:${server.address.port}/v1"))
-            val classifier = AiClassificationService(source, budget, { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+            val classifier = AiClassificationService(source, budget, { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
                 { text, candidates, beforeSend -> gateway.classify(text, candidates) {
                     beforeSend(); enteredFlight = true
                     while (!WorkerExecution.expired()) Thread.yield()
@@ -117,7 +117,7 @@ class AiClassificationServiceTest {
             val gateway = OpenAiResponsesGateway(OpenAiConfig("test-snapshot", "secret"),
                 baseUri = java.net.URI("http://127.0.0.1:${server.address.port}/v1"))
             val classifier = AiClassificationService(source, budget,
-                { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) }, gateway::classify)
+                { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) }, gateway::classify)
             assertEquals(ProcessingOutcome.Partial, classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")))
             assertEquals("RESERVED", duringPreflight)
             assertEquals(0, responses)
@@ -132,7 +132,7 @@ class AiClassificationServiceTest {
         val budget = LlmBudgetService(source)
         val gateway = OpenAiResponsesGateway(OpenAiConfig("test-snapshot", "secret"))
         val classifier = AiClassificationService(source, budget,
-            { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+            { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
             { text, candidates, beforeSend ->
                 Thread.currentThread().interrupt()
                 try { gateway.classify(text, candidates, beforeSend) } finally { Thread.interrupted() }
@@ -148,12 +148,12 @@ class AiClassificationServiceTest {
         assertEquals(0L, budget.windowTotals("DAILY").settled)
     }
     @Test fun `stale model results preserve pending data while settling actual usage`() = withAnalysisDatabase { source ->
-        for (classification in listOf(ClassificationResult.Assigned("CAT_HOME", null), ClassificationResult.Abstained,
+        for (classification in listOf(ClassificationResult.Assigned("C026", null), ClassificationResult.Abstained,
             ClassificationResult.Unusable("bad"), ClassificationResult.Terminal("configuration"), ClassificationResult.Retryable)) {
             val claim = newAnalysisClaim(source)
             var expected: String? = null
             val outcome = pausedAnalysisCall({ pause ->
-                AiClassificationService(source, LlmBudgetService(source), { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+                AiClassificationService(source, LlmBudgetService(source), { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
                     { _, _, beforeSend -> beforeSend(); pause(); GatewayResponse(classification, 500, 20) }).classify(claim, Metadata("Lamp", null, null, "https://example.com/item"))
             }, {
                 analysisSql(source, "update wishlist_items set version=version+1 where id='${claim.itemId}'")
@@ -168,12 +168,12 @@ class AiClassificationServiceTest {
     }
 
     @Test fun `stale response without usage retains maximum and reconciliation accounting`() = withAnalysisDatabase { source ->
-        for (classification in listOf(ClassificationResult.Assigned("CAT_HOME", null), ClassificationResult.Retryable)) {
+        for (classification in listOf(ClassificationResult.Assigned("C026", null), ClassificationResult.Retryable)) {
             val claim = newAnalysisClaim(source)
             val budget = LlmBudgetService(source)
             var expected: String? = null
             val outcome = pausedAnalysisCall({ pause ->
-                AiClassificationService(source, budget, { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+                AiClassificationService(source, budget, { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
                     { _, _, beforeSend -> beforeSend(); pause(); GatewayResponse(classification, null, null) }).classify(claim, Metadata("Lamp", null, null, "https://example.com/item"))
             }, {
                 analysisSql(source, "update analysis_jobs set execution_token='${UUID.randomUUID()}' where id='${claim.jobId}'")
@@ -197,10 +197,10 @@ class AiClassificationServiceTest {
         val before = pendingSnapshot(source, claim)
         val pending = AnalysisPendingResultRepository(source)
         kotlin.test.assertFalse(pending.saveMetadata(claim, Metadata("stale", null, null, "https://example.com/item")))
-        kotlin.test.assertFalse(pending.saveAssignment(claim, ClassificationResult.Assigned("CAT_HOME", null)))
+        kotlin.test.assertFalse(pending.saveAssignment(claim, ClassificationResult.Assigned("C026", null)))
         kotlin.test.assertFalse(pending.saveFailure(claim, app.wishlist.AnalysisFailureCode.AI_ABSTAINED))
-        assertNull(pending.candidateSnapshot(claim) { error("stale provider must not run") })
-        val classifier = AiClassificationService(source, LlmBudgetService(source), { error("candidate supply must not run") }, { _, _, _ -> error("gateway must not run") })
+        assertNull(pending.candidateSnapshotWithConnection(claim) { _, _ -> error("stale provider must not run") })
+        val classifier = AiClassificationService(source, LlmBudgetService(source), { _, _ -> error("candidate supply must not run") }, { _, _, _ -> error("gateway must not run") })
         assertEquals(ProcessingOutcome.Stale, classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")))
         assertEquals(before, pendingSnapshot(source, claim))
         assertEquals("0", analysisScalar(source, "select count(*) from llm_budget_reservations"))
@@ -208,21 +208,21 @@ class AiClassificationServiceTest {
 
     @Test fun `extraction is not ready until classification succeeds`() = withJob { source, jobId ->
         val classifier = AiClassificationService(source, LlmBudgetService(source),
-            { CandidateSnapshot(setOf("CAT_HOME"), setOf("PUR_GIFT")) },
-            { _, _, beforeSend -> beforeSend(); GatewayResponse(ClassificationResult.Assigned("CAT_HOME", "PUR_GIFT"), 500, 20) })
+            { _, _ -> CandidateSnapshot(setOf("C026"), setOf("PUR_GIFT")) },
+            { _, _, beforeSend -> beforeSend(); GatewayResponse(ClassificationResult.Assigned("C026", "PUR_GIFT"), 500, 20) })
         val processor = GeneralExtractionProcessor(source,
             { ExtractionResult.Complete(Metadata("Lamp", null, null, "https://example.com/item")) },
             classifier::classify)
 
         assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
         source.connection.use { c -> c.createStatement().executeQuery("select analysis_status,predicted_category_id,predicted_purpose_id from wishlist_items").use { r ->
-            r.next(); assertEquals("READY", r.getString(1)); assertEquals("CAT_HOME", r.getString(2)); assertEquals("PUR_GIFT", r.getString(3))
+            r.next(); assertEquals("READY", r.getString(1)); assertEquals("C026", r.getString(2)); assertEquals("PUR_GIFT", r.getString(3))
         } }
     }
 
     @Test fun `invalid classification leaves extracted item partial`() = withJob { source, jobId ->
         val classifier = AiClassificationService(source, LlmBudgetService(source),
-            { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+            { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
             { _, _, beforeSend -> beforeSend(); GatewayResponse(ClassificationResult.Unusable("invalid_candidate_id_or_status"), 500, 20) })
         val processor = GeneralExtractionProcessor(source,
             { ExtractionResult.Complete(Metadata("Lamp", null, null, "https://example.com/item")) },
@@ -235,7 +235,7 @@ class AiClassificationServiceTest {
 
     @Test fun `budget refusal makes item partial without calling model`() = withJob { source, jobId ->
         val classifier = AiClassificationService(source, LlmBudgetService(source, dailyCeilingMicrousd = 1),
-            { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
+            { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
             { _, _, _ -> error("model must not be called") })
         val processor = GeneralExtractionProcessor(source,
             { ExtractionResult.Complete(Metadata("Lamp", null, null, "https://example.com/item")) },
@@ -249,8 +249,8 @@ class AiClassificationServiceTest {
     @Test fun `classification result remains provisional until worker commits terminal state`() = withJob { source, jobId ->
         val claim = claimJob(source, jobId)
         val classifier = AiClassificationService(source, LlmBudgetService(source),
-            { CandidateSnapshot(setOf("CAT_HOME"), emptySet()) },
-            { _, _, beforeSend -> beforeSend(); GatewayResponse(ClassificationResult.Assigned("CAT_HOME", null), 500, 20) })
+            { _, _ -> CandidateSnapshot(setOf("C026"), emptySet()) },
+            { _, _, beforeSend -> beforeSend(); GatewayResponse(ClassificationResult.Assigned("C026", null), 500, 20) })
         assertEquals(ProcessingOutcome.Complete, classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")))
         source.connection.use { c -> c.createStatement().executeQuery("select predicted_category_id,analysis_status from wishlist_items").use { r ->
             r.next(); assertEquals(null,r.getString(1)); assertEquals("PROCESSING",r.getString(2))
@@ -259,14 +259,14 @@ class AiClassificationServiceTest {
 
     @Test fun `retry uses sealed candidate snapshot even when provider changes`() = withJob { source, jobId ->
         var claim = claimJob(source, jobId)
-        var current = CandidateSnapshot(setOf("CAT_FIRST"), emptySet())
+        var current = CandidateSnapshot(setOf("C001"), emptySet())
         var response = GatewayResponse(ClassificationResult.Retryable, null, null)
-        val classifier = AiClassificationService(source, LlmBudgetService(source), { current }, { _, _, beforeSend -> beforeSend(); response })
+        val classifier = AiClassificationService(source, LlmBudgetService(source), { _, _ -> current }, { _, _, beforeSend -> beforeSend(); response })
         assertEquals(ProcessingOutcome.Retryable, classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")))
         analysisSql(source, "update analysis_jobs set stage='GENERAL_PENDING' where id='$jobId'")
         claim = claimJob(source, jobId)
-        current = CandidateSnapshot(setOf("CAT_SECOND"), emptySet())
-        response = GatewayResponse(ClassificationResult.Assigned("CAT_FIRST", null), 500, 20)
+        current = CandidateSnapshot(setOf("C002"), emptySet())
+        response = GatewayResponse(ClassificationResult.Assigned("C001", null), 500, 20)
         assertEquals(ProcessingOutcome.Complete, classifier.classify(claim, Metadata("Lamp", null, null, "https://example.com/item")))
     }
 
@@ -274,7 +274,7 @@ class AiClassificationServiceTest {
         val claim = claimJob(source, jobId)
         var first = true
         val classifier = AiClassificationService(source,LlmBudgetService(source),
-            { CandidateSnapshot(setOf("C026"),emptySet(),mapOf("C026" to "디지털·IT > 헤드폰")) },
+            { _, _ -> CandidateSnapshot(setOf("C026"),emptySet(),mapOf("C026" to "디지털·IT > 헤드폰")) },
             { _, snapshot, beforeSend ->
                 beforeSend()
                 if (first) { first=false; GatewayResponse(ClassificationResult.Retryable,null,null) }

@@ -11,6 +11,11 @@
 | 상품 상태·허용 행동·공통 DTO·공개 오류 계약 | [wishlist-item-state-api.md](../wishlist-item-state-api.md) |
 | 상품 상태·claim·중간/최종 쓰기 보호·lease 복구·AI 예산 경계 | [wishlist-state-persistence.md](wishlist-state-persistence.md) |
 | B1 생성·재전송·상세 projection·공유 시각·공개 실패·지정 event 발행 | [wishlist-item-read-api.md](wishlist-item-read-api.md) |
+| CAT-01~04 클라이언트 계약·요청/응답 예시·오류 | [category-management-api.md](category-management-api.md) |
+| 카테고리 AI 후보·snapshot·stale·토큰 단계 | [category-ai-candidates.md](category-ai-candidates.md) |
+| B2 새 worktree baseline·입력 기반·리뷰·검증 경계 | [B2 준비 기록](../../history/architecture/server/b2-category-foundation-2026-10-07.md) |
+| B2 후속 리뷰·공용 fallback·V12·후보 구조 정리 | [후속 리뷰 기록](../../history/architecture/server/b2-review-followup-2026-10-07.md) |
+| B2 구현·제품 답변·회귀·리뷰 보완 | [B2 구현 기록](../../history/architecture/server/b2-category-implementation-2026-10-07.md) |
 | B1 구현·TDD·migration/경합·전체 회귀 결과 | [B1 구현 기록](../../history/architecture/server/b1-item-read-and-create-2026-10-06.md) |
 | B1 리뷰의 생성 snapshot·의존성·입력 경계·실패 enum 보완 | [B1 리뷰 기록](../../history/architecture/server/b1-review-boundaries-2026-10-06.md) |
 | 요청 IO·역할별 DB pool·client 재사용·종료 gate | [runtime-resources.md](runtime-resources.md) |

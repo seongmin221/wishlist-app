@@ -56,6 +56,7 @@ class AnalysisJobReconciler(
     }
 
     private fun recoverLocked(connection: Connection, candidate: Candidate): Boolean {
+        if(!connection.lockAnalysisOwner(candidate.itemId,skipLocked=true)) return false
         val item = connection.lockAnalysisItem(candidate.itemId, skipLocked = true) ?: return false
         val job = connection.lockAnalysisJob(candidate.id, skipLocked = true) ?: return false
         if (job.itemId != candidate.itemId || job.generation != candidate.generation || job.stage != candidate.stage ||

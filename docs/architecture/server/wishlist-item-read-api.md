@@ -39,3 +39,7 @@ V10은 `client_created_at timestamptz`만 추가하고 기존 행은 null로 유
 B0의 production createTask RPC 5초 상한과 batch 발행 메서드를 유지한다. B5의 Scheduler·장기 PENDING 복구·batch의 후보별 시간/실패 격리·generation 전체 retry 예산은 후속 범위다.
 
 Scheduler가 있는 상태의 비동기 발행 전환과 API/Worker body 크기 제한은 운영 정책·설정 범위의 후속 검토 항목이다. 이번 리뷰 보완은 fire-and-forget 작업이나 임의 body 상한을 추가하지 않는다.
+
+## B2 category 표시 확장
+
+생성 snapshot·owner GET·replay는 같은 mapper를 유지한다. category에 nullable name/parentId/kind를 추가하며 공용 C-ID와 custom UUID를 하나의 id로 표시한다. custom 이름은 owner 조건의 현재 row에서 읽으므로 편집 뒤 활성 item GET에 반영되며 item version·연결·review를 초기화하지 않는다. category 자원 관리 계약은 [B2 계약](category-management-api.md)을 따른다.

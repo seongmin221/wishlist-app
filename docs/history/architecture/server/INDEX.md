@@ -1,5 +1,11 @@
 # Server 의사결정
 
+- [B2 후속 리뷰 보완](b2-review-followup-2026-10-07.md) — 공용 fallback·확정 상태·FAILED stage·V12·후보 타입/codec·API 문서 분리
+
+- [B2 카테고리 구현·리뷰](b2-category-implementation-2026-10-07.md) — CAT-01~04·V11·AI owner/stale 보호·피드백 보완·전체 검증
+
+- [B2 작업 수신·카테고리 입력 기반](b2-category-foundation-2026-10-07.md) — 독립 worktree baseline·입력/parent registry·후속 정책 확정
+
 ## 초기 결정
 
 - **확정**: 상품 저장 API는 비동기 분석 완료를 기다리지 않고 `PROCESSING` 상태를 즉시 응답한다.

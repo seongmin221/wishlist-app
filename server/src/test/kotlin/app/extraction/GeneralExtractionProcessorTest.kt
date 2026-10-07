@@ -51,7 +51,7 @@ class GeneralExtractionProcessorTest {
             val processor = GeneralExtractionProcessor(source,
                 { url -> ExtractionResult.Complete(Metadata("A product", "Description", null, url)) },
                 { id, _ ->
-                    source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
+                    source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='C026' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
                     app.analysis.ProcessingOutcome.Complete
                 })
 

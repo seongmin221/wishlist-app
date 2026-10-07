@@ -1,5 +1,6 @@
 package app.analysis
 
+import app.ai.CandidateSnapshotCodec
 import app.ai.CandidateSnapshot
 import app.ai.ClassificationResult
 import app.extraction.Metadata
@@ -7,7 +8,6 @@ import app.wishlist.AnalysisFailureCode
 import java.sql.Connection
 import java.util.UUID
 import javax.sql.DataSource
-import kotlinx.serialization.json.*
 
 class AnalysisPendingResultRepository(private val dataSource: DataSource) {
     fun isCurrent(claim: AnalysisClaim): Boolean = guarded(claim) { true } ?: false
@@ -42,29 +42,18 @@ class AnalysisPendingResultRepository(private val dataSource: DataSource) {
     } ?: false
 
     /** supply may read local/DB candidates only; no remote call while row locks are held. */
-    fun candidateSnapshot(claim: AnalysisClaim, supply: (UUID) -> CandidateSnapshot): CandidateSnapshot? = guarded(claim) { c ->
-        val existing = c.prepareStatement("select candidate_snapshot_json from analysis_jobs where id=?").use { s ->
-            s.setObject(1, claim.jobId); s.executeQuery().use { r -> check(r.next()); r.getString(1) }
-        }
-        if (existing != null) {
-            val json = Json.parseToJsonElement(existing).jsonObject
-            CandidateSnapshot(
-                json.getValue("categories").jsonArray.map { it.jsonPrimitive.content }.toSet(),
-                json.getValue("purposes").jsonArray.map { it.jsonPrimitive.content }.toSet(),
-                json["category_labels"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content }.orEmpty(),
-                json["purpose_labels"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content }.orEmpty(),
-            )
+    fun candidateSnapshotWithConnection(claim:AnalysisClaim,supply:(Connection,AnalysisClaim)->CandidateSnapshot):CandidateSnapshot? = guarded(claim) { c ->
+        snapshotLocked(c,claim) { supply(c,claim) }
+    }
+
+    private fun snapshotLocked(c:Connection,claim:AnalysisClaim,supply:()->CandidateSnapshot):CandidateSnapshot? {
+        val stored = CategoryCandidateGuard.read(c, claim)
+        return if (stored.hasSnapshot) {
+            if (CategoryCandidateGuard.valid(c, claim, stored)) stored.snapshot else null
         } else {
-            val fresh = supply(claim.jobId)
-            require(fresh.categoryIds.isNotEmpty() && fresh.purposeIds.size <= 10)
-            require(fresh.categoryLabels.keys.all { it in fresh.categoryIds })
-            require(fresh.purposeLabels.keys.all { it in fresh.purposeIds })
-            val json = JsonObject(mapOf(
-                "categories" to JsonArray(fresh.categoryIds.sorted().map(::JsonPrimitive)),
-                "purposes" to JsonArray(fresh.purposeIds.sorted().map(::JsonPrimitive)),
-                "category_labels" to JsonObject(fresh.categoryLabels.mapValues { JsonPrimitive(it.value) }),
-                "purpose_labels" to JsonObject(fresh.purposeLabels.mapValues { JsonPrimitive(it.value) }),
-            )).toString()
+            val fresh = supply().copy(ownerId = claim.ownerId.toString())
+            val json = CandidateSnapshotCodec.encode(fresh)
+            requireNotNull(CandidateSnapshotCodec.decode(json)) { "Invalid candidate snapshot" }
             // Local candidate work can still consume time: check the lease again before storing.
             if (!AnalysisWriteGuard.lockCurrent(c, claim)) null else {
                 c.prepareStatement("update analysis_jobs set candidate_snapshot_json=? where id=?").use { s ->

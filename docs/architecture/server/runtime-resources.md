@@ -51,10 +51,14 @@ fetch는 call을 lock 아래 등록한 뒤 외부 IO를 수행한다. close는 �
 
 `AnalysisTiming`의 처리 80초 < Worker 응답 90초 < Cloud Tasks dispatch 105초 < DB lease 120초를 테스트로 고정한다. WorkerExecution은 claim·처리·finish를 bounded executor에서 실행하고 queue 대기까지 포함해 90초가 지나면 요청에 RETRY를 반환하고 작업 interrupt를 시도한다. redirect HTTP·token 계산·LLM·browser launch/navigation은 같은 단조 시계의 남은 80초 예산을 사용한다. 처리 예산을 넘긴 결과는 성공으로 반영하지 않고 guarded retry로 전환한다.
 
-executor queue에서 꺼낼 때와 양 lane의 claim 전에 남은 예산을 확인한다. 이미 마감된 전달은 RETRY만 반환하고 DB claim·attempt·outbox를 변경하지 않는다. claim의 pool/item/job 잠금 대기로 마감될 수도 있으므로 두 잠금과 DB 시각을 얻은 뒤, 한도 실패 또는 attempt 증가 전에 다시 확인해 transaction을 rollback한다. SDK의 밀리초 timeout으로 변환하기 전 1ms 미만이면 마감 예외를 던져 무제한 timeout 0을 만들지 않는다.
+executor queue에서 꺼낼 때와 양 lane의 claim 전에 남은 예산을 확인한다. 이미 마감된 전달은 RETRY만 반환하고 DB claim·attempt·outbox를 변경하지 않는다. claim의 pool/owner/item/job 잠금 대기로 마감될 수도 있으므로 owner/item/job 잠금과 DB 시각을 얻은 뒤, 한도 실패 또는 attempt 증가 전에 다시 확인해 transaction을 rollback한다. SDK의 밀리초 timeout으로 변환하기 전 1ms 미만이면 마감 예외를 던져 무제한 timeout 0을 만들지 않는다.
 
 유료 LLM timeout은 예산 markInFlight의 DB 작업이 끝난 뒤 계산한다. 이 지점에서 마감됐으면 미전송임을 명시하고 예약을 해제한다. 실제 client.send에 들어간 이후의 timeout/통신 오류는 사용량 불명확 비용 정산 정책을 따른다.
 
 JVM interrupt가 모든 JDBC/SDK 호출을 즉시 멈추는 것은 아니다. 반환하지 않는 작업은 executor의 제한된 slot을 계속 사용하되 요청 응답은 기다리지 않는다. 늦게 끝난 retry는 PENDING+새 outbox를 원자 저장하고, 끝나지 않은 RUNNING은 120초 lease로 복구한다. 사용량이 도착한 실제 AI 비용 정산은 stale 결과 폐기와 별도로 유지한다. lease heartbeat를 추가하지 않는다.
 
 예상치 못한 API 오류는 requestId·예외 타입·발생 stack frame을 ERROR로 기록한다. 예외 메시지에는 SQL/credential/사용자 입력이 포함될 수 있어 로그와 공개 응답에 넣지 않는다. Ktor 요청 오류(400/404/413/415)는 안전한 4xx envelope로 반환하며 취소는 재전파한다.
+
+## B2 category 후보 공급
+
+Worker의 custom 후보는 잠금 transaction의 동일 connection으로 읽는다. candidate snapshot 저장 후 connection을 반환한 다음 gateway를 호출한다. max pool 1에서도 category 편집과 외부 AI 호출이 서로 DB connection을 기다리지 않는 회귀를 유지한다. 입력 토큰 preflight의 최대 네 단계는 기존 Worker 처리 시간과 2,000/80 비용 상한을 공유한다. custom 축약 후 초과 시 그 호출만 공용 taxonomy로 분류한다. B5 Scheduler/browser runtime 조립은 추가하지 않았다.

@@ -50,6 +50,9 @@ data class CategoryDto(
     val id: String? = null,
     val source: ValueSource? = null,
     val missingReason: CategoryMissingReason? = null,
+    val name: String? = null,
+    val parentId: String? = null,
+    val kind: String? = null,
 )
 
 @Serializable
