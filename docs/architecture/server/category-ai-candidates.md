@@ -51,7 +51,7 @@ AI 요청의 developer 메시지에는 고정 지시문만 넣는다. user 메�
 | stale 재예약의 일반 실행 예산이 소진됨 | job FAILED, item FAILED_RETRYABLE; 새 job/outbox 없음 |
 | 후보 stale로 Partial 또는 Complete를 반환했고 CONFIRMED/DEFERRED 또는 USER/override category가 있음 | AI assignment를 버리고 기존 category 기준 READY/PARTIAL 계산; 연결·review 유지 |
 | 유효한 AI 결과가 기존 확정 category·purpose와 다름 | 기존 연결 유지 |
-| 목적이 null·UNASSIGNED이며 사용자 해제/override가 없음 | 기존 B0 계약대로 신규 AI 목적 연결 허용; 확정/보류 review 값 유지 |
+| 목적 결과 | B3부터 [AI 목적 후보](purpose-ai-candidates.md)의 판단/판단 없음 규칙을 따른다. CONFIRMED/DEFERRED·USER·override 상품의 빈 목적은 채우지 않는다 |
 | generation/token/lease/lifecycle 또는 실행 identity가 바뀜 | 기존 Worker guard를 따라 반영 차단 |
 
 replacement는 일반·browser 시도 횟수와 최초 시각을 승계한다. 일반 실행 최대 3회 또는
@@ -61,7 +61,7 @@ replacement는 일반·browser 시도 횟수와 최초 시각을 승계한다. �
 
 ## 토큰 단계와 공용 fallback
 
-유료 입력 2,000·출력 80 토큰 상한과 가격표는 유지한다. B3 구현부터 입력 상한은 2,500이며 목적 후보를 포함한 단계는 [B3 설계](../../superpowers/specs/2026-10-07-b3-purpose-management-design.md#토큰-단계와-최악-크기)를 따른다. custom 단계의 순서와 의미는 바뀌지 않는다. custom의 가용 예산은 공용 후보,
+유료 입력 상한은 B3부터 2,500(B2 당시 2,000)·출력 80 토큰이며 가격표는 유지한다. 목적 후보를 포함한 단계는 [B3 설계](../../superpowers/specs/2026-10-07-b3-purpose-management-design.md#토큰-단계와-최악-크기)를 따른다. custom 단계의 순서와 의미는 바뀌지 않는다. custom의 가용 예산은 공용 후보,
 상품, 출력 schema를 포함한 입력의 실측 2,000 토큰에서 남은 공간이다.
 각 단계는 token-count endpoint에서 같은 요청 형태를 검사한다. 단계를 통과한 요청만
 유료 호출을 한 번 보내고, 실제 전송한 후보 ID로 응답을 검증한다.

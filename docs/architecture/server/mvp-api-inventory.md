@@ -32,7 +32,7 @@
 
 | 종류 | 수 | 현재 상태 |
 | --- | ---: | --- |
-| 앱 서버 제품 API 동작 | **37** | B1 상품 생성·상세 2개 route 연결, 나머지 35개 route 없음. 목적 삭제 영향·표시 metadata 등 후속 확장은 각 묶음에서 완료 |
+| 앱 서버 제품 API 동작 | **37** | B1 상품 생성·상세 2개, B2 category 4개, B3 목적 4개 route 연결, 나머지 27개 route 없음. 목적 삭제 영향·표시 metadata 등 후속 확장은 각 묶음에서 완료 |
 | 내부 작업 HTTP 동작 | **3** | 일반 Worker 연결, browser는 조건부 route/service만 있고 runtime 연결 없음, maintenance 신규 제안 |
 | 공통 health HTTP 동작 | **1** | `/health` 구현 |
 | 와이어프레임 | **43** | 아래 W01~W43 모두 API 또는 기기/외부 서비스 책임에 연결 |
@@ -94,14 +94,14 @@ CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 
 
 ## 앱 서버 API — 목적 8개
 
-B3 PUR-01~04의 제품 정책과 계약은 [B3 설계](../../superpowers/specs/2026-10-07-b3-purpose-management-design.md)와 [제품 결정](../../history/product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md)에서 확정했다. 구현 상태는 route 연결 후 갱신한다.
+B3 PUR-01~04와 owner별 AI 목적 후보·반영 보호를 구현했다. [확정 계약](purpose-management-api.md)과 [AI 목적 후보](purpose-ai-candidates.md)를 따르며, 정책 경위는 [제품 결정](../../history/product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md)에 있다.
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| PUR-01 | `GET /v1/purposes` | 목적 탭, 상품/검토의 목적 선택 시트, 빈 목적 표시 · S3/S7 | cursor/limit, 요약/선택용 projection | ID·이름·설명·colorKey/iconKey·후보 수·최근 활동 시각·미리보기·version, archive 입구 count/요약 | 없음 |
-| PUR-02 | `POST /v1/purposes` | 목적 탭·상품·검토에서 새 목적 만들기 · S3 | 필수 이름/colorKey/iconKey, 선택 설명, Idempotency-Key | 빈 ACTIVE purpose와 ID·version. 기존 상품 전체 자동 재판단 없음 | 없음 |
-| PUR-03 | `GET /v1/purposes/{id}` | 목적 상세·빈 목적·편집 초기값 · S3/S7 | purpose ID | 목적 정보·후보 count·membershipVersion·allowedActions·version. 후보 0이면 archive 불가 | 없음 |
-| PUR-04 | `PATCH /v1/purposes/{id}` | 이름·설명·색·아이콘을 한 번에 저장 · S3/S7 | expectedVersion, 변경 필드 | 새 purpose·version·표시값. 관련 미확정 AI 결과의 재판단은 서버 내부 정책으로 처리 | 없음 |
+| PUR-01 | `GET /v1/purposes` | 목적 탭, 상품/검토의 목적 선택 시트, 빈 목적 표시 · S3/S7 | cursor/limit, 요약/선택용 projection | ID·이름·설명·colorKey/iconKey·후보 수·최근 활동 시각·미리보기·version, archive 입구 count/요약 | **구현(B3)**: SUMMARY/SELECT·활동순 keyset cursor·미리보기4·archiveSummary(현재 0) |
+| PUR-02 | `POST /v1/purposes` | 목적 탭·상품·검토에서 새 목적 만들기 · S3 | 필수 이름/colorKey/iconKey, 선택 설명, Idempotency-Key | 빈 ACTIVE purpose와 ID·version. 기존 상품 전체 자동 재판단 없음 | **구현(B3)**: owner 잠금·receipt replay·60초10건·ACTIVE30·job 없음 |
+| PUR-03 | `GET /v1/purposes/{id}` | 목적 상세·빈 목적·편집 초기값 · S3/S7 | purpose ID | 목적 정보·후보 count·membershipVersion·allowedActions·version. 후보 0이면 archive 불가 | **구현(B3)**: owner 상세·후보 수·membershipVersion·allowedActions(ARCHIVE는 후보≥1) |
+| PUR-04 | `PATCH /v1/purposes/{id}` | 이름·설명·색·아이콘을 한 번에 저장 · S3/S7 | expectedVersion, 변경 필드 | 새 purpose·version·표시값. 관련 미확정 AI 결과의 재판단은 서버 내부 정책으로 처리 | **구현(B3)**: expectedVersion·no-op·optional null·AI 재판단 없음 |
 | PUR-05 | `GET /v1/purposes/{id}/deletion-impact` | 목적 삭제 확인·목적 미지정이 될 후보 펼침 · S3 | cursor/limit | 영향 count·item 요약·cursor·purpose version·impactToken, 상품 유지·archive 비영향 | 없음 |
 | PUR-06 | `DELETE /v1/purposes/{id}` | 목적만 삭제·상품 purpose 해제 · S3 | purpose version·impactToken | 상품 유지·사용자가 확정한 목적 미지정, 관련 version 갱신. 빈 목적도 허용 | 없음 |
 | PUR-07 | `GET /v1/purposes/{id}/candidate-items` | 후보 추가 시트, 전체/상위/세부 category 필터 · S3/S7 | categoryId 또는 parentId, cursor/limit, includeCategoryFacets | 현재 목적 소속 제외한 선택 가능 item·현재 다른 목적·이동 안내·version·cursor. facets는 **전체 추가 가능 pool**의 category별 count, 현재 필터/page로 제한하지 않음 | 없음 |

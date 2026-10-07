@@ -9,3 +9,4 @@
 - [AI 분류 출시 전 모의고사 문제집은 왜 나누는가](QA-AI-005-llm-release-test-set.md)
 - [AI 분류 후보를 모두 보낼 수 없는 이유는 무엇인가](QA-AI-006-taxonomy-input-budget-and-purpose-data.md)
 - [OpenAI API 키는 어디에 저장하는가](QA-AI-007-openai-api-key-storage.md)
+- [입력 상한을 올리면 목적 근거 축소 문제가 해결되는가](QA-AI-008-input-cap-and-tier-order.md)
