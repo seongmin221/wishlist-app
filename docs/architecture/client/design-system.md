@@ -55,11 +55,34 @@ client/tools/design-tokens.json          (색·모서리·간격·목적 색) �
 | `WLCard`, `WLIconTile`, `WLChip`, `WLAddChip` | 카드 면, 아이콘 타일, 칩, 점선 추가 칩 |
 | `WLInput`, `WLUnderlineField` | 라벨·안내가 있는 입력칸, 밑줄 편집 칸 |
 | `PriceText`(`formatPrice`), `PurposeDot`(`WLPurposeColor`) | 가격, 목적 색 점 |
-| `EmptyState`, `ExpandableGroup`(`WLChevron`), `Masonry2Col` | 빈 상태, 접고 펴는 묶음, 2열 엇갈림 배치 |
+| `EmptyState`, `ExpandableGroup`(`WLChevron`), `Masonry2Col`(`verticalGap`) | 빈 상태(시트 위에서는 타일이 `sheetField`), 접고 펴는 묶음, 2열 엇갈림 배치(열 간격과 세로 간격을 따로 줄 수 있음) |
+| `WLTopBar`(`WLTopBarMetrics`) | 하위 화면 위쪽 바(뒤로·제목·⋯). 아래 "위쪽 바" 절 |
+| `WLHeaderSheet`(`WLHeaderSheetState`, `WLSheetDetent`) | 고정된 위 면 + 끌어 올리는 목록 시트(목적 상세·아카이브 상세). 아래 "머리 시트" 절 |
 
 iOS에는 Android `.copy(...)`에 해당하는 `WLTextStyle.resized`와 파생 스타일 `buttonMedium`·`bodyBold`·`buttonRegular`가 더 있다.
 
 `WLInput.maxLength`는 UTF-16 길이가 아닌 grapheme 수다. 한도 초과 붙여넣기는 앞쪽 허용 길이를 남긴다. 한글 IME의 marked/composition 범위가 있으면 편집을 보존하고 확정 후 제한한다. Android는 단일 `TextFieldState`를 받고 `snapshotFlow`로 확정 상태를 제한한다. 부모 값과 내부 편집 값의 이중 소유나 지연 callback 반영이 없다. 현재 Compose의 InputTransformation은 들어오는 composition 범위를 공개하지 않고 composition-only commit이 transformation을 통과하지 않으므로 commit 관찰 경로를 쓴다. iOS는 직접 Binding과 `onChange` 절단, 앱 공용 UIKit 입력 알림·window별 약한 responder cache를 사용한다. Android 호스트 JDK의 `\X` 회귀 검사와 API 26 ICU·실기기 IME 결과는 구분한다.
+
+## 위쪽 바 (`WLTopBar`)
+
+모든 하위 화면의 뒤로·⋯·닫기 버튼 자리를 한 곳에서 정한다(결정 2026-10-07).
+
+- **기준:** `safeTop` = 기기의 실제 위쪽 안전 영역(Android `WindowInsets.statusBars ∪ displayCutout`의 top, iOS `safeAreaInsets.top`). 보드 상태 바 44 같은 고정 숫자를 쓰지 않는다.
+- **치수(`WLTopBarMetrics`):** 바는 `safeTop + 6`부터 높이 56(아래 끝 `safeTop + 62`), 좌우 `screenMargin` 20. 44 버튼은 바 안 세로 가운데라 윗변이 `safeTop + 12`다.
+- **배치:** 왼쪽(뒤로) · 가운데 슬롯(제목 덩어리, 세로 가운데) · 오른쪽(⋯ 등, 간격 10). 가운데가 비어도 오른쪽은 끝에 붙는다. 큰 글자로 가운데가 56보다 크면 바가 늘어나고 버튼은 세로 가운데를 지킨다(Android).
+- **배경:** 없으면 버튼만 떠 있다(상품 상세). 있으면 바와 상태 바 뒤까지 같은 색으로 칠해 스크롤 내용이 상태 바에 비치지 않는다(세부 유형 목록). iOS는 스크롤 안에 붙은 머리에서 상태 바 영역을 화면이 안전 영역 높이만큼 따로 칠한다.
+- **쓰는 곳:** 세부 유형 목록(제목 20/700 + 개수 18/700 + 상위 이름 13), 상품 상세(사진 칸은 `safeTop + 68`부터), 목적 상세 머리 시트의 맨 윗줄(펼침 시 시트 윗변 = `safeTop + 62`, 타일·이름은 바 세로 가운데). 탭 첫 화면 제목(도현 28)도 같은 바의 세로 가운데(`safeTop + 20`)이고 부제는 바 바로 아래다.
+
+## 머리 시트 (`WLHeaderSheet`)
+
+목적 상세·아카이브 상세의 "위 색 면 + 목록 시트" 구조다(결정 2026-10-07). 시스템 시트가 아니라 화면 안의 층이며 overlay가 아니다.
+
+- **층:** 뒤의 머리 층은 고정이고 스크롤되지 않으며 끌기를 받지 않는다. 시트(손잡이 + 목록)만 시트를 움직인다. iOS는 머리 층을 스크롤 뷰 밖 고정 층으로 두고, 그 층의 눌림 영역을 화면 위 ~ 현재 시트 윗변으로 한정한다.
+- **멈추는 높이:** `WLSheetDetent.resting`(머리 내용의 측정 높이 바로 아래)과 `expanded`(위쪽 바 아래 끝 `safeTop + 62`) 두 개뿐이다. 머리 높이가 바뀌면(그 자리 편집) resting이 260 `ease`로 따라가고, 시트가 resting에 있었으면 함께 내려간다. 이 낮은 높이는 끌기로 갈 수 없고 편집 시작 때만 생긴다. 펼친 상태에서 편집을 시작하려면 `animateTo(resting)`/`animate(to: .resting)` 후 머리를 늘린다.
+- **끌기:** expanded 전에는 시트가 움직이고, 닿은 뒤 남은 끌기·플링은 목록 스크롤이 된다. 목록 맨 위에서 아래로 끌면 시트가 내려오고 resting 아래는 고무줄이다. 손잡이 탭은 `toggle()`. Android는 손잡이 drag + 목록 nested scroll로, 놓으면 300 `emphasized`(속도 우선) 스냅이다. iOS는 resting 자리를 비운 한 `ScrollView`로 구현하고 놓은 뒤 스냅은 시스템 감속 곡선이다(손잡이 탭·`animate(to:)`만 300 `emphasized`).
+- **진행값:** `progress`(0 = resting, 1 = expanded)를 머리 슬롯에 넘겨 화면이 요소를 연속으로 바꾼다. 목적 상세는 뒤로·⋯ 제자리, 아이콘 타일 44 → 36·이름 도현 28 → 20이 윗줄로 이동, 설명·알약은 p 0 → 0.5에 사라지고 윗줄 `+`가 p 0.5 → 1에 나타난다. 진행값은 배치·그리기 단계에서 읽는다.
+- **상태 유지·접근성:** 멈춘 높이는 저장되어 상세를 다녀와도 유지된다. 손잡이는 "목록 넓게 보기"/"헤더 펼치기"(영어 "Expand list"/"Show header") 버튼으로 읽힌다(Android 문자열 리소스, iOS `Localizable.xcstrings`). 사라진 요소는 누르기·접근성에서 빠진다.
+- **테스트:** Android `WLHeaderSheetStateTest`, iOS `WLHeaderSheetTests`가 진행값·스냅·고무줄·머리 높이 변경 시 resting 이동을 검사한다.
 
 ## overlay
 
@@ -84,11 +107,13 @@ Navigation Compose·`NavigationStack`·`TabView`를 쓰지 않는다. 두 플랫
 
 - **상태:** 탭(`WLTab`: 홈·카테고리·목적)마다 독립 스택(`WLRoute`)을 가진다. `push(route, sourceKey)`·`pop()`·`selectTab(tab)`은 전환을 시작하고 상태를 바로 바꾼다. 루트에서 `pop()`은 false(시스템에 맡김)다. 현재 탭을 다시 고르면 전환 없이 맨 위 스크롤 요청을 낸다.
 - **경로 책임:** Android는 `WLRoute` 인터페이스, iOS는 목적지와 화면 정책을 담은 `WLRoute` 값이다. feature가 `pushStyle`·`showsTabBar`를 정하고 앱 renderer가 화면을 고른다. core는 데모 id 앞머리로 화면을 선택하지 않는다.
-- **루트 제공·복원:** 앱 루트가 navigator를 소유하고 overlay 바깥에서 제공한다. Android registry도 같은 범위다. Android saver는 탭·스택·route codec·칸 id·nextId와 상태 정리 대상 목록을 복원해 새 상세가 예전 상세의 저장 상태를 받지 않게 한다. iOS navigation 저장·복원은 후속 과제다.
+- **루트 제공·복원:** 앱 루트가 navigator를 소유하고 overlay 바깥에서 제공한다. Android saver는 탭·스택·route codec·칸 id·nextId와 상태 정리 대상 목록을 복원해 새 상세가 예전 상세의 저장 상태를 받지 않게 한다. iOS navigation 저장·복원은 후속 과제다.
 - **전환 종료:** 화면이 모션을 끝내면 모듈 내부 `finishTransition()`을 명시적으로 부른다(자기 전환일 때만). 그동안 `push`·`pop`·`selectTab`·끌기 시작은 모두 false이고 `InputBlocker`가 화면을 막는다. 모션이 끊겨도 `finally`에서 끝내 입력이 잠기지 않는다.
-- **공유 요소:** 사진이 있는 이동은 사진이 카드 자리 → 상세 자리로 커지고(420/360 `emphasized`), 사진이 없는 이동은 누른 요소 뒤의 자리 표시 면이 떠오름 80 → 화면 전체 420으로 커지며 색·모서리가 다음 화면 바탕으로 바뀐다. 다음 화면 내용은 커짐 시작 190 뒤부터 230 동안 나타난다. 탭 바는 내용과 같은 시간표로 사라진다.
-  - Android: `SharedTransitionLayout` + 탭마다 `SeekableTransitionState`. 사진과 면 모두 `sharedElement`.
-  - iOS: 원래 자리·상세 자리 사각형을 phase 하나로 보간해 전환 층에 그린다. 사각형은 전환을 시작할 때만 UIKit 탐침에서 읽는다.
+- **화면 이동:** 사진이 있는 이동은 사진이 카드 자리 → 상세 자리로 커진다(420/360 `emphasized`, 상세의 나머지는 페이드, 아래 화면은 그대로). 사진이 없는 이동은 가로 밀기다(결정 2026-10-07): 위 칸 W → 0, 아래 칸 0 → −0.25W, 열기 360·뒤로 300 `emphasized`(`pushSlideOpen`·`pushSlideBack`·`pushSlideParallax`). 밀리는 화면은 처음부터 불투명하고 페이드·그림자가 없다. 두 화면이 모두 탭 바를 보이면 탭 바는 고정이고, 한쪽만 보이면 진행값과 함께 옅어지거나 나타난다. 경로 정책은 `WLPushStyle.photo`/`.slide`(Android `Photo`/`Slide`)다.
+  - Android: `SharedTransitionLayout` + 탭마다 `SeekableTransitionState`. 사진만 `sharedElement`.
+  - iOS: 원래 자리·상세 자리 사각형을 phase 하나로 보간해 전환 층에 그린다. 사각형은 전환을 시작할 때만 UIKit 탐침에서 읽는다. 밀기는 `WLSlideOffset`.
+  - 사진 상세는 원래 사진 비율로 fit된 사진만 공유 요소 경계로 삼는다(정사각 칸 안 aspect-fit). 그래야 전환 마지막 프레임에 크기·모양이 바뀌지 않는다.
+  - 이전의 자리 표시 면 전환(누른 요소의 면이 화면 전체로 커짐)은 끝까지 자연스럽지 않아 2026-10-07에 코드와 토큰을 지웠다.
 - **끌어서 뒤로:** 같은 pop 전환을 손가락 진행값으로 되감는다. 50% 이상이거나 빠르게 놓으면(초당 1.5 진행 이상) 확정, 아니면 되돌린다(남은 비율만큼, 하한 120ms).
   - Android: `PredictiveBackHandler`. 진행값이 없는 뒤로(API 33 미만, 3버튼, 화면의 뒤로 버튼)는 pop 전환을 처음부터 재생한다.
   - iOS: window 수준 `UIPanGestureRecognizer`(왼쪽 20pt, 오른쪽 가로 우세). 스크롤 pan이 이 인식기의 실패를 기다린다. 전환 중이거나 overlay가 열려 있으면 받지 않는다. 배경은 [QA-CLI-007](../../learning/client/q-and-a/QA-CLI-007-swiftui-gesture-vs-scrollview.md).
@@ -139,12 +164,12 @@ C1에서 고치지 않고 남긴 것. C3 첫 실제 화면 전에 다시 본다.
 - `Masonry2Col`은 lazy가 아니다. 긴 목록에서는 바꾼다. Android는 유한한 폭이 필수이며 가로 스크롤에 넣을 때 호출부에서 `width`를 지정해야 한다(잘못된 제약은 명시적 오류). iOS의 제안 폭이 없으면 자식의 intrinsic 폭으로 계산하고 Layout cache로 sizeThatFits/placeSubviews 측정을 재사용한다.
 - `sheetStepResize` 토큰을 아직 쓰지 않는다. 단계가 있는 시트에서 내용 높이가 바뀌면 시트 높이가 튄다.
 - `WLMenu`는 화면 아래 가까이에서 위로 뒤집히지 않는다.
-- 메뉴 anchor는 Android `WLMenuAnchor`·iOS `WLAnchor` 참조 객체다. 레이아웃 좌표는 등록만 하고 누를 때 window 좌표를 읽는다. 면 이동 원래 쪽의 `sourceKey`는 Android 인자, iOS environment다.
+- 메뉴 anchor는 Android `WLMenuAnchor`·iOS `WLAnchor` 참조 객체다. 레이아웃 좌표는 등록만 하고 누를 때 window 좌표를 읽는다. 사진 이동 원래 쪽의 `sourceKey`는 Android 인자, iOS environment다.
 - iOS의 모든 탭·스택 칸 유지, 입력 responder cache와 겹친 입력 소유, Android 공유 요소 비용과 Gradle 모듈 경계는 [C3 성능·구조 확인](c3-performance-checks.md)을 따른다.
 - 실기기 한글 IME·TalkBack: 39/40자 근처 조합·삭제·커서 이동·초과 붙여넣기, 입력칸이 라벨뿐 아니라 입력한 내용과 선택을 읽는지 확인한다.
 - 실기기 VoiceOver 확인 목록: 시트 트리의 라벨 없는 Group, 칸 `ZStack`의 숨은 형제 escape 우회, push 뒤 포커스가 안 옮겨 가면 `.screenChanged` 보완([spike 기록](../../history/architecture/client/ios-router-spike-2026-10-05.md) 권고).
 
 ## 데모
 
-- 탭 첫 화면이 곧 데모다. 시트(안의 "삭제(시트까지 닫기)" → 확인창 → `dismissAll`)·확인창·⋯ 메뉴(삭제 → 확인창), 사진 카드(사진 이동), 칩·목적 카드(면 이동), 가장 긴 목적 이름, 긴 가격(`KRW 1,190,000`)을 담는다. iOS 데모에만 칩 목록 → 상품 상세(깊이 2)가 있다.
+- 탭 첫 화면이 곧 데모다. 홈은 컴포넌트 데모(시트 → 확인창 → `dismissAll`, ⋯ 메뉴, 사진 카드, 칩, 가장 긴 목적 이름, 긴 가격 `KRW 1,190,000`)이고, 카테고리·목적 탭과 그 하위 화면은 보드(FCategoryHome·FCategoryList·FProductDetail·FPurposeHome·FPurposeDetail)를 따른다: 카테고리 세로 페이징, 2열 엇갈림 목록, 상품 상세, 겹쳐 쌓인 목적 카드, 머리 시트를 쓰는 목적 상세. 데모 경로는 상품(사진 이동, 탭 바 숨김)·세부 유형 목록·목적 상세(가로 밀기, 탭 바 보임)로 나뉜다. 상품 사진 자리 표시 색은 UI 토큰이 아닌 이미지 견본이라 보드 값을 그대로 쓴다.
 - 데모는 Android debug source set, iOS `#if DEBUG`에만 있다. release에는 데모 경로·화면 코드가 포함되지 않으며 탭 이름만 보이는 빈 첫 화면이다.
