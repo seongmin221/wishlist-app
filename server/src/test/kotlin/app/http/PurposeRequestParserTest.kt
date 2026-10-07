@@ -1,6 +1,6 @@
 package app.http
 
-import app.category.CategoryChange
+import app.common.FieldChange
 import app.purpose.*
 import kotlin.test.*
 
@@ -22,7 +22,7 @@ class PurposeRequestParserTest {
     @Test fun `patch distinguishes omitted fields optional null and required null`() {
         val request = assertIs<PurposeParseResult.Valid<PurposePatchRequest>>(parsePurposePatchRequest("""{"expectedVersion":2,"description":null,"colorKey":"PINK"}""")).request
         assertEquals(2, request.expectedVersion)
-        assertEquals(PurposeChanges(description = CategoryChange.Set(null), color = PurposeColor.PINK), request.changes)
+        assertEquals(PurposeChanges(description = FieldChange.Set(null), color = PurposeColor.PINK), request.changes)
         for ((raw, fields) in listOf(
             """{"expectedVersion":2}""" to emptySet(), """{"expectedVersion":"2","name":"a"}""" to setOf("expectedVersion"),
             """{"expectedVersion":0,"name":"a"}""" to setOf("expectedVersion"), """{"expectedVersion":2,"name":null}""" to setOf("name"),

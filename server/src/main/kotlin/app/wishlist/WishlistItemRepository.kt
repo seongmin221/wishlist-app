@@ -35,20 +35,19 @@ class WishlistItemRepository(private val dataSource: DataSource) {
 
     private fun find(connection: Connection, ownerId: UUID, keyColumn: String, key: UUID): WishlistItem? =
         connection.prepareStatement("""
-            select id, owner_id, version, current_generation, analysis_status, review_status,
-                   lifecycle_status, product_name, coalesce(category_id,custom_category_id::text) category_id, category_missing_reason,
-                   manual_completion_at, category_source, purpose_id::text purpose_id, purpose_source,
-                   name_source, image_source, user_override_fields, client_submission_id, source_url,
-                   product_image_url, analysis_failure_code, client_created_at, created_at, updated_at,
-                   coalesce((select name from public_categories c where c.id=wishlist_items.category_id),
-                     (select name from custom_categories c where c.id=wishlist_items.custom_category_id and c.owner_id=wishlist_items.owner_id and c.deleted_at is null)) category_name,
-                   coalesce((select parent_id from public_categories c where c.id=wishlist_items.category_id),
-                     (select parent_id from custom_categories c where c.id=wishlist_items.custom_category_id and c.owner_id=wishlist_items.owner_id and c.deleted_at is null)) category_parent,
-                   case when custom_category_id is not null then 'CUSTOM' when category_id is not null then 'PUBLIC' end category_kind,
-                   (select p.name from purposes p where p.owner_id=wishlist_items.owner_id and p.id=wishlist_items.purpose_id) purpose_name,
-                   (select p.color_key from purposes p where p.owner_id=wishlist_items.owner_id and p.id=wishlist_items.purpose_id) purpose_color_key,
-                   (select p.icon_key from purposes p where p.owner_id=wishlist_items.owner_id and p.id=wishlist_items.purpose_id) purpose_icon_key
-            from wishlist_items where owner_id = ? and $keyColumn = ?
+            select i.id, i.owner_id, i.version, i.current_generation, i.analysis_status, i.review_status,
+                   i.lifecycle_status, i.product_name, coalesce(i.category_id,i.custom_category_id::text) category_id, i.category_missing_reason,
+                   i.manual_completion_at, i.category_source, i.purpose_id::text purpose_id, i.purpose_source,
+                   i.name_source, i.image_source, i.user_override_fields, i.client_submission_id, i.source_url,
+                   i.product_image_url, i.analysis_failure_code, i.client_created_at, i.created_at, i.updated_at,
+                   coalesce((select name from public_categories c where c.id=i.category_id),
+                     (select name from custom_categories c where c.id=i.custom_category_id and c.owner_id=i.owner_id and c.deleted_at is null)) category_name,
+                   coalesce((select parent_id from public_categories c where c.id=i.category_id),
+                     (select parent_id from custom_categories c where c.id=i.custom_category_id and c.owner_id=i.owner_id and c.deleted_at is null)) category_parent,
+                   case when i.custom_category_id is not null then 'CUSTOM' when i.category_id is not null then 'PUBLIC' end category_kind,
+                   p.name purpose_name, p.color_key purpose_color_key, p.icon_key purpose_icon_key
+            from wishlist_items i left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id
+            where i.owner_id = ? and i.$keyColumn = ?
         """.trimIndent()).use { statement ->
             statement.setObject(1, ownerId)
             statement.setObject(2, key)

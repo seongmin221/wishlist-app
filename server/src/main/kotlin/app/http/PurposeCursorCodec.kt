@@ -1,5 +1,6 @@
 package app.http
 
+import app.common.parseCanonicalUuid
 import app.purpose.PurposeCursorPosition
 import app.purpose.PurposeProjection
 import java.security.MessageDigest

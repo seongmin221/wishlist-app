@@ -31,4 +31,8 @@ object UserTextRules {
     }
 
     fun isBlank(text: String): Boolean = normalizedKey(text).isEmpty()
+
+    /** Keeps at most [maximum] Unicode code points so surrogate pairs are never split. */
+    fun truncate(text: String, maximum: Int): String =
+        text.codePoints().limit(maximum.toLong()).toArray().let { String(it, 0, it.size) }
 }

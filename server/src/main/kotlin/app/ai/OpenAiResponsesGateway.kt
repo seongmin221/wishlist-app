@@ -1,5 +1,6 @@
 package app.ai
 
+import app.text.UserTextRules
 import app.analysis.WorkerExecution
 import app.budget.PriceTable
 import app.analysis.ProcessingDeadlineExceeded
@@ -155,8 +156,7 @@ class OpenAiResponsesGateway(
         return response.copy(classification = classification, sent = SentCandidates(sent.tier.index, sent.customCount, sent.purposeCount))
     }
 
-    private fun truncate(text: String, maximum: Int): String =
-        text.codePoints().limit(maximum.toLong()).toArray().let { String(it, 0, it.size) }
+    private fun truncate(text: String, maximum: Int): String = UserTextRules.truncate(text, maximum)
 
     private fun compactCandidates(ids: Set<String>, labels: Map<String, String>): String = ids.sorted()
         .groupBy { labels[it]?.substringBefore(" > ") ?: "" }

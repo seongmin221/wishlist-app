@@ -1,6 +1,6 @@
 package app.purpose
 
-import app.category.CategoryChange
+import app.common.FieldChange
 import app.testutil.*
 import app.wishlist.CreateWishlistItemService
 import java.util.UUID
@@ -72,7 +72,7 @@ class PurposeListAndEditTest {
         assertEquals(1, results.count { it.isSuccess })
         val conflict = results.single { it.isFailure }.exceptionOrNull() as PurposeException
         assertEquals("PURPOSE_VERSION_CONFLICT", conflict.code); assertEquals(2, conflict.currentVersion)
-        val cleared = service.patch(owner, purpose.id, 2, PurposeChanges(description = CategoryChange.Set(null), icon = PurposeIcon.BOOK))
+        val cleared = service.patch(owner, purpose.id, 2, PurposeChanges(description = FieldChange.Set(null), icon = PurposeIcon.BOOK))
         assertNull(cleared.input.description); assertEquals(PurposeIcon.BOOK, cleared.input.icon); assertEquals(3, cleared.version)
         assertEquals(purpose.activityAt, cleared.activityAt); assertEquals(1, cleared.membershipVersion)
         assertEquals("INVALID_PURPOSE_INPUT", assertFailsWith<PurposeException> { service.patch(owner, purpose.id, 3, PurposeChanges()) }.code)

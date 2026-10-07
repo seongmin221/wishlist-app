@@ -1,5 +1,6 @@
 package app.category
 
+import app.common.FieldChange
 import app.testutil.*
 import app.wishlist.CreateWishlistItemService
 import java.util.UUID
@@ -13,7 +14,7 @@ class CategoryServiceTest {
         val service=CategoryService(source); val owner=UUID.randomUUID()
         val input=CategoryInput("desk", "description",listOf("keyboard")); val key=UUID.randomUUID()
         val first=service.create(owner,key,"G003",input).category
-        assertEquals(1,service.patch(owner,first.id,1,CategoryChanges(name=input.name,description=CategoryChange.Set(input.description),examples=CategoryChange.Set(input.examples))).version)
+        assertEquals(1,service.patch(owner,first.id,1,FieldChanges(name=input.name,description=FieldChange.Set(input.description),examples=FieldChange.Set(input.examples))).version)
         val second=service.create(owner,UUID.randomUUID(),"G003",input.copy(name="second")).category
         val before=service.list(owner,CategoryScope.SELECT,"G003").groups.single().categories.single { it.id==second.id.toString() }.displayOrder
         analysisSql(source,"update custom_categories set deleted_at=clock_timestamp() where id='${first.id}'")
@@ -91,7 +92,7 @@ class CategoryServiceTest {
         assertEquals(1, results.count { !it.replayed })
         assertEquals(1, results.map { it.category.id }.toSet().size)
         val category = results.first().category
-        val edited = service.patch(owner, category.id, 1, CategoryChanges(name = "changed", description = CategoryChange.Set(null), examples = CategoryChange.Set(emptyList())))
+        val edited = service.patch(owner, category.id, 1, FieldChanges(name = "changed", description = FieldChange.Set(null), examples = FieldChange.Set(emptyList())))
         assertEquals(2, edited.version)
         assertEquals("changed", service.create(owner, key, "G003", input).category.input.name)
         assertEquals("IDEMPOTENCY_KEY_REUSED", assertFailsWith<CategoryException> {
@@ -111,8 +112,8 @@ class CategoryServiceTest {
         val other = UUID.randomUUID()
         val category = service.create(owner, UUID.randomUUID(), "G003", CategoryInput("desk", null, emptyList())).category
         assertNull(service.get(other, category.id))
-        assertEquals("CATEGORY_NOT_FOUND", assertFailsWith<CategoryException> { service.patch(other, category.id, 1, CategoryChanges(name="forged")) }.code)
-        val updates = concurrent(2) { n -> runCatching { service.patch(owner, category.id, 1, CategoryChanges(name="name-$n")) } }
+        assertEquals("CATEGORY_NOT_FOUND", assertFailsWith<CategoryException> { service.patch(other, category.id, 1, FieldChanges(name="forged")) }.code)
+        val updates = concurrent(2) { n -> runCatching { service.patch(owner, category.id, 1, FieldChanges(name="name-$n")) } }
         assertEquals(1, updates.count { it.isSuccess })
         val failure = updates.single { it.isFailure }.exceptionOrNull() as CategoryException
         assertEquals("CATEGORY_VERSION_CONFLICT", failure.code)

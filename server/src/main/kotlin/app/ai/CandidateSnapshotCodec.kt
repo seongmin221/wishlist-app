@@ -1,5 +1,6 @@
 package app.ai
 
+import app.common.parseCanonicalUuid
 import kotlinx.serialization.json.*
 
 /** One versioned JSON boundary for both snapshot reuse and final result validation. */
@@ -66,8 +67,7 @@ internal object CandidateSnapshotCodec {
         }).toString()
     }
 
-    private fun canonicalUuid(value: String): String =
-        java.util.UUID.fromString(value).toString().also { require(it.equals(value, ignoreCase = true)) }
+    private fun canonicalUuid(value: String): String = requireNotNull(parseCanonicalUuid(value)).toString()
 
     private fun string(value: JsonElement?): String =
         requireNotNull((value as? JsonPrimitive)?.takeIf { it.isString }?.content)

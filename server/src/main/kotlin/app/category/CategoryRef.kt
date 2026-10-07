@@ -1,5 +1,6 @@
 package app.category
 
+import app.common.parseCanonicalUuid
 import app.ai.TaxonomyCatalog
 import java.util.UUID
 
@@ -16,8 +17,7 @@ sealed interface CategoryRef {
 
         fun parse(value: String): CategoryRef? {
             if (value in publicIds) return Public(value)
-            val id = try { UUID.fromString(value) } catch (_: IllegalArgumentException) { return null }
-            return if (id.toString().equals(value, ignoreCase = true)) Custom(id) else null
+            return parseCanonicalUuid(value)?.let(::Custom)
         }
     }
 }

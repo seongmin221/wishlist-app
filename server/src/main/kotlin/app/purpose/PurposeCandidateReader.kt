@@ -1,5 +1,6 @@
 package app.purpose
 
+import app.text.UserTextRules
 import app.ai.PurposeCandidate
 import java.sql.Connection
 import java.util.UUID
@@ -24,12 +25,10 @@ object PurposeCandidateReader {
                 from wishlist_items where owner_id=? and lifecycle_status='ACTIVE' and purpose_id=any(?) and id<>?
                     and nullif(btrim(product_name),'') is not null) ranked where rank<=? order by purpose_id,rank""").use { s ->
                 s.setObject(1, owner); s.setArray(2, array); s.setObject(3, excludeItem); s.setInt(4, ITEM_NAMES)
-                s.executeQuery().use { r -> buildList { while (r.next()) add(r.getObject(1, UUID::class.java) to truncate(r.getString(2))) } }
+                s.executeQuery().use { r -> buildList { while (r.next()) add(r.getObject(1, UUID::class.java) to UserTextRules.truncate(r.getString(2), ITEM_NAME_CODE_POINTS)) } }
             }.groupBy({ it.first }, { it.second })
         } finally { array.free() }
         return rows.map { (id, name, description) -> PurposeCandidate(id.toString(), name, description, names[id].orEmpty()) }
     }
 
-    private fun truncate(text: String): String =
-        text.codePoints().limit(ITEM_NAME_CODE_POINTS.toLong()).toArray().let { String(it, 0, it.size) }
 }

@@ -1,6 +1,6 @@
 package app.http
 
-import app.category.CategoryChange
+import app.common.FieldChange
 import app.purpose.*
 import kotlinx.serialization.json.JsonObject
 
@@ -38,13 +38,13 @@ fun parsePurposePatchRequest(raw: String): PurposeParseResult<PurposePatchReques
     val icon = body["iconKey"].strictString()?.let(PurposeStyle::icon)
     val description = body["description"].strictString()
     val fields = buildSet {
-        if ("name" in body) addAll(PurposeInputPolicy.validate(name, null))
-        if (!body.optionalStringValid("description") || description != null && PurposeInputPolicy.validate("unchanged", description).isNotEmpty()) add("description")
+        if ("name" in body && !PurposeInputPolicy.validateName(name)) add("name")
+        if (!body.optionalStringValid("description") || !PurposeInputPolicy.validateDescription(description)) add("description")
         if ("colorKey" in body && color == null) add("colorKey")
         if ("iconKey" in body && icon == null) add("iconKey")
     }
     if (fields.isNotEmpty()) return PurposeParseResult.Invalid(fields)
     return PurposeParseResult.Valid(PurposePatchRequest(expected, PurposeChanges(
-        name, if ("description" in body) CategoryChange.Set(description) else CategoryChange.Keep, color, icon,
+        name, if ("description" in body) FieldChange.Set(description) else FieldChange.Keep, color, icon,
     )))
 }

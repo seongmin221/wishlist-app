@@ -1,5 +1,6 @@
 package app.category
 
+import app.common.FieldChange
 import app.ai.TaxonomyCatalog
 import app.persistence.MutationReceipts
 import app.persistence.OwnerStructureLock
@@ -63,23 +64,23 @@ class CategoryService(private val dataSource: DataSource) {
         }
     }
 
-    fun patch(owner: UUID, id: UUID, expectedVersion: Int, changes: CategoryChanges): CustomCategory = dataSource.inTransaction { connection ->
+    fun patch(owner: UUID, id: UUID, expectedVersion: Int, changes: FieldChanges): CustomCategory = dataSource.inTransaction { connection ->
         OwnerStructureLock.lock(connection, owner)
         val current = categories.find(connection, owner, id, lock = true) ?: throw CategoryException("CATEGORY_NOT_FOUND")
         if (current.version != expectedVersion) {
             throw CategoryException("CATEGORY_VERSION_CONFLICT", currentVersion = current.version)
         }
-        val hasChanges = changes.name != null || changes.description != CategoryChange.Keep || changes.examples != CategoryChange.Keep
+        val hasChanges = changes.name != null || changes.description != FieldChange.Keep || changes.examples != FieldChange.Keep
         if (!hasChanges || expectedVersion <= 0) throw CategoryException("INVALID_CATEGORY_INPUT")
         val input = CategoryInput(
             changes.name ?: current.input.name,
             when (val value = changes.description) {
-                CategoryChange.Keep -> current.input.description
-                is CategoryChange.Set -> value.value
+                FieldChange.Keep -> current.input.description
+                is FieldChange.Set -> value.value
             },
             when (val value = changes.examples) {
-                CategoryChange.Keep -> current.input.examples
-                is CategoryChange.Set -> value.value
+                FieldChange.Keep -> current.input.examples
+                is FieldChange.Set -> value.value
             },
         )
         validateInput(input)

@@ -1,5 +1,6 @@
 package app.purpose
 
+import app.text.UserTextRules
 import kotlin.test.*
 
 class PurposeInputPolicyTest {
@@ -27,5 +28,15 @@ class PurposeInputPolicyTest {
         assertEquals(setOf("name"), PurposeInputPolicy.validate("zero​width", null))
         assertEquals(emptySet(), PurposeInputPolicy.validate("ㅤ", null))
         assertEquals(emptySet(), PurposeInputPolicy.validate("👩‍💻 작업", ""))
+    }
+
+    @Test fun `name and description rules are checked independently`() {
+        assertTrue(PurposeInputPolicy.validateDescription("설".repeat(200)))
+        assertFalse(PurposeInputPolicy.validateDescription("설".repeat(201)))
+        assertTrue(PurposeInputPolicy.validateDescription(null))
+        assertFalse(PurposeInputPolicy.validateName(" "))
+        assertTrue(PurposeInputPolicy.validateName("목적"))
+        assertEquals("가나", app.text.UserTextRules.truncate("가나다", 2))
+        assertEquals("😀", app.text.UserTextRules.truncate("😀😀", 1))
     }
 }

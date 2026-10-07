@@ -1,5 +1,6 @@
 package app.purpose
 
+import app.common.FieldChange
 import java.time.Instant
 import java.util.UUID
 
@@ -35,14 +36,14 @@ data class PurposePage(val projection: PurposeProjection, val entries: List<Purp
 
 data class PurposeChanges(
     val name: String? = null,
-    val description: app.category.CategoryChange<String?> = app.category.CategoryChange.Keep,
+    val description: FieldChange<String?> = FieldChange.Keep,
     val color: PurposeColor? = null,
     val icon: PurposeIcon? = null,
 ) {
-    val hasChanges: Boolean get() = name != null || description != app.category.CategoryChange.Keep || color != null || icon != null
+    val hasChanges: Boolean get() = name != null || description != FieldChange.Keep || color != null || icon != null
     fun applyTo(current: PurposeInput) = PurposeInput(
         name ?: current.name,
-        when (val value = description) { app.category.CategoryChange.Keep -> current.description; is app.category.CategoryChange.Set -> value.value },
+        when (val value = description) { FieldChange.Keep -> current.description; is FieldChange.Set -> value.value },
         color ?: current.color, icon ?: current.icon,
     )
 }

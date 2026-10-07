@@ -9,7 +9,13 @@ object PurposeInputPolicy {
     const val DESCRIPTION_MAX = 200
 
     fun validate(name: String?, description: String?): Set<String> = buildSet {
-        if (name == null || !UserTextRules.valid(name, NAME_MAX) || UserTextRules.isBlank(name)) add("name")
-        if (description != null && !UserTextRules.valid(description, DESCRIPTION_MAX, multiline = true)) add("description")
+        if (!validateName(name)) add("name")
+        if (!validateDescription(description)) add("description")
     }
+
+    fun validateName(name: String?): Boolean = name != null && UserTextRules.valid(name, NAME_MAX) && !UserTextRules.isBlank(name)
+
+    /** Description is optional; null means none. */
+    fun validateDescription(description: String?): Boolean =
+        description == null || UserTextRules.valid(description, DESCRIPTION_MAX, multiline = true)
 }
