@@ -12,6 +12,9 @@ data class WishlistItem(
     val clientCreatedAt: Instant?,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val categoryName:String? = null,
+    val categoryParentId:String? = null,
+    val categoryKind:String? = null,
 ) {
     val id: UUID get() = storedState.id
     val version: Int get() = storedState.version

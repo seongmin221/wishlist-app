@@ -17,6 +17,7 @@ object AnalysisWriteGuard {
 
     internal fun lockExecution(connection: Connection, claim: AnalysisClaim): LockedAnalysisExecution? {
         require(!connection.autoCommit) { "Analysis writes require an explicit transaction" }
+        app.persistence.OwnerStructureLock.lock(connection,claim.ownerId)
         val item = connection.lockAnalysisItem(claim.itemId) ?: return null
         if (item.ownerId != claim.ownerId) return null
         val job = connection.lockAnalysisJob(claim.jobId) ?: return null
@@ -86,4 +87,11 @@ internal fun Connection.lockAnalysisJob(jobId: UUID, skipLocked: Boolean = false
 
 internal fun Connection.analysisDatabaseTime(): Instant = createStatement().use { statement ->
     statement.executeQuery("select clock_timestamp()").use { rows -> check(rows.next()); rows.getTimestamp(1).toInstant() }
+}
+
+internal fun Connection.lockAnalysisOwner(itemId:UUID,skipLocked:Boolean=false):Boolean {
+    val owner=prepareStatement("select owner_id from wishlist_items where id=?").use { s ->
+        s.setObject(1,itemId);s.executeQuery().use { r -> if(r.next()) r.getObject(1,UUID::class.java) else null }
+    } ?: return false
+    return app.persistence.OwnerStructureLock.lock(this,owner,skipLocked)
 }

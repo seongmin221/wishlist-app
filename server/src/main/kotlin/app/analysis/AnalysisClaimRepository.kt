@@ -23,6 +23,7 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
             statement.setObject(1, jobId)
             statement.executeQuery().use { rows -> if (rows.next()) rows.getObject(1, UUID::class.java) else null }
         } ?: return ClaimResult.Ignored
+        if(!connection.lockAnalysisOwner(itemId)) return ClaimResult.Ignored
         val item = connection.lockAnalysisItem(itemId) ?: return ClaimResult.Ignored
         val job = connection.lockAnalysisJob(jobId) ?: return ClaimResult.Ignored
         if (job.itemId == itemId && job.generation == generation && job.stage == "${lane.name}_PENDING" &&

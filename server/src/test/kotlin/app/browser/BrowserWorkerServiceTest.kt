@@ -107,7 +107,7 @@ class BrowserWorkerServiceTest {
         val browser = BrowserWorkerService(source,
             { Metadata("Rendered product", null, null, "https://example.com/item") },
             { id, _ ->
-                source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='CAT_TEST' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
+                source.connection.use { c -> c.prepareStatement("update analysis_jobs set pending_category_id='C026' where id=?").use { s -> s.setObject(1,id.jobId); s.executeUpdate() } }
                 ProcessingOutcome.Complete
             })
         assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))

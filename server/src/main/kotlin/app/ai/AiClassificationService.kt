@@ -11,16 +11,23 @@ import app.extraction.Metadata
 import java.util.UUID
 import javax.sql.DataSource
 
-class AiClassificationService(
+class AiClassificationService private constructor(
     dataSource: DataSource,
     private val budget: LlmBudgetService,
-    private val candidatesForJob: (UUID) -> CandidateSnapshot,
+    private val candidatesForJob: ((UUID) -> CandidateSnapshot)?,
+    private val candidateProvider: CategoryCandidateProvider?,
     private val gateway: (String, CandidateSnapshot, () -> Unit) -> GatewayResponse,
 ) {
+    constructor(dataSource:DataSource,budget:LlmBudgetService,supply:(UUID)->CandidateSnapshot,gateway:(String,CandidateSnapshot,()->Unit)->GatewayResponse)
+        : this(dataSource,budget,supply,null,gateway)
+    constructor(dataSource:DataSource,budget:LlmBudgetService,provider:CategoryCandidateProvider,gateway:(String,CandidateSnapshot,()->Unit)->GatewayResponse)
+        : this(dataSource,budget,null,provider,gateway)
     private val pending = AnalysisPendingResultRepository(dataSource)
 
     fun classify(claim: AnalysisClaim, metadata: Metadata): ProcessingOutcome {
-        val candidates = pending.candidateSnapshot(claim, candidatesForJob) ?: return ProcessingOutcome.Stale
+        val candidates = (candidateProvider?.let { pending.candidateSnapshotWithConnection(claim,it::snapshot) }
+            ?: if(candidateProvider==null) pending.candidateSnapshot(claim,requireNotNull(candidatesForJob)) else null)
+            ?: return if (pending.isCurrent(claim)) ProcessingOutcome.Partial else ProcessingOutcome.Stale
         val reservation = when (val result = budget.reserveBeforeCall(claim, UUID.randomUUID())) {
             is ReserveResult.Reserved -> result.reservation
             ReserveResult.Stale -> return ProcessingOutcome.Stale

@@ -12,7 +12,12 @@ data class CandidateSnapshot(
     val purposeIds: Set<String>,
     val categoryLabels: Map<String,String> = emptyMap(),
     val purposeLabels: Map<String,String> = emptyMap(),
+    val ownerId: String? = null,
+    val customCategories: Map<String,CustomCategoryCandidate> = emptyMap(),
+    val schemaVersion: Int = 2,
 )
+
+data class CustomCategoryCandidate(val version: Int,val name:String,val parentId:String,val description:String?,val examples:List<String>)
 
 sealed interface ClassificationResult {
     data class Assigned(val categoryId: String, val purposeId: String?) : ClassificationResult

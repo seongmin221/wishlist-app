@@ -48,11 +48,10 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
     val source = resources.own(DatabaseFactory.pooledDataSource(env.getValue("DATABASE_URL"),
         env.getValue("DATABASE_USER"), env.getValue("DATABASE_PASSWORD"), runtime.databasePool))
     if (runtime.role == RuntimeRole.GENERAL_WORKER) {
-        val catalog = TaxonomyCatalog.loadV1()
         val model = env.getValue("OPENAI_MODEL_SNAPSHOT")
         val gateway = OpenAiResponsesGateway(OpenAiConfig(model, env.getValue("OPENAI_API_KEY"), allowLocalAlias = env["APP_ENV"] != "production"))
         val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = model, allowLocalAlias = env["APP_ENV"] != "production"),
-            { catalog.snapshot(catalog.categories.map { it.id }.toSet()) }, gateway::classify)
+            CategoryCandidateProvider(), gateway::classify)
         val transport = resources.own(SafeHttpTransport())
         val extractor = HttpMetadataExtractor(UrlSafetyPolicy(), transport::fetch)
         val processor = GeneralExtractionProcessor(source, extractor::extract, classifier::classify)
@@ -82,5 +81,6 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
     routing {
         get("/health") { call.respondText("ok") }
         wishlistRoutes(service, detailService) { resolver.resolve(it) }
+        categoryRoutes(app.category.CategoryService(source)) { resolver.resolve(it) }
     }
 }
