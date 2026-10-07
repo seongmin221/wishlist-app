@@ -109,9 +109,11 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 ## B2 — 카테고리 기본 관리
 
 **현재 상태(2026-10-07):** develop `00577226`에서 별도 Orca worktree로 수신했다.
-[계약·설계 초안](category-management-api.md)과 [작업별 계획](../../superpowers/plans/2026-10-07-b2-category-management.md)을 준비했다.
-생성 key retention·진행 중 후보 stale 후 재판단·생성 rate limit은 사용자 답변 대기다.
-확정 입력 정책·parent registry·순수 parser를 독립 선행 작업으로 구현·리뷰했으며 CAT-01~04 완료로 표시하지 않는다.
+[확정 계약](category-management-api.md)과 [작업별 계획](../../superpowers/plans/2026-10-07-b2-category-management.md)을 준비했다.
+생성 key는 계정 데이터 유지 동안 보존, 미확정 stale 실행만 예산 승계 재예약, 신규 생성은 owner별 60초 5건으로 확정했다.
+CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement를 구현·독립 리뷰했다.
+최종 단독 전체 실행은 245개 중244 통과·실패/오류0·RealUrlPilot1 skip이다.
+[구현·리뷰 이력](../../history/architecture/server/b2-category-implementation-2026-10-07.md)을 따른다.
 새 공간의 직접 baseline은 전체 `--rerun-tasks` 203개 중 202 통과·실패/오류 0·RealUrlPilot 1 skip이다.
 입력 기반 리뷰 보완 후 단독 전체 실행은 214개 중 213 통과·실패/오류 0·RealUrlPilot 1 skip이다.
 [수신·검증 기록](../../history/architecture/server/b2-category-foundation-2026-10-07.md)을 따른다.

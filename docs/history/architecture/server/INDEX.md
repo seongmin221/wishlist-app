@@ -1,6 +1,8 @@
 # Server 의사결정
 
-- [B2 작업 수신·카테고리 입력 기반](b2-category-foundation-2026-10-07.md) — 독립 worktree baseline·계약 초안·입력/parent registry·미확정 정책
+- [B2 카테고리 구현·리뷰](b2-category-implementation-2026-10-07.md) — CAT-01~04·V11·AI owner/stale 보호·피드백 보완·전체 검증
+
+- [B2 작업 수신·카테고리 입력 기반](b2-category-foundation-2026-10-07.md) — 독립 worktree baseline·입력/parent registry·후속 정책 확정
 
 ## 초기 결정
 

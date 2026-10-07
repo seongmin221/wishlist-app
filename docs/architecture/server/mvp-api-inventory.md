@@ -77,16 +77,16 @@ READY 항목에서 사용자 category 삭제 때문에 category가 빈 경우에
 
 ## 앱 서버 API — 카테고리 6개
 
-B2는 [CAT-01~04 계약·설계 초안](category-management-api.md)을 준비 중이다.
-입력 정책·parent registry·순수 요청 파서는 선행 작업이며 HTTP API 구현 완료를 의미하지 않는다.
-생성 key 보존·진행 중 AI stale 처리·생성 rate limit 수치는 사용자 확인 후 확정한다.
+B2 CAT-01~04와 owner별 AI 후보·stale 보호를 구현·검증했다. [확정 계약](category-management-api.md)을 따른다.
+최종 전체 실행은 245개 중244 통과·실패/오류0·RealUrlPilot1 skip이다.
+생성 key는 계정 데이터 유지 동안 보존, 미확정 stale 실행은 예산을 승계해 재예약, 신규 생성은 owner별 60초 5건으로 사용자 확인을 완료했다.
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| CAT-01 | `GET /v1/categories` | category 탭, 전체 category 선택, 생성 상위 선택 · S3/S6/S7 | scope=BROWSE/SELECT, 선택 parentId | stable ID·이름·상위·공용/사용자 구분·순서·활성 item count, customUsedCount/limit. BROWSE는 상품/빈 custom이 있는 상위, SELECT는 전체 taxonomy | 없음: 공용 리소스만 존재 |
-| CAT-02 | `GET /v1/custom-categories/{id}` | custom 목록 헤더·편집 폼 초기값 · S3 | custom category ID | 이름·고정 parent·설명·예시·itemCount·version. AI 후보 제외 내부 사유는 노출하지 않음 | 없음 |
-| CAT-03 | `POST /v1/custom-categories` | 탭 + 추가, 선택 시트 안 새 category 만들기 · S3 | parentId, 이름, 선택 설명/예시, Idempotency-Key | 생성 category ID·표시값·사용 개수. 사용자당20·40/200/5×60 제한·같은 상위 normalized 이름 unique | 없음 |
-| CAT-04 | `PATCH /v1/custom-categories/{id}` | 이름·설명·예시 저장 · S3 | expectedVersion, 변경 필드 | 새 category·version, 활성 표시명 반영. 부모 이동은 현재 문서 요구에 없으므로 받지 않음 | 없음 |
+| CAT-01 | `GET /v1/categories` | category 탭, 전체 category 선택, 생성 상위 선택 · S3/S6/S7 | scope=BROWSE/SELECT, 선택 parentId | stable ID·이름·상위·공용/사용자 구분·순서·활성 item count, customUsedCount/limit. BROWSE는 상품/빈 custom이 있는 상위, SELECT는 전체 taxonomy | **구현(B2)**: SELECT/BROWSE·count·빈 custom·안정 순서 |
+| CAT-02 | `GET /v1/custom-categories/{id}` | custom 목록 헤더·편집 폼 초기값 · S3 | custom category ID | 이름·고정 parent·설명·예시·itemCount·version. AI 후보 제외 내부 사유는 노출하지 않음 | **구현(B2)**: owner 상세·빈 custom·내부 AI 정보 제외 |
+| CAT-03 | `POST /v1/custom-categories` | 탭 + 추가, 선택 시트 안 새 category 만들기 · S3 | parentId, 이름, 선택 설명/예시, Idempotency-Key | 생성 category ID·표시값·사용 개수. 사용자당20·40/200/5×60 제한·같은 상위 normalized 이름 unique | **구현(B2)**: owner 잠금·receipt/replay·20개·60초5건 |
+| CAT-04 | `PATCH /v1/custom-categories/{id}` | 이름·설명·예시 저장 · S3 | expectedVersion, 변경 필드 | 새 category·version, 활성 표시명 반영. 부모 이동은 현재 문서 요구에 없으므로 받지 않음 | **구현(B2)**: version·no-op·null·parent 고정·현재 표시명 |
 | CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 active item 수·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | 없음 |
 | CAT-06 | `DELETE /v1/custom-categories/{id}` | 삭제 확정 · S3/S4 | category version·impactToken | category 삭제·참조 해제·CUSTOM_CATEGORY_DELETED 원자 반영. 영향이 바뀌면 재확인 가능한 409 | 없음 |
 

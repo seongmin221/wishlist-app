@@ -1,6 +1,6 @@
 # B2 작업 수신과 카테고리 입력 기반
 
-> 2026-10-07 · B2 진행 중 · CAT-01~04 HTTP/DB/AI 연결은 아직 미구현
+> 2026-10-07 · 입력 기반 선행 단계의 기록 · 후속 구현은 B2 구현·리뷰 이력을 참조
 
 ## 작업 공간·기준
 
@@ -24,7 +24,7 @@ schema seed·공개 CAT-01 연결은 다음 작업이다.
 AI snapshot은 현재 ID/label만 저장하고 최종 적용은 item→job 순서다.
 owner·custom version snapshot, 동일 connection 후보 공급, owner 선행 잠금은 후속 구현 대상이다.
 생성 receipt 보존 기간, 진행 중 stale 실행 처리, 생성 rate limit 수치는 기존 문서의
-미확정 사항이므로 사용자에게 선택지를 제시했고 답변을 기다린다. 새 정책으로 확정하지 않았다.
+당시 미확정 사항이므로 사용자에게 선택지를 제시했다. 후속 답변은 아래 정책 확정 기록에 반영했다.
 
 ## 독립 선행 구현
 
@@ -72,7 +72,7 @@ XML은 tests=214, failures=0, errors=0, skipped=1로 **213 통과·RealUrlPilot 
 
 입력 기반·테스트는 로컬 `74b9d1d`로 커밋했다. 이 커밋은 공개 API 구현 완료가 아니다.
 
-## 남은 작업
+## 후속 정책 확정
 
-제품 답변 반영 후 V11·CAT-01~04·owner별 AI 후보·stale 전이를 구현하고 실제 PostgreSQL 경합을 검증한다.
-API inventory/implementation order는 B2 준비 상태로 표시했다. push·PR·병합은 하지 않는다.
+세 정책은 사용자 확인을 완료했다. 계정 데이터 동안 receipt 보존, 미확정 stale 실행 예산 승계 재예약, owner별 60초 신규 성공 5건이다. V11·CAT-01~04·owner별 AI 후보·stale 전이의 후속 구현과 검증은 [B2 구현 기록](b2-category-implementation-2026-10-07.md)에 있다. 추가 리뷰에서 빈/공백 예시 422와 custom 축약 후에도 2,000 토큰을 넘으면 해당 호출의 공용 taxonomy 분류도 확정했다.
+입력 선행 단계에서는 API inventory/implementation order를 준비 상태로 표시했다. 후속 구현 완료 상태와 전체 검증은 별도 B2 구현 이력으로 갱신한다. push·PR·병합은 하지 않는다.

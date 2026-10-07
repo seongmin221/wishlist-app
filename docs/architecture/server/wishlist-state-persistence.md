@@ -6,7 +6,7 @@
 
 V8은 기존 상품 테이블에 review 상태, 수동 완료 시각, 현재 category/purpose와 출처, category 누락 사유, 이름/이미지 출처, 사용자 덮어쓰기 필드, current generation을 추가한다. 목적 자원이 아직 없으므로 legacy predicted purpose는 진단 값으로 보존하고 현재 purpose로 승격하지 않는다.
 
-analysis/review/lifecycle와 값 출처는 enum 허용 목록으로 제한하고 version/current generation은 양수여야 한다. category가 있으면 출처는 AI/USER이고 누락 사유는 null이어야 한다. AI purpose에는 ID가 필요하며 USER+null은 사용자의 명시적 목적 해제다. 덮어쓰기 필드는 NAME/BRAND/IMAGE/CATEGORY/PURPOSE만 허용한다. category/purpose/media 테이블과 owner FK는 해당 자원 구현 묶음에서 추가한다.
+analysis/review/lifecycle와 값 출처는 enum 허용 목록으로 제한하고 version/current generation은 양수여야 한다. category가 있으면 출처는 AI/USER이고 누락 사유는 null이어야 한다. AI purpose에는 ID가 필요하며 USER+null은 사용자의 명시적 목적 해제다. 덮어쓰기 필드는 NAME/BRAND/IMAGE/CATEGORY/PURPOSE만 허용한다. V11은 custom category 테이블과 (owner_id,custom_category_id) 복합 FK를 추가했다. 공용 category_id와 custom_category_id는 동시 지정할 수 없으며 동일한 출처·누락 사유 CHECK를 공유한다. purpose/media의 owner FK는 후속 자원 구현에서 추가한다.
 
 신규 생성은 같은 transaction에서 current generation 1, analysis job generation 1, outbox를 저장한다. 분석 전 category 누락 사유는 EXTRACTION_UNRESOLVED다.
 
@@ -33,13 +33,13 @@ B0 Task 4~7에서 중간·최종 반영과 복구에 현재 상태·출처·실�
 
 ## 원자 claim과 쓰기 보호
 
-`AnalysisClaimRepository.claim(jobId, generation, lane)`는 먼저 job의 item ID를 잠금 없이 찾고, transaction에서 item→job 순서로 `FOR UPDATE`한 뒤 관계와 상태를 다시 검증한다. 현재 generation의 ACTIVE·PROCESSING·수동 미완료 상품과 해당 lane의 PENDING job만 실행 가능하다. BROWSER는 기존 fallback 플래그도 필요하다. owner는 요청에서 받지 않고 잠근 상품 row에서 얻는다. 같은 job/generation/lane의 PENDING이 삭제된 상품에 속하면 item→job 잠금 안에서 CANCELLED로 바꾸고 분석/추가 outbox 없이 ACK한다.
+`AnalysisClaimRepository.claim(jobId, generation, lane)`는 먼저 job의 item ID를 잠금 없이 찾고, transaction에서 owner→item→job 순서로 `FOR UPDATE`한 뒤 관계와 상태를 다시 검증한다. 현재 generation의 ACTIVE·PROCESSING·수동 미완료 상품과 해당 lane의 PENDING job만 실행 가능하다. BROWSER는 기존 fallback 플래그도 필요하다. owner는 요청에서 받지 않고 잠근 상품 row에서 얻는다. 같은 job/generation/lane의 PENDING이 삭제된 상품에 속하면 owner→item→job 잠금 안에서 CANCELLED로 바꾸고 분석/추가 outbox 없이 ACK한다.
 
 유효한 claim은 새 UUID token, DB 시각 기준 120초 lease, 현재 item version을 저장하고 해당 lane의 attempt만 한 번 증가시킨다. 다른 요청은 이미 RUNNING인 job을 Ignored로 처리하므로 중복 attempt가 없다. lane별 3회 또는 첫 시도로부터 30분을 소진하면 Exhausted를 반환하고 같은 잠금 아래 현재 상품을 FAILED_RETRYABLE로 바꾸며 version을 한 번 증가시킨다. 오래된 generation이나 비활성·수동 완료 상품에는 이 소진 처리를 적용하지 않는다.
 
 claim을 다시 발급할 때 assignment/purpose/failure 임시 결과를 지운다. GENERAL은 임시 metadata도 지우고 BROWSER는 일반 추출 metadata를 유지한다. generation의 candidate snapshot은 두 lane 모두 유지한다.
 
-`AnalysisWriteGuard.lockCurrent(connection, claim)`는 명시적 transaction을 요구한다. item→job 잠금 뒤 owner·item 관계·generation·token·lane RUNNING·상품 상태·수동 완료·현재 version과 claimed version을 검증한다. lease는 두 잠금을 얻은 뒤 읽은 DB `clock_timestamp()`와 비교한다. 잠금 대기 전에 시각을 읽으면 대기 중 만료를 놓칠 수 있기 때문이다.
+`AnalysisWriteGuard.lockCurrent(connection, claim)`는 명시적 transaction을 요구한다. owner→item→job 잠금 뒤 owner·item 관계·generation·token·lane RUNNING·상품 상태·수동 완료·현재 version과 claimed version을 검증한다. lease는 owner/item/job 잠금을 얻은 뒤 읽은 DB `clock_timestamp()`와 비교한다. 잠금 대기 전에 시각을 읽으면 대기 중 만료를 놓칠 수 있기 때문이다.
 
 false 결과는 현재 실행을 취소하거나 token을 수정하지 않는다. true/false 모두 transaction commit/rollback과 잠금 해제는 호출자 책임이다. guard 뒤의 DB 쓰기는 같은 transaction에서 수행하며 외부 네트워크 호출 중에는 connection이나 잠금을 유지하지 않는다. 중간 쓰기 경로와 기존 Worker 최종 transaction 입구에는 Task 5에서 적용했다. Task 6의 AnalysisResultRepository는 최종 상태·출처 정책과 token 해제를 같은 guard transaction에 둔다.
 
@@ -61,7 +61,7 @@ Task 5의 AnalysisPendingResultRepository는 guard와 source URL 읽기, 임시 
 
 ## 최종 결과와 재시도
 
-일반·browser Worker는 AnalysisResultRepository.finish를 공유한다. item→job 잠금 뒤 owner·job 관계·generation·lane·token·claimed version으로 실행 identity를 검증하고 현재 상품 상태와 lease를 확인한다. 다른 실행·generation·삭제·보관·수동 완료·만료 lease의 결과는 item/job/outbox를 바꾸지 않고 ACK한다. 예외적으로 같은 실행 identity와 현재 ACTIVE·PROCESSING·수동 미완료 상품의 version만 달라졌다면 Stale outcome에서도 job CANCELLED·상품 FAILED_RETRYABLE·version +1을 원자 저장한다. 사용자 필드·진단·outbox를 보존하며 반복 finish는 추가 변경하지 않는다. 이 경로는 maintenance가 없는 B5 이전에도 실행된다. 최종 성공·부분·실패는 item version을 한 번 올린다. 현재 실행의 재시도와 browser fallback은 item version을 유지한다.
+일반·browser Worker는 AnalysisResultRepository.finish를 공유한다. owner→item→job 잠금 뒤 owner·job 관계·generation·lane·token·claimed version으로 실행 identity를 검증하고 현재 상품 상태와 lease를 확인한다. 다른 실행·generation·삭제·보관·수동 완료·만료 lease의 결과는 item/job/outbox를 바꾸지 않고 ACK한다. 예외적으로 같은 실행 identity와 현재 ACTIVE·PROCESSING·수동 미완료 상품의 version만 달라졌다면 Stale outcome에서도 job CANCELLED·상품 FAILED_RETRYABLE·version +1을 원자 저장한다. 사용자 필드·진단·outbox를 보존하며 반복 finish는 추가 변경하지 않는다. 이 경로는 maintenance가 없는 B5 이전에도 실행된다. 최종 성공·부분·실패는 item version을 한 번 올린다. 현재 실행의 재시도와 browser fallback은 item version을 유지한다.
 
 READY에는 사용 가능한 현재 category가 필요하다. Complete여도 현재 category가 없으면 PARTIAL과 AI_INVALID_CANDIDATE 진단을 남겨 RUNNING에 갇히지 않게 한다. 현재 category가 있으면 누락 사유는 null이다. 새 분류의 predicted 값은 진단으로 저장하고 현재 값과 구분한다.
 
@@ -76,7 +76,7 @@ CONFIRMED/DEFERRED는 유지한다. 사용 가능한 이름·category가 있고 
 
 ## 만료 실행 복구
 
-AnalysisJobReconciler.reconcileExpired는 updated_at 대신 DB clock_timestamp와 lease_until을 비교한다. RUNNING 후보를 기본 100개(설정 1~1000)까지 잠금 없이 발견한 뒤 각 후보를 별도 transaction에서 item→job 순서로 SKIP LOCKED한다. 두 잠금을 얻은 뒤 발견 당시의 관계·generation·stage·token·lease·claimed version을 재검증하고 DB 시각으로 만료를 다시 확인한다. 실행이 바뀌거나 행이 사용 중이면 이번 스캔에서 건너뛴다. 후보 하나의 오류는 job ID·예외 타입을 기록하고 다음 후보로 진행하며 취소/interrupt는 재전파한다. 반환값은 commit한 복구·취소·한도 실패 전이 수다.
+AnalysisJobReconciler.reconcileExpired는 updated_at 대신 DB clock_timestamp와 lease_until을 비교한다. RUNNING 후보를 기본 100개(설정 1~1000)까지 잠금 없이 발견한 뒤 각 후보를 별도 transaction에서 owner→item→job 순서로 SKIP LOCKED한다. owner/item/job 잠금을 얻은 뒤 발견 당시의 관계·generation·stage·token·lease·claimed version을 재검증하고 DB 시각으로 만료를 다시 확인한다. 실행이 바뀌거나 행이 사용 중이면 이번 스캔에서 건너뛴다. 후보 하나의 오류는 job ID·예외 타입을 기록하고 다음 후보로 진행하며 취소/interrupt는 재전파한다. 반환값은 commit한 복구·취소·한도 실패 전이 수다.
 
 ACTIVE·PROCESSING·현재 generation·수동 미완료·claimed version 일치인 실행만 재시도하거나 한도 실패로 반영한다. 무효 실행은 CANCELLED로 token/lease/claimed version을 해제한다. 상품이 여전히 현재 generation의 ACTIVE·PROCESSING·수동 미완료라면 version 불일치 또는 browser fallback 불일치로 실행을 취소할 때 상품도 FAILED_RETRYABLE로 바꾸고 version을 한 번 증가시킨다. 편집된 필드와 outbox는 보존해 PROCESSING 정체와 옛 결과 덮어쓰기를 막는다. 삭제·보관·수동 완료·다른 generation·이미 종료된 상품은 변경하지 않는다. V9가 만료시킨 legacy RUNNING은 token/claimed version이 null이므로 기존 version 검증을 우회하고 재claim에서 새 identity를 받는다. identity와 lease가 모두 null인 중단된 legacy도 복구한다.
 
@@ -87,3 +87,7 @@ lane별 3회 또는 첫 시도에서 30분을 소진하면 job FAILED와 identit
 claim·finish·reconciler의 lane별 재시도 한도는 AnalysisJobTransitions의 hasRetryBudget을 공유한다. job stage/실행 identity 해제와 잠근 상품의 FAILED_RETRYABLE 갱신도 공용 helper에 둔다. B5의 generation 전체 한도를 추가할 때 이 lane별 규칙과 구분한다.
 
 오래된 PENDING·queue retry 소진·미발행 fallback의 실제 발행/복구는 [B5 설계](analysis-pending-recovery.md)에 따라 연결한다.
+
+## B2 category 후보 보호
+
+V11 app_users를 잠금 기준으로 사용한다. 기존 owner는 backfill하고 신규 owner는 공통 helper가 lazy insert 뒤 FOR UPDATE한다. B1 생성과 Worker claim/staging/finish/recovery는 owner를 먼저 잠근다. custom snapshot v2는 owner·version·구조화된 이름/설명/예시를 저장하고 동일 connection에서 공급한다. 재사용과 최종 반영에서 stale를 검사하며 잘못된 구조는 유료 호출 없이 최종 replacement로 넘긴다. replacement는 기존 시도 횟수·최초 시각을 승계한다. CONFIRMED/DEFERRED의 기존 category·purpose와 USER/override 연결은 유효한 새 AI 결과에도 유지한다. 기존 B0 계약의 null·UNASSIGNED 목적 슬롯 신규 AI 연결은 유지한다. 세부 사항은 [B2 category 계약](category-management-api.md)을 따른다.
