@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 상태: **승인 v4 · 실행 중 (2026-10-07)**. 아래 제안 인터페이스와 기본값은 구현 계획이며 서버 신규 계약을 확정하지 않는다. 사용자 승인에 따라 Task 1부터 실행하며 Task 5 뒤 중간 확인을 받는다.
+- 상태: **승인 v4 · Task 1~5 검증 완료, 중간 확인 대기 (2026-10-07)**. 아래 제안 인터페이스와 기본값은 구현 계획이며 서버 신규 계약을 확정하지 않는다. 사용자 승인에 따라 Task 1부터 실행하며 Task 5 뒤 중간 확인을 받는다.
 - 브랜치 `client/c2-kmp-core`, PR base `develop`. 시작 HEAD: `e884d14fcd59be026886b2056f3e0e377a5c627f`.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. `iosArm64`/`iosSimulatorArm64`, static `Shared.framework` direct integration 유지. 공유 코드에 Compose/SwiftUI 의존성 없음.
 - 서버 최신 확인(2026-10-07 13:48 KST): B1 PR [#8](https://github.com/seongmin221/wishlist-app/pull/8)와 B2 PR [#9](https://github.com/seongmin221/wishlist-app/pull/9) merged. B2 브랜치 `origin/seongmin221/server-b2-category-management` tip `3df880e`, 최신 `origin/develop`은 `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0`이며 열린 PR은 없다. B2 PR #9 mergedAt은 13:31:42 KST. 과거 시작 HEAD는 위 기록을 유지하며, Task 1 실행 전에 `origin/develop` `1c6d949081d47ddb28e60c00eda44b4aa0d91fb0` 위로 승인된 rebase를 완료했다(실행 기준 계획 commit `dd62150`). 이 commit의 서버 계약을 기준으로 실행한다.
@@ -345,6 +345,10 @@ interface FakeControls {
 - [x] **Step 5: 문서·커밋.** integration-status에 fake 규칙과 API 공개 구현을 구별해서 적고 `feature(kmp): 가짜 저장소의 상태와 재전송 규칙 구현`.
 
 ## Task 5 이후 사용자 확인 지점
+
+**실행 결과 (2026-10-07):** Task 1·2a·2b·3·4·5는 구현과 task별 독립 리뷰(spec PASS / quality Approved)를 완료했다. SKIE 0.10.12의 Kotlin 2.3.21 Flow/suspend 및 Swift 구현 → Kotlin callback 호출을 실제 검증했고, 선택 의존성은 [호환성 기록](../../history/architecture/client/c2-dependency-compatibility-2026-10-07.md)에 고정했다. 최종 commonTest는 Android host·iOS simulator 각각 81개(공통 Fake 계약 7개 포함)가 실패·오류·skip 없이 실행됐다. 가격 플랫폼 이관 시 Android Debug/Release 각각 62개와 Swift 전체 73개도 통과했으며, Task 5 simulator framework link를 확인했다. Task 4~5 이후 플랫폼 전체 테스트를 다시 실행한 결과로 해석하지 않는다. 기존 Gradle configuration/deprecation 경고는 남아 있다.
+
+시드는 상위 8개/세부 30개 분류·목적 7개·중복 통합 상품 8개이며 보드 count와 실제 membership은 분리한다. 공용 taxonomy에 없는 세 분류는 custom UUID다. Fake는 현재 세션을 통한 명시적 seed 투입, 생성·상세·상태 전이·CAS·idempotency·계정 격리를 검증했다. 통합 범위는 [서버 연동 현황](../../architecture/client/server-integration-status.md)에 기록했다. 새 Fake API의 Swift 호출·Remote·실서버 연결은 아직 검증하지 않았고, Task 6a~10은 중간 확인 후 진행한다.
 
 Task 1~5의 Kotlin 모델·가격·시드·Fake 산출물, 실제 테스트 결과, 미검증 Swift 경계를 제시한다. 사용자 확인 전 Task 6a~10은 시작하지 않는다. 이 중간 확인은 큰 PR의 후반 설계 재작업을 줄이기 위해 사용자가 요청한 절차다. 브랜치/PR은 C2 한 개를 유지한다. interop 대안이 미결정이어도 Task 2a~5의 Kotlin 부분까지 진행할 수 있다.
 
