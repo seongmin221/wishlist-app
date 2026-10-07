@@ -96,7 +96,7 @@ B2~B4가 읽기·참조 자원 준비 단계이고, B5~B7 완료 뒤 실제 사�
 
 생성 응답 작업에서 outbox event ID 지정 발행도 연결한다. 기존 `dispatchPending(1)`이 오래된 retry event를 먼저 골라 신규 상품 발행을 밀어내는 문제는 B5까지 미루지 않는다. backlog와 신규 event를 함께 둔 회귀를 B1 통과 조건에 포함한다. Scheduler·오래된 PENDING 복구는 B5 범위를 유지한다.
 
-**통과:** 생성 201/Location, replay 200/표시 header, 같은 key 다른 URL 409, 다른 owner GET 404, READY/PARTIAL/실패 표현, DELETED 일반 GET 404·생성 replay에는 기존 tombstone. 중복 key 재전송은 item/job/outbox를 늘리지 않는다. deletionImpact의 목적 정보는 B3/B8에서 실제 연결 데이터와 함께 확장한다.
+**통과:** 생성 201/Location, replay 200/표시 header, 같은 key 다른 URL 409, 다른 owner GET 404, READY/PARTIAL/실패 표현, DELETED 일반 GET 404·생성 replay에는 기존 tombstone. 중복 key 재전송은 item/job/outbox를 늘리지 않는다. deletionImpact의 목적 정보는 ITEM-05와 함께 B7에서 실제 연결 데이터로 확장한다.
 
 **주요 테스트:** `CreateWishlistItemServiceTest`, `WishlistRoutesTest`, `DatabaseMigrationTest`, `DatabaseFactoryTest`, `OutboxDispatcherTest`; 신규 `WishlistDetailRoutesTest`가 실제 PostgreSQL을 통해 상세 service·공통 mapper의 상태표와 HTTP 계약을 함께 검증한다.
 
@@ -127,6 +127,8 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 **통과:** 19개에서 동시 생성 두 건 중 한 건만 성공, 같은 parent 공백/대소문자 정규화 중복 방지, 다른 parent의 이름 규칙 준수, parent 변경 거절, 입력 제한, 빈 custom 표시, 다른 owner 차단. archive 독립성은 B10에서 후속 검증한다.
 
 ## B3 — 목적 기본 관리
+
+**현재 상태(2026-10-07):** develop `1c6d949`에서 별도 Orca worktree로 수신했다. 직접 baseline은 전체 `--rerun-tasks` 252개 중 251 통과·실패/오류 0·RealUrlPilot 1 skip이다. 활동순·입력 제한·목적 수·AI 근거·재판단 정책을 사용자와 확정하고 [B3 설계](../../superpowers/specs/2026-10-07-b3-purpose-management-design.md)를 작성했다. 구현 전이다.
 
 **산출물:** 목적 생성·상세·목록·편집, 상품/검토 화면의 선택 목록.
 
@@ -265,11 +267,11 @@ ARC-07 → ARC-08 → ARC-09. 현재 참조 상태와 복원 정책을 preview/�
 | --- | --- | --- |
 | 홈 보완 projection·기존 requiredAction 충돌 | B0 | category 재지정과 수동 완료 차이, 최신 계약 반영 |
 | clientCreatedAt·metadata optional 규칙 | B1 | 보관 필드·검증, 서버 createdAt 정렬 유지 |
-| 목적 입력 제한·색/icon stable key·활동순 | B3 | 이름 중복·길이, 목록/AI 최근 목적·홈 정렬 동일 기준 |
+| 목적 입력 제한·색/icon stable key·활동순 | B3 (**해결**) | [B3 제품 결정](../../history/product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md) |
 | 홈 목적 개수·빈 목적 노출·연속 restart | B4 | 2~3개 확정, 현재 대상 재조회와 완료 검토 재개 구분 |
 | retry 예산·deadline·즉시 발행 제한 | B5 | 일반/browser 합산과 timeout·복구, 기존 운영 계약 유지 |
 | 이미지 형식/크기·저장소·외부 이미지 보존 | B6 | upload·completion·정리·archive 장기 보존 방향 |
-| 상품명/brand 제한·생성 후 편집 취소 | B7 | CAT/PUR POST 성공 뒤 draft 취소 시 새 자원 수명 |
+| 상품명/brand 제한·생성 후 편집 취소 | B7 | CAT POST 성공 뒤 draft 취소 시 새 자원 수명. PUR는 B3에서 유지로 해결 |
 | 후보 filter·선택 유지·분석 상태·bulk 상한 | B8a | 추가 가능 item 상태, 이동 원자성, 최대 요청 크기 |
 | impact token·DELETE 전달 형식·신규 key retention | B2 생성 및 B8 삭제 전, B9/B10 재확인 | 생성 key 정책은 B2부터, 최종 삭제 검증은 B8부터. 기존 ITEM-05는 별도 계약 유지 |
 | 다중 중복 후보·다른 판매처 식별 | B9 | 정확한 지원 범위와 사용자 판단 단위 |

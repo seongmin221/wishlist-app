@@ -15,14 +15,14 @@ ITEM-03 deletionImpact의 목적 정보는 상품 삭제 ITEM-05와 함께 B7에
 
 ## 확정한 제품 정책
 
-사용자 답변(2026-10-07)과 근거 문서에서 확정한 값이다. 경위는
+사용자 답변(2026-10-07)과 근거 문서에서 확정한 값이다. 경위·근거·감수한 부작용은
 [B3 제품 결정](../../history/product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md)에 둔다.
 
 | 항목 | 결정 |
 | --- | --- |
 | 색 key | `CORAL, MUSTARD, PERIWINKLE, CYAN, MINT, PINK`; 기본 CORAL (디자인 6색·canvas 기본) |
 | 아이콘 key | `HEART, HOME, PLANE, GIFT, TENT, MUSIC, STAR, BOOK`; 기본 HEART 미리 선택 (canvas·handoff 8개) |
-| 필수 입력 | 이름·colorKey·iconKey 필수, 설명 선택. 서버는 기본값을 채우지 않는다 |
+| 필수 입력 | 이름·colorKey·iconKey 필수, 설명 선택. 기본값은 클라이언트의 초기 선택이며 서버는 생략된 key를 채우지 않는다 |
 | 입력 제한 | 이름 1~40, 설명 0~200 Unicode code point. B2와 같은 문자 규칙(설명만 LF/CRLF). 이름 중복 허용 |
 | 개수·속도 | ACTIVE 목적 owner당 30개. 신규 생성 성공 owner별 직전 60초 10건 |
 | 생성 key | receipt를 계정 데이터 유지 동안 보존. 실패는 receipt 없음 |
@@ -31,9 +31,9 @@ ITEM-03 deletionImpact의 목적 정보는 상품 삭제 ITEM-05와 함께 B7에
 | 정렬 | 목적 탭·선택 목록·AI 후보 선정 모두 `activityAt DESC, id DESC`. 빈 목적 포함 |
 | 후보 수 | 해당 목적이 연결된 ACTIVE 상품 전부(분석·검토·보완 상태 무관). 미리보기는 최근 저장순 4개 |
 | AI 근거 | 활동순 ACTIVE 목적 최대 10개의 이름·설명·최근 후보 상품명 최대 2개 |
-| 편집 후 재판단 | 없음. 진행 중 분석이 고른 목적이 낡았으면 목적 연결만 버린다 |
+| 편집 후 재판단 | MVP에서는 없음. 진행 중 분석이 고른 목적이 낡았으면 목적 연결만 버린다 |
 | 확정/보류 목적 미지정 | CONFIRMED/DEFERRED 상품의 빈 목적을 AI가 채우지 않는다(B0/B2 동작 변경) |
-| AI 후보 제외 | 목적 텍스트에는 B2 custom 안전 제외를 적용하지 않는다. JSON 데이터 분리로 보호 |
+| AI 후보 제외 | 목적 텍스트에는 B2 custom 안전 제외를 적용하지 않는다. 근거는 결정 기록 참조 |
 | archive 입구 | B3는 ARCHIVED 목적의 실제 수(현재 0)와 빈 제목 목록. B10에서 archive 기록으로 출처 전환 |
 
 ## 공개 계약
@@ -51,12 +51,13 @@ key는 모양 이름이며 화면 라벨(예: PLANE=여행)이 바뀌어도 바�
 
 필수 정규 UUID `Idempotency-Key`. body는 `name`, `colorKey`, `iconKey`, 선택 `description`.
 알 수 없는 필드·잘못된 타입·key 밖의 값은 422 INVALID_PURPOSE_INPUT과 `details.fields`다.
-description 생략/null은 null이다.
+description 생략과 null은 같은 null로 정규화한다.
 
 검사 순서: owner 잠금 → 같은 key receipt → 60초 10건 → ACTIVE 30개 → 생성·receipt 저장.
-정상 replay는 한도 검사보다 먼저 처리한다. payload fingerprint는 원문 name·description(기본값 적용)·
-colorKey·iconKey의 canonical JSON SHA-256이다. 다른 payload는 409 IDEMPOTENCY_KEY_REUSED다.
-replay 대상이 ACTIVE가 아니면(향후 삭제·archive) 409 PURPOSE_NOT_AVAILABLE이다.
+정상 replay는 한도 검사보다 먼저 처리한다. payload fingerprint는 원문 name·정규화한 description·
+colorKey·iconKey의 canonical JSON SHA-256이다. receipt가 있으면 B2와 같은 순서로 판정한다.
+fingerprint가 다르면 대상 상태와 관계없이 409 IDEMPOTENCY_KEY_REUSED, 같으면 대상이 ACTIVE가 아닐 때
+(향후 삭제·archive) 409 PURPOSE_NOT_AVAILABLE, ACTIVE면 replay다.
 rate limit은 직전 60초의 CREATE_PURPOSE 성공 receipt를 대상 목적 상태와 무관하게 센다.
 Retry-After는 B2와 같은 계산이다.
 
@@ -78,9 +79,14 @@ Retry-After는 B2와 같은 계산이다.
 }
 ```
 
-`ARCHIVE`는 candidateCount ≥ 1일 때만 포함한다. allowedActions는 상태가 허용하는 행동이며
-해당 API의 구현 묶음(B8/B10)과 별개다. 없는 목적·ACTIVE가 아닌 목적·다른 owner는 모두
-404 PURPOSE_NOT_FOUND, 형식 오류는 400 INVALID_PURPOSE_ID다.
+`ARCHIVE`는 candidateCount ≥ 1일 때만 포함한다. allowedActions는 B1 상품의 REANALYZE처럼 상태가 허용하는
+행동이며 API 구현 묶음과 별개다. B3만 배포된 동안 클라이언트(C6)는 DELETE·ADD_CANDIDATES·ARCHIVE를
+fake 또는 비활성으로 처리하고 B8/B10 연결 때 실제 호출로 바꾼다.
+없는 목적·ACTIVE가 아닌 목적·다른 owner는 모두 404 PURPOSE_NOT_FOUND, 형식 오류는 400 INVALID_PURPOSE_ID다.
+
+candidateCount는 B4 ITEM-02 `purposeId` filter 결과와 같은 집합이다(같은 owner·ACTIVE·현재 purpose 일치).
+B4는 일반 category 목록의 표시 조건(이름·category 존재)을 목적 filter에 추가하지 않는다.
+B7 이후 변경 흐름에서도 PUR-01/PUR-03 count·미리보기와 ITEM-02 결과의 일치를 다시 확인한다.
 
 ### PUR-01 `GET /v1/purposes`
 
@@ -110,11 +116,24 @@ membershipVersion은 바꾸지 않는다. 응답은 PUR-03 표현이다.
 ### 상품 응답 확장
 
 B1 공통 mapper의 `purpose`에 nullable `name, colorKey, iconKey`를 추가한다. 현재 owner 목적 row에서 읽어
-편집 결과가 활성 상품 GET에 바로 반영된다. 목적 편집은 상품 version·출처·review를 바꾸지 않는다.
+편집 결과가 활성 상품 GET에 바로 반영된다. 목적이 없으면 네 값이 모두 null이고 source로 의미를 구분한다.
 
 ```json
 {"purpose":{"id":"44444444-4444-4444-8444-444444444444","name":"출퇴근 헤드폰","colorKey":"CORAL","iconKey":"MUSIC","source":"AI"}}
+{"purpose":{"id":null,"name":null,"colorKey":null,"iconKey":null,"source":"UNASSIGNED"}}
+{"purpose":{"id":null,"name":null,"colorKey":null,"iconKey":null,"source":"USER"}}
 ```
+
+UNASSIGNED는 아직 연결이 없음, USER+null은 사용자가 확정한 목적 미지정이다.
+목적 편집은 상품 version·출처·review를 바꾸지 않는다. B2 category 이름 변경과 같이 상품 version이 같아도
+목적 표시값은 바뀔 수 있으므로 클라이언트는 상품 version만으로 목적 표시 캐시를 유지하지 않고 재조회 값을 쓴다.
+
+### 확정된 목적 미지정의 표현
+
+저장 표현은 하나다. 사용자가 목적 없음을 확정한 상태는 `purpose_source=USER, purpose_id=null`이다.
+legacy 전환, B8 목적 삭제, B7에서 목적 없이 저장하는 확정·편집이 이 표현을 기록하도록 권장하며 B7 계약에서 확정한다.
+CONFIRMED/DEFERRED + UNASSIGNED는 별도 의미가 아니라 "검토를 마친 상품"에 대한 AI 보호 조건이다.
+AI는 USER 출처·PURPOSE override·CONFIRMED/DEFERRED 중 하나라도 해당하면 목적을 쓰지 않는다.
 
 ### 오류 코드
 
@@ -149,56 +168,91 @@ V13만 추가한다. V1~V12는 수정하지 않는다.
 **mutation_receipts**: category_id를 nullable로 바꾸고 `purpose_id` + `(owner_id,purpose_id)` FK를 추가한다.
 `num_nonnulls(category_id,purpose_id)=1` CHECK. operation은 CREATE_PURPOSE다.
 
-**잠금과 version**: 사용자 구조 변경은 owner → purpose → item → job 순서다. Worker finish는 기존
+**잠금 순서**: 사용자 구조 변경은 owner → purpose(ID순) → item(ID순) → job 순서다. Worker finish는 기존
 owner → item → job 뒤 목적 row를 갱신한다. 모든 목적 쓰기가 owner 잠금을 먼저 잡으므로 순환 대기가 없다.
-외부 HTTP/AI 동안 DB 잠금을 유지하지 않는다. `version`은 목적 정보 CAS, `membershipVersion`은 후보 유입·유출마다
-+1(B8 이동·B10 archive 확인용)이다. AI 재검증은 version 대신 snapshot의 이름·설명 원문을 비교해
-색·아이콘 편집이 AI 결과를 무효화하지 않게 한다.
+이 전제는 B3에 한정되지 않는다. B7 ITEM-04/07/08, B8 PUR-05~08, B10 archive/restore도 owner 잠금 없이
+목적 row를 잠그거나 갱신하는 경로를 만들지 않는다. 외부 HTTP/AI 동안 DB 잠금을 유지하지 않는다.
+
+**version 역할**: `version`은 목적 정보(이름·설명·색·아이콘) CAS다. `membershipVersion`은 후보 유입·유출마다
++1이며 B8 이동·B10 archive 확인용이다. AI 재검증은 version 대신 snapshot의 이름·설명 원문을 비교해
+색·아이콘 편집이 AI 결과를 무효화하지 않게 한다. 후보 구성 변경은 목적 정보 변경으로 보지 않는다.
 
 ## AI 목적 후보
 
-[AI 내부 설계](../../architecture/server/purpose-ai-candidates.md)에 상세를 둔다.
+상세는 구현과 함께 작성하는 `docs/architecture/server/purpose-ai-candidates.md`에 둔다.
 
-- **공급**: B2 `CategoryCandidateSupply`가 같은 connection으로 ACTIVE 목적 상위 10개(활동순, 빈 목적 포함)와
-  각 목적의 최근 저장순 ACTIVE 후보 상품명 최대 2개(분석 대상 상품 제외, 각 40 code point)를 읽는다.
-- **snapshot v3**: codec이 `purpose_candidates` `{id: {name, description, item_names}}`를 저장한다.
-  v1/v2 snapshot에는 목적 후보가 없으므로 그 결과의 목적은 버린다.
-- **요청**: 목적은 compact 문자열이 아니라 JSON object 배열로 보낸다. 출력 80 token 안에 UUID 두 개가 들어가지 않도록
-  요청에서는 목적에 `P01`~`P10` alias를 쓰고 응답을 실제 ID로 되돌린다.
-- **토큰 단계**(2,000/80 유지, 단계별 token-count 검사, 실제 전송 후보로만 응답 검증):
+### 공급과 snapshot
 
-| 단계 | 상품 | custom | 목적 |
-| --- | --- | --- | --- |
-| T0 | 2,400 | 전체 | 이름+설명+상품명 |
-| T1 | 800 | 이름만 | 이름+설명 |
-| T2 | 160 | 이름 12 | 이름만 |
-| T3 | 160 | 제외 | 이름만 |
-| T4 | 160 | 제외 | 제외(B2 공용 최소) |
+B2 `CategoryCandidateSupply`가 같은 connection으로 ACTIVE 목적 상위 10개(활동순, 빈 목적 포함)와
+각 목적의 최근 저장순 ACTIVE 후보 상품명 최대 2개를 읽는다. 분석 대상 상품은 제외하고 상품명은 각 40 code point로 자른다.
 
-  목적·custom이 모두 없으면 B2와 같은 T0→T4다. 직전 단계와 같은 본문은 다시 검사하지 않는다.
-  목적을 제외한 호출은 그 호출의 목적 미지정이며 stale·재시도로 다루지 않는다.
-- **반영**: AI가 고른 목적이 같은 owner·ACTIVE이고 이름·설명이 snapshot과 같을 때만 연결한다. 아니면 목적만 버리고
-  재예약하지 않는다. category stale은 B2 규칙(예산 승계 재예약)을 그대로 따른다. CONFIRMED/DEFERRED,
-  USER 출처·PURPOSE override는 연결하지 않는다. 연결이 바뀌면 같은 transaction에서 새 목적의 membershipVersion +1·
-  activity(CANDIDATE_ADDED), 이전 목적의 membershipVersion +1을 기록한다.
-- **비용 보호**: 목적 생성·편집은 job을 만들지 않는다. 기존 generation의 최대 3회·30분 예산과 B2 replacement는 그대로다.
+기존 v2 codec에는 이미 `purposes` ID 배열·`purpose_labels`와 `purposes.size <= 10` 검사가 있고 gateway가
+compact 문자열로 보낸다. 그러나 이 값은 목적 테이블이 생기기 전의 문자열 ID라 신뢰하지 않는다.
+v1/v2 snapshot에서 나온 목적 결과는 버린다. 신규 **schema v3**는 `purposes` ID 배열을 유지하고
+`purpose_labels`를 없애는 대신 같은 ID를 key로 하는 `purpose_candidates`
+`{id: {name, description, item_names}}`를 저장한다. codec은 두 ID 집합의 일치와 정규 UUID를 요구한다.
+
+### 요청 형식과 안전성
+
+목적은 compact 문자열 대신 JSON object 배열로 보낸다. 사용자 텍스트의 구두점이 구조를 깨지 않는다.
+key는 짧게 `{"id":"P01","n":이름,"d":설명,"i":[상품명]}`로 쓰고 고정 developer 지시문이 key 의미를 설명한다.
+출력 80 token 안에 custom UUID와 목적 UUID가 함께 들어가지 않도록 목적 ID는 `P01`~`P10` alias로 보내고
+응답을 실제 ID로 되돌린다. 응답은 실제 전송한 alias 집합으로만 검증하며 그 밖의 값은 Unusable이다.
+
+목적 이름·설명은 사용자 텍스트이고 후보 상품명은 외부 쇼핑몰 추출 텍스트(향후 사용자 편집 포함)다.
+모두 JSON 데이터 메시지에만 넣는다. 목적에 custom 안전 제외를 적용하지 않는 근거는 결정 기록에 있다.
+
+### 토큰 단계와 최악 크기
+
+유료 입력 2,000·출력 80과 가격표를 유지한다. 단계마다 token-count endpoint로 같은 요청을 검사하고
+통과한 단계 하나만 유료 호출한다. 직전 단계와 같은 본문은 다시 검사하지 않는다. 목적·custom이 모두 없으면
+B2와 같은 T0→T5(공용 최소)다.
+
+| 단계 | 상품 | custom | 목적 | 최악 추정 | 보통 추정 |
+| --- | --- | --- | --- | ---: | ---: |
+| T0 | 2,400 | 전체 | 10개 이름+설명+상품명 | ≈17,500 | ≈2,700 |
+| T1 | 800 | 이름만 | 10개 이름+설명 | ≈5,750 | ≈1,900 |
+| T2 | 160 | 이름 12 | 10개 이름만 | ≈2,490 | — |
+| T3 | 160 | 제외 | 10개 이름만 | ≈1,590 | — |
+| T4 | 160 | 제외 | 활동순 5개 이름만 | ≈1,350 | — |
+| T5 | 160 | 제외 | 제외(B2 공용 최소) | ≈1,110 | — |
+
+추정 기준: 실제 `ai/taxonomy/v1.json` 공용 compact 1,184자(한글 523자)와 지시문·schema를 고정분 ≈950 token으로 두었다.
+한글 1자=1 token, ASCII 2.5자=1 token인 보수적 가정이다. 최악은 custom 20개·목적 10개·모든 입력 최대 길이,
+보통은 상품 metadata 300자·custom 3개·목적 설명 30자다. 실제 값은 runtime token-count가 결정하며
+이 표는 단계 설계의 근거이지 측정 결과가 아니다.
+
+해석: 추정상 최악에서도 T3에서 목적 이름은 남고 T4/T5는 추정이 틀렸을 때의 보험이다. 자주 잃는 근거는
+목적이 여러 개일 때의 상품명(T0), 상품 metadata가 길 때의 설명이다. T4는 6~10번째 목적, T5는 전체 목적을
+그 호출에서만 제외하며 결과는 목적 미지정이다. stale·재시도로 다루지 않는다.
+
+관측: Worker는 유료 호출 전 선택 단계·전송 custom 수·전송 목적 수를 jobId와 함께 INFO 로그로 남긴다.
+사용자 텍스트는 기록하지 않는다. T4/T5 빈도는 이 로그로 확인하며 cloud metric 연결은 B11에서 다룬다.
+
+### 반영과 보호
+
+AI가 고른 목적이 같은 owner·ACTIVE이고 이름·설명이 snapshot과 같을 때만 연결한다. 아니면 목적만 버리고
+재예약하지 않는다. category stale은 B2 규칙(예산 승계 재예약)을 그대로 따른다. USER 출처·PURPOSE override·
+CONFIRMED/DEFERRED는 목적을 쓰지 않는다. 연결이 바뀌면 같은 transaction에서 새 목적의 membershipVersion +1·
+activity(CANDIDATE_ADDED), 이전 목적의 membershipVersion +1을 기록한다. 목적 생성·편집은 job을 만들지 않으며
+기존 generation의 최대 3회·30분 예산과 B2 replacement는 그대로다.
 
 ## 검증
 
 실제 PostgreSQL/Testcontainers로 다음을 확인한다.
 
 - owner 격리·다른 owner 목적 참조의 DB 차단, 다른 owner 404
-- key replay·payload 충돌·실패 재시도·operation namespace, 29개에서 동시 생성 두 건 중 하나만 성공, 60초 10건과 Retry-After
+- key replay·payload 충돌·replay 판정 순서·실패 재시도·operation namespace, 29개에서 동시 생성 두 건 중 하나만 성공, 60초 10건과 Retry-After
 - 입력 경계(code point·문자 규칙·key 밖 값), 빈 목적 생성·상세·목록 유지
 - version 충돌·no-op·optional null, 색 편집 후 AI 결과 유지, 이름 편집 후 목적만 폐기
-- 동일 activityAt tie-break·cursor·projection·limit, 목적 0~1개 모델
-- stale snapshot의 owner·비활성·이름 변경, CONFIRMED/DEFERRED·USER/override 보호, 신규 목적 생성 시 job 0
-- T0~T4 축약·목적 alias 역매핑·전송하지 않은 목적 거절, legacy V12→V13 upgrade
+- 동일 activityAt tie-break·cursor·projection·limit, 목적 0~1개 모델, 빈 목적의 상품 응답 null 표현
+- stale snapshot의 owner·비활성·이름 변경, v1/v2 snapshot 목적 결과 폐기, CONFIRMED/DEFERRED·USER/override 보호, 신규 목적 생성 시 job 0
+- T0~T5 축약·짧은 key·alias 역매핑·전송하지 않은 목적 거절·단계 로그, legacy V12→V13 upgrade
 - B1/B2/Worker 기존 회귀 전체
 
 ## 문서와 커밋
 
 - `docs/architecture/server/purpose-management-api.md`: 공개 계약·JSON·오류·헤더 예시
 - `docs/architecture/server/purpose-ai-candidates.md`: 후보 공급·snapshot·토큰·stale
-- persistence·read API·inventory·implementation order·INDEX 갱신, 제품 결정과 구현 이력 기록
+- persistence(V13·잠금 규칙)·read API·inventory·implementation order·INDEX 갱신, 구현 이력 기록
 - 의미별 한글 로컬 커밋. push·PR·병합은 하지 않는다.
