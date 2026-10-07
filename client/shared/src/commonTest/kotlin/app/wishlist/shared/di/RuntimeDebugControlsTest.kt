@@ -26,6 +26,14 @@ class RuntimeDebugControlsTest {
         runtime.close()
     }
 
+    @Test fun closedDebugRuntimeHasNoDebugControls() = runTest {
+        val runtime = createRuntime(debugBindings())
+        runtime.startDebugSession()
+        assertNotNull(runtime.debugControls())
+        runtime.close()
+        assertNull(runtime.debugControls())
+    }
+
     @Test fun pendingCountCreatesUnboundRowsInSharedOrderOnceReady() = runTest {
         val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
         val controls = assertNotNull(runtime.debugControls())

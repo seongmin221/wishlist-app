@@ -3,6 +3,7 @@
 package app.wishlist.shared.data.local
 
 import app.wishlist.shared.core.*
+import app.wishlist.shared.di.RUNTIME_NOT_READY
 import app.wishlist.shared.model.*
 import app.wishlist.shared.repository.LocalStore
 import kotlinx.coroutines.CancellationException
@@ -11,8 +12,29 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Single-process SQLite store. Lock order is session gate -> DB transaction; only the short DB
- * commit runs inside the gate. The account is always taken from the validated snapshot, never
+ * Keeps the owner's resources (the SQL driver) open while one store operation runs. It is a
+ * counter, never a lock: [enter] does not block, so it adds no lock-order edge.
+ */
+internal interface StoreLease {
+    /** False once the owner is closing: the operation must not touch the DB at all. */
+    fun enter(): Boolean
+
+    /** Ends the operation; the last exit after close may run the owner's teardown on this thread. */
+    fun exit()
+
+    /** For a store whose driver nobody closes underneath it (unit tests). */
+    object None : StoreLease {
+        override fun enter() = true
+        override fun exit() = Unit
+    }
+}
+
+/**
+ * Single-process SQLite store. Order is lease -> (first driver open) -> session gate -> DB
+ * transaction; only the short DB commit runs inside the gate. Every operation holds a [lease] from
+ * before the driver is touched until after the gate is left, so the runtime's close never closes
+ * the driver under a running query; an operation started after close is UNAVAILABLE/RUNTIME_NOT_READY
+ * without touching the DB. The account is always taken from the validated snapshot, never
  * from the caller's arbitrary value. The driver is opened by [LazyDriver] on first use, before the
  * gate is entered. Any non-cancellation exception (including a failed open) becomes
  * LOCAL_STORE_FAILURE.
@@ -22,6 +44,7 @@ internal class SqlLocalStore(
     private val driver: LazyDriver,
     /** Test-only seam: runs inside the accept transaction after the cache write. */
     private val afterAcceptCacheWrite: () -> Unit = {},
+    private val lease: StoreLease = StoreLease.None,
 ) : LocalStore {
     @Volatile private var database: WishlistDatabase? = null
 
@@ -30,25 +53,35 @@ internal class SqlLocalStore(
     private fun <T> failure(kind: ErrorKind, code: String? = null): ClientResult<T> =
         ClientResult.Failure(ClientError(kind, code))
 
-    /** Device-level work that does not depend on the account (no session gate). */
-    private suspend fun <T> local(block: (WishlistDatabase) -> ClientResult<T>): ClientResult<T> = try {
-        block(db())
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        failure(ErrorKind.UNAVAILABLE, LOCAL_STORE_FAILURE)
+    /**
+     * The only way to [db]: holds the lease across the driver open, the session gate and the
+     * blocking SQL, and releases it (also on cancellation) only after the gate has been left.
+     */
+    private suspend inline fun <T> leased(block: () -> ClientResult<T>): ClientResult<T> {
+        if (!lease.enter()) return failure(ErrorKind.UNAVAILABLE, RUNTIME_NOT_READY)
+        try {
+            return try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failure(ErrorKind.UNAVAILABLE, LOCAL_STORE_FAILURE)
+            }
+        } finally {
+            lease.exit()
+        }
     }
+
+    /** Device-level work that does not depend on the account (no session gate). */
+    private suspend fun <T> local(block: (WishlistDatabase) -> ClientResult<T>): ClientResult<T> =
+        leased { block(db()) }
 
     private suspend fun <T> gated(
         snapshot: SessionSnapshot,
         block: (WishlistDatabase) -> ClientResult<T>,
-    ): ClientResult<T> = try {
+    ): ClientResult<T> = leased {
         val db = db()
         session.withCurrent(snapshot) { block(db) }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        failure(ErrorKind.UNAVAILABLE, LOCAL_STORE_FAILURE)
     }
 
     private suspend fun <T> gatedForAccount(

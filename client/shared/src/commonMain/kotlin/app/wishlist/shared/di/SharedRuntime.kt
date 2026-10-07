@@ -77,7 +77,10 @@ class SharedRuntime internal constructor(
     private val env: RuntimeEnvironment,
     private val seedOverride: (suspend () -> ClientResult<Unit>)? = null,
 ) {
-    private val koinApplication = koinApplication { modules(sharedModules(env)) }
+    // Every graph lookup, the ready publication and every store DB operation run inside the guard;
+    // teardown waits for them. Created first: the graph's store holds it as its lease.
+    private val guard = CloseGuard(onClosed = ::tearDown)
+    private val koinApplication = koinApplication { modules(sharedModules(env, guard)) }
     internal val koin: Koin = koinApplication.koin
     private val mutableSession: MutableAuthSession = koin.get()
     private val debugStarted = MutableStateFlow(false)
@@ -121,9 +124,6 @@ class SharedRuntime internal constructor(
      * for an unexpected exception). The runtime still becomes [ready]; null when it succeeded.
      */
     val bootstrapFailure: StateFlow<ClientError?> = mutableBootstrapFailure.asStateFlow()
-
-    // Every graph lookup and the ready publication run inside the guard; teardown waits for them.
-    private val guard = CloseGuard(onClosed = ::tearDown)
 
     /**
      * DEBUG only, idempotent: starts signed out, restores the saved fake account (changing the
@@ -252,9 +252,14 @@ class SharedRuntime internal constructor(
     }
 
     /**
-     * Releases the HTTP client, its engine and the SQL driver once (if created). Idempotent and
-     * safe from any thread: new lookups are refused at once, and teardown runs when the last
-     * in-flight lookup or ready publication finishes, ending with ready = false.
+     * Releases the HTTP client, its engine and the SQL driver once (if created). Idempotent,
+     * non-blocking and safe from any thread. At once: ready = false, new graph lookups and new
+     * local-store DB operations are refused (UNAVAILABLE/RUNTIME_NOT_READY, the DB untouched), and
+     * the runtime's background jobs are cancelled. The teardown itself is deferred until the last
+     * in-flight graph lookup, ready publication or local-store DB operation (including a first
+     * driver open) has returned, and then runs on that caller's thread (possibly the io thread),
+     * ending with ready = false. It does not wait for in-flight HTTP requests (the HTTP client and
+     * engine are closed with the rest of the teardown) or for caller jobs outside the store.
      */
     fun close() {
         if (!guard.close()) return

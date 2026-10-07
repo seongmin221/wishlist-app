@@ -14,6 +14,7 @@ import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.data.local.CachedGetItemRepository
 import app.wishlist.shared.data.local.LazyDriver
 import app.wishlist.shared.data.local.SqlLocalStore
+import app.wishlist.shared.data.local.StoreLease
 import app.wishlist.shared.data.remote.AuthTokenProvider
 import app.wishlist.shared.data.remote.AuthenticatedTransport
 import app.wishlist.shared.data.remote.CallbackAuthTokenProvider
@@ -88,12 +89,13 @@ internal class ResourceRegistry {
 }
 
 /**
- * Lock-free close guard. Graph lookups and ready publication run inside [use]; [close] refuses
- * new users at once, but the actual teardown ([onClosed]) runs exactly once, when the last active
- * user leaves (or immediately if there is none). So no lookup ever meets a closed graph, and the
- * teardown's `ready = false` is the last ready write.
+ * Lock-free close guard. Graph lookups, ready publication and every DB operation of the store
+ * (as its [StoreLease]) are its users; [close] refuses new users at once, but the actual teardown
+ * ([onClosed]) runs exactly once, when the last active user leaves (or immediately if there is
+ * none), on that user's thread. So no lookup ever meets a closed graph, no query ever meets a
+ * closed driver, and the teardown's `ready = false` is the last ready write. It never blocks.
  */
-internal class CloseGuard(private val onClosed: () -> Unit) {
+internal class CloseGuard(private val onClosed: () -> Unit) : StoreLease {
     private data class State(val users: Int, val closing: Boolean)
 
     private val state = MutableStateFlow(State(users = 0, closing = false))
@@ -108,7 +110,7 @@ internal class CloseGuard(private val onClosed: () -> Unit) {
         }
     }
 
-    fun enter(): Boolean {
+    override fun enter(): Boolean {
         while (true) {
             val current = state.value
             if (current.closing) return false
@@ -116,7 +118,7 @@ internal class CloseGuard(private val onClosed: () -> Unit) {
         }
     }
 
-    fun exit() {
+    override fun exit() {
         while (true) {
             val current = state.value
             val next = current.copy(users = current.users - 1)
@@ -150,13 +152,13 @@ internal val ITEM_03_DELEGATE = named("ITEM_03")
  * exist only in DEBUG (the seed catalog needs them even if no API is FAKE); Remote parts only when
  * some API is REMOTE. ITEM-01/03 are wired from their explicit binding, never from the build mode.
  */
-internal fun sharedModules(env: RuntimeEnvironment): List<Module> = buildList {
-    add(coreModule(env))
+internal fun sharedModules(env: RuntimeEnvironment, storeLease: StoreLease): List<Module> = buildList {
+    add(coreModule(env, storeLease))
     if (env.bindings.buildMode == ClientBuildMode.DEBUG) add(fakeModule())
     env.remote?.let { add(remoteModule(env, it)) }
 }
 
-private fun coreModule(env: RuntimeEnvironment) = module {
+private fun coreModule(env: RuntimeEnvironment, storeLease: StoreLease) = module {
     single { MutableAuthSession() } bind AuthSession::class
     single { env.clock }
     single { env.ids }
@@ -165,7 +167,8 @@ private fun coreModule(env: RuntimeEnvironment) = module {
         val registry = get<ResourceRegistry>()
         LazyDriver(
             open = {
-                // Registered only once actually opened; an open racing close() is closed at once.
+                // Registered only once actually opened. The open runs inside a store lease, so close()
+                // defers teardown past it; the closed-registry check is only a backstop.
                 val driver = registry.register(env.platform.openDriver()) { it.close() }
                 check(!registry.isClosed) { "Runtime closed while opening the driver" }
                 driver
@@ -173,7 +176,9 @@ private fun coreModule(env: RuntimeEnvironment) = module {
             io = env.dispatchers.io,
         )
     }
-    single<LocalStore> { SqlLocalStore(get(), get()) }
+    // The one SQL store of the graph (also the one CachedGetItemRepository holds): every operation
+    // leases the runtime's close guard, so close() never closes the driver under a running query.
+    single<LocalStore> { SqlLocalStore(get(), get(), lease = storeLease) }
     single<SnapshotCreateItemRepository>(ITEM_01_DELEGATE) { itemBackend(env.bindings.backendOf(ApiId.ITEM_01)) }
     single<GetItemRepository>(ITEM_03_DELEGATE) { itemBackend(env.bindings.backendOf(ApiId.ITEM_03)) }
     // The Get facade owns cache sync: the selected delegate is wrapped exactly once.

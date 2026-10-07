@@ -39,8 +39,16 @@ final class SharedInteropTests: XCTestCase {
         collector.cancel()
         await collector.value
         let collected = states.count
+        // Later states must really be published, each one observably new: a retry of the same item
+        // would end in a state equal to the current one, so the wait could pass before it ran.
+        // Another account resets to Initial; its retry then ends in NOT_FOUND, which only the
+        // processed retry can produce (so no request is still in flight when the test ends).
+        try await SharedTestRuntime.switchAccount(runtime, to: .apple)
+        await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
         presenter.retry()
-        await SharedTestRuntime.eventually { presenter.state.value.loading == false && presenter.state.value.item != nil }
+        await SharedTestRuntime.eventually {
+            presenter.state.value.loading == false && presenter.state.value.error?.kind == .notFound
+        }
         XCTAssertEqual(states.count, collected, "a cancelled collector must not receive values")
     }
 
