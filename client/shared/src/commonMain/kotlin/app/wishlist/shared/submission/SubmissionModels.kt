@@ -24,9 +24,11 @@ data class InboxRecord(
 data class InboxImportResult(val deletable: List<String>, val retained: List<String>)
 
 /**
- * What the home screen shows for the current session. [local] is the store's pending() view (that
- * account's queue plus unbound rows; unbound rows only when signed out); [processing] is the
- * account's cached items still being analysed, oldest first. Both are empty for another account.
+ * What the home screen shows for the current session, already in display order (the coordinator is
+ * the one ordering point; the home Presenter keeps it). [local] is the store's pending() view (that
+ * account's queue plus unbound rows; unbound rows only when signed out), oldest first by
+ * (sharedAt µs, key) as the store returns it; [processing] is the account's cached items still being
+ * analysed, sorted by (createdAt, id). Both are empty for another account.
  */
 data class SubmissionView(
     val accountId: String?,

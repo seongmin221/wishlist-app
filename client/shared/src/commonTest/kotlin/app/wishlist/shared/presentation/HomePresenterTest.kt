@@ -78,7 +78,8 @@ class HomePresenterTest {
     }
 
     @Test
-    fun loggedOutShowsUnboundOldestFirstWithLocalOnly() = runTest {
+    fun loggedOutShowsUnboundInViewOrderWithLocalOnly() = runTest {
+        // The coordinator view is the one ordering point; the presenter keeps its order as given.
         view.value = SubmissionView(
             null,
             listOf(local("new", T0 + 4.minutes), local("old", T0), local("mid", T0 + 2.minutes)),
@@ -88,10 +89,10 @@ class HomePresenterTest {
         val p = presenter()
         advanceUntilIdle()
         val state = assertIs<HomeState.LoggedOut>(p.state.value)
-        assertEquals(listOf("old", "mid", "new"), state.pending.map { it.sourceUrl.substringAfterLast('/') })
+        assertEquals(listOf("new", "old", "mid"), state.pending.map { it.sourceUrl.substringAfterLast('/') })
         assertTrue(state.pending.all { it.status == RowStatus.LOCAL_ONLY })
         assertEquals("shop.example", state.pending.first().host)
-        assertEquals(RelativeTime.Minutes(5), state.pending.first().savedAt)
+        assertEquals(RelativeTime.Minutes(5), state.pending[1].savedAt)
         p.close()
     }
 
@@ -116,12 +117,12 @@ class HomePresenterTest {
         advanceUntilIdle()
         val state = assertIs<HomeState.LoggedIn>(p.state.value)
         assertEquals(
-            listOf(RowStatus.WAITING_NETWORK, RowStatus.SENDING, RowStatus.FAILED, RowStatus.PROCESSING, RowStatus.PROCESSING, RowStatus.PROCESSING),
+            listOf(RowStatus.FAILED, RowStatus.SENDING, RowStatus.WAITING_NETWORK, RowStatus.PROCESSING, RowStatus.PROCESSING, RowStatus.PROCESSING),
             state.processing.map { it.status },
         )
-        // Local rows (oldest first) then processing rows by createdAt, ties by id; input order is deliberately unsorted.
+        // Local rows then processing rows, each in the view's order (the coordinator sorts; see SubmissionCoordinatorTest).
         assertEquals(
-            listOf("local-p", "local-s", "local-f", "item-i1", "item-i2", "item-i3"),
+            listOf("local-f", "local-s", "local-p", "item-i3", "item-i2", "item-i1"),
             state.processing.map { it.key },
         )
         assertEquals(state.processing.size, state.processing.map { it.key }.toSet().size)

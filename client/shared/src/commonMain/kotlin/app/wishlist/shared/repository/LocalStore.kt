@@ -44,7 +44,7 @@ interface LocalStore {
         retryAfter: Instant?,
     ): ClientResult<Unit>
 
-    /** The snapshot account's cached ACTIVE items whose analysis is still PROCESSING. */
+    /** The snapshot account's cached ACTIVE items whose analysis is still PROCESSING, in no particular order (the submission view sorts them). */
     suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>>
 
     suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit>

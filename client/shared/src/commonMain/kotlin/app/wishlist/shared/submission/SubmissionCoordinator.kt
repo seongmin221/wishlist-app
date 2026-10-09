@@ -71,6 +71,10 @@ class SubmissionCoordinator internal constructor(
     private class Request(val refresh: Boolean, val done: CompletableDeferred<Unit>?)
 
     private val requests = Channel<Request>(Channel.UNLIMITED)
+
+    // Intermediate view updates (a row marked SUBMITTING, a session change) only ask for a publish;
+    // one publisher runs them, and requests arriving during a run collapse into one more run.
+    private val publishRequests = Channel<Unit>(Channel.CONFLATED)
     private val viewLock = Mutex()
     private val mutableView = MutableStateFlow(SubmissionView(null, emptyList(), emptyList(), flushing = false))
     val view: StateFlow<SubmissionView> = mutableView.asStateFlow()
@@ -90,7 +94,10 @@ class SubmissionCoordinator internal constructor(
             while (true) requests.tryReceive().getOrNull()?.done?.complete(Unit) ?: break
         }
         scope.launch(dispatcher) {
-            combine(session.state, ready) { _, _ -> }.collect { guarded(Unit) { publishView() } }
+            for (signal in publishRequests) guarded(Unit) { publishView() }
+        }
+        scope.launch(dispatcher) {
+            combine(session.state, ready) { _, _ -> }.collect { requestPublish() }
         }
     }
 
@@ -174,7 +181,7 @@ class SubmissionCoordinator internal constructor(
         try {
             // Resets stale SUBMITTING rows and binds unbound ones in one commit, before any POST.
             val queue = (store.prepareFlush(snapshot) as? ClientResult.Success)?.value ?: return
-            publishView()
+            requestPublish()
             val now = clock.now()
             for (row in queue) {
                 if (row.submissionStatus != SubmissionStatus.PENDING) continue
@@ -183,7 +190,7 @@ class SubmissionCoordinator internal constructor(
             }
         } finally {
             mutableView.update { it.copy(flushing = false) }
-            publishView()
+            publishView() // the final state, before the flush (and a refresh awaiting it) returns
         }
     }
 
@@ -191,9 +198,9 @@ class SubmissionCoordinator internal constructor(
     private suspend fun send(snapshot: SessionSnapshot, row: LocalSubmission): Boolean {
         val id = row.clientSubmissionId
         if (store.markSubmission(snapshot, id, SubmissionStatus.SUBMITTING, null, null) is ClientResult.Failure) return false
-        // Shown as sending without suspending here; ITEM-01 itself is bound to the flush snapshot, so
-        // an account change at any point is SESSION_CHANGED and never a POST for the other account.
-        scope.launch(dispatcher) { guarded(Unit) { publishView() } }
+        // Shown as sending without suspending here (a coalesced publish); ITEM-01 itself is bound to the
+        // flush snapshot, so an account change at any point is SESSION_CHANGED and never a POST for the other account.
+        requestPublish()
         val command = CreateItemCommand(id, row.sourceUrl, row.sharedAt)
         return when (val result = guarded(STEP_FAILURE) { create.create(command, snapshot) }) {
             is ClientResult.Success -> accept(snapshot, id, result)
@@ -230,7 +237,15 @@ class SubmissionCoordinator internal constructor(
         publishView()
     }
 
-    /** Recomputes the view for the current session. Lock order: viewLock → session gate (held only to publish). */
+    private fun requestPublish() {
+        publishRequests.trySend(Unit)
+    }
+
+    /**
+     * Recomputes the view for the current session; the one place that orders it (see [SubmissionView]):
+     * local rows keep the store's (sharedAt, key) order, processing items are sorted by (createdAt, id).
+     * Lock order: viewLock → session gate (held only to publish).
+     */
     private suspend fun publishView(): Unit = viewLock.withLock {
         val snapshot = session.state.value
         val previous = mutableView.value

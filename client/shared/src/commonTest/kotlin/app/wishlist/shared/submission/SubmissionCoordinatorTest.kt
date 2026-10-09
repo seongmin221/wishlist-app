@@ -29,6 +29,7 @@ import app.wishlist.shared.model.CategoryMissingReason
 import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.model.WishlistItem
+import app.wishlist.shared.model.itemFixture
 import app.wishlist.shared.repository.CreateItemCommand
 import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import app.wishlist.shared.repository.LocalStore
@@ -114,12 +115,26 @@ internal class CountingStore(private val delegate: LocalStore) : LocalStore by d
     var prepareFlushCalls = 0
         private set
 
+    /** View reads: one pending() and (signed in) one processingItems() per view computation. */
+    var pendingCalls = 0
+    var processingItemsCalls = 0
+
     /** Runs right after a markSubmission has committed (outside the session gate). */
     var afterMark: suspend (SubmissionStatus) -> Unit = {}
 
     override suspend fun prepareFlush(snapshot: SessionSnapshot): ClientResult<List<LocalSubmission>> {
         prepareFlushCalls++
         return delegate.prepareFlush(snapshot)
+    }
+
+    override suspend fun pending(): ClientResult<List<LocalSubmission>> {
+        pendingCalls++
+        return delegate.pending()
+    }
+
+    override suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>> {
+        processingItemsCalls++
+        return delegate.processingItems(snapshot)
     }
 
     override suspend fun markSubmission(
@@ -670,6 +685,58 @@ class SubmissionCoordinatorTest {
         assertEquals(1, h.beforeRefreshCalls)
         val cached = h.store.cachedItem(h.session.state.value, item.id).successValue()
         assertEquals(AnalysisStatus.READY, cached?.analysis?.status)
+    }
+
+    @Test fun flushOfManyRowsCoalescesViewPublishes() = runCoordinatorTest { h ->
+        h.signIn()
+        val keys = List(100) { "00000000-0000-4000-9000-" + it.toString().padStart(12, '0') }
+        keys.forEachIndexed { i, key ->
+            h.store.saveSubmission(submission(id = key, binding = GOOGLE_ID, sharedAt = baseTime + i.seconds)).successValue()
+        }
+        h.store.pendingCalls = 0
+        h.store.processingItemsCalls = 0
+
+        h.flush()
+
+        assertEquals(keys, h.keysSent())
+        // The instant fake ITEM-01 never suspends the flush, so the sends' publish requests collapse
+        // into one publisher run; with the publish after prepareFlush and the final one that is at most
+        // 4 view computations (the old code ran one per row: >= 100 each).
+        assertTrue(h.store.pendingCalls <= 4, "pending() calls: ${h.store.pendingCalls}")
+        assertTrue(h.store.processingItemsCalls <= 4, "processingItems() calls: ${h.store.processingItemsCalls}")
+        assertTrue(h.view.local.isEmpty())
+        assertEquals(100, h.view.processing.size)
+        assertEquals(h.create.results.map { it.successValue().id }, h.view.processing.map { it.id })
+        assertFalse(h.view.flushing)
+    }
+
+    @Test fun viewOrdersProcessingByCreatedAtThenId() = runCoordinatorTest { h ->
+        h.signIn()
+        val snapshot = h.session.state.value
+        fun item(id: String, at: Instant) = itemFixture(
+            analysis = AnalysisStatus.PROCESSING,
+            id = "00000000-0000-4000-a000-00000000000$id",
+            clientSubmissionId = "00000000-0000-4000-b000-00000000000$id",
+        ).copy(createdAt = at)
+        // Stored unsorted. Same createdAt ties by id; a fractional second sorts after the whole one
+        // (as ISO text ".5Z" would sort before "Z").
+        val stored = listOf(
+            item("3", baseTime + 2.seconds),
+            item("2", baseTime + 2.seconds),
+            item("4", baseTime + 500.milliseconds),
+            item("1", baseTime),
+        )
+        stored.forEach { h.store.upsertItem(snapshot, it).successValue() }
+        h.flush() // republishes the view (a refresh would ask the fake ITEM-03, which knows none of them)
+        assertEquals(listOf("1", "4", "2", "3"), h.view.processing.map { it.id.last().toString() })
+    }
+
+    @Test fun viewKeepsLocalRowsInSharedOrder() = runCoordinatorTest { h ->
+        h.store.saveSubmission(submission(id = UUID_C, sharedAt = baseTime + 1.seconds)).successValue()
+        h.store.saveSubmission(submission(id = UUID_B, sharedAt = baseTime)).successValue()
+        h.store.saveSubmission(submission(id = UUID_A, sharedAt = baseTime + 1.seconds)).successValue()
+        h.flush()
+        assertEquals(listOf(UUID_B, UUID_A, UUID_C), h.view.local.map { it.clientSubmissionId })
     }
 
     @Test fun viewHidesOtherAccountsLocalItems() = runCoordinatorTest { h ->

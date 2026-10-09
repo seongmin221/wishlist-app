@@ -94,8 +94,7 @@ deleteAccountItems:
 DELETE FROM item_cache WHERE account_id = ?;
 
 selectProcessingItems:
-SELECT * FROM item_cache WHERE account_id = ? AND analysis_status = 'PROCESSING' AND lifecycle_status = 'ACTIVE'
-ORDER BY created_at, item_id;
+SELECT * FROM item_cache WHERE account_id = ? AND analysis_status = 'PROCESSING' AND lifecycle_status = 'ACTIVE';
 
 selectAppState:
 SELECT value FROM app_state WHERE key = ?;

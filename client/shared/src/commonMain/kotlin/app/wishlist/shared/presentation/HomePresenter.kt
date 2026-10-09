@@ -4,9 +4,7 @@ import app.wishlist.shared.core.AuthAccount
 import app.wishlist.shared.core.AuthFacade
 import app.wishlist.shared.core.Clock
 import app.wishlist.shared.domain.DisplayFormat
-import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
-import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.SubmissionView
 import kotlinx.coroutines.CoroutineDispatcher
@@ -84,19 +82,15 @@ class HomePresenter internal constructor(
             // A view still tied to an account is not this signed-out state's: show nothing of it.
             val unbound = if (view.accountId == null) view.local.filter { it.accountBinding == null } else emptyList()
             return HomeState.LoggedOut(
-                unbound.oldestFirst().map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, RowStatus.LOCAL_ONLY) },
+                unbound.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, RowStatus.LOCAL_ONLY) },
             )
         }
         if (view.accountId != account.accountId) return HomeState.Loading
-        val local = view.local.oldestFirst().map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, it.submissionStatus.toRow()) }
-        val processing = view.processing
-            .sortedWith(compareBy<WishlistItem> { it.createdAt }.thenBy { it.id })
-            .map { row("item-${it.id}", it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
+        // The view is already in display order (SubmissionView): local rows, then processing items.
+        val local = view.local.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, it.submissionStatus.toRow()) }
+        val processing = view.processing.map { row("item-${it.id}", it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
         return HomeState.LoggedIn(local + processing, busy)
     }
-
-    private fun List<LocalSubmission>.oldestFirst() =
-        sortedWith(compareBy<LocalSubmission> { it.sharedAt }.thenBy { it.clientSubmissionId })
 
     private fun SubmissionStatus.toRow() = when (this) {
         SubmissionStatus.SUBMITTING -> RowStatus.SENDING
