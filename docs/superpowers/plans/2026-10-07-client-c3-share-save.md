@@ -120,6 +120,7 @@
 | `share_saved_title` | 위시리스트에 저장했어요 | Saved to your wishlist |
 | `share_saved_fetching` | 정보를 가져오는 중이에요 | Fetching details |
 | `share_saved_open_app` | 앱을 열면 정보를 가져와요 | Details arrive when you open the app |
+| `share_saved_open_app` | 앱을 열면 정보를 가져와요 | Details arrive when you open the app |
 | `share_local_title` | 이 기기에 저장했어요 | Saved on this device |
 | `share_local_line` | 로그인하면 정보를 가져와요 | Sign in to fetch details |
 | `share_offline_line` | 다음에 앱을 열면 보내요 | We'll send it next time you open the app |

@@ -8,7 +8,7 @@ C2 Remote 대상은 **ITEM-01·ITEM-03만**이다. Task 5는 Create/Get Fake와 
 
 ## C3: ITEM-01 사용 경로
 
-- **경로:** 공유 수신(Android Activity 즉시, iOS 앱의 inbox import) → `LocalStore`에 미귀속 또는 현재 계정 귀속 `PENDING` 저장 → `SubmissionCoordinator` flush(로그인·공유·foreground·네트워크 복구·당겨서 새로고침 신호, single-flight) → `prepareFlush`로 binding을 POST 전에 commit → 행마다 `SUBMITTING` 기록 → ITEM-01 → 성공이면 `accept`(캐시 upsert + 행 삭제 한 transaction). 같은 로컬 공유의 재전송은 같은 UUID key이고 서버(지금은 Fake)의 멱등 replay가 같은 항목을 돌려준다. 오류 분류는 C3-D8 표([KMP 구조](kmp.md#공유-수신전송-조정기submissioncoordinator)).
+- **경로:** 공유 수신(Android Activity 즉시, 1500ms 안에 저장하지 못하면 앱 파일 inbox 뒤 import, iOS 앱의 inbox import) → `LocalStore`에 미귀속 또는 현재 계정 귀속 `PENDING` 저장 → `SubmissionCoordinator` flush(로그인·공유·foreground·네트워크 복구·당겨서 새로고침 신호, single-flight) → `prepareFlush`로 binding을 POST 전에 commit → 행마다 `SUBMITTING` 기록 → ITEM-01 → 성공이면 `accept`(캐시 upsert + 행 삭제 한 transaction). 같은 로컬 공유의 재전송은 같은 UUID key이고 서버(지금은 Fake)의 멱등 replay가 같은 항목을 돌려준다. 오류 분류는 C3-D8 표([KMP 구조](kmp.md#공유-수신전송-조정기submissioncoordinator)). 429는 그 계정 전체를 `Retry-After`(최소 1초)까지 멈추고, 서버 쪽 오류는 30초부터 두 배(최대 15분)로 기다리며 한 flush의 두 번째 오류에서 멈춘다. 타이머가 대기 끝에 다시 보낸다.
 - **snapshot-aware create(Ruling 11):** coordinator는 공개 `CreateItemRepository`가 아니라 Kotlin internal `SnapshotCreateItemRepository.create(command, expected)`를 flush 시작의 `SessionSnapshot`으로 부른다. Fake는 현재 session이 `expected`가 아니면 owner 저장소를 건드리지 않고, Remote는 `AuthenticatedTransport`가 보내기 전·token 뒤에 같은 비교를 해 `SESSION_CHANGED`로 끝낸다. 그래서 `SUBMITTING` commit과 POST 사이에 계정이 바뀌어도 A의 key가 B의 token으로 가지 않는다(Review Focus 1).
 - **ITEM-03:** refresh 때 캐시의 `PROCESSING` 항목마다 GET(캐시 decorator가 갱신)으로 "분류 중" 줄을 정리한다. DEBUG는 `DebugAnalysisDriver`가 refresh 전에 5초 이상 된 Fake 항목을 완료한다.
 - **실행 범위:** 앱은 DEBUG Fake만 쓴다. Remote ITEM-01은 C2의 MockEngine 계약 테스트 그대로이며 C3 coordinator와 Remote를 함께 실서버로 돌린 적은 없다. RELEASE는 ITEM-01이 UNAVAILABLE이라 로그인 전 로컬 저장만 동작한다.
@@ -21,6 +21,7 @@ C3는 fake 인증만 쓴다(C3-D2). Apple Developer 가입 뒤 별도 "인증 �
 - DEBUG ITEM-01·03을 REMOTE로 바꿔 local 서버 + Firebase Auth Emulator로 실서버 검증한다(아래 표 "실서버 검증" 열). [KMP 알려진 한계](kmp.md#c3에서-생긴-항목)의 ITEM-01 `NOT_FOUND`·`SUBMISSION_ITEM_MISMATCH` 처리를 실제 응답으로 다시 본다.
 - iOS 확장의 background URLSession 직접 전송을 켠다(Keychain 공유 access group, token 만료 시 앱 전송으로 대체, 401에서 inbox 파일 보존). [ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md).
 - 개발자 팀 서명, 실기기 공유 확장 확인.
+- 실서버 응답으로 재시도 규칙을 다시 본다: 서버 쪽 오류의 재시도 상한, NOT_FOUND·로컬 원인 UNAVAILABLE을 재시도에서 뺄지, 429로 함께 기다리는 다른 줄의 문구, 처리 중 항목 ITEM-03 조회를 목록 API나 제한 병렬로 바꿀지([PR #12 리뷰 반영](../../history/architecture/client/c3-pr12-review-2026-10-09.md)).
 
 ## Fake 상태 규칙
 
