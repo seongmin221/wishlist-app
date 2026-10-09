@@ -39,10 +39,10 @@ final class HomeRowTextTests: XCTestCase {
     func testMetaAndHeaderTextResolveInBothLanguages() throws {
         let ko = try XCTUnwrap(HomeRowText.bundle(for: "ko"))
         let en = try XCTUnwrap(HomeRowText.bundle(for: "en"))
-        let local = HomeRow(key: "local-1", host: "musinsa.com", sourceUrl: "https://musinsa.com/p/1", savedAt: RelativeTimeDays(value: 2), status: .localOnly)
+        let local = HomeRow(key: "local-1", target: HomeRowTargetLocal(submissionId: "1"), host: "musinsa.com", sourceUrl: "https://musinsa.com/p/1", savedAt: RelativeTimeDays(value: 2), status: .localOnly)
         XCTAssertEqual(HomeRowText.meta(local, bundle: ko), "2일 전 저장 · 이 기기에만 있어요")
         XCTAssertEqual(HomeRowText.meta(local, bundle: en), "Saved 2 days ago · Only on this device")
-        let processing = HomeRow(key: "item-1", host: "29cm.co.kr", sourceUrl: "https://29cm.co.kr/p", savedAt: RelativeTimeJustNow.shared, status: .processing)
+        let processing = HomeRow(key: "item-1", target: HomeRowTargetItem(itemId: "1"), host: "29cm.co.kr", sourceUrl: "https://29cm.co.kr/p", savedAt: RelativeTimeJustNow.shared, status: .processing)
         XCTAssertEqual(HomeRowText.meta(processing, bundle: ko), "상품 정보 추출 중")
         XCTAssertEqual(HomeRowText.meta(processing, bundle: en), "Extracting product info")
         XCTAssertEqual(HomeRowText.todoCount(7, bundle: ko), "할 일 7개")

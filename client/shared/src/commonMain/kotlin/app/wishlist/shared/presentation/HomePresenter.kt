@@ -97,19 +97,19 @@ class HomePresenter internal constructor(
     private fun compose(restored: Boolean, account: AuthAccount?, view: SubmissionView?, busy: Boolean): HomeState {
         if (!restored || view == null) return HomeState.Loading
         val now = clock.now()
-        fun row(key: String, url: String, at: Instant, status: RowStatus) =
-            HomeRow(key, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, utcOffsetSeconds), status)
+        fun row(key: String, target: HomeRowTarget, url: String, at: Instant, status: RowStatus) =
+            HomeRow(key, target, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, utcOffsetSeconds), status)
         if (account == null) {
             // A view still tied to an account is not this signed-out state's: show nothing of it.
             val unbound = if (view.accountId == null) view.local.filter { it.accountBinding == null } else emptyList()
             return HomeState.LoggedOut(
-                unbound.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, RowStatus.LOCAL_ONLY) },
+                unbound.map { row("local-${it.clientSubmissionId}", HomeRowTarget.Local(it.clientSubmissionId), it.sourceUrl, it.sharedAt, RowStatus.LOCAL_ONLY) },
             )
         }
         if (view.accountId != account.accountId) return HomeState.Loading
         // The view is already in display order (SubmissionView): local rows, then processing items.
-        val local = view.local.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, it.rowStatus()) }
-        val processing = view.processing.map { row("item-${it.id}", it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
+        val local = view.local.map { row("local-${it.clientSubmissionId}", HomeRowTarget.Local(it.clientSubmissionId), it.sourceUrl, it.sharedAt, it.rowStatus()) }
+        val processing = view.processing.map { row("item-${it.id}", HomeRowTarget.Item(it.id), it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
         return HomeState.LoggedIn(local + processing, busy)
     }
 

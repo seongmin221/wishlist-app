@@ -126,6 +126,13 @@ class HomePresenterTest {
             state.processing.map { it.key },
         )
         assertEquals(state.processing.size, state.processing.map { it.key }.toSet().size)
+        assertEquals(
+            listOf(
+                HomeRowTarget.Local("f"), HomeRowTarget.Local("s"), HomeRowTarget.Local("p"),
+                HomeRowTarget.Item("i3"), HomeRowTarget.Item("i2"), HomeRowTarget.Item("i1"),
+            ),
+            state.processing.map { it.target },
+        )
         assertFalse(state.refreshing)
         p.close()
     }
