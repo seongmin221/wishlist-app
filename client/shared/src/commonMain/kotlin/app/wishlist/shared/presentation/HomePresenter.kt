@@ -112,18 +112,19 @@ class HomePresenter internal constructor(
         val processing = view.processing.map { row("item-${it.id}", HomeRowTarget.Item(it.id), it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
         return HomeState.LoggedIn(local + processing, busy)
     }
+}
 
-    private fun LocalSubmission.rowStatus() = when (submissionStatus) {
-        SubmissionStatus.SUBMITTING -> RowStatus.SENDING
-        SubmissionStatus.FAILED -> RowStatus.FAILED
-        SubmissionStatus.PENDING -> when (lastSubmissionError?.kind) {
-            // Not tried yet, offline, or cut off by an account change: the next connection sends it.
-            null, ErrorKind.NETWORK, ErrorKind.TIMEOUT, ErrorKind.SESSION_CHANGED -> RowStatus.WAITING_NETWORK
-            ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND,
-            ErrorKind.RATE_LIMITED -> RowStatus.RETRYING
-            ErrorKind.UNAUTHENTICATED -> RowStatus.NEEDS_SIGN_IN
-            // Permanent kinds end FAILED; a PENDING row with one is still only waiting.
-            ErrorKind.VALIDATION, ErrorKind.CONFLICT -> RowStatus.WAITING_NETWORK
-        }
+/** Why a signed-in local row waits (or that it is sending/failed); shared by the home and local detail Presenters. */
+internal fun LocalSubmission.rowStatus(): RowStatus = when (submissionStatus) {
+    SubmissionStatus.SUBMITTING -> RowStatus.SENDING
+    SubmissionStatus.FAILED -> RowStatus.FAILED
+    SubmissionStatus.PENDING -> when (lastSubmissionError?.kind) {
+        // Not tried yet, offline, or cut off by an account change: the next connection sends it.
+        null, ErrorKind.NETWORK, ErrorKind.TIMEOUT, ErrorKind.SESSION_CHANGED -> RowStatus.WAITING_NETWORK
+        ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND,
+        ErrorKind.RATE_LIMITED -> RowStatus.RETRYING
+        ErrorKind.UNAUTHENTICATED -> RowStatus.NEEDS_SIGN_IN
+        // Permanent kinds end FAILED; a PENDING row with one is still only waiting.
+        ErrorKind.VALIDATION, ErrorKind.CONFLICT -> RowStatus.WAITING_NETWORK
     }
 }

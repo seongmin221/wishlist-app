@@ -24,6 +24,12 @@ import app.wishlist.shared.data.remote.FakeTokenSource
 import app.wishlist.shared.data.remote.RemoteItemRepository
 import app.wishlist.shared.data.remote.TEST_BASE_URL
 import app.wishlist.shared.presentation.ItemDetailState
+import app.wishlist.shared.presentation.LocalDetailOutcome
+import app.wishlist.shared.presentation.RowStatus
+import app.wishlist.shared.data.fake.DebugAnalysisDriver
+import app.wishlist.shared.model.AnalysisStatus
+import app.wishlist.shared.submission.ShareCardKind
+import kotlin.time.Duration.Companion.seconds
 import app.wishlist.shared.di.ClientBuildMode.DEBUG
 import app.wishlist.shared.di.ClientBuildMode.RELEASE
 import app.wishlist.shared.repository.CreateItemCommand
@@ -350,6 +356,62 @@ class SharedModulesTest {
         advanceUntilIdle()
         assertEquals(RUNTIME_NOT_READY, late.state.value.error?.code)
         late.close()
+    }
+
+    @Test fun runtime_detail_load_republishes_the_submission_view() = runTest {
+        var now = runtimeTime
+        val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler), clock = Clock { now })
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
+        val submissions = runtime.submissions()
+        assertEquals(ShareCardKind.SAVED, submissions.receiveShared("https://shop.example/p/1", online = true))
+        advanceUntilIdle()
+        val processing = submissions.view.value!!.processing.single()
+
+        // The fake backend finishes the analysis; only the cache (and so the view) does not know yet.
+        now += 5.seconds
+        assertEquals(1, runtime.koin.get<DebugAnalysisDriver>().advance().successValue())
+        advanceUntilIdle()
+        assertEquals(listOf(processing), submissions.view.value!!.processing)
+
+        // A successful detail load refreshes the cache and asks the coordinator to republish.
+        val presenter = runtime.itemDetailPresenter()
+        presenter.load(processing.id)
+        advanceUntilIdle()
+        assertEquals(AnalysisStatus.READY, presenter.state.value.item?.analysis?.status)
+        assertTrue(submissions.view.value!!.processing.isEmpty())
+        presenter.close()
+        runtime.close()
+    }
+
+    // --- Local link detail Presenter from the runtime ---------------------------------------------
+
+    @Test fun runtime_local_detail_presenter_uses_the_runtime_view_session_and_store() = runTest {
+        val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        assertEquals(1, assertNotNull(runtime.debugControls()).createUnboundPending(1).successValue())
+        advanceUntilIdle()
+        val pending = runtime.localStore().pending().successValue().single()
+
+        val presenter = runtime.localSubmissionDetailPresenter()
+        presenter.load(pending.clientSubmissionId.uppercase())
+        advanceUntilIdle()
+        val row = assertNotNull(presenter.state.value.row)
+        assertEquals(pending.clientSubmissionId, row.submissionId)
+        assertEquals("example.com", row.host)
+        assertEquals(RowStatus.LOCAL_ONLY, row.status)
+        assertTrue(presenter.state.value.canDelete)
+
+        // Deleting goes through the runtime's coordinator and store.
+        presenter.delete()
+        advanceUntilIdle()
+        assertEquals(LocalDetailOutcome.Deleted, presenter.state.value.outcome)
+        assertTrue(runtime.localStore().pending().successValue().isEmpty())
+        assertTrue(runtime.submissions().view.value!!.local.isEmpty())
+        presenter.close()
+        runtime.close()
     }
 
     // --- Isolation and one session per runtime --------------------------------------------------

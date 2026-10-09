@@ -251,6 +251,17 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - 대기 줄 상태: SUBMITTING → `SENDING`, FAILED → `FAILED`, PENDING은 마지막 오류로 나눈다. 오류 없음·NETWORK·TIMEOUT·SESSION_CHANGED → `WAITING_NETWORK`("연결되면 보내요"), SERVER·INVALID_RESPONSE·UNAVAILABLE·NOT_FOUND·RATE_LIMITED → `RETRYING`("잠시 후 다시 보내요", 타이머가 다시 보냄), UNAUTHENTICATED → `NEEDS_SIGN_IN`("다시 로그인하면 보내요"). 2026-10-09 사용자 확정.
 - foreground refresh는 앱 전역이다. 플랫폼이 `submissions().refresh()`를 부르고 HomePresenter는 view 변화에만 반응하며, `refresh()`만 사용자 새로고침과 `refreshing` 표시를 맡는다(HomePresenter에 foreground intent는 없다). `suspend refreshNow()`는 같은 일을 하고 끝날 때 돌아온다(이미 실행 중이거나 close 뒤면 바로 돌아옴, 호출자 취소는 기다림만 끝낸다). `refresh()`는 같은 본문을 launch한다. iOS `.refreshable`이 이것을 기다린다.
 
+## 로컬 대기 상세 Presenter (C4)
+
+> 2026-10-10 C4 Task 6. 화면은 묶음 3에서 붙인다.
+
+`SharedRuntime.localSubmissionDetailPresenter()`는 호출마다 새 `LocalSubmissionDetailPresenter`를 만든다. 입력은 coordinator `view`, gated `LocalStore.cachedItemBySubmission`(받아들여진 링크 조회), `SubmissionCoordinator.deleteLocal`, runtime `session`·clock·`utcOffsetSeconds`이고, 단일 레인·멱등 `close()`·close 뒤 intent 무시는 다른 Presenter와 같다. `LocalDetailState(row, canDelete, deleting, deleteFailed, outcome)`이며 view·`load`·`tick`·삭제 종료마다 현재 view를 다시 판정한다.
+
+- **행이 있으면**(key는 정규 UUID로 비교) `row`(host·원문 URL·상대 시각·상태)를 갱신한다. 로그인 view는 홈과 같은 `LocalSubmission.rowStatus()`(HomePresenter.kt의 internal top-level 함수로 옮겨 공유), 비로그인 view는 `LOCAL_ONLY`다. `canDelete`는 SUBMITTING만 false다. ready 전(view null)은 row도 outcome도 없다.
+- **행이 없고 outcome이 없으면:** 한 계정의 view 다음에 다른 계정(로그아웃 포함) view가 오면 그 뒤로 이 화면은 아무것도 판정하지 않는다(셸이 계정 전환에 닫는다). 이 표시는 유지된다. 그래서 A → 로그아웃 → B를 지나도 B 이름으로 조회하지 않는다. 비로그인 → A(로그인)는 계정 이탈이 아니다. 로그인 직후 바로 보내져 A의 첫 view에 행이 없어도 조회해서 `MovedTo`가 된다. 비로그인 view면 `Gone`이다. 그 밖에는 view 계정과 같은 session snapshot으로 조회한다(session이 이미 다른 계정이면 다음 view를 기다린다). 항목이 있으면 `MovedTo(itemId)`(PROCESSING·READY 모두), 없으면 `RemovedOnServer`(D19: DELETED로 받아들여져 캐시가 없음), 조회 실패면 `Gone`(삭제 안내 없이 닫힘)이다.
+- **삭제:** `delete()`는 `canDelete`이고 진행 중이 아닐 때만 돈다. 진행 중에는 행 없는 view(삭제가 바로 게시한 view)로 판정하지 않고 삭제 결과를 기다린다. 성공이면 `Deleted`, `CONFLICT/SUBMISSION_IN_FLIGHT`(그 사이 전송 시작)면 `deleting`만 내려 곧 올 `MovedTo`를 기다리고, 그 밖의 실패는 `deleteFailed = true`(다음 view에서 false)다.
+- outcome은 한 번 정해지면 바뀌지 않는다. `tick()`은 데이터 없이 상대 시각만 다시 계산한다.
+
 ## C2 최종 검증 요약
 
 > 2026-10-07 Task 10. 명령·건수·로그 경로는 [C2 최종 검증 기록](../../history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.

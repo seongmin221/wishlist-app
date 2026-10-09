@@ -19,6 +19,7 @@ import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.presentation.AccountPresenter
 import app.wishlist.shared.presentation.HomePresenter
 import app.wishlist.shared.presentation.ItemDetailPresenter
+import app.wishlist.shared.presentation.LocalSubmissionDetailPresenter
 import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
@@ -234,6 +235,26 @@ class SharedRuntime internal constructor(
             view = submissions.view,
             refreshes = submissions.refreshes,
             runRefresh = submissions::refresh,
+            clock = env.clock,
+            utcOffsetSeconds = env.platform.utcOffsetSeconds,
+            dispatcher = env.dispatchers.io,
+        )
+    }
+
+    /**
+     * A new local (not yet sent) link detail Presenter over the one [submissions] coordinator's view,
+     * this runtime's [session] and the gated local store (accepted-link lookup); deleting goes through
+     * the coordinator so the view is republished at once. The platform owner calls
+     * [LocalSubmissionDetailPresenter.close].
+     */
+    fun localSubmissionDetailPresenter(): LocalSubmissionDetailPresenter {
+        val submissions = submissions()
+        val store = localStore()
+        return LocalSubmissionDetailPresenter(
+            view = submissions.view,
+            lookup = store::cachedItemBySubmission,
+            delete = submissions::deleteLocal,
+            session = session,
             clock = env.clock,
             utcOffsetSeconds = env.platform.utcOffsetSeconds,
             dispatcher = env.dispatchers.io,
