@@ -21,6 +21,7 @@ import app.wishlist.shared.repository.LocalStore
 import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -38,6 +39,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -107,11 +109,15 @@ class SubmissionCoordinator internal constructor(
         }
     }
 
-    /** iOS inbox: imports each record with its share-time binding. Idempotent per key. */
+    /**
+     * iOS inbox: imports each record with its share-time binding. Idempotent per key. Waits for
+     * ready without a time limit (a slow DEBUG cold start must not defer the whole inbox); if the
+     * runtime closes first, every readable record is retained.
+     */
     suspend fun importInbox(records: List<InboxRecord>): InboxImportResult = withContext(dispatcher) {
         val deletable = mutableListOf<String>()
         val retained = mutableListOf<String>()
-        val storeReady = awaitReady()
+        val storeReady = awaitReady(Duration.INFINITE)
         for (record in records) {
             val submission = record.toSubmissionOrNull()
             val keep = when {
@@ -266,8 +272,26 @@ class SubmissionCoordinator internal constructor(
         return if (saved is ClientResult.Failure) saved else ClientResult.Success(binding)
     }
 
-    private suspend fun awaitReady(): Boolean =
-        scope.isActive && withTimeoutOrNull(READY_WAIT) { ready.first { it } } != null
+    /**
+     * True once ready within [limit] (no limit when infinite); false at the limit or as soon as the
+     * coordinator's scope closes. Waited in that scope, so closing the runtime ends the wait.
+     */
+    private suspend fun awaitReady(limit: Duration = READY_WAIT): Boolean {
+        if (!scope.isActive) return false
+        if (ready.value) return true
+        val waiter = scope.async { ready.first { it } }
+        return try {
+            when {
+                limit.isInfinite() -> waiter.await()
+                else -> withTimeoutOrNull(limit) { waiter.await() }
+            } != null
+        } catch (e: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            false // the scope closed
+        } finally {
+            waiter.cancel()
+        }
+    }
 
     private fun ClientError.isAccountRace() =
         kind == ErrorKind.SESSION_CHANGED || code == ACCOUNT_BINDING_MISMATCH

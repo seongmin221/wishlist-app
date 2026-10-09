@@ -215,6 +215,28 @@ class SharedModulesTest {
         runtime.close()
     }
 
+    @Test fun restored_login_stores_the_first_run_flag_after_ready() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = savedAccount }
+        // Inline dispatch: the presenter observes the restored account the moment the restore publishes
+        // it, before ready (as a parallel io thread can).
+        val runtime = createRuntime(debugBindings(), probe = probe, dispatcher = RecordingDispatcher())
+        // Created before the bootstrap, like the apps' root owner.
+        val account = runtime.accountPresenter()
+        runtime.startDebugSession()
+        runtime.ready.first { it }
+        assertEquals("fake-google-0001", account.state.value.account?.accountId)
+        assertEquals("1", runtime.localStore().readAppState("onboarding.login.seen").successValue())
+
+        runtime.auth().signOut().successValue()
+        account.close()
+        val next = runtime.accountPresenter()
+        assertTrue(next.state.value.restored)
+        assertNull(next.state.value.account)
+        assertFalse(next.state.value.showFirstRunLogin)
+        next.close()
+        runtime.close()
+    }
+
     @Test fun release_auth_is_the_unavailable_facade() {
         val runtime = createRuntime(releaseBindings())
         assertIs<UnavailableAuthFacade>(runtime.auth())

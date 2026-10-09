@@ -64,12 +64,12 @@ class AccountPresenter internal constructor(
             }.collect { mutableState.value = it }
         }
         scope.launch {
-            // The saved flag is readable only once the runtime restored the login.
+            // The saved flag is readable (and writable) only once the runtime restored the login;
+            // before that the gated facade ignores the write. The restore publishes the saved
+            // account before ready, so accounts are followed only from here on (the current one included).
             auth.restored.first { it }
             val stored = auth.hasSeenFirstRunLogin()
             seen.update { (it == true) || stored }
-        }
-        scope.launch {
             // Having signed in once (also restored) ends the first-run offer for good.
             auth.account.collect { account ->
                 if (account != null && seen.value != true) {

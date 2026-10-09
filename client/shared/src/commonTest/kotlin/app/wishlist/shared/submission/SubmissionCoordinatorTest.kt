@@ -629,6 +629,27 @@ class SubmissionCoordinatorTest {
         assertEquals(LINK, h.storeHarness.row(UUID_A)?.source_url)
     }
 
+    @Test fun importInboxWaitsForReadyWithoutATimeout() = runCoordinatorTest(ready = false) { h ->
+        // A slow DEBUG cold start (DB open, migration, restore, seed) takes longer than the share wait.
+        val result = async { h.coordinator.importInbox(listOf(record())) }
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertFalse(result.isCompleted)
+        h.ready.value = true
+        advanceUntilIdle()
+        assertEquals(InboxImportResult(listOf(UUID_A), emptyList()), result.await())
+        assertEquals(listOf(UUID_A), h.pending().map { it.clientSubmissionId })
+    }
+
+    @Test fun importInboxBeforeReadyRetainsWhenTheCoordinatorCloses() = runCoordinatorTest(ready = false) { h ->
+        val result = async { h.coordinator.importInbox(listOf(record(), record(key = "bad"))) }
+        advanceTimeBy(5_000)
+        runCurrent()
+        h.scope.cancel()
+        advanceUntilIdle()
+        assertEquals(InboxImportResult(deletable = listOf("bad"), retained = listOf(UUID_A)), result.await())
+    }
+
     @Test fun importStoreFailureIsRetained() = runCoordinatorTest(store = ::failingStore) { h ->
         val result = h.coordinator.importInbox(listOf(record(key = UUID_A), record(key = "bad")))
         assertEquals(InboxImportResult(deletable = listOf("bad"), retained = listOf(UUID_A)), result)

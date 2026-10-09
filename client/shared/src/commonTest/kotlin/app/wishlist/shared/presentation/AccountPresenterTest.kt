@@ -32,6 +32,9 @@ internal class ScriptedAuth(restored: Boolean = true, var seen: Boolean = false)
     var signOutCalls = 0
     var markCalls = 0
 
+    /** Like the runtime's gated facade: the first-run write is dropped until the login is restored (ready). */
+    var dropMarksUntilRestored = false
+
     /** When set, sign-in waits for it; otherwise it succeeds at once. */
     var signInGate: CompletableDeferred<ClientResult<AuthAccount>>? = null
 
@@ -51,6 +54,7 @@ internal class ScriptedAuth(restored: Boolean = true, var seen: Boolean = false)
     override suspend fun hasSeenFirstRunLogin() = seen
     override suspend fun markFirstRunLoginSeen() {
         markCalls++
+        if (dropMarksUntilRestored && !mutableRestored.value) return
         seen = true
     }
 }
@@ -82,6 +86,29 @@ class AccountPresenterTest {
         assertFalse(s.state.value.showFirstRunLogin)
         assertNotNull(s.state.value.account)
         s.close()
+    }
+
+    @Test
+    fun accountRestoredBeforeReadyStoresTheFirstRunFlagOnceRestored() = runTest {
+        // The runtime publishes the saved account during its restore, before ready/restored.
+        val auth = ScriptedAuth(restored = false).also { it.dropMarksUntilRestored = true }
+        val p = presenter(auth)
+        advanceUntilIdle()
+        auth.mutableAccount.value = AuthAccount("a", "a@x", AuthProvider.GOOGLE)
+        advanceUntilIdle()
+        auth.mutableRestored.value = true
+        advanceUntilIdle()
+        assertTrue(auth.seen, "the flag must be stored once the facade accepts it")
+
+        p.signOut()
+        advanceUntilIdle()
+        assertFalse(p.state.value.showFirstRunLogin)
+        p.close()
+        // The next launch (a new presenter over the same storage) does not offer it either.
+        val next = presenter(auth)
+        advanceUntilIdle()
+        assertFalse(next.state.value.showFirstRunLogin)
+        next.close()
     }
 
     @Test
