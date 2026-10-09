@@ -138,14 +138,14 @@ class LocalStoreContractTest {
         }
     }
 
-    @Test fun lower_and_same_versions_are_skipped_and_only_higher_replaces() = runTest {
+    @Test fun lower_version_is_skipped_and_same_or_higher_replaces() = runTest {
         withHarness { h ->
             val a = h.session.login("A")
             h.store.upsertItem(a, item(5, name = "five")).successValue()
             h.store.upsertItem(a, item(4, name = "four")).successValue()
             assertEquals("five", h.store.cachedItem(a, itemId).successValue()!!.product.name)
             h.store.upsertItem(a, item(5, name = "same")).successValue()
-            assertEquals("five", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+            assertEquals("same", h.store.cachedItem(a, itemId).successValue()!!.product.name)
             h.store.upsertItem(a, item(6, name = "six")).successValue()
             assertEquals(6, h.store.cachedItem(a, itemId).successValue()!!.version)
             assertEquals("six", h.store.cachedItem(a, itemId).successValue()!!.product.name)
@@ -406,6 +406,98 @@ class LocalStoreContractTest {
         h.login("B")
         assertEquals(listOf(ids[3]), h.store.processingItems(h.snapshot()).successValue().map { it.id })
         assertEquals(ErrorKind.SESSION_CHANGED, h.store.processingItems(a).failureKind())
+    }
+
+    @Test fun getUpsertReplacesTheSameVersion() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, name = "옛 이름")).successValue()
+            h.store.upsertItem(a, item(version = 3, name = "새 이름")).successValue()
+            assertEquals("새 이름", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+        }
+    }
+
+    @Test fun getUpsertStillIgnoresAnOlderVersion() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, name = "v3")).successValue()
+            h.store.upsertItem(a, item(version = 2, name = "v2")).successValue()
+            val cached = h.store.cachedItem(a, itemId).successValue()!!
+            assertEquals(3, cached.version)
+            assertEquals("v3", cached.product.name)
+        }
+    }
+
+    @Test fun acceptKeepsANewerSameVersionCacheRow() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, name = "GET 결과")).successValue()
+            h.store.saveSubmission(submission(binding = "A")).successValue()
+            h.store.accept(a, submissionId, item(version = 3, name = "멱등 응답")).successValue()
+            assertEquals("GET 결과", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+            assertEquals(emptyList(), h.store.pending().successValue())
+        }
+    }
+
+    private fun itemRowCount(h: StoreHarness): Long =
+        h.driver.executeQuery(null, "SELECT COUNT(*) FROM item_cache", { c ->
+            app.cash.sqldelight.db.QueryResult.Value(if (c.next().value) c.getLong(0) else 0L)
+        }, 0).value ?: 0L
+
+    @Test fun undecodableRowIsDroppedOnRead() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3)).successValue()
+            h.driver.execute(null, "UPDATE item_cache SET analysis_status = 'NOT_A_STATUS'", 0)
+            assertNull(h.store.cachedItem(a, itemId).successValue())
+            assertEquals(0L, itemRowCount(h))
+        }
+    }
+
+    @Test fun undecodableProcessingRowDoesNotHideTheOthers() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            val good = "00000000-0000-4000-8000-000000000201"
+            val bad = "00000000-0000-4000-8000-000000000202"
+            h.store.upsertItem(a, itemFixture(analysis = AnalysisStatus.PROCESSING, id = good)).successValue()
+            h.store.upsertItem(a, itemFixture(analysis = AnalysisStatus.PROCESSING, id = bad)).successValue()
+            h.driver.execute(null, "UPDATE item_cache SET created_at = 'broken' WHERE item_id = '$bad'", 0)
+            assertEquals(listOf(good), h.store.processingItems(a).successValue().map { it.id })
+            assertEquals(1L, itemRowCount(h))
+        }
+    }
+
+    @Test fun uppercaseIdReadsAndRemovesTheCanonicalRow() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, id = UUID_A)).successValue()
+            assertEquals(UUID_A, h.store.cachedItem(a, UUID_A.uppercase()).successValue()!!.id)
+            h.store.removeCachedItem(a, UUID_A.uppercase(), 3).successValue()
+            assertNull(h.store.cachedItem(a, UUID_A).successValue())
+        }
+    }
+
+    @Test fun cachedItemBySubmissionFindsTheAcceptedItem() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.saveSubmission(submission(id = UUID_B, binding = "A")).successValue()
+            h.store.accept(a, UUID_B, item(version = 1).copy(clientSubmissionId = UUID_B)).successValue()
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B).successValue()!!.id)
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B.uppercase()).successValue()!!.id)
+        }
+    }
+
+    @Test fun cachedItemBySubmissionIsNullWhenAbsent() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            assertNull(h.store.cachedItemBySubmission(a, submissionId).successValue())
+        }
+    }
+
+    @Test fun cachedItemBySubmissionNeedsAnAccount() = runTest {
+        withHarness { h ->
+            assertEquals(ErrorKind.UNAUTHENTICATED, h.store.cachedItemBySubmission(h.snapshot(), submissionId).failureKind())
+        }
     }
 
     @Test fun appStateRoundTripsAndDeletes() = runStoreTest { h ->

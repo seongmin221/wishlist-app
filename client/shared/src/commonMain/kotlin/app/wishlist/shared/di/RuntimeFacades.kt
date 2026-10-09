@@ -95,6 +95,8 @@ internal class GatedLocalStore(
         gated { delegate.upsertItem(snapshot, item) }
     override suspend fun cachedItem(snapshot: SessionSnapshot, id: String) =
         gated { delegate.cachedItem(snapshot, id) }
+    override suspend fun cachedItemBySubmission(snapshot: SessionSnapshot, submissionId: String) =
+        gated { delegate.cachedItemBySubmission(snapshot, submissionId) }
     override suspend fun accept(snapshot: SessionSnapshot, submissionId: String, item: WishlistItem) =
         gated { delegate.accept(snapshot, submissionId, item) }
     override suspend fun removeCachedItem(snapshot: SessionSnapshot, id: String, throughVersion: Int) =
@@ -119,6 +121,8 @@ internal object ClosedLocalStore : LocalStore {
     override suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit> =
         unavailable(RUNTIME_NOT_READY)
     override suspend fun cachedItem(snapshot: SessionSnapshot, id: String): ClientResult<WishlistItem?> =
+        unavailable(RUNTIME_NOT_READY)
+    override suspend fun cachedItemBySubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<WishlistItem?> =
         unavailable(RUNTIME_NOT_READY)
     override suspend fun accept(snapshot: SessionSnapshot, submissionId: String, item: WishlistItem): ClientResult<Unit> =
         unavailable(RUNTIME_NOT_READY)

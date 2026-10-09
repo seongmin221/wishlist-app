@@ -90,6 +90,12 @@ INSERT OR REPLACE INTO item_cache VALUES ?;
 selectItem:
 SELECT * FROM item_cache WHERE account_id = ? AND item_id = ?;
 
+selectItemBySubmission:
+SELECT * FROM item_cache WHERE account_id = ? AND lower(client_submission_id) = ? LIMIT 1;
+
+deleteItem:
+DELETE FROM item_cache WHERE account_id = ? AND item_id = ?;
+
 deleteItemThrough:
 DELETE FROM item_cache WHERE account_id = ? AND item_id = ? AND version <= ?;
 

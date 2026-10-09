@@ -47,8 +47,17 @@ interface LocalStore {
     /** The snapshot account's cached ACTIVE items whose analysis is still PROCESSING, in no particular order (the submission view sorts them). */
     suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>>
 
+    /**
+     * ITEM-03 GET 결과 전용. 같은 version이면 덮어쓴다(목적·카테고리 편집은 item version을 올리지 않는다).
+     * 더 작은 version은 버린다. [accept]는 `>`를 유지한다.
+     */
     suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit>
+
+    /** UUIDs compare case-insensitively. A row that cannot be decoded is deleted and reads as absent. */
     suspend fun cachedItem(snapshot: SessionSnapshot, id: String): ClientResult<WishlistItem?>
+
+    /** The cached item accepted for [submissionId] (case-insensitive); Success(null) when none. Undecodable rows are dropped. */
+    suspend fun cachedItemBySubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<WishlistItem?>
 
     /**
      * Atomically writes the accepted item to the cache and deletes its submission. The item must
