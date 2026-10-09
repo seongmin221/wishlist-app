@@ -36,7 +36,7 @@
 | browser | route 단위 URL 검사, Chromium이 DNS를 별도 조회 | 프로세스 내 pinning proxy 경유 |
 | outbox | `dispatchPending`이 첫 실패에서 batch 중단 | 실패 이벤트만 제외하고 계속 |
 | reconciler | RUNNING만, 정렬 첫 batch 고정 | `recovery_check_at` 순환 + PENDING 복구 |
-| queue | `TaskGateway.create`만 | `status` 조회 추가 |
+| queue | `TaskGateway.create`만, `AnalysisTask`에 예약 시각 없음 | `status` 조회 추가, `AnalysisTask.scheduleAt`(Cloud Tasks scheduleTime) 추가 |
 | Worker 응답 | Retryable은 retry outbox 저장 후에도 503 | outbox 저장 시 204, backoff는 scheduleTime |
 
 ## 1. 실행 역할
@@ -68,7 +68,7 @@ budget   = attempts < 3 && (first == null || now < first + 30분)
 - claim·Worker Retryable·**finish의 NeedsBrowser 분기**·RUNNING 복구·PENDING 재예약·category stale replacement가 모두 이 함수를 쓴다. NeedsBrowser 분기(`AnalysisResultRepository.finishLocked`)는 `!browserAttempted`에 더해 예산을 확인하고, 소진이면 browser outbox를 만들지 않고 그 자리에서 FAILED_RETRYABLE(`ANALYSIS_RETRYABLE_FAILURE`)로 finish한다. lane별 카운터는 진단용으로 유지하며 claim은 해당 lane 카운터만 1 증가시킨다.
 - 재예약은 attempt를 증가시키지 않는다. 새 claim만 증가시킨다.
 - 예산 함수 자체는 schema 변경이 없다. stale replacement는 이미 두 lane 값을 승계한다.
-- **claim 전 실패 상한.** 발행된 task가 claim 전에 계속 실패하면(Worker 인증 설정 오류, 시작 중 crash, claim 전 5xx) attempt=0·첫 시각 null이라 위 함수는 항상 참이다. 그래서 PENDING 재예약에 별도 상한을 둔다. `recovery_seq >= 3`이면 더 재예약하지 않고 FAILED_RETRYABLE로 끝낸다. 재예약 1회에 Cloud Tasks 전달 3회와 5분 정체 판정이 붙으므로 3회면 약 30분이다.
+- **claim 전 실패 상한.** 발행된 task가 claim 전에 계속 실패하면(Worker 인증 설정 오류, 시작 중 crash, claim 전 5xx) attempt=0·첫 시각 null이라 위 함수는 항상 참이다. 그래서 PENDING 재예약에 별도 상한을 둔다. `recovery_seq >= 3`이면 더 재예약하지 않고 FAILED_RETRYABLE로 끝낸다. `recovery_seq`는 claim 때 초기화하지 않는 **job 전체 누적 상한**이다. 사이에 claim이 있었던 정상 유실 3회로도 상한에 걸리지만, 단순하고 job 하나의 재예약 총량을 제한한다. category stale replacement로 만든 새 job은 0부터 시작한다(attempt 합산과 30분은 승계하므로 전체 상한은 유지된다). 재예약 1회에 Cloud Tasks 전달 3회와 5분 정체 판정이 붙으므로 3회면 약 30분이다.
 
 **소진 시 metadata 반영.** 예산 소진으로 실패하는 모든 경로(claim Exhausted, finish의 Retryable·NeedsBrowser, RUNNING 복구, PENDING 재예약, stale replacement)는 공통 helper `failExhausted(jobId, itemId)`를 쓴다. 이 helper는 job FAILED와 상품 FAILED_RETRYABLE에 더해, job에 남은 pending metadata를 §4의 실패 병합 규칙(`existing ?: pending`, 보호 필드 유지)으로 반영한다. pending에 페이지 metadata가 있으면(`pending_canonical_url is not null`) 확인 시각과 가격 쌍도 §4 규칙대로 기록한다. 그래서 "이미 읽은 페이지 정보"가 실패 경로에 따라 버려지거나 남는 일이 없다. 수동 편집으로 version이 바뀌어 취소되는 경로(`failRetryableItem`만 호출)는 metadata를 반영하지 않는다.
 
@@ -82,6 +82,7 @@ budget   = attempts < 3 && (first == null || now < first + 30분)
 | stale replacement 뒤 새 generation | 합산값·첫 시각 승계 |
 | RUNNING 복구·PENDING 재예약 | attempt 불변 |
 | claim 전 실패로 PENDING 재예약 3회 후 다시 MISSING | 재예약 없이 FAILED_RETRYABLE |
+| 재예약 → claim → Retryable … 사이에 claim이 있었던 유실 누적 3회 후 MISSING | 누적 상한으로 FAILED_RETRYABLE(claim이 recovery_seq를 초기화하지 않음) |
 | Worker Retryable(outbox 저장) | 204 ACK, 원래 task 종료, retry outbox만 남음 |
 
 **Worker 응답.** 확정 결정 6에 따라 응답을 다음처럼 나눈다.
@@ -94,7 +95,7 @@ budget   = attempts < 3 && (first == null || now < first + 30분)
 | 90초 Worker timeout(작업이 아직 끝나지 않음) | 늦게 끝나면 retry outbox, 멈추면 lease 복구 | 503 |
 | 그 외 결과·Ignored·Exhausted | 기존 | 204 |
 
-durable outbox가 있으면 진행은 outbox와 maintenance가 보장하므로 원래 task를 끝내 예산 이중 소비를 막는다. durable 기록이 없는 경우만 Cloud Tasks 재전달에 맡긴다. 90초 timeout은 늦은 finish가 outbox를 만들면 재전달과 겹칠 수 있다. 이때도 claim이 RUNNING 중복을 막고, 남는 위험은 늦은 finish와 재전달 사이 시점의 추가 attempt 1회뿐이다. 이 위험은 문서에 남긴다.
+구현에서는 `WorkerDisposition`의 의미를 이렇게 고정한다. retry outbox를 저장한 Retryable은 `finishLocked`가 `ACKNOWLEDGE`를 반환한다. `RETRY`는 durable 기록이 없는 경우(claim 전 마감, executor 포화, 90초 timeout)만 뜻하며 route는 그대로 503으로 바꾼다. durable outbox가 있으면 진행은 outbox와 maintenance가 보장하므로 원래 task를 끝내 예산 이중 소비를 막는다. durable 기록이 없는 경우만 Cloud Tasks 재전달에 맡긴다. 90초 timeout은 늦은 finish가 outbox를 만들면 재전달과 겹칠 수 있다. 이때도 claim이 RUNNING 중복을 막고, 남는 위험은 늦은 finish와 재전달 사이 시점의 추가 attempt 1회뿐이다. 이 위험은 문서에 남긴다.
 
 **retry backoff.** retry outbox의 `not_before`는 `DB 시각 + min(10초 × 2^(합산 attempts − 1), 600초)`다(1회 후 10초, 2회 후 20초). dispatcher는 `not_before`를 기다리지 않고 바로 발행하며 Cloud Tasks `scheduleTime`으로 넘긴다. 그래서 Scheduler 주기와 무관하게 ADR-009 backoff가 유지된다. RUNNING 복구·PENDING 재예약·browser fallback·신규 생성 outbox의 `not_before`는 null(즉시)이다.
 
@@ -148,9 +149,9 @@ alter table analysis_jobs
     check ((pending_price is null) = (pending_currency is null));
 create index analysis_jobs_pending_recovery_idx on analysis_jobs (recovery_check_at nulls first, updated_at, id)
   where stage in ('GENERAL_PENDING','BROWSER_PENDING');
-alter table outbox_events add column not_before timestamptz;
 create index analysis_jobs_running_recovery_idx on analysis_jobs (recovery_check_at nulls first, lease_until, id)
   where stage in ('GENERAL_RUNNING','BROWSER_RUNNING');
+alter table outbox_events add column not_before timestamptz;
 create index outbox_events_job_created_idx on outbox_events (analysis_job_id, created_at desc, id desc);
 ```
 
@@ -165,6 +166,7 @@ create index outbox_events_job_created_idx on outbox_events (analysis_job_id, cr
 - merchant: brand와 같은 병합(보호 없음).
 - `metadata_checked_at`: 이번 finish가 페이지에서 읽은 pending metadata를 가지고 있으면(`pending_canonical_url is not null`) finish transaction의 `clock_timestamp()`로 기록한다. 상태(READY/PARTIAL)와 optional 값의 null 여부와 무관하다. NeedsBrowser는 pending metadata를 저장하지 않으므로(`GeneralExtractionProcessor`는 `Complete`만 저장) "general NeedsBrowser → browser 실패로 PARTIAL"은 pending이 비어 있어 기록하지 않는다. 기록 여부는 lane이 아니라 pending 페이지 metadata의 존재로만 정한다. 페이지 metadata가 없는 PARTIAL·실패는 기존 값을 유지한다. 예산 소진 실패도 §2의 `failExhausted`로 같은 규칙을 따른다. `classified_at`으로 대체하지 않는다.
 - category stale replacement, version 불일치, lease 만료 등 기존 무반영 경로는 그대로다.
+- stale replacement는 두 경우로 나뉜다. 예산이 남아 새 generation으로 바뀌면 이번 실행의 pending metadata를 반영하지 않는다(새 generation이 다시 분석). replacement 시점에 예산이 소진돼 FAILED로 끝나면(`StaleCategoryReplacement.kt`의 소진 분기) `failExhausted`로 반영한다.
 
 **조회.** 상세(`WishlistItemRepository`)와 목록·홈(`WishlistReadRepository`)이 공유하는 projection과 `WishlistItemRowMapper`가 새 컬럼을 읽는다(홈 목적 미리보기처럼 카드 표현을 쓰지 않는 조회는 제외). DTO는 이미 nullable `brand/price/currency/merchant/metadataCheckedAt`을 가진다. 가격은 기존 `DecimalJsonSerializer`로 JSON number다. 응답 필드 추가·이름 변경은 없다.
 
@@ -273,4 +275,4 @@ interface TaskGateway {
 
 ## 12. 문서 갱신
 
-계약 문서(`wishlist-item-state-api.md` 가격 단위·통화 확정, `wishlist-item-read-api.md` metadata null 문구), `extraction-pipeline.md`, `analysis-pending-recovery.md`(503 유지 문단을 ACK 전환과 재예약 상한으로 교체), `runtime-resources.md`, `overview.md`, `wishlist-state-persistence.md`, `mvp-api-inventory.md`(WORK/OPS 상태), `mvp-api-implementation-order.md`(B5 상태·미결정 해결 표), INDEX, B5 구현 이력, 필요한 learning Q&A(pinning proxy·generation 예산).
+계약 문서(`wishlist-item-state-api.md` 가격 단위·통화 확정, `wishlist-item-read-api.md` metadata null 문구), `extraction-pipeline.md`, `analysis-pending-recovery.md`(503 유지 문단을 ACK 전환과 재예약 상한으로 교체), `runtime-resources.md`, `overview.md`, `wishlist-state-persistence.md`(Retryable 응답 문구), `mvp-api-inventory.md`(WORK/OPS 상태, Retryable 응답 문구), `mvp-api-implementation-order.md`(B5 상태·미결정 해결 표), INDEX, B5 구현 이력, 필요한 learning Q&A(pinning proxy·generation 예산).
