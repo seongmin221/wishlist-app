@@ -27,23 +27,10 @@ final class HomePresenterOwner {
         self.init(presenter: runtime.homePresenter())
     }
 
-    /// Pull to refresh (`.refreshable`): asks the Presenter, then returns once its `refreshing`
-    /// went back to false — or at once if the refresh finished before it was ever seen (the
-    /// Presenter publishes a conflated StateFlow, so a fast refresh can skip the `true` frame).
+    /// Pull to refresh (`.refreshable`): returns once the Presenter's refresh finished (at once while
+    /// another one runs or after close). Cancelling the pull ends only the wait (CancellationError).
     func refresh() async {
-        presenter.refresh()
-        var sawRefreshing = false
-        let start = ContinuousClock.now
-        while !Task.isCancelled {
-            guard let loggedIn = presenter.state.value as? HomeStateLoggedIn else { return }
-            if loggedIn.refreshing {
-                sawRefreshing = true
-            } else if sawRefreshing || ContinuousClock.now - start > .milliseconds(300) {
-                return
-            }
-            if ContinuousClock.now - start > .seconds(30) { return }
-            try? await Task.sleep(for: .milliseconds(30))
-        }
+        try? await presenter.refreshNow()
     }
 
     func close() {

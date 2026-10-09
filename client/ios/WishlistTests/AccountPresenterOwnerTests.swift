@@ -88,3 +88,27 @@ final class SessionMirrorTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: AppGroup.accountBindingKey))
     }
 }
+
+/// The home owner's pull to refresh awaits the Presenter's refresh instead of polling its state.
+final class HomePresenterOwnerTests: XCTestCase {
+    @MainActor
+    func testRefreshReturnsOnlyAfterTheRefreshFinished() async throws {
+        let runtime = await SharedTestRuntime.readyDebug() // signed in with Google
+        defer { runtime.close() }
+        let owner = HomePresenterOwner(runtime: runtime)
+        defer { owner.close() }
+        let submissions = runtime.submissions()
+        let url = "https://shop.example/ios-refresh-await-\(UUID().uuidString)"
+        func queued() -> Bool { submissions.view.value.local.contains { $0.sourceUrl == url } }
+        _ = try await submissions.receiveShared(text: url, online: false)
+        XCTAssertTrue(queued())
+
+        // The pending row's ITEM-01 is held 800ms; the refresh sends it before returning.
+        try XCTUnwrap(runtime.debugControls()).delayNextItem01(millis: 800)
+        let start = Date()
+        await owner.refresh()
+        XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(start), 0.7)
+        XCTAssertFalse(queued())
+        await SharedTestRuntime.eventually { (owner.state as? HomeStateLoggedIn)?.refreshing == false }
+    }
+}

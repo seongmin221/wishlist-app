@@ -16,6 +16,7 @@ import app.wishlist.shared.model.itemFixture
 import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.SubmissionView
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -149,6 +150,38 @@ class HomePresenterTest {
         }
         assertEquals(listOf(FlushTrigger.USER_REFRESH), refreshes)
         p.close()
+    }
+
+    @Test
+    fun refreshNowReturnsOnceTheRefreshFinished() = runTest {
+        signIn(accountA)
+        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList(), flushing = false)
+        val gate = CompletableDeferred<Unit>()
+        refreshGate = gate
+        val p = presenter()
+        advanceUntilIdle()
+
+        val call = async { p.refreshNow() }
+        advanceUntilIdle()
+        assertFalse(call.isCompleted)
+        assertTrue(assertIs<HomeState.LoggedIn>(p.state.value).refreshing)
+        // While one runs, another is ignored and returns at once.
+        val second = async { p.refreshNow() }
+        advanceUntilIdle()
+        assertTrue(second.isCompleted)
+
+        now = T0 + 20.minutes
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(call.isCompleted)
+        val state = assertIs<HomeState.LoggedIn>(p.state.value)
+        assertFalse(state.refreshing)
+        assertEquals(RelativeTime.Minutes(20), state.processing.single().savedAt)
+        assertEquals(listOf(FlushTrigger.USER_REFRESH), refreshes)
+
+        p.close()
+        p.refreshNow() // closed: returns without refreshing
+        assertEquals(1, refreshes.size)
     }
 
     @Test

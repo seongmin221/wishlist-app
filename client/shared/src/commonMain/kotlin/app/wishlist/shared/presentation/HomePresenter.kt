@@ -55,17 +55,29 @@ class HomePresenter internal constructor(
         }
     }
 
-    /** Pull-to-refresh: shows [HomeState.LoggedIn.refreshing] until the refresh finished. */
+    /** Pull-to-refresh: shows [HomeState.LoggedIn.refreshing] until the refresh finished. Returns at once. */
     fun refresh() {
-        scope.launch {
-            if (refreshing.value) return@launch
-            refreshing.value = true
-            try {
-                refresh(FlushTrigger.USER_REFRESH)
-            } finally {
-                refreshing.value = false
-                recompute.value++
-            }
+        scope.launch { userRefresh() }
+    }
+
+    /**
+     * [refresh], awaited: returns once that refresh finished (iOS `.refreshable` awaits it). Returns
+     * at once while another refresh is running or after [close]. Cancelling the caller stops only the
+     * wait; the refresh itself runs on in the Presenter.
+     */
+    suspend fun refreshNow() {
+        scope.launch { userRefresh() }.join()
+    }
+
+    // On the Presenter's single lane, so the running check and the flag change are atomic.
+    private suspend fun userRefresh() {
+        if (refreshing.value) return
+        refreshing.value = true
+        try {
+            refresh(FlushTrigger.USER_REFRESH)
+        } finally {
+            refreshing.value = false
+            recompute.value++
         }
     }
 
