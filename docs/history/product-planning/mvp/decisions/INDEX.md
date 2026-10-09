@@ -7,6 +7,7 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 - [로컬 대기 저장과 분석 재시도](local-pending-analysis.md) — 확정 · 2026-09-10
 - [Product 캐시와 WishlistItem 스냅샷](product-cache-snapshot.md) — 확정 · 2026-09-05
 - [중복 URL과 상품 후보 처리](duplicate-items.md) — 확정 · 2026-09-05
+- [B5 비동기 분석과 운영 복구](b5-analysis-runtime-policy-2026-10-09.md) — 확정 · 2026-10-09 · 합산 3회·가격 범위 null·canonical eTLD+1·PENDING 5분·DNS Retryable
 
 ## 후보 정리
 
