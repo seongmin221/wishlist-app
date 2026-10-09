@@ -21,6 +21,7 @@ import io.ktor.client.engine.mock.respondError
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -156,3 +157,19 @@ internal fun createRuntime(
 
 /** Fixed device offset (KST) so relative-date tests do not depend on the host zone. */
 internal const val TEST_UTC_OFFSET_SECONDS = 9 * 3600
+
+/** Runs blocks inline but records that they were dispatched to it (the runtime's io seam). */
+internal class RecordingDispatcher : CoroutineDispatcher() {
+    var dispatches = 0
+        private set
+    var inside = false
+        private set
+
+    override fun isDispatchNeeded(context: kotlin.coroutines.CoroutineContext): Boolean = true
+
+    override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
+        dispatches++
+        inside = true
+        try { block.run() } finally { inside = false }
+    }
+}

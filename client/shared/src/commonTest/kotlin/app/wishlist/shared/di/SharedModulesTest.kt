@@ -529,19 +529,3 @@ class SharedModulesTest {
         assertTrue(probe.engines.isEmpty())
     }
 }
-
-/** Runs blocks inline but records that they were dispatched to it (the runtime's io seam). */
-private class RecordingDispatcher : CoroutineDispatcher() {
-    var dispatches = 0
-        private set
-    var inside = false
-        private set
-
-    override fun isDispatchNeeded(context: kotlin.coroutines.CoroutineContext): Boolean = true
-
-    override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
-        dispatches++
-        inside = true
-        try { block.run() } finally { inside = false }
-    }
-}

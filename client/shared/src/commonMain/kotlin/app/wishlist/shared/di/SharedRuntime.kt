@@ -248,6 +248,7 @@ class SharedRuntime internal constructor(
             ready = ready,
             clock = env.clock,
             ids = env.ids,
+            io = env.dispatchers.io,
             onPendingCreated = { submissions().requestFlush(FlushTrigger.LAUNCH) },
         )
     }

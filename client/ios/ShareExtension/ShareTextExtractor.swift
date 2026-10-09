@@ -23,8 +23,8 @@ enum ShareTextExtractor {
     }()
 
     private static let trailingPunctuation = Set(".,;:!?".utf16)
-    /// Closers whose unpaired copies are trimmed. Kotlin's map also lists `>` and its quote rule
-    /// covers `'` `"`, but the link pattern already excludes those three, so they never reach here.
+    /// Closers whose unpaired copies are trimmed (the same map as Kotlin's). The link pattern already
+    /// excludes `>` `'` `"`, so they never reach here.
     private static let openerOf: [UInt16: UInt16] = [
         unit(")"): unit("("),
         unit("]"): unit("["),

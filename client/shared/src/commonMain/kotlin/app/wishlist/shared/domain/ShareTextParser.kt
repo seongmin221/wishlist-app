@@ -10,17 +10,17 @@ sealed interface ParsedShare {
 /**
  * Extracts the first http(s) link from shared text (C3-D4). Rule shared with the iOS extension's
  * Swift extractor (same test vectors): first match of `https?://[^\s<>"'　]+` (case-insensitive),
- * then trailing `.,;:!?` and unpaired closing brackets/quotes are trimmed repeatedly; an empty host
- * is no link; more than [MAX_URL_LENGTH] UTF-16 units is too long. Case and percent-encoding are
- * kept as shared (normalization is the server's job).
+ * then trailing `.,;:!?` and unpaired closing brackets are trimmed repeatedly; an empty host is no
+ * link; more than [MAX_URL_LENGTH] UTF-16 units is too long. Case and percent-encoding are kept as
+ * shared (normalization is the server's job). The pattern already excludes `<>"'`, so neither quotes
+ * nor `>` can reach the trimming.
  */
 object ShareTextParser {
     const val MAX_URL_LENGTH = 2048
 
     private val link = Regex("https?://[^\\s<>\"'　]+", RegexOption.IGNORE_CASE)
     private const val TRAILING_PUNCTUATION = ".,;:!?"
-    private val openerOf = mapOf(')' to '(', ']' to '[', '}' to '{', '>' to '<', '」' to '「', '』' to '『')
-    private const val QUOTES = "'\""
+    private val openerOf = mapOf(')' to '(', ']' to '[', '}' to '{', '」' to '「', '』' to '『')
 
     fun parse(text: String?): ParsedShare {
         if (text.isNullOrEmpty()) return ParsedShare.NoLink
@@ -46,7 +46,6 @@ object ShareTextParser {
         return when {
             last in TRAILING_PUNCTUATION -> true
             opener != null -> url.count { it == opener } < url.count { it == last }
-            last in QUOTES -> url.count { it == last } % 2 == 1
             else -> false
         }
     }

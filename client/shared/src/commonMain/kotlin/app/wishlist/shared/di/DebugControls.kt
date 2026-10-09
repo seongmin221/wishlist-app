@@ -11,8 +11,10 @@ import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.repository.LocalStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -29,6 +31,8 @@ class DebugControls internal constructor(
     private val ready: StateFlow<Boolean>,
     private val clock: Clock,
     private val ids: IdGenerator,
+    /** The runtime's io dispatcher: the store work never runs on the caller's (main) thread. */
+    private val io: CoroutineDispatcher,
     private val onPendingCreated: () -> Unit,
 ) {
     /** The next Fake ITEM-01 request waits [millis] before its session check (FakeStore.delayNext). */
@@ -40,8 +44,13 @@ class DebugControls internal constructor(
      * Waits for ready, then saves [count] unbound PENDING shares (new keys, distinct URLs, sharedAt
      * one minute apart ending now, oldest first) and asks for a flush so the home view shows them.
      * Signed in, that flush binds and sends them like any unbound share. The value is the count saved.
+     * The saves run on the runtime's io dispatcher.
      */
-    suspend fun createUnboundPending(count: Int): ClientResult<Int> {
+    suspend fun createUnboundPending(count: Int): ClientResult<Int> = withContext(io) {
+        savePending(count)
+    }
+
+    private suspend fun savePending(count: Int): ClientResult<Int> {
         if (withTimeoutOrNull(READY_WAIT) { ready.first { it } } == null) {
             return ClientResult.Failure(ClientError(ErrorKind.UNAVAILABLE, RUNTIME_NOT_READY))
         }

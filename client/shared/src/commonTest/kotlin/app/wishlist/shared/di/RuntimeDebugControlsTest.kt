@@ -1,8 +1,11 @@
-@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package app.wishlist.shared.di
 
 import app.wishlist.shared.core.AuthProvider
+import app.wishlist.shared.core.Clock
+import app.wishlist.shared.core.IdGenerator
+import app.wishlist.shared.core.RuntimeDispatchers
 import app.wishlist.shared.data.fake.successValue
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.submission.ShareCardKind
@@ -17,6 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 /** SharedRuntime.debugControls(): DEBUG-only demo hooks (launch argument / intent extra). */
 class RuntimeDebugControlsTest {
@@ -53,6 +57,27 @@ class RuntimeDebugControlsTest {
         assertTrue(rows.last().sharedAt <= runtimeTime)
         // The home view picks them up without another signal.
         assertEquals(rows, runtime.submissions().view.value.local)
+        runtime.close()
+    }
+
+    @Test fun pendingCountSavesOnTheIoDispatcher() = runTest {
+        val io = RecordingDispatcher()
+        val probe = RuntimeResourcesProbe()
+        val runtime = assembleSharedRuntime(
+            bindings = debugBindings(), remote = null, platform = probe.platform,
+            clock = Clock { runtimeTime }, ids = IdGenerator { Uuid.random().toString() },
+            dispatchers = RuntimeDispatchers(default = StandardTestDispatcher(testScheduler), io = io),
+        )
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        assertTrue(runtime.ready.value)
+        // The key guard's lookup inside each save: record whether it ran on the io dispatcher.
+        val savedOnIo = mutableListOf<Boolean>()
+        probe.drivers.single().beforeQuery = { sql ->
+            if ("WHERE client_submission_id = ?" in sql) savedOnIo += io.inside
+        }
+        assertEquals(2, assertNotNull(runtime.debugControls()).createUnboundPending(2).successValue())
+        assertEquals(listOf(true, true), savedOnIo)
         runtime.close()
     }
 
