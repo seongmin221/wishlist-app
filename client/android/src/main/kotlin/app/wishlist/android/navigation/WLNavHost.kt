@@ -280,7 +280,7 @@ private fun SharedTransitionScope.TabStack(
                 if (stillMine()) seek.seekTo(e.progress.coerceIn(0f, 1f), to)
             }
             if (!stillMine()) {
-                scope.launch { seek.snapTo(navigator.entries(tab).last()) }
+                scope.launch { seek.snapTo(gestureSettleEntry(navigator, tab, gesture, from)) }
                 return@PredictiveBackHandler
             }
             val commit = !seen || last >= Motion.interactiveBackCommitProgress || velocity >= FlingProgressPerSecond
@@ -325,17 +325,19 @@ private suspend fun revert(
     tab: WLTab,
     gesture: WLNavTransition?,
 ) {
-    // 끌기 도중 계정 범위 칸이 정리되었으면 `from`은 이미 빠진 칸이다. 되돌리지 않고 지금 맨 위로 고정한다
-    // (빠진 칸을 다시 그리면 그 칸의 ViewModelStore를 새로 만들게 된다).
+    // 끌기·되돌림 도중 계정 범위 칸이 정리되었으면 `from`은 이미 빠진 칸이다. 되감지 않고 지금 맨 위로 고정한다
+    // (빠진 칸을 다시 그리면 그 칸의 ViewModelStore를 새로 만들게 되고, seek은 새 맨 위 재생을 끊는다).
     if (navigator.activeTransition !== gesture) {
-        seek.snapTo(navigator.entries(tab).last())
+        seek.snapTo(gestureSettleEntry(navigator, tab, gesture, from))
         return
     }
     try {
         if (seek.targetState == to && progress > 0f) {
             coroutineScope {
                 val a = Animatable(progress)
-                val follower = launch { snapshotFlow { a.value }.collect { seek.seekTo(it.coerceIn(0f, 1f), to) } }
+                val follower = launch {
+                    snapshotFlow { a.value }.collect { if (navigator.activeTransition === gesture) seek.seekTo(it.coerceIn(0f, 1f), to) }
+                }
                 // 되돌림 길이 = 그 화면 종류(사진·면)의 뒤로 시간 × 남은 비율.
                 val back = if (from.route.pushStyle == WLPushStyle.Slide) Motion.pushSlideBack else Motion.pushPhotoBack
                 val ms = (back * progress).toInt().coerceAtLeast(RevertMinMillis)
@@ -343,12 +345,23 @@ private suspend fun revert(
                 follower.cancel()
             }
         }
-        seek.snapTo(from)
+        seek.snapTo(gestureSettleEntry(navigator, tab, gesture, from))
     } finally {
-        // 되돌림이 끊겨도 끌기 상태를 반드시 풀어 입력이 막힌 채 남지 않게 한다(BackGesture일 때만 풀린다).
-        navigator.cancelBackGesture()
+        // 되돌림이 끊겨도 끌기 상태를 반드시 풀어 입력이 막힌 채 남지 않게 한다(아직 이 끌기일 때만).
+        if (navigator.activeTransition === gesture) navigator.cancelBackGesture()
     }
 }
+
+/**
+ * 끌어서 뒤로를 되돌린 뒤 고정할 칸. 끌기가 아직 활성이면 시작한 칸(`from`), 그 사이 끝났으면(계정 떠남 정리)
+ * 지금 그 탭의 맨 위 칸.
+ */
+internal fun gestureSettleEntry(
+    navigator: WLNavigator,
+    tab: WLTab,
+    gesture: WLNavTransition?,
+    from: WLBackStackEntry,
+): WLBackStackEntry = if (navigator.activeTransition === gesture) from else navigator.entries(tab).last()
 
 /** 라우터의 뒤로 처리를 켤지. 현재 탭이고, overlay가 없고, pop할 칸이 있거나 전환 중(받아서 버림)일 때만. */
 internal fun navBackEnabled(isCurrent: Boolean, overlayShowing: Boolean, canPop: Boolean, transitioning: Boolean): Boolean =

@@ -337,4 +337,18 @@ class WLNavigatorTest {
         assertEquals(nav.entries(WLTab.Home).map { it.id }.toSet() + nav.entries(WLTab.Category).map { it.id } +
             nav.entries(WLTab.Purpose).map { it.id }, nav.allEntryIds())
     }
+
+    @Test
+    fun gestureSettlesOnTheCurrentTopOnceADropEndsIt() {
+        val nav = WLNavigator()
+        nav.settle(TestScoped("item"))
+        assertTrue(nav.beginBackGesture())
+        val gesture = nav.activeTransition
+        val from = nav.entries(WLTab.Home).last()
+        assertEquals(from, gestureSettleEntry(nav, WLTab.Home, gesture, from))
+
+        nav.dropAccountScoped() // 되돌림 애니메이션 도중
+
+        assertEquals(nav.entries(WLTab.Home).first(), gestureSettleEntry(nav, WLTab.Home, gesture, from))
+    }
 }
