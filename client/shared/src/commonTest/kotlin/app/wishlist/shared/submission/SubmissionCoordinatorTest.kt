@@ -526,6 +526,42 @@ class SubmissionCoordinatorTest {
         assertTrue(h.pending().isEmpty())
     }
 
+    @Test fun retryAfterZeroWaitsASecondInsteadOfLooping() = runCoordinatorTest { h ->
+        h.signIn()
+        h.create.fail(ClientError(ErrorKind.RATE_LIMITED, retryAfterSeconds = 0))
+        h.coordinator.receiveShared(LINK, online = true)
+        runCurrent()
+        assertEquals(1, h.create.calls.size) // no immediate resend
+        advanceTimeBy(1_001)
+        runCurrent()
+        assertEquals(2, h.create.calls.size)
+        assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun aFlushStoppedEarlyKeepsTheWaitOfRowsItDidNotReach() = runCoordinatorTest { h ->
+        h.signIn()
+        h.share(online = false)
+        h.share(online = false)
+        h.create.fail(ClientError(ErrorKind.SERVER))
+        h.create.fail(ClientError(ErrorKind.SERVER))
+        h.coordinator.requestFlush()
+        runCurrent()
+        assertEquals(2, h.create.calls.size)
+
+        // 5s later the first row hits NETWORK and stops the flush before the second row.
+        advanceTimeBy(5_000)
+        h.create.fail(ClientError(ErrorKind.NETWORK))
+        h.coordinator.requestFlush()
+        runCurrent()
+        assertEquals(3, h.create.calls.size)
+
+        // The second row's 30s wait still resends both, with no other trigger.
+        advanceTimeBy(25_001)
+        runCurrent()
+        assertEquals(5, h.create.calls.size)
+        assertTrue(h.pending().isEmpty())
+    }
+
     @Test fun rateLimitHoldsEveryRowOfTheAccount() = runCoordinatorTest { h ->
         h.signIn()
         h.share(online = false)
@@ -813,6 +849,7 @@ class SubmissionCoordinatorTest {
         val refresh = launch { h.coordinator.refresh() }
         runCurrent()
         assertEquals(1, lookups)
+        val flushesBefore = h.store.prepareFlushCalls
         launch { h.coordinator.receiveShared("https://shop.example/p/new", online = true) }
         runCurrent()
         assertEquals(3, h.create.calls.size)
@@ -827,6 +864,8 @@ class SubmissionCoordinatorTest {
         advanceUntilIdle()
         assertTrue(refresh.isCompleted)
         assertTrue(h.pending().isEmpty())
+        // The share's queued request is not a second flush once the lookups ran one for it.
+        assertEquals(1, h.store.prepareFlushCalls - flushesBefore)
     }
 
     @Test fun viewOrdersProcessingByCreatedAtThenId() = runCoordinatorTest { h ->

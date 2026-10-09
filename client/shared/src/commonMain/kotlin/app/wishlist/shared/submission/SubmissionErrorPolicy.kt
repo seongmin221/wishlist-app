@@ -26,7 +26,8 @@ internal object SubmissionErrorPolicy {
         // Ruling 10: the next rows would fail the same way (offline, timing out, throttled), so stop.
         ErrorKind.NETWORK, ErrorKind.TIMEOUT -> Decision(SubmissionStatus.PENDING, null, stopFlush = true)
         ErrorKind.RATE_LIMITED -> {
-            val wait = (error.retryAfterSeconds ?: DEFAULT_RETRY_AFTER_SECONDS).coerceAtLeast(0)
+            // At least 1s: `Retry-After: 0` must not turn the retry timer into a send loop.
+            val wait = (error.retryAfterSeconds ?: DEFAULT_RETRY_AFTER_SECONDS).coerceAtLeast(1)
             Decision(SubmissionStatus.PENDING, now + wait.seconds, stopFlush = true)
         }
         // The account changed: no store write for this snapshot can succeed; the row keeps its binding.

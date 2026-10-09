@@ -178,6 +178,12 @@ class SubmissionCoordinator internal constructor(
             val batch = mutableListOf(requests.receive())
             while (true) batch += requests.tryReceive().getOrNull() ?: break
             val refresh = batch.any { it.refresh }
+            // Only flush requests, and a flush already ran after they were made (a refresh's lookups
+            // step aside for them): running again would resend every row just tried.
+            if (!refresh && !flushWanted.value) {
+                batch.forEach { it.done?.complete(Unit) }
+                continue
+            }
             try {
                 guarded(Unit) { if (refresh) refreshOnce() else flushOnce() }
             } finally {
@@ -191,12 +197,17 @@ class SubmissionCoordinator internal constructor(
         flushWanted.value = false
         val snapshot = session.state.value
         if (snapshot.accountId == null) return publishView()
-        val retry = RetryWindow()
+        val retry = RetryWindow(clock)
+        // A flush that could not read the queue knows no waits: it leaves the current timer as it is.
+        var queueRead = false
         try {
             // Resets stale SUBMITTING rows and binds unbound ones in one commit, before any POST.
             val queue = (store.prepareFlush(snapshot) as? ClientResult.Success)?.value ?: return
+            queueRead = true
             requestPublish()
             val now = clock.now()
+            // Every recorded wait counts, also of rows this flush stops before (a NETWORK stop).
+            queue.filter { it.submissionStatus == SubmissionStatus.PENDING }.mapNotNull { it.retryAfter }.forEach(retry::note)
             // 429 is the server pausing this account, not one row: nothing is sent until it ends.
             val throttledUntil = queue
                 .filter { it.submissionStatus == SubmissionStatus.PENDING && it.lastSubmissionError?.kind == ErrorKind.RATE_LIMITED }
@@ -210,17 +221,18 @@ class SubmissionCoordinator internal constructor(
                 if (session.state.value != snapshot || !send(snapshot, row, retry)) return
             }
         } finally {
-            scheduleRetry(retry.earliest)
+            if (queueRead) scheduleRetry(retry.earliest)
             publishView() // the final state, before the flush (and a refresh awaiting it) returns
         }
     }
 
-    /** The earliest future retryAfter met during one flush. */
-    private class RetryWindow {
+    /** The earliest future retryAfter met during one flush; a time not after now is ignored (no busy loop). */
+    private class RetryWindow(private val clock: Clock) {
         var earliest: Instant? = null
             private set
 
         fun note(at: Instant) {
+            if (at <= clock.now()) return
             earliest = earliest?.let { minOf(it, at) } ?: at
         }
     }
@@ -293,7 +305,7 @@ class SubmissionCoordinator internal constructor(
     /**
      * Recomputes the view for the current session; the one place that orders it (see [SubmissionView]):
      * local rows keep the store's (sharedAt, key) order, processing items are sorted by (createdAt, id).
-     * Lock order: viewLock → session gate (held only to publish).
+     * Lock order: viewLock → session gate (here only to publish; [accept] takes the same order).
      */
     private suspend fun publishView(): Unit = viewLock.withLock {
         val snapshot = session.state.value

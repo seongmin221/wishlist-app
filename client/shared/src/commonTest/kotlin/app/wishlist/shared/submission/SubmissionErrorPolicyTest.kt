@@ -41,4 +41,9 @@ class SubmissionErrorPolicyTest {
         val decision = SubmissionErrorPolicy.decide(ClientError(ErrorKind.RATE_LIMITED, retryAfterSeconds = 30), now)
         assertEquals(Decision(PENDING, now + 30.seconds, stopFlush = true), decision)
     }
+
+    @Test fun rateLimitedWaitsAtLeastOneSecond() {
+        val decision = SubmissionErrorPolicy.decide(ClientError(ErrorKind.RATE_LIMITED, retryAfterSeconds = 0), now)
+        assertEquals(Decision(PENDING, now + 1.seconds, stopFlush = true), decision)
+    }
 }
