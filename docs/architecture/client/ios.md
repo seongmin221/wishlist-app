@@ -38,8 +38,65 @@
 ## 공유 runtime 연결 (C2)
 
 - `WishlistApp`이 `init()`에서 `SharedRuntimeFactory.shared.create(bindings:remote:)`로 프로세스당 `SharedRuntime` 하나를 만들어 보유한다. `AppRuntimeConfig.bindings()`가 `#if DEBUG`로 mode와 37개 map을 고른다(DEBUG: ITEM-01·03 FAKE, 나머지 UNAVAILABLE / Release: 모두 UNAVAILABLE). C2에는 remote config가 없다.
-- `Wishlist/Debug/DebugSessionBootstrap.swift`는 파일 전체가 `#if DEBUG`이며 `startDebugSession()`만 호출한다. Release 바이너리에는 이 타입의 심볼이 없다.
+- `Wishlist/Debug/DebugSessionBootstrap.swift`는 파일 전체가 `#if DEBUG`이며 `startDebugSession()`을 호출한 뒤 `DebugLaunchHooks`로 launch argument `-wl.fake.delayItem01 <ms>`·`-wl.fake.pendingCount <N>`을 `runtime.debugControls()`에 넘긴다(C3 Task 7 시연용). 인자는 runtime을 조립하는 프로세스 시작 때만 읽으므로 cold start에서만 적용된다. 이미 실행 중이면 `xcrun simctl launch --terminate-running-process <udid> app.wishlist.ios -wl.fake.pendingCount 100`처럼 먼저 종료하고 띄운다. Release 바이너리에는 이 타입의 심볼과 `wl.fake` 문자열이 없다.
 - static `Shared.framework`가 SQLite driver를 포함하므로 앱 target `OTHER_LDFLAGS`에 `-lsqlite3`를 둔다.
-- `SharedRuntimeTests`가 앱 설정(Debug)의 binding, 실제 factory로 만든 runtime의 `ready`가 SKIE `for await`로 true가 되는 흐름과 debug owner 계정, close 후 ready=false, RELEASE binding의 즉시 ready를 검증한다.
+- `SharedRuntimeTests`가 앱 설정(Debug)의 binding, 실제 factory로 만든 runtime의 `ready`가 SKIE `for await`로 true가 되는 흐름과 로그인 전 시작(C3부터 debug 고정 계정 없음), close 후 ready=false, RELEASE binding의 즉시 ready를 검증한다.
 - `Features/Detail/ItemDetailPresenterOwner.swift`는 `@MainActor @Observable` 수명 소유자다(UI 없음). Presenter의 `state`를 main actor `Task`에서 SKIE `for await`로 수집해 구체 타입 `item: WishlistItem?`·`error: ClientError?`·`loading`으로 다시 게시한다. Task는 owner를 약하게 잡아 순환 참조가 없고, `close()`(멱등)와 `deinit`이 수집을 취소하고 Presenter를 닫는다. `init(runtime:)`은 `runtime.itemDetailPresenter()`를 쓴다.
-- `SharedInteropTests`는 Task 1 probe 대신 실제 Presenter·runtime으로 Flow 수집·collector 취소·suspend 호출·close·계정 전환(runtime session의 `MutableAuthSession.changeAccount`)을 검증하고, Swift `PlatformTokenSource` callback 성공/오류를 REMOTE ITEM-03 runtime(도달 불가 `http://127.0.0.1:9`)으로 검증한다. `ItemDetailPresenterOwnerTests`는 owner의 구체 state 수집, 계정 전환·오류 후 retry, close·deinit에 의한 종료를 검증한다.
+- `SharedInteropTests`는 Task 1 probe 대신 실제 Presenter·runtime으로 Flow 수집·collector 취소·suspend 호출·close·계정 전환(C3부터 `MutableAuthSession`이 internal이라 테스트 helper `switchAccount`가 `runtime.auth()`의 signOut·signIn을 쓴다)을 검증하고, Swift `PlatformTokenSource` callback 성공/오류를 REMOTE ITEM-03 runtime(도달 불가 `http://127.0.0.1:9`)으로 검증한다. `ItemDetailPresenterOwnerTests`는 owner의 구체 state 수집, 계정 전환·오류 후 retry, close·deinit에 의한 종료를 검증한다.
+
+## 공유 확장·inbox·로그인·홈·설정 (C3)
+
+> 2026-10-07 C3 Task 0·6·7. 공유 수신 방식은 [ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)(C3-D1 C안): 확장은 Shared.framework 없이 app group `inbox/`에 공유 1건 = JSON 파일 1개를 쓰고 끝난다. 본 앱이 실행·foreground 때 가져와 SQLite에 넣고 KMP `SubmissionCoordinator`가 같은 key로 전송한다. 다중 프로세스 DB 공유는 없다. 확장의 background URLSession 직접 전송은 자리(`ShareDirectSender`)만 두고 꺼 두었다("인증 연결" 단계).
+
+### target과 app group
+
+- `ShareExtension` target(`app.wishlist.ios.share`, `com.apple.share-services`, WebURL 1개 + Text)은 Shared.framework를 링크하지 않는다(Build Shared phase 없음, `APPLICATION_EXTENSION_API_ONLY = YES`). 확장이 함께 컴파일하는 앱 파일은 `WishlistTokens.swift`·`WLTypography.swift`·`WLTheme.swift`(WLText 포함)·`WLCard.swift`·`WLIconTile.swift`·`WLLineIcon.swift`와 `AppGroupShared/*`이고, 서체 4종을 resource로 넣고 확장 `Info.plist`에 `UIAppFonts`를 둔다. 문구는 확장 전용 `ShareExtension/Localizable.xcstrings`(`share.*`)다. `WLTypography`의 `.trailing` 정렬은 확장에서 쓸 수 없는 `UIApplication.shared` 대신 SwiftUI `layoutDirection`으로 정한다.
+- app group은 `group.app.wishlist`(`AppGroupShared/AppGroup.swift`: group id, `wl.session.accountBinding` 키, `inbox/` 경로).
+- **서명 발견(Task 0, Ruling 4):** 시뮬레이터의 entitlements는 서명 단계에서 바이너리 `__TEXT,__entitlements`에 들어간다. `CODE_SIGNING_ALLOWED=NO` 빌드에는 entitlements가 없어 `containerURL(forSecurityApplicationGroupIdentifier:)`가 nil이다. 프로젝트 기본 "Sign to Run Locally"(팀 없음, override 없는 `xcodebuild build`나 Xcode Run)는 앱·확장 모두 app group이 붙고 같은 container를 본다. 그래서 공유 확인용 빌드는 기본 서명, IOS_TEST·CI는 `CODE_SIGNING_ALLOWED=NO`를 유지한다. app group을 쓰는 코드는 디렉터리·defaults를 주입받아 테스트는 임시 폴더를 쓰고, 실행 중 container가 nil이면 inbox만 꺼진다(로그, crash 없음). 실기기·배포는 Apple Developer 팀이 필요하다(인증 연결 단계).
+
+### inbox 형식 v1
+
+- 공유 1건 = `inbox/<clientSubmissionId>.json` 하나: `{"v":1,"clientSubmissionId":"<소문자 uuid>","sourceUrl":"<추출한 링크>","sharedAt":"2026-10-07T01:02:03.456Z","accountBinding":null}`. `sharedAt`은 UTC 밀리초(부동소수 표기에 기대지 않고 정수 ms로 한 번 반올림), `accountBinding`은 공유 순간 미러된 계정이며 없으면 명시적 `null`(`AppGroupShared/InboxRecordFile.swift`).
+- 쓰기(`ShareExtension/ShareInboxWriter.swift`): `inbox/.tmp-<key>`에 `Data.write(.atomic)` 후 `moveItem`으로 최종 이름. 같은 URL을 다시 공유해도 새 key다.
+- 읽기(`Platform/ShareInboxReader.swift`): `.`으로 시작하지 않는 `*.json`을 이름순으로 읽는다. v1 레코드만 `runtime.submissions().importInbox(records:)`에 넘기고, 결과의 `deletable`만 지운다(retained·importer 오류는 남겨 다음에 다시). 읽을 수 없는 바이트·필드 누락은 corrupt로 바로 지우고, `v`가 1이 아니면 미래 형식으로 보고 건드리지 않는다. 진행 중 쓰기(`.tmp-*`)는 무시한다. import 뒤·삭제 전에 죽으면 같은 key를 다시 import하며 KMP가 no-op으로 처리한다.
+
+### 확장 흐름과 화면
+
+- `ShareViewController`: `extensionContext.inputItems`의 `NSItemProvider`에서 `UTType.url` 먼저, 없거나 웹 링크가 아니면(앱 scheme URL 등) `UTType.plainText`(각 3초 상한, 글은 필요할 때만 읽음) → `ShareTextExtractor`(결정은 `ShareExtension/ShareInput.swift`의 순수 함수 `decide`·`string(_:type:)`로 테스트한다. `Data`는 `url`로 요청한 값만 `URL(dataRepresentation:)`으로 읽고 글은 UTF-8로 읽는다 — 글을 URL로 읽으면 공백이 `%20`이 되어 링크가 글 끝까지 늘어난다) → 카드 종류(Ruling 2, Swift 자체 enum `ShareCardKind`): 링크 없음·2048 초과 `invalid`, container 없음·쓰기 실패 `storeFailed`, 미러된 계정이 있으면 `savedOpenApp`("위시리스트에 저장했어요 / 앱을 열면 정보를 가져와요"), 없으면 `local`("이 기기에 저장했어요 / 로그인하면 정보를 가져와요"). 쓰기 뒤 `DisabledShareDirectSender.send`(아무것도 하지 않음, 활성화 조건은 문서 주석: 가입·Keychain 공유·토큰 만료 정책).
+- `ShareTextExtractor`는 Kotlin `ShareTextParser`의 Swift 사본이다. 패턴의 공백은 Kotlin `\s`와 같은 ASCII 6자(space·\t·\n·\x0B·\f·\r)를 직접 적는다(ICU `\s`는 NBSP 등까지 잡아 Android와 달라진다). 길이·자르기는 UTF-16 단위다. `ShareTextExtractorTests`가 Kotlin `ShareTextParserTest`와 같은 벡터를 같은 순서로 검사한다. Kotlin의 따옴표·`>` 자르기는 패턴이 이미 제외해 도달하지 않으므로 옮기지 않았다.
+- 카드(`ShareCardView`): motion.md 6절 — 340 `standard`로 올라오고 1500 유지, 260 `accelerate`로 내려간 뒤 `completeRequest`. 저장이 끝나고 **`viewDidAppear` 뒤에만** 시작한다(`viewDidLoad`의 `completeRequest`는 무시되어 시트가 닫히지 않았다, Task 0). 등장 때 VoiceOver announcement(제목, 보조 줄).
+- **표시 방식(Task 6 시뮬레이터 확인, iOS 26.5):** 확장 view와 hosting view는 투명이고 `modalPresentationStyle = .overFullScreen`을 주지만, iOS가 확장 window 안에서 우리 화면을 담는 page sheet(`UIDropShadowView`, `systemBackgroundColor`)를 그리고 그 뒤 Safari를 어둡게 한다. 그래서 보드처럼 "원래 앱 위의 카드"가 아니라 "불투명 시스템 시트 아래쪽의 카드"로 보인다. 시트 크기(`preferredContentSize`)는 반영되지 않고 `sheetPresentationController`는 nil이다. 시스템 view 배경을 직접 지우면 카드만 뜨지만 UIKit 내부 계층에 기대므로 쓰지 않는다. 카드가 내려간 뒤 시트는 저절로 닫힌다(탭 후 약 4초 안).
+- **시트 바탕(Ruling 17, C3 Task 7):** 시트를 없앨 수 없으므로 확장 view·hosting view·`ShareCardHost`가 보드 FShareSaved*의 "다른 앱" 바탕색(`ShareBackdrop`: 라이트 #E9E9E9, 다크 #2A2A2A)을 칠해 카드 대비를 보드와 같게 유지한다. 카드는 시트 아래쪽에서 보드 motion대로 오르내리고 그림자는 없다. 디자인 토큰이 아니라 이 확장 전용 값이며, 보드와의 차이(전체 높이 불투명 시스템 시트)는 history에 보드 차이로 기록한다.
+
+- **직접 전송 자리:** `ShareExtension/ShareDirectSender.swift`의 `DisabledShareDirectSender`는 아무것도 하지 않는다. 켜려면 개발자 팀(Keychain 공유 access group으로 token 전달), token 만료(Firebase ID token 1시간) 정책, 401에서도 inbox 파일을 지우지 않는 규칙이 필요하다. 켜도 앱의 inbox import·같은 key 재전송은 그대로이며 서버 멱등 replay로 결과를 받는다.
+
+### 앱 쪽 신호·세션 미러
+
+- **inbox 중단 복구(3차 리뷰):** 확장은 `.tmp-<key>`를 `.atomic`으로 쓴 뒤 이름을 바꾼다. 그 사이에 확장이 끝나면 완전한 임시 파일이 남는데, reader는 60초(`staleTemporaryAge`) 넘은 임시 파일을 제자리로 옮겨(이미 같은 record가 있으면 지움) 다른 record처럼 가져온다(`testStaleTemporaryWriteIsRecoveredAndImported`). 홈 화면은 보이는 동안 1분마다 `HomePresenterOwner.tick()`을 불러 상대 시각을 다시 계산한다.
+- `Platform/AppSignals.swift`(Ruling 1): 실행과 background에서 돌아올 때만(`ForegroundTransitions`: 첫 `.active`와 `.background` 뒤의 `.active`. 제어 센터·알림 센터·Face ID 창의 `.inactive → .active`는 앱을 떠난 것이 아니라 제외, PR #12 2차 리뷰) inbox pass(앞 pass가 끝난 뒤 순서대로) → `refresh()`. refresh는 다음 pass가 기다리지 않는다. XCTest host(`XCTestConfigurationFilePath` 환경 변수)에서는 inbox·refresh·네트워크 신호를 모두 끈다(IOS_TEST host는 설치된 debug 앱과 같은 container·DB를 쓴다). `NetworkSignals`는 `NWPathMonitor`의 unsatisfied → satisfied 전이에서 `requestFlush()`(첫 갱신은 기준값).
+- `Platform/SessionMirror.swift`: `AccountPresenterOwner.binding`(복원 전 `unknown` / `signedOut` / `signedIn(id)`)이 바뀔 때마다 app group defaults에 `wl.session.accountBinding`을 쓰거나 지운다. 복원 전에는 지난 값을 그대로 둔다. 자격 증명이 아니다.
+
+### 화면과 owner
+
+- `Features/Session/AccountPresenterOwner`·`HomePresenterOwner`: `ItemDetailPresenterOwner`와 같은 `@MainActor @Observable` 수명 소유자. `WishlistApp`이 하나씩 만들어 environment로 넣는다. `HomeState.Loading`(복원 전·계정 전환 중)은 머리만 그려 이전 계정 줄이 비치지 않는다. 당겨서 새로고침은 로그인 뒤에만 `.refreshable`(시스템 indicator)이고, `HomePresenterOwner.refresh()`가 SKIE async로 `HomePresenter.refreshNow()`를 기다려 그 refresh가 끝나면 돌아온다(state polling 없음. 당김이 취소되면 `CancellationError`는 조용히 버리고 refresh는 Presenter에서 계속된다).
+- 첫 실행 로그인(FLogin)은 `ContentView`의 탭 셸 위 레이어다(`showFirstRunLogin`, 사라짐 opacity 260 `accelerate` — 애니메이션은 이 레이어의 컨테이너에만 걸어 같은 갱신의 탭 셸 변화에 번지지 않게 한다, 뜨는 동안 아래는 접근성에서 가림). 홈 로그인 카드·설정 "로그인"은 같은 화면을 `AppDestination.login`(가로 밀기)으로 연다. 홈 오른쪽 위 설정은 `AppDestination.settings`. 로그인 중에는 로그인·로그아웃 버튼을 막고, 실패는 화면에 남기지 않는다.
+- 홈(FHomeLoggedOut·FHome): 로그인 전은 로그인 카드 + "분석 대기"(줄마다 "원본" → `openURL`). 로그인 뒤 머리 보조 줄은 "할 일 N개"(`home.todo.count`, N = 분류 중 줄 수, Ruling 13), "분류 중" 카드 줄 상태 줄은 "상품 정보 추출 중"(Ruling 14)이고 오른쪽 동작이 없다(Ruling 15). 할 일 카드는 머리 전체와 화살표 버튼이 같은 펼치기이며 화살표 VoiceOver 이름은 "펼치기"/"접기". 줄 key는 목록 정체성으로만 쓴다.
+- 설정(FSettings·FSettingsLoggedOut): 로그아웃(먹색)·웹뷰 데이터 삭제(빨강) 확인창은 `WLConfirmDialog`. 웹뷰 삭제는 `WKWebsiteDataStore.default()`의 모든 형식, "방금 삭제했어요"는 화면 수명 동안만. 버전은 `CFBundleShortVersionString`. 라이선스 줄은 C12까지 숨긴다.
+- C1 홈 데모(`DemoHomeScreen`)는 지웠다. ⋯ 메뉴·삭제 확인창 데모는 상품 상세 데모에 있다.
+- 테스트: `ShareTextExtractorTests`·`InboxWriterReaderTests`는 확장 소스(`ShareTextExtractor.swift`·`ShareInboxWriter.swift`)를 테스트 target에도 컴파일한다. 테스트 target은 `WISHLIST_TESTS` 조건을 켜서 `ShareInboxWriter.swift`가 app group 타입을 `@testable import Wishlist`로 본다. `HomeRowTextTests`(문구 키 매핑·한영 번역 존재), `AccountPresenterOwnerTests`·`SessionMirrorTests`(owner 수명·미러), `HomePresenterOwnerTests`(당겨서 새로고침이 ITEM-01 800ms 지연 전송이 끝난 뒤에 돌아옴).
+- 시연 hook(C3 Task 7): 위 launch argument로 전송 중 계정 전환과 전송 중 `simctl terminate` 뒤 같은 key 재전송을 확인했다(저장소 밖 XCUITest harness로 Safari 공유 시트도 조작). 기록은 [C3 검증 기록](../../history/architecture/client/c3-verification-2026-10-07.md).
+
+### 검증 빌드와 서명
+
+- 단위 테스트(IOS_TEST)와 Release simulator build는 `CODE_SIGNING_ALLOWED=NO`다. 이 빌드에는 app group이 없어 app group 코드는 주입한 임시 폴더로만 테스트한다.
+- 공유 확장을 손으로 확인할 때는 서명 override 없는 기본 빌드("Sign to Run Locally", 팀 없음)를 설치한다. IOS_TEST가 같은 bundle id의 서명 없는 앱을 설치하므로 테스트 뒤 다시 설치한다. 명령은 [client/README.md](../../../client/README.md#공유-확장-확인-빌드ios).
+
+## C3 남은 점
+
+- 확장 표시: iOS 26이 확장을 불투명 전체 높이 시트로 감싼다(Ruling 17로 보드 바탕색을 칠해 대비만 맞춤). A(현재)·B(다른 대비)·C(UIKit 내부 계층 배경 제거) 중 A를 사용자가 확정했다(2026-10-09). 바탕 hex가 세 곳에 따로 정의돼 있다(확장 전용 값, 정리 대상).
+- 실기기 공유 확장·VoiceOver는 확인하지 않았다(개발자 팀 필요, 인증 연결 단계). Notes 앱의 링크 없는 글 공유는 자동화하지 않았고 2048자 초과 URL로 INVALID 카드를 확인했다.
+- 확장 입력 읽기는 첨부마다 3초 상한이고 넘으면 링크 없음(INVALID)으로 본다(구현 중 정한 규칙).
+- XCTest host는 앱 신호는 끄지만 runtime·debug 복원·seed는 설치된 debug 앱과 같은 `wishlist.db`에서 돈다([KMP 알려진 한계](kmp.md#알려진-한계와-인계-단계)).
+- `NetworkSignals`·`AppSignals`는 자동 테스트가 없다.
+- 홈 목록은 lazy가 아니다(`ScrollView` 안 `VStack`). 대기 300개에서 XCTest 측정 CPU가 N보다 빠르게 늘었다. Instruments는 `DevToolsSecurity` 승인 뒤 다시 잰다([C3 성능 확인](c3-performance-checks.md#c3-측정-결과-2026-10-07)).
+- 로그인 뒤 할 일 머리 "할 일 N개"는 0개일 때도 보인다(보드는 비지 않은 예만 있다). 영어는 plural로 "1 to-do"·"7 to-dos"다(iOS xcstrings plural variation, Android `<plurals>`).

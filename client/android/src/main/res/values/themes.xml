@@ -4,4 +4,16 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowBackground">#F8F8F8</item>
     </style>
+
+    <!-- 공유 카드 Activity: 창은 투명하고 어둡게 하지 않으며 전환 애니메이션이 없다(카드 모션은 Compose가 그린다). -->
+    <style name="Theme.Wishlist.ShareCard" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

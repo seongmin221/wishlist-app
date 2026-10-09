@@ -105,8 +105,8 @@ client/ios/      DesignSystem/, Navigation/, Features/<화면>/, ShareExtension/
 | --- | --- | --- | --- |
 | C0 | 셋업 미커밋 변경 커밋, `origin/main` 리베이스, 핸드오프 확보 확인, "핸드오프 사본 없음" 문구 정리, 이 spec과 C1 plan 커밋 | — | — |
 | C1 | 완료(2026-10-06, 목적 아이콘 key 초안은 C1 계획에 없어 남김). 토큰 생성기·서체·공통 컴포넌트, 탭 셸, 시트·확인창·push 전환 데모, iOS 라우터 spike, 목적 색·아이콘 key 초안 | 모션 보드 4종, 탭 바 | — |
-| C2 | 구현·로컬 검증 완료(2026-10-07, PR 대기; 실서버·Android Context SQLite 실기기·Darwin redirect는 C3/C12 인계). KMP 핵심: 모델·상태 축, repository 인터페이스, fake·시드, SQLDelight, Ktor client 뼈대·오류 매핑, `AuthTokenProvider`, Koin, SKIE 연결 확인, Presenter 기반 | — | — |
-| C3 | 저장: 공유 수신, LocalSubmission, 로그인 안내·건너뛰기, 로그인 전 홈·분석 대기, 전송·재전송, 설정(로그아웃·웹뷰 데이터 삭제) | FLogin, FHomeLoggedOut, FShareSaved*, FSettings* | ITEM-01 |
+| C2 | 구현·로컬 검증 완료(2026-10-07, draft PR 2026-10-09; 실서버·Android Context SQLite 실기기·Darwin redirect는 C3/C12 인계). KMP 핵심: 모델·상태 축, repository 인터페이스, fake·시드, SQLDelight, Ktor client 뼈대·오류 매핑, `AuthTokenProvider`, Koin, SKIE 연결 확인, Presenter 기반 | — | — |
+| C3 | 구현·로컬 검증 완료(2026-10-07, PR 대기; fake 인증만, 공유 확장 C안 중 확장 전송은 끔([ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)). 인계: 가입 뒤 "인증 연결"(Firebase·Apple/Google을 `AuthFacade` 뒤에, iOS 확장 background 전송, ITEM-01 실서버, 실기기·팀 서명), C4 원본 웹뷰·대기 항목 삭제 UI, C5 Android 모듈 분리 재검토, C7 FHome 나머지 카드, C12 라이선스 화면). 저장: 공유 수신, LocalSubmission, 로그인 안내·건너뛰기, 로그인 전 홈·분석 대기, 전송·재전송, 설정(로그아웃·웹뷰 데이터 삭제) | FLogin, FHomeLoggedOut, FShareSaved*, FSettings* | ITEM-01 |
 | C4 | 상품 상세(보기)·분석 중·원본 링크 웹뷰 | FProductDetail, FProductProcessing, FWebView* | B1 |
 | C5 | 카테고리 탭·세부 유형 목록(fake 목록)·선택 시트·생성·편집 | FCategoryHome/AddSheet/List/ListCustom/ListCustomEmpty/EditSheet, FProductCategoryPicker/Create | B2 |
 | C6 | 목적 탭·상세(머리 접기)·생성·편집 | FPurposeHome/Create/Detail/DetailEmpty/EditInPlace | B3 |
@@ -142,12 +142,12 @@ C1과 C2는 서로 의존하지 않아 병렬로 진행할 수 있다. C3 이후
 
 | 항목 | 결정 시점 | 진행용 기본값 |
 | --- | --- | --- |
-| 공유 확장의 서버 직접 전송 여부(공유 카드 문구에 영향, [QA-CLI-002](../../learning/client/q-and-a/QA-CLI-002-share-receipt-feedback.md)) | C3 시작 전 | 없음. C3 plan에서 두 방식을 비교해 결정 |
+| 공유 확장의 서버 직접 전송 여부(공유 카드 문구에 영향, [QA-CLI-002](../../learning/client/q-and-a/QA-CLI-002-share-receipt-feedback.md)) | C3 시작 전 | **C3에서 C안으로 결정([ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)).** iOS 확장은 app group inbox에 기록, 앱이 같은 key로 전송. 확장 background 전송은 "인증 연결" 단계에서 켬 |
 | 목적 색·아이콘 key 목록 | C1 초안, 서버 B3 계약에서 확정 | 색 6개 + 핸드오프 아이콘 묶음 key |
 | 연속 처리 "처음부터 다시 보기" 범위 | C7 | 이번 세션에서 건너뛴 항목만. 보류 항목을 다시 여는 서버 API는 없다 |
 | 목적 활동순 정렬·홈 노출 개수 | C6 / 서버 B3 | 서버 정의를 따르고, fake는 최근 수정순 |
 | 사진 업로드 MIME·크기·압축 | C8 / 서버 B6 | 긴 변 2048px JPEG로 압축 |
-| Firebase 프로젝트·Apple 로그인 설정 | C3의 실제 연결 전 | fake 인증 |
+| Firebase 프로젝트·Apple 로그인 설정 | Apple Developer 가입 뒤 "인증 연결"(C3에서 미룸, C3-D2) | fake 인증(`AuthFacade` 뒤 `FakeAuthFacade`) |
 | 실제 앱 ID·서명 | C12 | 임시 ID 유지 |
 
 ## 위험

@@ -7,7 +7,12 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.wishlist.shared.core.ClientResult
-import app.wishlist.shared.core.MutableAuthSession
+import app.wishlist.shared.core.AuthSession
+import app.wishlist.shared.core.ErrorKind
+import app.wishlist.shared.core.ClientError
+import app.wishlist.shared.core.SessionSnapshot
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import app.wishlist.shared.model.AnalysisStatus
 import app.wishlist.shared.model.ItemAnalysis
 import app.wishlist.shared.model.ItemCategory
@@ -60,7 +65,7 @@ class ItemDetailPresenterOwnerTest {
     }
 
     private val repository = GatedRepository()
-    private val session = MutableAuthSession()
+    private val session = TestAuthSession()
 
     private fun TestScope.owner(store: ViewModelStore): Pair<ItemDetailPresenterOwner, ItemDetailPresenter> {
         val presenter = ItemDetailPresenter(repository, session, StandardTestDispatcher(testScheduler))
@@ -114,4 +119,20 @@ class ItemDetailPresenterOwnerTest {
         unused.close()
         store.clear()
     }
+}
+
+/** The shared session's account changes are internal to the runtime, so this test owns a minimal one. */
+private class TestAuthSession : AuthSession {
+    private val mutableState = MutableStateFlow(SessionSnapshot(null, 0))
+    override val state: StateFlow<SessionSnapshot> = mutableState
+
+    fun changeAccount(accountId: String?) {
+        mutableState.value = SessionSnapshot(accountId, mutableState.value.generation + 1)
+    }
+
+    override suspend fun <T> withCurrent(
+        snapshot: SessionSnapshot,
+        operation: suspend () -> ClientResult<T>,
+    ): ClientResult<T> =
+        if (mutableState.value != snapshot) ClientResult.Failure(ClientError(kind = ErrorKind.SESSION_CHANGED)) else operation()
 }

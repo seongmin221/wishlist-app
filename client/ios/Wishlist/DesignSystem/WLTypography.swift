@@ -206,7 +206,7 @@ struct WLLabelText: UIViewRepresentable {
         let paragraph = NSMutableParagraphStyle()
         paragraph.minimumLineHeight = lineHeight
         paragraph.maximumLineHeight = lineHeight
-        paragraph.alignment = Self.alignment(env.multilineTextAlignment)
+        paragraph.alignment = Self.alignment(env.multilineTextAlignment, env.layoutDirection)
         // 문단 스타일을 직접 주면 UILabel 기본 줄바꿈 전략(.standard: 한글은 어절 단위)이 빠져 글자 중간에서 끊긴다. 되살린다.
         paragraph.lineBreakStrategy = .standard
         let font = WLFontCache.font(name: postScriptName, size: pointSize)
@@ -226,11 +226,13 @@ struct WLLabelText: UIViewRepresentable {
         return CGSize(width: min(ceil(fitted.width), width), height: fitted.height)
     }
 
-    private static func alignment(_ a: TextAlignment) -> NSTextAlignment {
+    /// `UIApplication.shared` is unavailable in the share extension (this file is compiled there too), so the
+    /// SwiftUI layout direction decides which edge `.trailing` is.
+    private static func alignment(_ a: TextAlignment, _ direction: LayoutDirection) -> NSTextAlignment {
         switch a {
         case .leading: return .natural
         case .center: return .center
-        case .trailing: return UIApplication.shared.userInterfaceLayoutDirection == .rightToLeft ? .left : .right
+        case .trailing: return direction == .rightToLeft ? .left : .right
         }
     }
 

@@ -26,7 +26,8 @@ internal object VariantRoutes : WLRouteCodec {
     fun Content(route: WLRoute, sourceKey: String?): Boolean {
         when (route) {
             is WLRoute.TabRoot -> when (route.tab) {
-                WLTab.Home -> DemoHomeScreen()
+                // 홈 탭은 C3부터 실제 HomeScreen(main AppRoute)이다.
+                WLTab.Home -> return false
                 WLTab.Category -> DemoCategoryScreen()
                 WLTab.Purpose -> DemoPurposeScreen()
             }

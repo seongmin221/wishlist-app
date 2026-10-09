@@ -1,59 +1,106 @@
 package app.wishlist.shared.data.local
 
-import app.cash.sqldelight.db.SqlDriver
 import app.wishlist.shared.core.*
+import app.wishlist.shared.di.RUNTIME_NOT_READY
 import app.wishlist.shared.model.*
 import app.wishlist.shared.repository.LocalStore
 import kotlinx.coroutines.CancellationException
+import kotlin.concurrent.Volatile
 import kotlin.time.Instant
 
 /**
- * Single-process SQLite store. Lock order is session gate -> DB transaction; only the short DB
- * commit runs inside the gate. The account is always taken from the validated snapshot, never
- * from the caller's arbitrary value. Any non-cancellation exception becomes LOCAL_STORE_FAILURE.
+ * Keeps the owner's resources (the SQL driver) open while one store operation runs. It is a
+ * counter, never a lock: [enter] does not block, so it adds no lock-order edge.
+ */
+internal interface StoreLease {
+    /** False once the owner is closing: the operation must not touch the DB at all. */
+    fun enter(): Boolean
+
+    /** Ends the operation; the last exit after close may run the owner's teardown on this thread. */
+    fun exit()
+
+    /** For a store whose driver nobody closes underneath it (unit tests). */
+    object None : StoreLease {
+        override fun enter() = true
+        override fun exit() = Unit
+    }
+}
+
+/**
+ * Single-process SQLite store. Order is lease -> (first driver open) -> session gate -> DB
+ * transaction; only the short DB commit runs inside the gate. Every operation holds a [lease] from
+ * before the driver is touched until after the gate is left, so the runtime's close never closes
+ * the driver under a running query; an operation started after close is UNAVAILABLE/RUNTIME_NOT_READY
+ * without touching the DB. The account is always taken from the validated snapshot, never
+ * from the caller's arbitrary value. The driver is opened by [LazyDriver] on first use, before the
+ * gate is entered. Any non-cancellation exception (including a failed open) becomes
+ * LOCAL_STORE_FAILURE.
  */
 internal class SqlLocalStore(
     private val session: AuthSession,
-    driver: SqlDriver,
+    private val driver: LazyDriver,
     /** Test-only seam: runs inside the accept transaction after the cache write. */
     private val afterAcceptCacheWrite: () -> Unit = {},
+    private val lease: StoreLease = StoreLease.None,
 ) : LocalStore {
-    private val database = WishlistDatabase(driver)
-    private val queries = database.wishlistQueries
+    @Volatile private var database: WishlistDatabase? = null
+
+    private suspend fun db(): WishlistDatabase = database ?: WishlistDatabase(driver.get()).also { database = it }
 
     private fun <T> failure(kind: ErrorKind, code: String? = null): ClientResult<T> =
         ClientResult.Failure(ClientError(kind, code))
 
-    private suspend fun <T> gated(snapshot: SessionSnapshot, block: () -> ClientResult<T>): ClientResult<T> = try {
-        session.withCurrent(snapshot) { block() }
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        failure(ErrorKind.UNAVAILABLE, LOCAL_STORE_FAILURE)
+    /**
+     * The only way to [db]: holds the lease across the driver open, the session gate and the
+     * blocking SQL, and releases it (also on cancellation) only after the gate has been left.
+     */
+    private suspend inline fun <T> leased(block: () -> ClientResult<T>): ClientResult<T> {
+        if (!lease.enter()) return failure(ErrorKind.UNAVAILABLE, RUNTIME_NOT_READY)
+        try {
+            return try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failure(ErrorKind.UNAVAILABLE, LOCAL_STORE_FAILURE)
+            }
+        } finally {
+            lease.exit()
+        }
+    }
+
+    /** Device-level work that does not depend on the account (no session gate). */
+    private suspend fun <T> local(block: (WishlistDatabase) -> ClientResult<T>): ClientResult<T> =
+        leased { block(db()) }
+
+    private suspend fun <T> gated(
+        snapshot: SessionSnapshot,
+        block: (WishlistDatabase) -> ClientResult<T>,
+    ): ClientResult<T> = leased {
+        val db = db()
+        session.withCurrent(snapshot) { block(db) }
     }
 
     private suspend fun <T> gatedForAccount(
         snapshot: SessionSnapshot,
-        block: (accountId: String) -> ClientResult<T>,
-    ): ClientResult<T> = gated(snapshot) {
+        block: (db: WishlistDatabase, accountId: String) -> ClientResult<T>,
+    ): ClientResult<T> = gated(snapshot) { db ->
         val accountId = snapshot.accountId ?: return@gated failure(ErrorKind.UNAUTHENTICATED)
-        block(accountId)
+        block(db, accountId)
     }
 
     override suspend fun saveSubmission(submission: LocalSubmission): ClientResult<Unit> {
         val snapshot = session.state.value
-        return gated(snapshot) {
+        return gated(snapshot) { db ->
             val binding = submission.accountBinding
             if (binding != null && binding != snapshot.accountId) {
                 failure(ErrorKind.VALIDATION, ACCOUNT_BINDING_MISMATCH)
             } else {
-                database.transactionWithResult<ClientResult<Unit>> {
-                    val existing = queries.selectSubmission(submission.clientSubmissionId).executeAsOneOrNull()
-                    // An existing binding may only be kept, never rebound or cleared.
-                    if (existing?.account_binding != null && existing.account_binding != binding) {
+                insertGuarded(db, submission) { existing ->
+                    // An existing binding is never rebound or cleared by another writer.
+                    if (existing.account_binding != null && existing.account_binding != binding) {
                         failure(ErrorKind.VALIDATION, ACCOUNT_BINDING_MISMATCH)
                     } else {
-                        queries.insertSubmission(submission.toRow())
                         ClientResult.Success(Unit)
                     }
                 }
@@ -61,39 +108,108 @@ internal class SqlLocalStore(
         }
     }
 
+    override suspend fun importSubmission(submission: LocalSubmission): ClientResult<Unit> =
+        local { db -> insertGuarded(db, submission) { ClientResult.Success(Unit) } }
+
+    /**
+     * Key guard: a new key is inserted; the same key with another URL is a reused key; the same
+     * key and URL keeps the existing row untouched and answers [sameUrl].
+     */
+    private fun insertGuarded(
+        db: WishlistDatabase,
+        submission: LocalSubmission,
+        sameUrl: (Local_submission) -> ClientResult<Unit>,
+    ): ClientResult<Unit> = db.transactionWithResult {
+        val queries = db.wishlistQueries
+        val existing = queries.selectSubmission(submission.clientSubmissionId).executeAsOneOrNull()
+        when {
+            existing == null -> {
+                queries.insertSubmissionIfAbsent(submission.toRow())
+                ClientResult.Success(Unit)
+            }
+            existing.source_url != submission.sourceUrl -> failure(ErrorKind.CONFLICT, SUBMISSION_KEY_REUSED)
+            else -> sameUrl(existing)
+        }
+    }
+
     override suspend fun pending(): ClientResult<List<LocalSubmission>> {
         val snapshot = session.state.value
-        return gated(snapshot) {
+        return gated(snapshot) { db ->
             val account = snapshot.accountId
+            val queries = db.wishlistQueries
             val rows = if (account == null) queries.selectUnboundSubmissions().executeAsList()
             else queries.selectVisibleSubmissions(account).executeAsList()
             ClientResult.Success(rows.map { it.toModel() })
         }
     }
 
+    override suspend fun prepareFlush(snapshot: SessionSnapshot): ClientResult<List<LocalSubmission>> =
+        gatedForAccount(snapshot) { db, account ->
+            db.transactionWithResult {
+                val queries = db.wishlistQueries
+                queries.resetSubmitting(account)
+                queries.bindUnbound(account)
+                ClientResult.Success(queries.selectBoundSubmissions(account).executeAsList().map { it.toModel() })
+            }
+        }
+
+    override suspend fun markSubmission(
+        snapshot: SessionSnapshot,
+        id: String,
+        status: SubmissionStatus,
+        error: ClientError?,
+        retryAfter: Instant?,
+    ): ClientResult<Unit> = gatedForAccount(snapshot) { db, account ->
+        db.transactionWithResult {
+            val queries = db.wishlistQueries
+            val existing = queries.selectSubmission(id).executeAsOneOrNull()
+                ?: return@transactionWithResult failure(ErrorKind.NOT_FOUND, SUBMISSION_NOT_FOUND)
+            if (existing.account_binding != account) {
+                return@transactionWithResult failure(ErrorKind.VALIDATION, ACCOUNT_BINDING_MISMATCH)
+            }
+            queries.updateSubmissionState(
+                status = status.name, retry_after_us = retryAfter?.toEpochMicros(),
+                error_kind = error?.kind?.name, error_code = error?.code, error_request_id = error?.requestId,
+                error_current_version = error?.currentVersion?.toLong(),
+                error_retry_after_seconds = error?.retryAfterSeconds,
+                client_submission_id = id, account_binding = account,
+            )
+            ClientResult.Success(Unit)
+        }
+    }
+
+    override suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>> =
+        gatedForAccount(snapshot) { db, account ->
+            ClientResult.Success(db.wishlistQueries.selectProcessingItems(account).executeAsList().map { it.toModel() })
+        }
+
     override suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit> =
-        gatedForAccount(snapshot) { account ->
-            database.transaction { upsertIfNewer(account, item) }
+        gatedForAccount(snapshot) { db, account ->
+            db.transaction { db.upsertIfNewer(account, item) }
             ClientResult.Success(Unit)
         }
 
     override suspend fun cachedItem(snapshot: SessionSnapshot, id: String): ClientResult<WishlistItem?> =
-        gatedForAccount(snapshot) { account ->
-            ClientResult.Success(queries.selectItem(account, id).executeAsOneOrNull()?.toModel())
+        gatedForAccount(snapshot) { db, account ->
+            ClientResult.Success(db.wishlistQueries.selectItem(account, id).executeAsOneOrNull()?.toModel())
         }
 
     override suspend fun accept(snapshot: SessionSnapshot, submissionId: String, item: WishlistItem): ClientResult<Unit> =
-        gatedForAccount(snapshot) { account ->
-            database.transactionWithResult<ClientResult<Unit>> {
+        gatedForAccount(snapshot) { db, account ->
+            if (!sameUuid(item.clientSubmissionId, submissionId)) {
+                return@gatedForAccount failure(ErrorKind.VALIDATION, SUBMISSION_ITEM_MISMATCH)
+            }
+            db.transactionWithResult {
+                val queries = db.wishlistQueries
                 val pending = queries.selectSubmission(submissionId).executeAsOneOrNull()
-                    ?: return@transactionWithResult failure(ErrorKind.NOT_FOUND, "SUBMISSION_NOT_FOUND")
+                    ?: return@transactionWithResult failure(ErrorKind.NOT_FOUND, SUBMISSION_NOT_FOUND)
                 if (pending.account_binding != account) {
                     return@transactionWithResult failure(ErrorKind.VALIDATION, ACCOUNT_BINDING_MISMATCH)
                 }
                 if (item.lifecycleStatus == LifecycleStatus.DELETED) {
                     queries.deleteItemThrough(account, item.id, item.version.toLong())
                 } else {
-                    upsertIfNewer(account, item)
+                    db.upsertIfNewer(account, item)
                 }
                 afterAcceptCacheWrite()
                 queries.deleteSubmission(submissionId)
@@ -102,47 +218,72 @@ internal class SqlLocalStore(
         }
 
     override suspend fun removeCachedItem(snapshot: SessionSnapshot, id: String, throughVersion: Int): ClientResult<Unit> =
-        gatedForAccount(snapshot) { account ->
-            queries.deleteItemThrough(account, id, throughVersion.toLong())
+        gatedForAccount(snapshot) { db, account ->
+            db.wishlistQueries.deleteItemThrough(account, id, throughVersion.toLong())
             ClientResult.Success(Unit)
         }
 
     override suspend fun clearCurrentCache(): ClientResult<Unit> {
         val snapshot = session.state.value
-        return gated(snapshot) {
-            snapshot.accountId?.let { queries.deleteAccountItems(it) }
+        return gated(snapshot) { db ->
+            snapshot.accountId?.let { db.wishlistQueries.deleteAccountItems(it) }
             ClientResult.Success(Unit)
         }
     }
 
-    private fun upsertIfNewer(account: String, item: WishlistItem) {
-        val existing = queries.selectItem(account, item.id).executeAsOneOrNull()?.version
-        if (existing == null || item.version > existing) queries.insertItem(item.toRow(account))
+    override suspend fun readAppState(key: String): ClientResult<String?> =
+        local { db -> ClientResult.Success(db.wishlistQueries.selectAppState(key).executeAsOneOrNull()) }
+
+    override suspend fun writeAppState(key: String, value: String?): ClientResult<Unit> = local { db ->
+        if (value == null) db.wishlistQueries.deleteAppState(key) else db.wishlistQueries.upsertAppState(key, value)
+        ClientResult.Success(Unit)
+    }
+
+    private fun WishlistDatabase.upsertIfNewer(account: String, item: WishlistItem) {
+        val existing = wishlistQueries.selectItem(account, item.id).executeAsOneOrNull()?.version
+        if (existing == null || item.version > existing) wishlistQueries.insertItem(item.toRow(account))
     }
 
     internal companion object {
         const val LOCAL_STORE_FAILURE = "LOCAL_STORE_FAILURE"
         const val ACCOUNT_BINDING_MISMATCH = "ACCOUNT_BINDING_MISMATCH"
+        const val SUBMISSION_KEY_REUSED = "SUBMISSION_KEY_REUSED"
+        const val SUBMISSION_ITEM_MISMATCH = "SUBMISSION_ITEM_MISMATCH"
+        const val SUBMISSION_NOT_FOUND = "SUBMISSION_NOT_FOUND"
     }
 }
 
+/** UUIDs compare by value (case-insensitive); anything unparsable never matches. */
+private fun sameUuid(a: String, b: String): Boolean = canonicalUuidOrNull(a)?.let { it == canonicalUuidOrNull(b) } ?: false
+
+/** Epoch microseconds; sub-microsecond digits are truncated (the server's precision). */
+private fun Instant.toEpochMicros(): Long = epochSeconds * 1_000_000 + nanosecondsOfSecond / 1_000
+
+private fun instantOfEpochMicros(us: Long): Instant =
+    Instant.fromEpochSeconds(us.floorDiv(1_000_000L), us.mod(1_000_000L) * 1_000)
+
 private fun LocalSubmission.toRow() = Local_submission(
-    client_submission_id = clientSubmissionId, source_url = sourceUrl, created_at = createdAtIso,
-    account_binding = accountBinding, status = submissionStatus.name, server_item_id = serverItemId,
+    client_submission_id = clientSubmissionId, source_url = sourceUrl, shared_at_us = sharedAt.toEpochMicros(),
+    account_binding = accountBinding, status = submissionStatus.name, retry_after_us = retryAfter?.toEpochMicros(),
     error_kind = lastSubmissionError?.kind?.name, error_code = lastSubmissionError?.code,
     error_request_id = lastSubmissionError?.requestId,
     error_current_version = lastSubmissionError?.currentVersion?.toLong(),
     error_retry_after_seconds = lastSubmissionError?.retryAfterSeconds,
 )
 
+/**
+ * A value this build does not know (a newer build's status or error kind, or one the v1 migration
+ * carried over) must not make the whole queue unreadable: an unknown status reads as PENDING (resent
+ * with its own key, so the server dedupes it) and an unknown error kind as no recorded error.
+ */
 private fun Local_submission.toModel() = LocalSubmission(
-    clientSubmissionId = client_submission_id, sourceUrl = source_url, createdAt = Instant.parse(created_at),
-    accountBinding = account_binding, submissionStatus = SubmissionStatus.valueOf(status),
-    serverItemId = server_item_id,
-    lastSubmissionError = error_kind?.let {
-        ClientError(ErrorKind.valueOf(it), error_code, error_request_id,
-            error_current_version?.toInt(), error_retry_after_seconds)
+    clientSubmissionId = client_submission_id, sourceUrl = source_url, sharedAt = instantOfEpochMicros(shared_at_us),
+    accountBinding = account_binding,
+    submissionStatus = SubmissionStatus.entries.firstOrNull { it.name == status } ?: SubmissionStatus.PENDING,
+    lastSubmissionError = error_kind?.let { name -> ErrorKind.entries.firstOrNull { it.name == name } }?.let {
+        ClientError(it, error_code, error_request_id, error_current_version?.toInt(), error_retry_after_seconds)
     },
+    retryAfter = retry_after_us?.let(::instantOfEpochMicros),
 )
 
 private fun WishlistItem.toRow(account: String) = Item_cache(

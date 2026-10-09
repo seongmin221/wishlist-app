@@ -3,8 +3,14 @@
 package app.wishlist.shared.di
 
 import app.wishlist.shared.core.ApiId
+import app.wishlist.shared.core.AuthProvider
 import app.wishlist.shared.core.AuthSession
+import app.wishlist.shared.core.ClientError
+import app.wishlist.shared.core.ClientResult
+import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.ErrorKind
+import app.wishlist.shared.core.IdGenerator
+import app.wishlist.shared.core.RuntimeDispatchers
 import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
@@ -27,6 +33,10 @@ import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -35,6 +45,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class SharedModulesTest {
+    private val savedAccount = mapOf("auth.account" to "GOOGLE|fake-google-0001|user@example.com")
     private val remoteItemId = "00000000-0000-4000-8000-000000000101"
     private val boardOrder = listOf(
         "소니 WH-1000XM6", "보스 QuietComfort Ultra", "젠하이저 MOMENTUM 4", "애플 AirPods Max",
@@ -144,7 +155,7 @@ class SharedModulesTest {
         runtime.close()
     }
 
-    @Test fun debug_bootstrap_changes_account_then_seeds_that_namespace_then_reports_ready() = runTest {
+    @Test fun debug_bootstrap_starts_signed_out_and_reports_ready() = runTest {
         val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
         val accountWhenReady = mutableListOf<String?>()
         // A foreground collector: advanceUntilIdle does not drive background-only work.
@@ -153,14 +164,82 @@ class SharedModulesTest {
             accountWhenReady += runtime.session.state.value.accountId
         }
         runtime.startDebugSession()
-        runtime.startDebugSession() // idempotent: one account change, one seed
+        runtime.startDebugSession() // idempotent
         advanceUntilIdle()
 
-        assertEquals(listOf<String?>(DEBUG_ACCOUNT_ID), accountWhenReady)
-        assertEquals(1L, runtime.session.state.value.generation)
+        assertEquals(listOf<String?>(null), accountWhenReady)
+        assertNull(runtime.bootstrapFailure.value)
+        assertEquals(0L, runtime.session.state.value.generation)
+        assertTrue(runtime.auth().restored.value)
+        assertNull(runtime.auth().account.value)
+        assertEquals(ErrorKind.UNAUTHENTICATED, runtime.catalogRepository().items(null, null).error().kind)
+
+        // Signing in seeds that account's namespace.
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val items = runtime.catalogRepository().items(null, null).successValue()
         assertEquals(boardOrder, items.map { it.product.name })
         assertEquals(7, runtime.catalogRepository().purposes().successValue().size)
+        runtime.close()
+    }
+
+    @Test fun debug_bootstrap_restores_the_saved_account_and_seeds_that_namespace_before_ready() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = mapOf("auth.account" to "APPLE|fake-apple-0001|apple@example.com") }
+        val runtime = createRuntime(debugBindings(), probe = probe, dispatcher = StandardTestDispatcher(testScheduler))
+        val seenWhenReady = mutableListOf<Pair<String?, Int>>()
+        launch {
+            runtime.ready.first { it }
+            seenWhenReady += runtime.session.state.value.accountId to runtime.catalogRepository().items(null, null).successValue().size
+        }
+        runtime.startDebugSession()
+        advanceUntilIdle()
+
+        assertEquals(listOf<Pair<String?, Int>>("fake-apple-0001" to boardOrder.size), seenWhenReady)
+        assertEquals(AuthProvider.APPLE, runtime.auth().account.value?.provider)
+        assertNull(runtime.bootstrapFailure.value)
+        runtime.close()
+    }
+
+    @Test fun restored_is_published_only_together_with_ready() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = mapOf("onboarding.login.seen" to "1") }
+        val runtime = createRuntime(debugBindings(), probe = probe, dispatcher = StandardTestDispatcher(testScheduler))
+        var restoredBeforeReady: Boolean? = null
+        runtime.beforeReadyPublished = { restoredBeforeReady = runtime.auth().restored.value }
+        runtime.startDebugSession()
+        advanceUntilIdle()
+
+        assertEquals(false, restoredBeforeReady)
+        // Once restored is observed, the facade serves first-run state and sign-in.
+        assertTrue(runtime.auth().restored.value)
+        assertTrue(runtime.auth().hasSeenFirstRunLogin())
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
+        runtime.close()
+    }
+
+    @Test fun restored_login_stores_the_first_run_flag_after_ready() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = savedAccount }
+        // Inline dispatch: the presenter observes the restored account the moment the restore publishes
+        // it, before ready (as a parallel io thread can).
+        val runtime = createRuntime(debugBindings(), probe = probe, dispatcher = RecordingDispatcher())
+        // Created before the bootstrap, like the apps' root owner.
+        val account = runtime.accountPresenter()
+        runtime.startDebugSession()
+        runtime.ready.first { it }
+        assertEquals("fake-google-0001", account.state.value.account?.accountId)
+        assertEquals("1", runtime.localStore().readAppState("onboarding.login.seen").successValue())
+
+        runtime.auth().signOut().successValue()
+        account.close()
+        val next = runtime.accountPresenter()
+        assertTrue(next.state.value.restored)
+        assertNull(next.state.value.account)
+        assertFalse(next.state.value.showFirstRunLogin)
+        next.close()
+        runtime.close()
+    }
+
+    @Test fun release_auth_is_the_unavailable_facade() {
+        val runtime = createRuntime(releaseBindings())
+        assertIs<UnavailableAuthFacade>(runtime.auth())
         runtime.close()
     }
 
@@ -170,6 +249,7 @@ class SharedModulesTest {
         val runtime = createRuntime(debugBindings())
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
 
         val facade = assertIs<GatedGetItemRepository>(runtime.getItemRepository())
         val cached = assertIs<CachedGetItemRepository>(facade.delegate)
@@ -187,6 +267,7 @@ class SharedModulesTest {
         val runtime = createRuntime(debugBindings(ApiId.ITEM_03 to Backend.UNAVAILABLE))
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val cached = assertIs<CachedGetItemRepository>(assertIs<GatedGetItemRepository>(runtime.getItemRepository()).delegate)
         assertSame(UnavailableItemRepository, cached.delegate)
 
@@ -216,6 +297,7 @@ class SharedModulesTest {
         assertIs<RemoteItemRepository>(cached.delegate)
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
 
         val item = runtime.getItemRepository().get(remoteItemId).successValue()
         assertEquals(2, item.version)
@@ -236,8 +318,10 @@ class SharedModulesTest {
         advanceUntilIdle()
         assertEquals(RUNTIME_NOT_READY, presenter.state.value.error?.code)
 
-        // The debug bootstrap changes the runtime session's account: the Presenter starts over.
+        // Signing in changes the runtime session's account: the Presenter starts over.
         runtime.startDebugSession()
+        advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         advanceUntilIdle()
         assertEquals(ItemDetailState.Initial, presenter.state.value)
 
@@ -279,6 +363,7 @@ class SharedModulesTest {
 
         a.startDebugSession()
         a.ready.first { it }
+        a.auth().signIn(AuthProvider.GOOGLE).successValue()
         assertFalse(b.ready.value)
         assertNull(b.session.state.value.accountId)
 
@@ -307,6 +392,7 @@ class SharedModulesTest {
         )
         runtime.startDebugSession()
         runtime.ready.first { it }
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         runtime.getItemRepository().get(remoteItemId).successValue()
         assertEquals(1, probe.drivers.size)
         assertEquals(1, probe.engines.size)
@@ -345,26 +431,95 @@ class SharedModulesTest {
         assertEquals(RUNTIME_NOT_READY, runtime.catalogRepository().items(null, null).error().code)
     }
 
-    @Test fun close_during_facade_resolution_does_not_throw_and_still_closes_the_driver_once() = runTest {
+    @Test fun close_during_first_driver_open_does_not_throw_and_still_closes_the_driver_once() = runTest {
         val probe = RuntimeResourcesProbe()
         val runtime = createRuntime(debugBindings(), probe = probe)
-        runtime.startDebugSession()
-        runtime.ready.first { it }
         var closes = 0
-        // close() arrives while the Get facade is being resolved (its first lookup opens the driver).
+        // close() arrives while the bootstrap's first real store use (the login restore) opens the driver.
         probe.onDriverOpen = { if (closes++ == 0) runtime.close() }
 
         val facade = runtime.getItemRepository()
+        assertTrue(probe.drivers.isEmpty())                    // lookups open nothing
+        runtime.startDebugSession()
         assertFalse(runtime.ready.value)
-        assertEquals(RUNTIME_NOT_READY, facade.get(remoteItemId).error().code)
         assertEquals(1, probe.drivers.size)
         assertEquals(1, probe.drivers.single().closes)
+        assertEquals(RUNTIME_NOT_READY, facade.get(remoteItemId).error().code)
         // Everything after close stays a typed failure, never an exception.
         assertEquals(RUNTIME_NOT_READY, runtime.localStore().pending().error().code)
         runtime.startDebugSession()
         runtime.close()
         assertFalse(runtime.ready.value)
         assertEquals(1, probe.drivers.single().closes)
+    }
+
+    @Test fun facadeLookupDoesNotOpenDriverOnCallerThread() = runTest {
+        val probe = RuntimeResourcesProbe()
+        val runtime = createRuntime(releaseBindings(), probe = probe)
+        runtime.getItemRepository(); runtime.localStore()
+        assertEquals(0, probe.drivers.size)                    // a facade lookup alone opens nothing
+        runtime.localStore().pending()
+        assertEquals(1, probe.drivers.size)                    // the first real use opens it on the io dispatcher
+        runtime.close()
+    }
+
+    @Test fun cancelledFirstOpenStillOpensTheDriverOnlyOnce() = runTest {
+        val probe = RuntimeResourcesProbe()
+        val runtime = createRuntime(releaseBindings(), probe = probe)
+        lateinit var caller: Job
+        // The caller is cancelled while the first open is running (the driver is already being created).
+        probe.onDriverOpen = { caller.cancel() }
+        caller = launch { runtime.localStore().pending() }
+        caller.join()
+        assertTrue(caller.isCancelled)
+        probe.onDriverOpen = {}
+        runtime.localStore().pending().successValue()
+        assertEquals(1, probe.drivers.size)                    // the next use reuses the driver opened above
+        runtime.close()
+        assertEquals(1, probe.drivers.single().closes)
+    }
+
+    @Test fun driverIsOpenedOnTheIoDispatcher() = runTest {
+        val io = RecordingDispatcher()
+        val probe = RuntimeResourcesProbe()
+        val runtime = assembleSharedRuntime(
+            bindings = releaseBindings(), remote = null, platform = probe.platform,
+            clock = Clock { runtimeTime }, ids = IdGenerator { "id" },
+            dispatchers = RuntimeDispatchers(default = Dispatchers.Unconfined, io = io),
+        )
+        var openedOnIo = false
+        probe.onDriverOpen = { openedOnIo = io.inside }
+        runtime.localStore().pending().successValue()
+        assertTrue(openedOnIo)
+        assertEquals(1, io.dispatches)
+        runtime.localStore().pending().successValue()
+        assertEquals(1, io.dispatches)                         // opened once, never re-dispatched
+        runtime.close()
+    }
+
+    @Test fun debugSeedFailureStillPublishesReadyAndReportsError() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = savedAccount }
+        val runtime = createRuntime(debugBindings(), probe = probe, seedOverride = { ClientResult.Failure(ClientError(ErrorKind.VALIDATION)) })
+        runtime.startDebugSession()
+        assertTrue(runtime.ready.value)
+        assertEquals(ErrorKind.VALIDATION, runtime.bootstrapFailure.value?.kind)
+        runtime.close()
+    }
+
+    @Test fun unexpectedBootstrapExceptionIsReportedNotThrown() = runTest {
+        val probe = RuntimeResourcesProbe().apply { appState = savedAccount }
+        val runtime = createRuntime(debugBindings(), probe = probe, seedOverride = { throw IllegalStateException("seed exploded") })
+        runtime.startDebugSession()
+        assertTrue(runtime.ready.value)
+        val failure = runtime.bootstrapFailure.value
+        assertEquals(ErrorKind.UNAVAILABLE, failure?.kind)
+        assertEquals(BOOTSTRAP_FAILURE, failure?.code)
+        // The half-applied restore is not left behind: session and account agree.
+        assertEquals("fake-google-0001", runtime.session.state.value.accountId)
+        assertEquals("fake-google-0001", runtime.auth().account.value?.accountId)
+        // The runtime still serves requests after a failed bootstrap.
+        assertEquals(emptyList(), runtime.localStore().pending().successValue())
+        runtime.close()
     }
 
     @Test fun closing_an_unused_runtime_opens_nothing() {

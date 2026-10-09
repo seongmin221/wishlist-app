@@ -58,6 +58,21 @@ class FakeItemRepositoryTest {
         assertEquals(ErrorKind.UNAUTHENTICATED, f.catalog.categories().error().kind)
         assertEquals(null, f.session.state.value.accountId)
     }
+    @Test fun create_for_a_stale_expected_snapshot_touches_no_owner() = runTest {
+        val f = FakeFixture(); f.login("A")
+        val expected = f.session.state.value
+        f.login("B")
+        val command = f.command()
+        assertEquals(ErrorKind.SESSION_CHANGED, f.repository.create(command, expected).error().kind)
+        assertTrue(f.generatedItemIds.isEmpty())
+        // Nothing was stored for B either: the same key is new for B, and for A once A is current again.
+        val forB = f.repository.create(command, f.session.state.value).successValue()
+        f.login("A")
+        val forA = f.repository.create(command, f.session.state.value).successValue()
+        assertNotEquals(forA.id, forB.id)
+        assertEquals(2, f.generatedItemIds.size)
+    }
+
     @Test fun original_url_reuse_reports_confirmed_code_without_version() = runTest {
         val f = FakeFixture(); f.login()
         val command = f.command(); f.repository.create(command).successValue()

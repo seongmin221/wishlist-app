@@ -63,8 +63,8 @@ struct ExpandableGroup<Header: View, Content: View>: View {
     }
 }
 
-/// 내용의 실제 높이를 접힘 진행값으로 줄인다. scale로 글자를 찌그러뜨리지 않는다.
-private struct WLDisclosureLayout: Layout {
+/// 내용의 실제 높이를 접힘 진행값으로 줄인다. scale로 글자를 찌그러뜨리지 않는다(홈 할 일 카드도 쓴다).
+struct WLDisclosureLayout: Layout {
     var progress: CGFloat
     var animatableData: CGFloat {
         get { progress }

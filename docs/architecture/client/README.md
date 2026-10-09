@@ -34,6 +34,6 @@
 - [KMP 구조](kmp.md)
 - [디자인 시스템과 앱 뼈대](design-system.md)
 
-## 미결정 사항
+## 공유 수신 방식(결정)
 
-- 로그인 상태에서 iOS Share Extension·Android 공유 수신 Activity가 공유된 로그인 토큰으로 직접 서버 저장 요청을 보낼지, 로컬에만 `LocalSubmission`을 만들고 전송을 앱에 맡길지 정하지 않았다. 공유 직후 확인 카드의 문구가 이 결정에 따라 달라진다. 배경은 [QA-CLI-002](../../learning/client/q-and-a/QA-CLI-002-share-receipt-feedback.md)를 참고한다.
+- 2026-10-07 C3에서 결정했다([ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md), C3-D1 C안). Android 공유 Activity는 앱 프로세스의 KMP runtime으로 받아 즉시 로컬 저장·전송한다. iOS Share Extension은 app group `inbox/`에 로컬 기록만 남기고 앱이 실행·foreground 때 가져와 같은 key로 전송한다. 확장의 직접 전송(background URLSession)은 자리만 두고 "인증 연결" 단계에서 켠다. 그래서 iOS 로그인 상태 카드 문구는 "앱을 열면 정보를 가져와요"다. 배경 질문은 [QA-CLI-002](../../learning/client/q-and-a/QA-CLI-002-share-receipt-feedback.md)·[QA-CLI-012](../../learning/client/q-and-a/QA-CLI-012-ios-share-starts-analysis.md).

@@ -35,6 +35,57 @@ Compose recomposition/layout trace와 프레임·할당 profiling으로 다음�
 
 반복 횟수와 결과는 기기/OS·항목 수·이미지 크기·글자 배율과 함께 기록한다. 메모리와 프레임 예산은 C3의 실제 기기 baseline을 얻은 뒤 정하며, 아직 수치가 없는데 임의의 통과 기준을 만들지 않는다.
 
+## C3 측정 결과 (2026-10-07)
+
+C3 실제 목록은 홈의 분석 대기·분류 중 행이다. 이미지가 없고 탭·상세 깊이도 없다. 그래서 위 공통 시나리오 가운데 "N개 목록 스크롤"만 측정했다. 이 값은 baseline이며 통과 기준이 아니다. 실행 방법과 화면 비교는 [C3 검증 기록](../../history/architecture/client/c3-verification-2026-10-07.md)에 있다.
+
+- **방법**
+  - debug 시연 hook `wl.fake.pendingCount`로 미귀속 행 N개(20/100/300)를 만든다.
+  - FHomeLoggedOut 할 일 카드를 펼친다.
+  - 위로 5회, 아래로 5회 스크롤한다.
+  - 다크 모드, 이미지 없음.
+- **목록 구현:** 두 플랫폼 모두 lazy 목록이 아니다. Android는 `Column` + `verticalScroll`, iOS는 `ScrollView` 안 `VStack`이며, 펼치면 N행을 모두 구성한다.
+
+### Android
+
+에뮬레이터 API 36(`sdk_gphone64_arm64`), 1080×2400 · 420dpi, Skia(OpenGL, emulation), 글자 배율 1.0. `dumpsys gfxinfo app.wishlist.android reset` 뒤 스크롤하고 `framestats`, `dumpsys meminfo`를 기록했다.
+
+| N | 프레임 | jank(deadline 놓침) | legacy jank | p50 / p90 / p95 / p99 | 느린 UI thread | TOTAL PSS | Java heap PSS | Native heap PSS |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 20 | 453 | 12 (2.65%) | 0% | 17 / 19 / 19 / 20 ms | 0 | 94,364 KB | 24,800 KB | 11,448 KB |
+| 100 | 683 | 26 (3.81%) | 40.85% | 19 / 25 / 29 / 40 ms | 2 | 102,740 KB | 30,092 KB | 13,940 KB |
+| 300 | 661 | 37 (5.60%) | 17.40% | 17 / 25 / 32 / 42 ms | 5 | 122,341 KB | 43,180 KB | 20,156 KB |
+
+### iOS
+
+iPhone 17 Pro 시뮬레이터 iOS 26.5(Apple M4 Pro 호스트), Dynamic Type Large.
+
+- `xcrun xctrace record --template "Time Profiler" --attach <pid>`는 시작한 뒤 끝나지 않았다. 이 맥은 `DevToolsSecurity`가 꺼져 있어 taskport 승인 대기로 보인다. Time Profiler·Allocations 기록은 사용자 승인 후 다시 한다.
+- 대신 XCTest `measure`(CPU·Memory·`scrollingAndDecelerationMetric`, 3회 평균)로 측정했다.
+- 이 CPU 값에는 XCUITest가 스와이프마다 앱 접근성 트리를 읽는 비용이 들어 있다. 숫자는 같은 방법끼리만 비교한다.
+
+| N | 절대 물리 메모리(평균 / 최고) | CPU 시간(10회 스크롤) | CPU instructions | 스크롤 drag+감속 시간 | 테스트 전체 시간 |
+| --- | --- | --- | --- | --- | --- |
+| 20 | 66,008 / 66,150 KB | 1.65 s | 9.9 G | 2.58 s | 61 s |
+| 100 | 90,458 / 90,912 KB | 8.03 s | 76.5 G | 2.58 s | 130 s |
+| 300 | 150,353 / 154,176 KB | 31.07 s | 481.7 G | 2.56 s | 222 s |
+
+스크롤 hitch 비율은 시뮬레이터에서 나오지 않았다.
+
+### 관찰
+
+- 두 플랫폼 모두 메모리가 N에 비례해 늘었다. iOS CPU는 N보다 빠르게 늘었다(20→300에서 약 19배).
+- 원인은 lazy 아닌 목록일 가능성이 있고, iOS는 접근성 트리 비용과 섞여 있다. 프로파일러로 나누어 보아야 한다.
+- 대기 행이 수백 개가 되는 일이 실제로 흔한지, lazy 목록으로 바꿀지는 실기기 Instruments·Android profiler 결과를 본 뒤 정한다. 지금은 기준선만 둔다.
+- Android N=100의 legacy jank 40.85%가 N=300(17.40%)보다 높은 것은 한 번만 측정한 값이라 원인을 설명하지 못했다. deadline 기준 jank는 N에 따라 늘었다. 다시 잴 때 반복 측정한다.
+
+### 이번에 측정하지 않은 항목
+
+- **입력:** C3 화면에는 입력 칸이 없다. 위 iOS·Android 입력 항목(키 입력당 responder 탐색, 한글 IME 조합, grapheme)은 입력 화면이 생기는 C5/C6에서 측정한다.
+- **이미지 로딩·교체:** C3 행에는 사진이 없다. 사진이 들어오는 단계에서 측정한다.
+- **탭 왕복·push/pop·공유 요소 registry, 숨은 탭 비용:** C3는 홈·설정·로그인만 있고 상세가 없다. 상세와 공유 요소 전환이 실제로 생기는 단계에서 측정한다.
+- **실기기:** 아직 측정하지 않았다.
+
 ## Gradle 모듈 경계 검토
 
 현재 Android `:android`는 application 한 모듈이며 Kotlin `internal`은 feature와 core를 격리하지 못한다. C1에서 폴더 경계와 route codec/provider 계약을 먼저 정리하고, C3 첫 실제 feature를 넣기 전에 core 분리를 진행할지를 검토한다.
@@ -49,3 +100,5 @@ Compose recomposition/layout trace와 프레임·할당 profiling으로 다음�
 | application | feature 등록·route rendering·DI·variant 데모 조립 |
 
 분리하면 host 전용 완료 API를 module 내부로 제한하고 feature→core 역의존을 컴파일러가 막을 수 있다. 지금 즉시 나누면 아직 없는 feature를 위한 Gradle 설정과 공개 API만 늘어날 수 있다. C2 Presenter/domain 계약과 C3 첫 feature 경계가 확정될 때 이동 범위·공개 API·모듈별 테스트 시간을 비교해 결정한다. 그 전에는 `finishTransition`을 feature에서 호출하지 않고 route codec/renderer를 앱이 연결하는 규칙을 유지한다.
+
+**C3 결정(C3-D10, 2026-10-07):** C3에서는 나누지 않았다. C3 화면은 로그인·홈·설정·공유 카드 네 개뿐이라 지금 분리하면 Gradle 설정과 공개 API만 늘어난다. `feature/*` 폴더 경계와 "feature는 `finishTransition`을 호출하지 않는다" 규칙을 유지하고, 카테고리 feature가 들어오는 C5에서 위 표대로 다시 검토한다. Android 쪽 배치는 [Android 구조](android.md#공유-수신로그인홈설정-c3)에 있다.

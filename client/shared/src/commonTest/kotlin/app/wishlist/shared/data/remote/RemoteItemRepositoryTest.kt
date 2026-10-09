@@ -20,6 +20,7 @@ import kotlin.test.*
 import kotlin.time.Instant
 
 private const val OWNER_A = "00000000-0000-4000-8000-000000000001"
+private const val OWNER_B = "00000000-0000-4000-8000-000000000002"
 private const val SUBMISSION = "00000000-0000-4000-8000-000000000003"
 private val shareTime = Instant.parse("2026-10-07T00:00:00Z")
 
@@ -63,6 +64,22 @@ class RemoteItemRepositoryTest {
         assertEquals(SUBMISSION, request.headers["Idempotency-Key"])
         assertEquals(url, first.sourceUrl)
         assertTrue(request.bodyText().contains("\"clientCreatedAt\":\"2026-10-07T00:00:00Z\""))
+    }
+
+    @Test fun create_for_a_stale_expected_snapshot_sends_no_request() = runTest {
+        val h = RemoteHarness(); h.session.changeAccount(OWNER_A)
+        val expected = h.session.state.value
+        h.session.changeAccount(OWNER_B)
+        assertEquals(ErrorKind.SESSION_CHANGED, h.repository.create(h.command(), expected).error().kind)
+        h.session.changeAccount(null)
+        h.session.changeAccount(OWNER_B) // same account again: a new generation is still stale
+        assertEquals(ErrorKind.SESSION_CHANGED, h.repository.create(h.command(), expected).error().kind)
+        assertEquals(ErrorKind.UNAUTHENTICATED, h.repository.create(h.command(), SessionSnapshot(null, 0)).error().kind)
+        assertTrue(h.server.engine.requestHistory.isEmpty())
+
+        // The current snapshot sends exactly once, as that account.
+        h.repository.create(h.command(), h.session.state.value).successValue()
+        assertEquals("Bearer token-$OWNER_B", h.server.engine.requestHistory.single().authorization())
     }
 
     @Test fun absent_client_created_at_is_omitted_from_the_body() = runTest {

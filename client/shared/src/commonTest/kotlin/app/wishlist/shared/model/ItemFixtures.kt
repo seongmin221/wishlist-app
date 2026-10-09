@@ -16,9 +16,11 @@ internal fun itemFixture(
     required: RequiredAction = RequiredAction.NONE,
     actions: Set<ItemAction> = setOf(ItemAction.EDIT, ItemAction.DELETE),
     version: Int = 1,
+    id: String = "00000000-0000-0000-0000-000000000001",
+    clientSubmissionId: String = "00000000-0000-0000-0000-000000000002",
 ) = WishlistItem(
-    id = "00000000-0000-0000-0000-000000000001",
-    clientSubmissionId = "00000000-0000-0000-0000-000000000002",
+    id = id,
+    clientSubmissionId = clientSubmissionId,
     version = version,
     sourceUrl = "https://shop.example/item",
     product = ProductSnapshot(name = name),

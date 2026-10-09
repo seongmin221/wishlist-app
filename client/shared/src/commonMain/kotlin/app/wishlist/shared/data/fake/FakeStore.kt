@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -26,7 +28,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         val entries = mutableMapOf<String, Entry>()
         val submissionIds = mutableMapOf<String, String>()
         /** Item keys are canonical UUID strings, so platform casing never splits one item in two. */
-        fun entry(id: String): Entry? = uuidOrNull(id)?.let(entries::get)
+        fun entry(id: String): Entry? = canonicalUuidOrNull(id)?.let(entries::get)
         var categories: List<Category> = emptyList()
         var purposes: List<Purpose> = emptyList()
         var seeded = false
@@ -44,8 +46,13 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         injections.update { it + (apiId to (it[apiId] ?: Injection()).copy(millis = millis)) }
     }
 
-    private suspend fun <T> request(apiId: ApiId?, operation: (OwnerStore) -> ClientResult<T>): ClientResult<T> {
-        val snapshot = session.state.value
+    /** [expected]: the snapshot the call is for (default: the current one); a stale one touches no owner. */
+    private suspend fun <T> request(
+        apiId: ApiId?,
+        expected: SessionSnapshot? = null,
+        operation: (OwnerStore) -> ClientResult<T>,
+    ): ClientResult<T> {
+        val snapshot = expected ?: session.state.value
         val injection = if (apiId == null) null else injections.getAndUpdate { it - apiId }[apiId]
         if (injection != null && injection.millis > 0) delay(injection.millis)
         val result = session.withCurrent(snapshot) {
@@ -62,8 +69,9 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         return if (session.state.value == snapshot) result else failure(ErrorKind.SESSION_CHANGED)
     }
 
-    suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> = request(ApiId.ITEM_01) { owner ->
-        val key = uuidOrNull(command.submissionId)
+    suspend fun create(command: CreateItemCommand, expected: SessionSnapshot? = null): ClientResult<WishlistItem> =
+        request(ApiId.ITEM_01, expected) { owner ->
+        val key = canonicalUuidOrNull(command.submissionId)
             ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
         val previous = owner.submissionIds[key]?.let { owner.entries.getValue(it).item }
         if (previous != null) {
@@ -87,7 +95,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     }
 
     suspend fun get(id: String): ClientResult<WishlistItem> = request(ApiId.ITEM_03) { owner ->
-        val key = uuidOrNull(id) ?: return@request invalidItemId()
+        val key = canonicalUuidOrNull(id) ?: return@request invalidItemId()
         val item = owner.entries[key]?.item
         if (item == null || item.lifecycleStatus == LifecycleStatus.DELETED)
             failure(ErrorKind.NOT_FOUND, "WISHLIST_ITEM_NOT_FOUND")
@@ -99,8 +107,8 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         if (owner.seeded) return@request ClientResult.Success(Unit)
         // Store keys use the same canonical form as every lookup; reject before any partial write.
         val items = data.items.map { item ->
-            val id = uuidOrNull(item.id) ?: return@request invalidItemId()
-            val key = uuidOrNull(item.clientSubmissionId)
+            val id = canonicalUuidOrNull(item.id) ?: return@request invalidItemId()
+            val key = canonicalUuidOrNull(item.clientSubmissionId)
                 ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
             item.copy(id = id, clientSubmissionId = key)
         }
@@ -128,19 +136,41 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
      * Applies a final analysis like the server's AnalysisResultRepository: USER values and a
      * CONFIRMED/DEFERRED review survive, READY overwrites AI metadata, other outcomes only fill gaps.
      */
-    suspend fun completeAnalysis(id: String, analysisGeneration: Int, result: AnalysisOutcome): ClientResult<Unit> = request(null) { owner ->
-        val entry = owner.entry(id) ?: return@request missing(id)
+    suspend fun completeAnalysis(id: String, analysisGeneration: Int, result: AnalysisOutcome): ClientResult<Unit> =
+        request(null) { owner -> applyAnalysis(owner, id, analysisGeneration, result) }
+
+    /**
+     * Completes, through the same rules as [completeAnalysis], every ACTIVE PROCESSING item of the
+     * current owner created at least [minAge] before [now]. There is no timer: the caller decides
+     * when (DEBUG refresh). Returns how many items were completed; an invalid outcome skips its item.
+     */
+    suspend fun completeDueAnalyses(
+        now: Instant,
+        minAge: Duration,
+        outcome: (WishlistItem) -> AnalysisOutcome,
+    ): ClientResult<Int> = request(null) { owner ->
+        val due = owner.entries.values.filter {
+            it.item.lifecycleStatus == LifecycleStatus.ACTIVE && it.item.analysis.status == AnalysisStatus.PROCESSING &&
+                now - it.item.createdAt >= minAge
+        }
+        ClientResult.Success(due.count { entry ->
+            applyAnalysis(owner, entry.item.id, entry.analysisGeneration, outcome(entry.item)) is ClientResult.Success
+        })
+    }
+
+    private fun applyAnalysis(owner: OwnerStore, id: String, analysisGeneration: Int, result: AnalysisOutcome): ClientResult<Unit> {
+        val entry = owner.entry(id) ?: return missing(id)
         val item = entry.item
         if (entry.analysisGeneration != analysisGeneration || item.lifecycleStatus != LifecycleStatus.ACTIVE ||
-            item.analysis.status != AnalysisStatus.PROCESSING) return@request ClientResult.Success(Unit)
+            item.analysis.status != AnalysisStatus.PROCESSING) return ClientResult.Success(Unit)
         if (result.status == AnalysisStatus.PROCESSING || result.status == AnalysisStatus.UNKNOWN ||
-            (result.categoryId != null && result.missingReason != null)) return@request failure(ErrorKind.VALIDATION)
+            (result.categoryId != null && result.missingReason != null)) return failure(ErrorKind.VALIDATION)
 
         val reviewSettled = item.reviewStatus == ReviewStatus.CONFIRMED || item.reviewStatus == ReviewStatus.DEFERRED
         val userCategory = item.category.source == ValueSource.USER
         val applyCategory = result.categoryId != null && !reviewSettled && !userCategory
         val categoryId = if (applyCategory) result.categoryId else item.category.id
-        if (result.status == AnalysisStatus.READY && categoryId.isNullOrBlank()) return@request failure(ErrorKind.VALIDATION)
+        if (result.status == AnalysisStatus.READY && categoryId.isNullOrBlank()) return failure(ErrorKind.VALIDATION)
         val complete = result.status == AnalysisStatus.READY
 
         val userName = item.product.nameSource == ValueSource.USER
@@ -172,7 +202,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
             analysis = ItemAnalysis(result.status, if (complete) null else result.failureCode),
             reviewStatus = review,
         ))
-        ClientResult.Success(Unit)
+        return ClientResult.Success(Unit)
     }
 
     suspend fun edit(id: String, expectedVersion: Int, patch: ItemPatch): ClientResult<WishlistItem> =
@@ -261,10 +291,9 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     private fun <T> Patch<T>.valueOr(original: T): T = when(this) { Patch.Unchanged -> original; is Patch.Set -> value }
     private fun notFound() = failure(ErrorKind.NOT_FOUND)
     private fun invalidItemId() = failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_ID")
-    private fun missing(id: String) = if (uuidOrNull(id) == null) invalidItemId() else notFound()
+    private fun missing(id: String) = if (canonicalUuidOrNull(id) == null) invalidItemId() else notFound()
     private fun conflict(item: WishlistItem) = failure(ErrorKind.CONFLICT, currentVersion = item.version)
     private fun failure(kind: ErrorKind, code: String? = null, currentVersion: Int? = null) =
         ClientResult.Failure(ClientError(kind, code, currentVersion = currentVersion))
 }
 
-private fun uuidOrNull(value: String): String? = try { Uuid.parse(value).toString() } catch (_: IllegalArgumentException) { null }

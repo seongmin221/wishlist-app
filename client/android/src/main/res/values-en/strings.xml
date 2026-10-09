@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Wishlist</string>
     <string name="wl_close">Close</string>
     <string name="wl_sheet">Sheet</string>
@@ -10,4 +10,75 @@
     <string name="wl_tab_purpose">Purpose</string>
     <string name="wl_header_sheet_expand">Expand list</string>
     <string name="wl_header_sheet_collapse">Show header</string>
+    <!-- C3: 로그인·홈·설정·공유 카드 (계획 문구 표) -->
+    <string name="login_title">Keep what you want to buy\nwith just a link</string>
+    <string name="login_point_share">Share to save it right away</string>
+    <string name="login_point_fetch">Sign in and we\'ll fetch product details</string>
+    <string name="login_point_devices">See the same list on your other devices</string>
+    <string name="login_apple">Continue with Apple</string>
+    <string name="login_google">Continue with Google</string>
+    <string name="login_later">Not now</string>
+    <string name="home_logged_out_caption">Not signed in</string>
+    <string name="home_login_card_title">Sign in to fetch details</string>
+    <string name="home_login_card_fill">We fill in names, photos and prices</string>
+    <string name="home_login_card_devices">Available on your other devices</string>
+    <string name="home_login_button">Sign in</string>
+    <string name="home_todo">To do</string>
+    <plurals name="home_todo_count">
+        <item quantity="one">%1$d to-do</item>
+        <item quantity="other">%1$d to-dos</item>
+    </plurals>
+    <string name="home_pending_title">Waiting for analysis</string>
+    <string name="home_pending_subtitle">Details arrive as soon as you sign in</string>
+    <string name="home_pending_meta">Saved %1$s · Only on this device</string>
+    <string name="home_original">Original</string>
+    <string name="home_processing_title">Sorting</string>
+    <string name="home_processing_subtitle">Fetching product details</string>
+    <string name="row_sending">Sending</string>
+    <string name="row_waiting_network">Sends when you\'re online</string>
+    <string name="row_retrying">Retrying soon</string>
+    <string name="row_needs_sign_in">Sends after you sign in again</string>
+    <string name="row_failed">This link can\'t be sent</string>
+    <string name="row_processing">Extracting product info</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes">%1$d min ago</string>
+    <string name="time_hours">%1$d hr ago</string>
+    <string name="time_yesterday">yesterday</string>
+    <!-- RelativeTime.Days is always 2 or more, so the plural form is fixed. -->
+    <string name="time_days" tools:ignore="PluralsCandidate">%1$d days ago</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_signed_in_google">Signed in with Google</string>
+    <string name="settings_signed_in_apple">Signed in with Apple</string>
+    <string name="settings_logout">Sign out</string>
+    <string name="settings_login_hint">Sign in to fetch details of saved items and see them on other devices</string>
+    <string name="settings_login">Sign in</string>
+    <string name="settings_original_links">Original links</string>
+    <string name="settings_webview_clear">Clear web view data</string>
+    <string name="settings_webview_clear_hint">Store sign-ins and history</string>
+    <string name="settings_webview_cleared">Just cleared</string>
+    <string name="settings_app_info">App info</string>
+    <string name="settings_version">Version</string>
+    <string name="logout_title">Sign out?</string>
+    <string name="logout_line_device">Only this device is signed out</string>
+    <string name="logout_line_kept">Saved items stay in your account</string>
+    <string name="logout_line_resume">Sign in again to pick up where you left off</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="webview_clear_title">Clear web view data?</string>
+    <string name="webview_clear_line_login">You\'ll be signed out of stores</string>
+    <string name="webview_clear_line_cookies">History and cookies are removed</string>
+    <string name="webview_clear_line_kept">Saved items stay as they are</string>
+    <string name="webview_clear_line_irreversible">This can\'t be undone</string>
+    <string name="webview_clear_confirm">Clear</string>
+    <string name="share_saved_title">Saved to your wishlist</string>
+    <string name="share_saved_open_app">Details arrive when you open the app</string>
+    <string name="share_saved_fetching">Fetching details</string>
+    <string name="share_local_title">Saved on this device</string>
+    <string name="share_local_line">Sign in to fetch details</string>
+    <string name="share_offline_line">We\'ll send it next time you open the app</string>
+    <string name="share_invalid_title">No link found</string>
+    <string name="share_invalid_line">Share again from the product page</string>
+    <string name="share_failed_title">Couldn\'t save</string>
+    <string name="share_failed_line">Please share again</string>
+    <string name="settings_back">Back</string>
 </resources>

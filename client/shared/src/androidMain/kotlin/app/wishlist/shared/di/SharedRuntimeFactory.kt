@@ -17,6 +17,7 @@ object SharedRuntimeFactory {
             platform = PlatformResources(
                 openDriver = { DriverFactory(appContext).create() },
                 createEngine = ::platformHttpEngine,
+                utcOffsetSeconds = { at -> java.util.TimeZone.getDefault().getOffset(at.toEpochMilliseconds()) / 1000 },
             ),
             clock = systemClock,
             ids = randomIds,
