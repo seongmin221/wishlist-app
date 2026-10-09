@@ -45,7 +45,7 @@
 
 - 보드는 "원래 앱 위에 뜨는 카드"다. iOS 26.5 시뮬레이터에서는 iOS가 확장 window 안에 불투명 page sheet(`UIDropShadowView`, `systemBackgroundColor`)를 그리고 그 뒤 앱을 어둡게 한다. `modalPresentationStyle = .overFullScreen`, `preferredContentSize`는 효과가 없고 `sheetPresentationController`는 nil이다.
 - 시스템 view들의 배경을 지우면 카드만 뜨지만 UIKit 내부 계층에 기대므로 넣지 않았다.
-- 카드 대비를 보드와 같게 하려고 시트 안에 보드의 "다른 앱" 바탕색(라이트 #E9E9E9, 다크 #2A2A2A)을 칠했다. 카드는 시트 아래쪽에서 보드 motion대로 오르내리고, 그림자는 없다. 사용자 답(A 현재안·B 다른 대비·C 내부 계층 수정)을 기다리는 동안 권장안 A를 적용했다. B·C를 고르면 `ShareCardView` 배치만 바뀐다. 보드 차이는 [디자인 결정](../../../design/decisions.md)에 기록했다.
+- 카드 대비를 보드와 같게 하려고 시트 안에 보드의 "다른 앱" 바탕색(라이트 #E9E9E9, 다크 #2A2A2A)을 칠했다. 카드는 시트 아래쪽에서 보드 motion대로 오르내리고, 그림자는 없다. A(현재안)·B(다른 대비)·C(내부 계층 수정) 중 권장안 A를 적용했고 사용자가 확정했다(2026-10-09). 보드 차이는 [디자인 결정](../../../design/decisions.md)에 기록했다.
 - `viewDidLoad`에서 부른 `completeRequest`는 표시 전이라 무시되어 시트가 닫히지 않았다. 카드 등장은 `viewDidAppear` 뒤, `completeRequest`는 내려가는 모션이 끝난 뒤에만 부른다.
 
 ## 재검토 조건

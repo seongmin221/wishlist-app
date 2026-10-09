@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- 상태: **승인 v1 · Task 0~7c 완료, Task 8 Step 1·2·4 완료, 리뷰·PR 대기 (2026-10-07)**. 설계 결정 C3-D1~D10은 이번 세션 대화에서 사용자가 승인했다. 실행 중 정한 판단은 아래 [실행 중 결정(ruling) 요약](#실행-중-결정ruling-요약)에 있다.
-- 작업 공간 `/Users/user/orca/workspaces/wishlist-app/client-c3-share-save`, 현재 브랜치 `seongmin221/client-c3-share-save`(Orca 생성 이름). 관례 이름 `client/c3-share-save`로 바꿀지 **PR 전에 사용자에게 확인**한다. PR base `develop`. 시작 HEAD `321835d6c2e916a1af2a8ebfdd9ec5b32fb4f063`(PR #10 merge). merge는 사용자 승인 없이 하지 않는다.
+- 상태: **승인 v1 · Task 0~7c 완료, Task 8 Step 1·2·4 완료, 최종 리뷰·수정 완료, PR 생성 (2026-10-09)**. 설계 결정 C3-D1~D10은 이번 세션 대화에서 사용자가 승인했다. 실행 중 정한 판단은 아래 [실행 중 결정(ruling) 요약](#실행-중-결정ruling-요약)에 있다.
+- 작업 공간 `/Users/user/orca/workspaces/wishlist-app/client-c3-share-save`, 브랜치는 Orca가 만든 `seongmin221/client-c3-share-save`에서 사용자 확인 뒤 관례 이름 `client/c3-share-save`로 바꿨다(2026-10-09). PR base `develop`. 시작 HEAD `321835d6c2e916a1af2a8ebfdd9ec5b32fb4f063`(PR #10 merge). merge는 사용자 승인 없이 하지 않는다.
 - C2 공간(`…/client-c2-kmp-core`)과 서버 B 공간은 수정·삭제하지 않는다.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. 공유 코드에 Compose/SwiftUI 의존성 없음. 새 라이브러리 의존성 추가 없음(필요해 보이면 구현 전에 사용자 확인).
 - 인증은 **fake만**. Firebase·Apple·Google 실제 연결, iOS 확장 직접 전송 활성화, ITEM-01 실서버 연결은 Apple Developer 가입 뒤 별도 "인증 연결" 단계.
@@ -848,7 +848,7 @@ func testUnknownVersionIsKept()              // v:2 파일 → 건드리지 않�
 - [x] **Step 2: 문서.** kmp.md: Coordinator·AuthFacade·schema v2·알려진 한계 표에서 C3 항목 해결 표시(해결 안 된 것은 사유와 다음 단계). android.md·ios.md: 공유 수신 구조, 신호, app group, 확장 target, 모듈 분리 보류(C3-D10). server-integration-status: ITEM-01 fake 사용 경로와 "인증 연결" 단계 인계. Q&A: "iOS는 공유만으로 분석이 시작되나? — B는 앱을 열 때 시작, C는 background URLSession으로 확장 종료 뒤에도 전송, 비용(Keychain·토큰 만료)". 로드맵 C3 행 상태와 미결정 표의 공유 확장 항목을 "C3에서 C안으로 결정"으로 갱신하고 "인증 연결" 단계를 C12 전 별도 행으로 추가할지 사용자에게 확인.
 - [ ] **Step 3: 리뷰.** 선택한 실행 방식의 전체 브랜치 독립 리뷰, 중요 결함 수정·재검증.
 - [x] **Step 4: 커밋.** `docs: C3 공유 저장 구조와 검증 결과 기록`.
-- [ ] **Step 5: 브랜치·PR.** 사용자에게 `client/c3-share-save`로 이름을 바꿀지 확인 → push → base develop draft PR. 설명: 결정 C3-D1~D10, 범위, 로컬 검증 건수·환경·미실행, 스크린샷 비교, "인증 연결" 인계. merge는 하지 않는다.
+- [x] **Step 5: 브랜치·PR.** 사용자에게 `client/c3-share-save`로 이름을 바꿀지 확인 → push → base develop draft PR. 설명: 결정 C3-D1~D10, 범위, 로컬 검증 건수·환경·미실행, 스크린샷 비교, "인증 연결" 인계. merge는 하지 않는다.
 
 ## C3 완료 기준
 
@@ -857,8 +857,8 @@ func testUnknownVersionIsKept()              // v:2 파일 → 건드리지 않�
 - [x] Review Focus 1~5가 테스트로 고정돼 Android host·iOS simulator에서 통과. (Task 8: host 364 · simulator 361 · XCTest 116, 실패·skip 0)
 - [x] kmp.md 알려진 한계의 C3 항목(정렬·accept 검사·key 가드·DB 열기 시점·seed 실패·`changeAccount` 노출)이 해결되거나 사유와 함께 이관됨. (6개 모두 해결: `fff233a`·`108a07f`·`c791412`)
 - [x] Android Context SQLite 실제 동작(강제 종료 후 유지)을 에뮬레이터에서 확인. (Task 5 smoke 3단계)
-- [ ] iOS 확장이 서명 없는 시뮬레이터에서 app group inbox를 쓰고 앱이 가져온다(Task 0이 실패했으면 사용자와 합의한 대체 기준). — **`CODE_SIGNING_ALLOWED=NO`에서는 app group이 없다(Task 0). 대체 기준(Ruling 4: 팀 없는 기본 "Sign to Run Locally" 서명)으로 확장 쓰기·앱 가져오기를 확인했다(Task 0 수동 공유, Task 6). 이 대체 기준을 사용자가 명시적으로 합의했는지는 PR 전에 확인한다.**
-- [ ] 문서·INDEX·로드맵·server-integration-status 최신화, draft PR 생성. — **문서는 Task 8 Step 2에서 갱신했고 draft PR은 대기.**
+- [x] iOS 확장이 서명 없는 시뮬레이터에서 app group inbox를 쓰고 앱이 가져온다(Task 0이 실패했으면 사용자와 합의한 대체 기준). — **`CODE_SIGNING_ALLOWED=NO`에서는 app group이 없다(Task 0). 대체 기준(Ruling 4: 팀 없는 기본 "Sign to Run Locally" 서명)으로 확장 쓰기·앱 가져오기를 확인했다(Task 0 수동 공유, Task 6). 사용자가 이 대체 기준을 그대로 받아들였다(2026-10-09).**
+- [x] 문서·INDEX·로드맵·server-integration-status 최신화, draft PR 생성. — **로드맵에 "인증 연결" 단계 행은 추가하지 않고 C3 행 인계로 둔다(사용자 결정 2026-10-09).**
 
 ## 실행 중 결정(ruling) 요약
 

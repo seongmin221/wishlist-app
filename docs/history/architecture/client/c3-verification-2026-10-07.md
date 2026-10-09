@@ -1,6 +1,6 @@
 # C3 화면 비교·예외 경로·성능 측정·최종 검증 (Task 7·8)
 
-> 2026-10-07 · 브랜치 `seongmin221/client-c3-share-save` · 코드 기준 `de01ded` · 스크린샷은 저장소에 넣지 않고 PR에 첨부한다
+> 2026-10-07 · 브랜치 `seongmin221/client-c3-share-save`(PR 전 `client/c3-share-save`로 이름 변경) · 코드 기준 `de01ded` · 스크린샷은 저장소에 넣지 않고 PR에 첨부한다
 
 ## 환경
 
