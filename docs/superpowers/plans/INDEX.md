@@ -1,5 +1,6 @@
 # 구현 계획 INDEX
 
+- [B5 비동기 분석·운영 복구](2026-10-09-b5-analysis-runtime-recovery.md) — 계획 검토 대기 · migration·추출·병합·합산 예산·DNS·egress proxy·browser/maintenance 역할·PENDING 복구·전체 흐름 12 Task
 - [B4 상품 목록·홈 조회](2026-10-07-b4-read-api.md) — Native Task1~9 완료·독립 리뷰 지적0·320 통과/1 skip, predicate·cursor·ITEM/HOME·index·회귀
 - [C3 공유 저장](2026-10-07-client-c3-share-save.md) — 승인 v1, Task 0~7c 완료·Task 8 완료(draft PR #12, 리뷰 3차 반영), 공유 수신(iOS inbox·Android 즉시 전송)·fake 인증·전송 조정기·로그인/홈/설정
 - [B3 목적 기본 관리](2026-10-07-b3-purpose-management.md) — 완료, Task 1~8, 입력 규칙·V13/V14·PUR-01~04·AI 목적 후보·문서/검증

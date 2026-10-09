@@ -1,6 +1,6 @@
 # B5 비동기 분석과 운영 복구 설계
 
-> 2026-10-09 · **설계 대화 승인 · spec 검토 대기** · 제품·운영 정책 확정
+> 2026-10-09 · **spec 승인(2026-10-10) · 구현 계획 검토 대기** · 제품·운영 정책 확정
 
 ## 목표와 범위
 
@@ -185,7 +185,7 @@ create index outbox_events_job_created_idx on outbox_events (analysis_job_id, cr
 **EgressProxy.** browser Worker가 소유하는 loopback 전용 HTTP proxy(`127.0.0.1`, 임의 port). loopback 전용이며 같은 컨테이너만 신뢰한다. loopback은 같은 컨테이너의 다른 프로세스(Chromium 포함)도 접근할 수 있으므로 별도 인증은 두지 않고, browser Worker 컨테이너에 다른 workload를 두지 않는 배포 조건을 B11에서 확인한다.
 
 - `CONNECT host:port`와 절대 URI HTTP 요청만 받는다. host마다 `UrlSafetyPolicy.validate`로 검증한 주소 중 하나에만 실제 TCP 연결한다. 검증과 연결 사이에 DNS를 다시 조회하지 않는다.
-- port는 80/443만 허용한다. 차단·DNS 실패는 연결 거부로 응답하고, 실패 종류를 해당 render에 기록해 PARTIAL 판정에 쓴다.
+- port는 80/443만 허용한다. 차단·DNS 실패는 `403 Forbidden`으로 거부한다. browser lane에서는 대상 실패가 모두 PARTIAL이므로 실패 종류를 따로 기록하지 않는다. 거부된 navigation은 Playwright 예외로 PARTIAL이 된다.
 - 연결별 timeout은 `WorkerExecution.remaining`을 따르고, render 종료 시 열린 연결을 모두 닫는다. 응답 body 크기는 proxy가 아닌 page content 단계에서 기존 512KiB 규칙을 적용한다.
 
 **Chromium 설정.** `--proxy-server=http://127.0.0.1:{port}`, `--proxy-bypass-list=<-loopback>`(loopback 우회 제거), `--disable-quic`, `--force-webrtc-ip-handling-policy=disable_non_proxied_udp`, context `serviceWorkers=BLOCK`, `acceptDownloads=false`. 기존 route 단위 URL 검사는 빠른 거부용으로 유지한다. 최종 URL은 다시 검증한다.
@@ -236,15 +236,16 @@ create index outbox_events_job_created_idx on outbox_events (analysis_job_id, cr
 ```kotlin
 data class AnalysisTask(val name: String, val jobId: UUID, val generation: Int, val type: String, val scheduleAt: Instant? = null)
 enum class TaskStatus { ALIVE, MISSING }
-interface TaskGateway {
+fun interface TaskGateway {
     fun create(task: AnalysisTask)
-    fun status(task: AnalysisTask): TaskStatus   // 조회 장애는 예외
+    // 조회 장애는 예외. 기본 구현은 항상 조회 실패로 취급해 재예약하지 않는다.
+    fun status(task: AnalysisTask): TaskStatus = throw UnsupportedOperationException("Task lookup unavailable")
 }
 ```
 
 - `CloudTasksGateway.status`: `getTask(queue/tasks/{name})` 성공 → ALIVE, `NotFoundException` → MISSING. getTask RPC도 재시도 없이 총 5초.
 - 테스트용 `InMemoryTaskQueue`(testutil): create 기록·중복 이름 무시, task 제거(유실/소진), 조회 장애 주입, 전달(Worker 호출) helper.
-- `fun interface`를 일반 interface로 바꾸므로 기존 lambda 사용처를 갱신한다.
+- `fun interface`와 기본 `status`를 유지해 기존 lambda 사용처(`TaskGateway { … }`)를 바꾸지 않는다. 조회를 지원하지 않는 gateway는 조회 실패와 같아 PENDING을 재예약하지 않으므로 안전한 기본값이다.
 
 ## 10. 오류·관측
 
