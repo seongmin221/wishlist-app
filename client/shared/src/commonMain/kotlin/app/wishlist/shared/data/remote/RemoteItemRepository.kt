@@ -6,6 +6,7 @@ import app.wishlist.shared.core.ClientError
 import app.wishlist.shared.core.ClientResult
 import app.wishlist.shared.core.ErrorKind
 import app.wishlist.shared.core.SessionSnapshot
+import app.wishlist.shared.core.hasValidUtf8Encoding
 import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.repository.CreateItemCommand
 import app.wishlist.shared.repository.CreateItemRepository
@@ -42,6 +43,8 @@ internal class RemoteItemRepository(
     override suspend fun create(command: CreateItemCommand, expected: SessionSnapshot): ClientResult<WishlistItem> {
         val snapshot = expected
         if (snapshot.accountId == null) return unauthenticated()
+        if (session.state.value != snapshot) return ClientResult.Failure(ClientError(ErrorKind.SESSION_CHANGED))
+        if (!hasValidUtf8Encoding(command.sourceUrl)) return ClientResult.Failure(ClientError(ErrorKind.VALIDATION, "INVALID_URL"))
         // Everything is computed outside the request lambda; the transport also builds it only once.
         val body = buildJsonObject {
             put("sourceUrl", command.sourceUrl)
@@ -71,7 +74,9 @@ internal class RemoteItemRepository(
         build: HttpRequestBuilder.() -> Unit,
     ): ClientResult<WishlistItem> {
         val response = when (val sent = transport.execute(snapshot, apiId, build)) {
-            is ClientResult.Failure -> return sent
+            is ClientResult.Failure -> return if (session.state.value != snapshot) {
+                ClientResult.Failure(ClientError(ErrorKind.SESSION_CHANGED))
+            } else sent
             is ClientResult.Success -> sent.value
         }
         val text = try {
@@ -80,6 +85,7 @@ internal class RemoteItemRepository(
             throw e
         } catch (e: Exception) {
             currentCoroutineContext().ensureActive()
+            if (session.state.value != snapshot) return ClientResult.Failure(ClientError(ErrorKind.SESSION_CHANGED))
             return ClientResult.Failure(ApiErrorMapper.fromThrowable(e))
         }
         val result = parseItem(text)

@@ -75,33 +75,35 @@ internal class AuthenticatedTransport(
         var token: String? = null
         if (authenticated) {
             when (val first = tokens.getToken(snapshot, forceRefresh = false)) {
-                is ClientResult.Failure -> return first
+                is ClientResult.Failure -> return if (isStale(snapshot)) sessionChanged() else first
                 is ClientResult.Success -> token = first.value
             }
         }
         if (isStale(snapshot)) return sessionChanged()
 
         var response = when (val sent = send(template, token)) {
-            is ClientResult.Failure -> return sent
+            is ClientResult.Failure -> return if (isStale(snapshot)) sessionChanged() else sent
             is ClientResult.Success -> sent.value
         }
         if (response.status.value == 401 && authenticated) {
             val refreshed = when (val second = tokens.getToken(snapshot, forceRefresh = true)) {
-                is ClientResult.Failure -> return second
+                is ClientResult.Failure -> return if (isStale(snapshot)) sessionChanged() else second
                 is ClientResult.Success -> second.value
             }
             if (isStale(snapshot)) return sessionChanged()
             response = when (val resent = send(template, refreshed)) {
-                is ClientResult.Failure -> return resent
+                is ClientResult.Failure -> return if (isStale(snapshot)) sessionChanged() else resent
                 is ClientResult.Success -> resent.value
             }
         }
         if (isStale(snapshot)) return sessionChanged()
-        return if (response.status.value in 200..299) {
+        val result = if (response.status.value in 200..299) {
             ClientResult.Success(response)
         } else {
             ClientResult.Failure(ApiErrorMapper.fromResponse(response))
         }
+        if (isStale(snapshot)) return sessionChanged()
+        return result
     }
 
     private fun isStale(snapshot: SessionSnapshot) = session.state.value != snapshot

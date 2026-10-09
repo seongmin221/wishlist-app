@@ -23,6 +23,42 @@ import kotlinx.serialization.json.jsonPrimitive
 import app.testutil.PostgresTestContainer
 
 class WishlistRoutesTest {
+    @Test
+    fun `uppercase https scheme preserves raw url through create replay and case conflict`() = app.testutil.withAnalysisDatabase { source ->
+        val service = CreateWishlistItemService(source)
+        val owner = UUID.randomUUID()
+        val key = UUID.randomUUID()
+        testApplication {
+            application { installApiHttpSupport(); routing { wishlistRoutes(service, app.wishlist.GetWishlistItemService(source)) { owner } } }
+            suspend fun submit(url: String) = client.post("/v1/wishlist-items") {
+                header("Idempotency-Key", key.toString())
+                contentType(ContentType.Application.Json)
+                setBody("""{"sourceUrl":"$url"}""")
+            }
+
+            val created = submit("HTTPS://A.EXAMPLE/Path")
+            assertEquals(HttpStatusCode.Created, created.status)
+            val createdBody = Json.parseToJsonElement(created.bodyAsText()).jsonObject
+            assertEquals("HTTPS://A.EXAMPLE/Path", createdBody.getValue("sourceUrl").jsonPrimitive.content)
+
+            val replay = submit("HTTPS://A.EXAMPLE/Path")
+            assertEquals(HttpStatusCode.OK, replay.status)
+            assertEquals("true", replay.headers["Idempotency-Replayed"])
+            val replayBody = Json.parseToJsonElement(replay.bodyAsText()).jsonObject
+            assertEquals(createdBody.getValue("id"), replayBody.getValue("id"))
+            assertEquals("HTTPS://A.EXAMPLE/Path", replayBody.getValue("sourceUrl").jsonPrimitive.content)
+
+            val conflict = submit("https://A.EXAMPLE/Path")
+            assertEquals(HttpStatusCode.Conflict, conflict.status)
+            val error = Json.parseToJsonElement(conflict.bodyAsText()).jsonObject.getValue("error").jsonObject
+            assertEquals("IDEMPOTENCY_KEY_REUSED", error.getValue("code").jsonPrimitive.content)
+            assertEquals(HttpStatusCode.UnprocessableEntity, submit("HTTPS://LOCALHOST/private").status)
+        }
+        assertEquals("1", app.testutil.analysisScalar(source, "select count(*) from wishlist_items"))
+        assertEquals("1", app.testutil.analysisScalar(source, "select count(*) from analysis_jobs"))
+        assertEquals("1", app.testutil.analysisScalar(source, "select count(*) from outbox_events"))
+    }
+
     @Test fun `blocking detail lookup runs outside the route executor`() {
         app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes(
             { _, _, _, _ -> app.wishlist.CreateResult.InvalidUrl },

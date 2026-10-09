@@ -115,6 +115,8 @@ core/  model/  data/remote/  data/local/  data/fake/  repository/  domain/  pres
 
 생성은 PROCESSING·version 1·analysisGeneration 1이다. owner와 submission UUID가 같은 재전송은 원본 URL 문자열을 비교하고, 최초 clientCreatedAt 및 최신 snapshot을 반환한다. 삭제는 version과 무관하고 반복 삭제도 성공한다. GET은 삭제 항목을 숨기지만 생성 key 재전송은 tombstone을 반환한다. 최종 분석·사용자 변경·삭제는 version을 증가시키며, 일반 편집·직접 보완·검토는 expectedVersion을 비교한다.
 
+2026-10-09 연동 보완부터 생성 전 URL·공유 시각을 검사한다. HTTP scheme은 대소문자 무관하게 판정하되 원본 URL은 보존하며, 2048 UTF-16 길이·UTF-8 표현 가능성·URI host·localhost/loopback을 확인한다. 공유 시각은 UTC year 1..9999만 받고 microsecond로 절삭한다. 실패는 key를 소비하지 않는다. Android는 Java URI, iOS는 Foundation의 자동 보정을 막는 원문 검사와 숫자 IPv6 파싱(`AI_NUMERICHOST`, DNS 없음)을 사용한다. 이는 생성 시점 입력 검사이며 extraction의 DNS·SSRF 정책을 대체하지 않는다. 두 parser의 모든 RFC URI 동작이 동일하다는 보장은 하지 않고 공통 계약 corpus로 지원 경계를 검증한다.
+
 Fake 전용 `Patch.Unchanged`/`Patch.Set(null)`은 생략과 명시적 삭제를 구별한다. 직접 보완은 이름·카테고리를 요구하고 원래 analysis status/failureCode를 유지하며 CONFIRMED·manualCompletionAt을 기록한다. 검토 CONFIRM/DEFER 이후 검토를 다시 열지 않는다. 같은 재분석 attempt는 generation을 한 번만 증가시키며 최신 상태를 재전송한다. 이전 generation·완료된 generation·삭제 후 분석 결과는 무시한다.
 
 최종 분석 반영은 서버 `AnalysisResultRepository`의 병합 규칙을 따른다. 출처가 USER인 이름·카테고리와 CONFIRMED/DEFERRED 검토는 유지한다. READY는 AI 이름을 새 값으로 바꾸고, 그 밖의 결과는 비어 있는 이름만 채운다. READY에는 반영 후 category가 있어야 하며, category가 없으면 이유가 없을 때 EXTRACTION_UNRESOLVED를 넣는다. 검토 PENDING은 이름과 category가 모두 있고 category가 확인 전 AI 값일 때만 설정한다. 목적·이미지·user override 목록은 Fake 분석 결과에 없어 반영하지 않는다.
@@ -136,6 +138,8 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - **redirect 검증 범위:** 실제 OkHttp는 Android host test(`OkHttpRedirectTest`)에서 MockWebServer 두 대(동적 port; 302·307·https로의 301)로 확인했다. redirect target 요청 수 0, bearer는 원 서버에만 도달한다. Darwin은 simulator 실행 없이 소스 검토만 했다. 3.4.3 기본 `KtorNSURLSessionDelegate`의 redirect callback이 `completionHandler(null)`로 따라가지 않으며, custom delegate를 추가하지 않는다. localhost 접근은 테스트 fixture 전용이고 production base URL 정책과 무관하다.
 
 ## 상품 DTO·mapper·Remote 계약
+
+2026-10-09 연동 보완에서는 token·첫 전송·401 재전송의 실패 반환 전과 HTTP 오류 body 처리 후에도 전체 session snapshot을 확인한다. Remote의 성공 body 읽기 실패도 같은 검사를 적용하며, 계정이 그대로이면 원래 오류를 반환하고 CancellationException은 전파한다. 잘못된 UTF-16 URL은 TextContent를 만들기 전 VALIDATION으로 반환한다. 공통 계약은 Fake/Remote 각각 17개이며 Mock fixture도 UUID 형식·생성 입력·시각 정밀도를 반영한다([연동 검사와 수정](../../history/architecture/client/client-server-integration-audit-2026-10-09.md#후속-수정-bugfixclient-server-contract)).
 
 > 2026-10-07 Task 6b 구현. fixture 기준은 서버 develop `1c6d949`(`WishlistItemDtos.kt`·`WishlistItemViewMapper.kt`·`DecimalJsonSerializer.kt`·`CategoryDtos.kt`)이며 손으로 옮겼다. Fake·evaluator로 정답을 만들지 않는다. 모두 Kotlin `internal`이다.
 
@@ -283,7 +287,7 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 | 계정이 바뀐 뒤 `retry()`가 이전 계정의 마지막 ID를 다시 요청한다(서버가 owner 범위라 누출은 없음) | C4 정책 결정 | |
 | repository의 의도치 않은 `CancellationException`이 `loading=true`를 남긴다. `close()` 뒤 state는 마지막 값을 유지한다 | C4 | |
 | 해독할 수 없는 cache row 하나가 그 item의 네트워크 GET을 막는다(계획대로의 동작) | C4에서 cache miss 처리 검토 | |
-| `ScriptedItemServer`가 UUID가 아닌 id에 404를 돌려주지만 서버·Fake는 400이다 | fixture를 다시 만질 때(C4) | |
+| `ScriptedItemServer`가 UUID가 아닌 id에 404를 돌려주지만 서버·Fake는 400이다 | fixture를 다시 만질 때(C4) | 해결(2026-10-09 연동 보완): 정규 36자 UUID 검사·400 오류, 생성 입력·시각 계약과 공통 시나리오 보강 |
 | Swift enum 이름 `.theRelease`가 어색하고, `RemoteConfig`는 https·path prefix를 검사하지 않는다 | 다듬기(C4/C12) | |
 
 ### C3에서 생긴 항목

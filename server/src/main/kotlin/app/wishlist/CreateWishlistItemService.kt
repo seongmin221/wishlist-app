@@ -66,7 +66,7 @@ class CreateWishlistItemService(
         // JDBC replaces unpaired surrogates, so the stored URL would stop matching its own key replay.
         if (!StandardCharsets.UTF_8.newEncoder().canEncode(sourceUrl)) return false
         return runCatching {
-            URI(sourceUrl).let { it.scheme in setOf("http", "https") && !it.host.isNullOrBlank() && !isLocalHost(it.host) }
+            URI(sourceUrl).let { it.scheme?.lowercase() in setOf("http", "https") && !it.host.isNullOrBlank() && !isLocalHost(it.host) }
         }.getOrDefault(false)
     }
 

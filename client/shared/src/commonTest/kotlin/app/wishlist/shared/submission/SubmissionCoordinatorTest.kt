@@ -22,7 +22,8 @@ import app.wishlist.shared.data.local.StoreHarness
 import app.wishlist.shared.data.local.UUID_A
 import app.wishlist.shared.data.local.UUID_B
 import app.wishlist.shared.data.local.UUID_C
-import app.wishlist.shared.data.local.submission
+import app.wishlist.shared.data.local.submission as storedSubmission
+import app.wishlist.shared.data.local.submissionId as storedSubmissionId
 import app.wishlist.shared.data.local.withHarness
 import app.wishlist.shared.model.AnalysisStatus
 import app.wishlist.shared.model.CategoryMissingReason
@@ -68,6 +69,16 @@ private const val APPLE_ID = "fake-apple-0001"
 private const val LINK = "https://shop.example/p/1"
 private const val SHARED_ISO = "2026-10-06T23:00:00.123456Z"
 private val baseTime = Instant.parse("2026-10-07T00:00:00Z")
+
+// LocalStore fixtures deliberately contain surrounding whitespace to test raw persistence.
+// Coordinator fixtures go through creation validation, so their default URL must be admissible.
+private fun submission(
+    id: String = storedSubmissionId,
+    binding: String? = null,
+    status: SubmissionStatus = SubmissionStatus.PENDING,
+    url: String = LINK,
+    sharedAt: Instant = baseTime,
+) = storedSubmission(id, binding, status, url, sharedAt)
 
 /** One ITEM-01 call: its key and the account it was made for (the expected snapshot's). */
 internal data class CreateCall(val key: String, val account: String?)

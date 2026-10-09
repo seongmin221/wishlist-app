@@ -81,7 +81,7 @@ client/ios/      DesignSystem/, Navigation/, Features/<화면>/, ShareExtension/
 ## 디자인 시스템과 모션 기반
 
 - `client/tools/gen_tokens`가 `tokens.json`과 디자인 결정의 값으로 `WishlistTokens.kt`·`WishlistTokens.swift`를 생성한다. 범위는 라이트·다크 색, 목적 6색(면·라이트 표시 테두리), 상태 아이콘 타일 5종, 위험 색 `#C62828`, 모서리 xs 10 ~ xl 36, 간격 4 단위, 곡선 9개와 모션 값이다.
-- 목적 색·아이콘은 key(`coral`, `mustard` …)로 다룬다. C1에서 key 목록 초안을 만들고 서버 B3 계약에서 확정한다.
+- 목적 색·아이콘의 UI token key(`coral`, `mustard` …)와 wire key를 구분한다. 서버 B3는 `CORAL` 등 6색·`HEART` 등 8아이콘의 대문자 key를 확정했으며 요청은 exact match다. C6에서 명시적인 UI↔wire 변환을 둔다([목적 계약](../../architecture/server/purpose-management-api.md#표시-key-리소스)).
 - 서체는 도현(목적 이름 제목·앱의 목소리 전용)과 IBM Plex Sans KR(400·500·700, 숫자는 tabular)을 번들한다. 텍스트 스타일 이름(`display28`, `display20`, `title`, `body`, `label`, `price` 등)은 두 플랫폼에서 같다. 한글 기준 밑줄 3px 같은 글꼴별 보정값은 스타일에 넣는다.
 - 공통 컴포넌트는 두 플랫폼에서 이름이 같다: `WLButton`, `WLCard`, `WLIconTile`, `WLChip`, `WLInput`, `WLUnderlineField`, `PriceText`, `PurposeDot`, `EmptyState`, `WLBottomSheet`, `WLConfirmDialog`, `WLMenu`, `Scrim`, `ExpandableGroup`, `Masonry2Col`.
 - 시스템 시트·탭·push 전환은 쓰지 않는다([모션 명세](../../../design/handoff/interactions/motion.md)).
@@ -143,9 +143,9 @@ C1과 C2는 서로 의존하지 않아 병렬로 진행할 수 있다. C3 이후
 | 항목 | 결정 시점 | 진행용 기본값 |
 | --- | --- | --- |
 | 공유 확장의 서버 직접 전송 여부(공유 카드 문구에 영향, [QA-CLI-002](../../learning/client/q-and-a/QA-CLI-002-share-receipt-feedback.md)) | C3 시작 전 | **C3에서 C안으로 결정([ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)).** iOS 확장은 app group inbox에 기록, 앱이 같은 key로 전송. 확장 background 전송은 "인증 연결" 단계에서 켬 |
-| 목적 색·아이콘 key 목록 | C1 초안, 서버 B3 계약에서 확정 | 색 6개 + 핸드오프 아이콘 묶음 key |
+| 목적 색·아이콘 key 목록 | **B3 확정**, C6 반영 | 대문자 고정 key 6색·8아이콘. UI 소문자 token과 변환 경계를 둔다([계약](../../architecture/server/purpose-management-api.md#표시-key-리소스)) |
 | 연속 처리 "처음부터 다시 보기" 범위 | C7 | 이번 세션에서 건너뛴 항목만. 보류 항목을 다시 여는 서버 API는 없다 |
-| 목적 활동순 정렬·홈 노출 개수 | C6 / 서버 B3 | 서버 정의를 따르고, fake는 최근 수정순 |
+| 목적 활동순 정렬·홈 노출 개수 | **B3/B4 확정**, C6/C7 반영 | 생성·후보 유입만 활동순을 바꾸며 편집·제거·조회는 유지. 목적 목록은 limit 생략 후 전체 재조회, 홈은 최대 3개([목적](../../architecture/server/purpose-management-api.md#pur-01-목록), [홈](../../architecture/server/wishlist-item-read-api.md)) |
 | 사진 업로드 MIME·크기·압축 | C8 / 서버 B6 | 긴 변 2048px JPEG로 압축 |
 | Firebase 프로젝트·Apple 로그인 설정 | Apple Developer 가입 뒤 "인증 연결"(C3에서 미룸, C3-D2) | fake 인증(`AuthFacade` 뒤 `FakeAuthFacade`) |
 | 실제 앱 ID·서명 | C12 | 임시 ID 유지 |

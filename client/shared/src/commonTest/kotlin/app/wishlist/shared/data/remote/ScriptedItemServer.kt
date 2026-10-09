@@ -5,6 +5,12 @@ import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import app.wishlist.shared.core.canonicalUuidOrNull
+import app.wishlist.shared.data.fake.isValidFakeSourceUrl
+import app.wishlist.shared.data.fake.isValidFakeClientCreatedAt
+import app.wishlist.shared.data.fake.normalizeFakeClientCreatedAt
+import kotlin.time.Instant
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -12,7 +18,8 @@ import kotlinx.serialization.json.Json
 
 /**
  * Test-only scripted responder for ITEM-01/ITEM-03. Written by hand from the server's documented
- * wire shapes (fixture baseline: develop 1c6d949); it never calls FakeStore or evaluateItem.
+ * wire shapes (C3/B4 baseline). It never calls FakeStore or evaluateItem; creation input helpers
+ * are shared with Fake so the common repository contract includes rejection and precision rules.
  * Owners are told apart by the Bearer token `token-<ownerId>`; submission keys are per owner.
  */
 internal class ScriptedItemServer {
@@ -44,7 +51,8 @@ internal class ScriptedItemServer {
         when {
             request.method == HttpMethod.Post && path == "/v1/wishlist-items" -> create(request, items)
             request.method == HttpMethod.Get && path.startsWith("/v1/wishlist-items/") -> {
-                val id = path.removePrefix("/v1/wishlist-items/")
+                val id = canonicalUuidOrNull(path.removePrefix("/v1/wishlist-items/"))
+                    ?: return@run error(HttpStatusCode.BadRequest, "INVALID_WISHLIST_ITEM_ID")
                 val stored = items.values.firstOrNull { it.id == id }?.takeIf { it.state != State.DELETED }
                 if (stored == null) error(HttpStatusCode.NotFound, "WISHLIST_ITEM_NOT_FOUND")
                 else ok(HttpStatusCode.OK, stored)
@@ -54,14 +62,28 @@ internal class ScriptedItemServer {
     }.also { statuses += it.statusCode.value }
 
     private fun MockRequestHandleScope.create(request: HttpRequestData, items: MutableMap<String, Stored>) = run {
-        val key = request.headers["Idempotency-Key"] ?: return@run error(HttpStatusCode.BadRequest, "INVALID_IDEMPOTENCY_KEY")
-        val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-        val url = (body["sourceUrl"] as JsonPrimitive).content
+        val key = request.headers["Idempotency-Key"]?.let(::canonicalUuidOrNull)
+            ?: return@run error(HttpStatusCode.BadRequest, "INVALID_IDEMPOTENCY_KEY")
+        val body = runCatching { Json.parseToJsonElement(request.bodyText()) as? JsonObject }.getOrNull()
+            ?: return@run error(HttpStatusCode.UnprocessableEntity, "INVALID_URL")
+        val url = (body["sourceUrl"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: return@run error(HttpStatusCode.UnprocessableEntity, "INVALID_URL")
+        val wireTime = body["clientCreatedAt"]
+        val time = if (wireTime == null || wireTime == JsonNull) null else {
+            val text = (wireTime as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: return@run error(HttpStatusCode.UnprocessableEntity, "INVALID_CLIENT_CREATED_AT")
+            // The route validates the offset-local year as well as the resulting UTC instant.
+            if (text.take(4).toIntOrNull() !in 1..9999) return@run error(HttpStatusCode.UnprocessableEntity, "INVALID_CLIENT_CREATED_AT")
+            runCatching { Instant.parse(text) }.getOrNull()
+                ?: return@run error(HttpStatusCode.UnprocessableEntity, "INVALID_CLIENT_CREATED_AT")
+        }
+        if (!isValidFakeClientCreatedAt(time)) return@run error(HttpStatusCode.UnprocessableEntity, "INVALID_CLIENT_CREATED_AT")
+        if (!isValidFakeSourceUrl(url)) return@run error(HttpStatusCode.UnprocessableEntity, "INVALID_URL")
         val existing = items[key]
         when {
             existing == null -> {
                 val stored = Stored("00000000-0000-4000-8000-${(++counter).toString().padStart(12, '0')}", key, url,
-                    (body["clientCreatedAt"] as? JsonPrimitive)?.content, State.PROCESSING)
+                    normalizeFakeClientCreatedAt(time)?.toString(), State.PROCESSING)
                 items[key] = stored
                 ok(HttpStatusCode.Created, stored)
             }
@@ -86,7 +108,7 @@ internal class ScriptedItemServer {
         return """{"id":"${s.id}","clientSubmissionId":"${s.key}","version":$version,"sourceUrl":${JsonPrimitive(s.sourceUrl)},
 "product":{"name":$name,"imageUrl":null,"price":null,"currency":null,"brand":null,"merchant":null,"metadataCheckedAt":null,"nameSource":null,"imageSource":null},
 "category":{"id":$categoryId,"source":null,"missingReason":null,"name":null,"parentId":null,"kind":null},
-"purpose":{"id":null,"source":"UNASSIGNED"},"analysis":{"status":"$analysis","failureCode":null},
+"purpose":{"id":null,"name":null,"colorKey":null,"iconKey":null,"source":"UNASSIGNED"},"analysis":{"status":"$analysis","failureCode":null},
 "reviewStatus":"$review","lifecycleStatus":"$lifecycle","requiredAction":"$required",
 "createdAt":"2026-10-07T00:00:00Z","updatedAt":"2026-10-07T00:00:00Z","manualCompletionAt":null,
 "allowedActions":$actions,"clientCreatedAt":$createdClient}"""

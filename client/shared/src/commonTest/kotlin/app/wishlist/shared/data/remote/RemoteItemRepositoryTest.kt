@@ -52,7 +52,7 @@ class RemoteItemRepositoryContractTest : RepositoryContractTest() {
 class RemoteItemRepositoryTest {
     @Test fun create_posts_key_bearer_and_exact_original_url_then_replay_is_200() = runTest {
         val h = RemoteHarness(); h.session.changeAccount(OWNER_A)
-        val url = " https://shop.example/headphone?x=1 "
+        val url = "HTTPS://shop.example/headphone?x=%2f"
         val first = h.repository.create(h.command(url)).successValue()
         val replay = h.repository.create(h.command(url)).successValue()
         assertEquals(listOf(201, 200), h.server.statuses)
@@ -91,8 +91,18 @@ class RemoteItemRepositoryTest {
 
     @Test fun get_encodes_the_id_as_one_path_segment() = runTest {
         val h = RemoteHarness(); h.session.changeAccount(OWNER_A)
-        assertEquals(ErrorKind.NOT_FOUND, h.repository.get("a b/c?d").error().kind)
+        val error = h.repository.get("a b/c?d").error()
+        assertEquals(ErrorKind.VALIDATION, error.kind)
+        assertEquals("INVALID_WISHLIST_ITEM_ID", error.code)
         assertEquals("/v1/wishlist-items/a%20b%2Fc%3Fd", h.server.engine.requestHistory.single().url.encodedPath)
+    }
+
+    @Test fun invalid_original_url_is_sent_without_trimming_and_returns_validation() = runTest {
+        val h = RemoteHarness(); h.session.changeAccount(OWNER_A)
+        val error = h.repository.create(h.command(" https://shop.example/headphone ")).error()
+        assertEquals(ErrorKind.VALIDATION, error.kind)
+        assertEquals("INVALID_URL", error.code)
+        assertTrue(h.server.engine.requestHistory.single().bodyText().contains(" https://shop.example/headphone "))
     }
 
     @Test fun key_reuse_conflict_carries_code_and_no_version() = runTest {
