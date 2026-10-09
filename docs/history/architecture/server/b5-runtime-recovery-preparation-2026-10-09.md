@@ -33,4 +33,4 @@
 
 ## 확정한 규칙
 
-재대조에서 초안의 질문 3건 외에 lane 간 재시도 횟수 계산과 일반 lane DNS 실패 의미도 미결정임을 확인했다. 5건 모두 [B5 제품·운영 결정](../../product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md)에 확정했다(합산 재시도·metadata 선택·canonical·PENDING 정체·DNS 실패). 설계는 [B5 spec](../../../superpowers/specs/2026-10-09-b5-analysis-runtime-recovery-design.md)에 있다.
+재대조에서 초안의 질문 3건 외에 lane 간 재시도 횟수 계산과 일반 lane DNS 실패 의미도 미결정임을 확인했다. 5건과 spec 리뷰에서 나온 Retryable 응답 방식까지 [B5 제품·운영 결정](../../product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md)에 확정했다(합산 재시도·metadata 선택·canonical·PENDING 정체·DNS 실패·Retryable ACK). 설계는 [B5 spec](../../../superpowers/specs/2026-10-09-b5-analysis-runtime-recovery-design.md)에 있다.

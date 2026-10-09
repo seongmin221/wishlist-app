@@ -14,11 +14,13 @@ B5 착수 대조에서 남은 미결정 규칙을 사용자에게 묻고 확정�
 3. **canonical.** 페이지 선언(`rel=canonical` → `og:url`)은 최종 URL과 같은 등록 도메인(eTLD+1)일 때만 채택한다. 그 외에는 정규화한 최종 URL을 쓴다. 정규화는 fragment와 승인된 tracking query만 제거하고 상품 식별 query는 보존한다.
 4. **PENDING 정체 판정.** 발행된 PENDING은 마지막 변경 후 5분이 지나면 queue를 조회한다. 조회 실패 시 1분 뒤, task가 살아 있으면 5분 뒤 다시 검사한다. 살아 있는 task나 조회 장애는 재예약·상품 실패를 만들지 않는다.
 5. **일반 lane DNS 실패는 Retryable.** generation 예산을 쓰며 소진 시 FAILED_RETRYABLE이다. 사설·loopback 주소, 허용하지 않는 scheme·port 차단은 FAILED_TERMINAL이다. browser lane의 대상 DNS 실패는 기존 확정대로 PARTIAL이다.
+6. **outbox를 저장한 Worker Retryable은 ACK.** 유효 실행의 Retryable이 retry outbox를 저장하면 204로 원래 task를 끝낸다. 원래 task 재전달과 retry outbox가 합산 3회 예산을 이중으로 쓰지 않게 하기 위해서다. ADR-009 backoff(10초부터 2배, 최대 10분)는 outbox의 발행 예정 시각을 Cloud Tasks scheduleTime으로 넘겨 유지한다. durable 기록이 없는 RETRY(claim 전 마감·executor 포화·90초 timeout)는 503을 유지한다. (2026-10-10 추가)
 
 ## 판단 근거
 
 - 합산 3회는 외부 사이트 장애 때 비용 상한을 ADR대로 유지한다. fallback에 별도 보장 횟수를 주는 안과 lane별 3회 안은 상한을 넘거나 ADR 문구를 바꿔야 했다.
 - 범위 가격을 최저가로 저장하면 '~부터' 의미를 표현할 필드가 없어 실제보다 싸 보일 수 있다. 신뢰할 값이 없으면 null이라는 B5 원칙을 따른다.
 - 같은 등록 도메인 canonical은 모바일·데스크톱 주소를 모아 B9 중복 후보를 놓치지 않게 하고, 다른 판매처 상품과 합쳐지는 것을 막는다.
-- 정체 5분은 delivery 105초·backoff 10/20초·Scheduler 1분을 더한 정상 지연을 넘는 첫 지점이다.
+- 정체 5분은 정상 지연 대부분을 넘는 시점이다. claim 전에 실패하는 3회 전달처럼 5분을 넘는 정상 task도 있지만, 재예약 전에 queue에서 ALIVE를 확인하므로 살아 있는 task를 유실로 오판하지 않는다.
+- maintenance가 진행을 보장하게 된 B5에서는, 503 재전달로 생기는 예산 이중 소비를 막는 쪽이 낫다. 합산 3회에서는 중복 claim 1회가 browser fallback 기회를 직접 줄인다.
 - JDK는 NXDOMAIN과 일시적 DNS 장애를 안정적으로 구분하지 못한다. 연결 실패와 같은 Retryable로 두면 일시 장애에서 회복할 수 있다.
