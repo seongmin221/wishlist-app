@@ -21,7 +21,7 @@ final class ItemDetailPresenterOwnerTests: XCTestCase {
     }
 
     @MainActor
-    func testOwnerFollowsAccountSwitchesAndRetriesAfterAnError() async throws {
+    func testOwnerFollowsAccountSwitchesAndForgetsThePreviousItem() async throws {
         let runtime = await SharedTestRuntime.readyDebug()
         defer { runtime.close() }
         let seed = try await SharedTestRuntime.firstSeedItem(runtime)
@@ -34,14 +34,14 @@ final class ItemDetailPresenterOwnerTests: XCTestCase {
         try await SharedTestRuntime.switchAccount(runtime, to: .apple)
         await SharedTestRuntime.eventually { owner.item == nil && owner.error == nil && !owner.loading }
 
+        // D3: the previous account's item is never requested again; retry does nothing.
         owner.retry()
-        await SharedTestRuntime.eventually { owner.error?.kind == .notFound }
-        XCTAssertNil(owner.item)
+        await SharedTestRuntime.stays(for: 0.3) { owner.item == nil && owner.error == nil && !owner.loading }
 
-        // Error -> retry -> item, once the first account is signed in again (new generation).
+        // Back to the first account (a new generation): still cleared, and a fresh load finds the item.
         try await SharedTestRuntime.switchAccount(runtime, to: .google)
         await SharedTestRuntime.eventually { owner.error == nil && owner.item == nil }
-        owner.retry()
+        owner.load(id: seed.id)
         await SharedTestRuntime.eventually { owner.item?.id == seed.id && !owner.loading }
         XCTAssertNil(owner.error)
     }

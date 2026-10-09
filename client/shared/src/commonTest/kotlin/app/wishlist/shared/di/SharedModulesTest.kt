@@ -336,9 +336,11 @@ class SharedModulesTest {
         (runtime.session as MutableAuthSession).changeAccount("account-b")
         advanceUntilIdle()
         assertEquals(ItemDetailState.Initial, presenter.state.value)
+        // D3: the previous account's item is never requested again; retry and refresh do nothing.
         presenter.retry()
+        presenter.refresh()
         advanceUntilIdle()
-        assertEquals(ErrorKind.NOT_FOUND, presenter.state.value.error?.kind)
+        assertEquals(ItemDetailState.Initial, presenter.state.value)
 
         presenter.close()
         runtime.close()

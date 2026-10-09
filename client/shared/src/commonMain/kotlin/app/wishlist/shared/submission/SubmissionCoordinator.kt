@@ -368,6 +368,9 @@ class SubmissionCoordinator internal constructor(
         publishRequests.trySend(Unit)
     }
 
+    /** Asks for a view republish (the detail Presenter calls it after each successful load). */
+    internal fun requestViewPublish() = requestPublish()
+
     /**
      * Recomputes the view for the current session; the one place that orders it (see [SubmissionView]):
      * local rows keep the store's (sharedAt, key) order, processing items are sorted by (createdAt, id).

@@ -208,10 +208,16 @@ class SharedRuntime internal constructor(
     /**
      * A new item detail Presenter over the gated ITEM-03 facade and this runtime's one [session].
      * Repository work runs on the runtime's background (I/O) dispatcher, never on the caller's UI
-     * thread. The platform owner that requested it calls [ItemDetailPresenter.close].
+     * thread. Each successful load asks [submissions] to republish its view, so the home list picks up
+     * the refreshed cache. The platform owner that requested it calls [ItemDetailPresenter.close].
      */
     fun itemDetailPresenter(): ItemDetailPresenter =
-        ItemDetailPresenter(repository = getItemRepository(), session = session, dispatcher = env.dispatchers.io)
+        ItemDetailPresenter(
+            repository = getItemRepository(),
+            session = session,
+            dispatcher = env.dispatchers.io,
+            onLoaded = { submissions().requestViewPublish() },
+        )
 
     /** A new login Presenter over [auth]; the platform owner calls [AccountPresenter.close]. */
     fun accountPresenter(): AccountPresenter = AccountPresenter(auth = auth(), dispatcher = env.dispatchers.io)

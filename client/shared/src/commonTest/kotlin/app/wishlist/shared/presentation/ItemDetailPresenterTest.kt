@@ -27,6 +27,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.AfterTest
@@ -208,6 +209,89 @@ class ItemDetailPresenterTest {
         repository.calls[1].fail(ErrorKind.SERVER)
         advanceUntilIdle()
         assertEquals(failed(ErrorKind.SERVER), presenter.state.value)
+    }
+
+    // --- Account change, refresh, normalization and the success hook ------------------------------
+
+    @Test fun retryAfterAnAccountChangeDoesNothing() = runTest {
+        val p = signedIn()
+        p.load(itemId); runCurrent(); repository.calls.last().succeed(item); runCurrent()
+        launch { session.changeAccount("account-b") }; runCurrent()
+        p.retry(); p.refresh(); runCurrent()
+        assertEquals(1, repository.calls.size)
+        assertEquals(ItemDetailState.Initial, p.state.value)
+    }
+
+    @Test fun refreshKeepsTheShownItemAndRepeatsTheLastId() = runTest {
+        val presenter = signedIn()
+        presenter.load(itemId)
+        runCurrent()
+        repository.calls[0].succeed(item)
+        runCurrent()
+
+        presenter.refresh()
+        runCurrent()
+        assertEquals(listOf(itemId, itemId), repository.calls.map { it.id })
+        assertEquals(ItemDetailState(item = item, loading = true, error = null), presenter.state.value)
+        repository.calls[1].succeed(refreshed)
+        runCurrent()
+        assertEquals(loaded(refreshed), presenter.state.value)
+    }
+
+    @Test fun refreshBeforeTheFirstLoadDoesNothing() = runTest {
+        val presenter = signedIn()
+        presenter.refresh()
+        runCurrent()
+        assertEquals(0, repository.calls.size)
+        assertEquals(ItemDetailState.Initial, presenter.state.value)
+    }
+
+    @Test fun uppercaseIdRefreshKeepsTheShownItem() = runTest {
+        val lowerId = "abcdef00-0000-4000-8000-00000000000a"
+        val lettered = item.copy(id = lowerId)
+        val presenter = signedIn()
+        presenter.load(lowerId.uppercase())
+        runCurrent()
+        assertEquals(lowerId, repository.calls.single().id)
+        repository.calls[0].succeed(lettered)
+        runCurrent()
+
+        presenter.refresh()
+        runCurrent()
+        assertEquals(ItemDetailState(item = lettered, loading = true, error = null), presenter.state.value)
+        presenter.load(lowerId.uppercase())
+        runCurrent()
+        assertEquals(ItemDetailState(item = lettered, loading = true, error = null), presenter.state.value)
+    }
+
+    @Test fun onLoadedRunsAfterEverySuccessfulLoad() = runTest {
+        launch { session.changeAccount("account-a") }
+        advanceUntilIdle()
+        var hooks = 0
+        val seen = mutableListOf<ItemDetailState>()
+        lateinit var presenter: ItemDetailPresenter
+        presenter = ItemDetailPresenter(repository, session, StandardTestDispatcher(testScheduler)) {
+            hooks++
+            seen += presenter.state.value
+        }.also { presenters += it }
+
+        presenter.load(itemId)
+        runCurrent()
+        repository.calls[0].fail(ErrorKind.SERVER)
+        runCurrent()
+        assertEquals(0, hooks)
+
+        presenter.retry()
+        runCurrent()
+        repository.calls[1].succeed(item)
+        runCurrent()
+        presenter.refresh()
+        runCurrent()
+        repository.calls[2].succeed(refreshed)
+        runCurrent()
+        assertEquals(2, hooks)
+        // The hook runs after the success state is published.
+        assertEquals(listOf(loaded(item), loaded(refreshed)), seen)
     }
 
     // --- Last request wins ------------------------------------------------------------------------
@@ -411,20 +495,38 @@ class ItemDetailPresenterTest {
 
     // --- Cancellation, dispatcher and state surface ----------------------------------------------
 
-    @Test fun repository_cancellation_propagates_and_is_never_an_error_state() = runTest {
+    @Test fun aStrayCancellationBecomesAnError() = runTest {
         val presenter = signedIn()
-        repository.onCall = { throw CancellationException("repository gave up") }
+        repository.onCall = { throw CancellationException("stray") }
         presenter.load(itemId)
-        advanceUntilIdle()
-        assertNull(presenter.state.value.error)
-        assertNull(presenter.state.value.item)
+        runCurrent()
+        assertEquals(
+            ItemDetailState(item = null, loading = false, error = ClientError(ErrorKind.UNAVAILABLE, DETAIL_STEP_FAILURE)),
+            presenter.state.value,
+        )
 
+        // The lane survives: the next load works.
         repository.onCall = {}
-        presenter.load(itemId)
-        advanceUntilIdle()
+        presenter.retry()
+        runCurrent()
         repository.calls[1].succeed(item)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(loaded(item), presenter.state.value)
+    }
+
+    @Test fun aRealCancellationStillPropagates() = runTest {
+        val presenter = signedIn()
+        val history = mutableListOf<ItemDetailState>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { presenter.state.toList(history) }
+        presenter.load(itemId)
+        runCurrent()
+        presenter.load(otherId)
+        runCurrent()
+        assertTrue(repository.calls[0].cancelled)
+        assertTrue(history.none { it.error != null }, "a real cancellation became an error: $history")
+        repository.calls[1].succeed(other)
+        runCurrent()
+        assertEquals(loaded(other), presenter.state.value)
     }
 
     @Test fun repository_runs_on_the_injected_dispatcher() = runTest {

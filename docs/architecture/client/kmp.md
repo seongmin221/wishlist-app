@@ -227,18 +227,18 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 
 ## 상품 상세 Presenter 기반
 
-> 2026-10-07 Task 9 구현. C4는 이 Presenter/State에 상세 intent를 추가하며 아래 규칙과 소유 관계를 유지한다.
+> 2026-10-07 Task 9 구현. C4 Task 4(2026-10-10)에서 `refresh()`·`onLoaded`·id 정규화·계정 전환 정책(D3)·새는 취소 처리를 더했다.
 
-- **공개 면:** `Presenter`(수명 계약, `close()`만), `ItemDetailState(item, loading, error)`와 `ItemDetailState.Initial`, `ItemDetailPresenter(repository: GetItemRepository, session: AuthSession, dispatcher: CoroutineDispatcher)`의 `state: StateFlow<ItemDetailState>`·`load(id)`·`retry()`·`close()`. 앱은 생성자 대신 `SharedRuntime.itemDetailPresenter()`를 쓴다. runtime의 gated Get facade(캐시 decorator 포함)·runtime 단일 session·`RuntimeDispatchers.io`로 만든다. 공개 생성자는 commonTest가 test dispatcher를 주입하는 경로다. UI/navigation 람다는 state에 두지 않는다.
+- **공개 면:** `Presenter`(수명 계약, `close()`만), `ItemDetailState(item, loading, error)`와 `ItemDetailState.Initial`, `ItemDetailPresenter(repository: GetItemRepository, session: AuthSession, dispatcher: CoroutineDispatcher, onLoaded: () -> Unit = {})`의 `state: StateFlow<ItemDetailState>`·`load(id)`·`retry()`·`refresh()`·`close()`. 앱은 생성자 대신 `SharedRuntime.itemDetailPresenter()`를 쓴다. runtime의 gated Get facade(캐시 decorator 포함)·runtime 단일 session·`RuntimeDispatchers.io`로 만든다. 공개 생성자는 commonTest가 test dispatcher를 주입하는 경로다. UI/navigation 람다는 state에 두지 않는다.
 - **의존성:** 상품 조회는 `GetItemRepository` 하나뿐이다. 캐시 읽기·쓰기는 하지 않는다(Task 7 decorator 소유).
 - **실행 모델:** intent는 어느 스레드에서 불러도 즉시 반환한다. intent 처리, session 관찰, state 발행은 주입 dispatcher의 단일 lane(`limitedParallelism(1)`)에서 순서대로 실행되고, repository 호출만 주입 dispatcher 자체에서 실행한다. scope는 `SupervisorJob`이고 `state`는 읽기 전용 StateFlow다.
-- **조회·재시도:** `load(id)`는 loading=true·error=null로 시작한다. 같은 id의 항목이 보이는 중이면(refresh) 항목을 유지하고, 다른 id면 바로 비운다. 성공은 항목 표시, 일반 오류는 기존 항목을 유지한 채 error, `NOT_FOUND`는 항목 제거 + error다. `retry()`는 마지막 id를 다시 조회하며 첫 load 전에는 아무것도 하지 않는다.
-- **마지막 요청 승리:** 새 load/retry는 이전 요청을 취소하고 request ID를 올린다. 취소를 무시하고 늦게 도착한 응답도 request ID가 현재가 아니면 버린다.
-- **session:** 계정 변경·같은 계정 재로그인(세대 증가)을 관찰하면 진행 요청을 취소하고 `Initial`로 되돌린다. 마지막 id는 남기므로 이후 `retry()`는 새 session으로 다시 조회한다. 응답 발행은 요청 시점 snapshot으로 `AuthSession.withCurrent` 안에서 하므로 계정 변경과 직렬화되고, 관찰자가 아직 변경을 처리하지 못한 경합에서도 이전 session의 응답은 게시되지 않는다. 관찰보다 먼저 들어온 load는 처리 시작 시 session을 먼저 동기화해 새 계정 요청이 뒤늦은 관찰에 취소되지 않는다.
+- **조회·재시도:** `load(id)`는 loading=true·error=null로 시작한다. 같은 id의 항목이 보이는 중이면(refresh) 항목을 유지하고, 다른 id면 바로 비운다. 성공은 항목 표시, 일반 오류는 기존 항목을 유지한 채 error, `NOT_FOUND`는 항목 제거 + error다. `retry()`(오류 뒤 다시 시도)와 `refresh()`는 같은 동작으로 마지막 id를 다시 조회하며(보이는 항목 유지) 첫 load 전에는 아무것도 하지 않는다. `load(id)`는 id를 canonical 소문자 UUID로 정규화한다(UUID가 아니면 그대로). 그래서 대문자 id로 열어도 refresh 중 항목이 유지된다. 성공 state를 게시한 뒤 lane에서 `onLoaded`를 부른다. runtime은 여기서 `submissions().requestViewPublish()`로 홈 view 재게시를 요청한다.
+- **마지막 요청 승리:** 새 load/retry/refresh는 이전 요청을 취소하고 request ID를 올린다. 취소를 무시하고 늦게 도착한 응답도 request ID가 현재가 아니면 버린다.
+- **session:** 계정 변경·같은 계정 재로그인(세대 증가)을 관찰하면 진행 요청을 취소하고 `Initial`로 되돌린다. 마지막 id도 지운다(D3: 이전 계정의 항목을 다시 요청하지 않는다). 그래서 이후 `retry()`·`refresh()`는 아무것도 하지 않고 state는 `Initial`이다. 응답 발행은 요청 시점 snapshot으로 `AuthSession.withCurrent` 안에서 하므로 계정 변경과 직렬화되고, 관찰자가 아직 변경을 처리하지 못한 경합에서도 이전 session의 응답은 게시되지 않는다. 관찰보다 먼저 들어온 load는 처리 시작 시 session을 먼저 동기화해 새 계정 요청이 뒤늦은 관찰에 취소되지 않는다.
 - **close:** `close()`는 scope를 취소한다. 멱등이며 이후 intent·session 변경·늦은 응답은 대체로 state를 바꾸지 않는다(state는 마지막 값에 멈춘다). 다만 다른 스레드의 in-flight 발행과 close의 순서는 보장하지 않고, close 시점에 진행 중이던 요청의 `loading=true`가 그대로 남는다(현재 테스트가 이를 고정하며 C4에서 다룬다).
-- **취소:** `CancellationException`은 전파하고 오류 state로 바꾸지 않는다.
+- **취소:** 진짜 취소(새 요청으로 교체, session 변경, close)는 전파하고 오류 state로 바꾸지 않는다. 요청 job이 아직 활성인데 repository가 던진 새는 `CancellationException`은 coordinator의 `guarded`처럼 `currentCoroutineContext().ensureActive()`로 구분해 `UNAVAILABLE`/`DETAIL_STEP_FAILURE` 오류로 게시한다.
 - **플랫폼 소유자(C4 유지 계약):** Android `ItemDetailPresenterOwner`(`ViewModel`)는 `onCleared()`에서, iOS `ItemDetailPresenterOwner`(`@MainActor @Observable`)는 `close()`/`deinit`에서 Presenter를 닫는다. 두 owner 모두 화면을 그리지 않는다. 자세한 내용은 [Android](android.md)·[iOS](ios.md) 문서의 C2 절에 있다.
-- **검증:** commonTest `ItemDetailPresenterTest`(조회·재시도·refresh 오류·NOT_FOUND·마지막 요청 승리·늦은 응답·close·계정/세대 변경·관찰 지연 경합·취소 전파·주입 dispatcher)와 `SharedModulesTest`의 runtime Presenter 연결을 Android host와 iOS simulator에서 실행한다. Task 1 interop probe는 삭제했고, Swift Flow 수집·collector 취소·suspend·close·계정 전환은 `SharedInteropTests`가 실제 Presenter·runtime으로, Swift `PlatformTokenSource` callback 성공/오류는 REMOTE ITEM-03 runtime + 도달 불가 base URL로 공개 API만 써서 검증한다(성공은 token이 전달되어 NETWORK, 오류는 `UNAUTHENTICATED`와 Swift `errorCode`).
+- **검증:** commonTest `ItemDetailPresenterTest`(조회·재시도·refresh 오류·NOT_FOUND·마지막 요청 승리·늦은 응답·close·계정/세대 변경과 D3 retry/refresh 무시·관찰 지연 경합·진짜 취소 전파·새는 취소 오류·대문자 id·`onLoaded`·주입 dispatcher)와 `SharedModulesTest`의 runtime Presenter 연결을 Android host와 iOS simulator에서 실행한다. Task 1 interop probe는 삭제했고, Swift Flow 수집·collector 취소·suspend·close·계정 전환은 `SharedInteropTests`가 실제 Presenter·runtime으로, Swift `PlatformTokenSource` callback 성공/오류는 REMOTE ITEM-03 runtime + 도달 불가 base URL로 공개 API만 써서 검증한다(성공은 token이 전달되어 NETWORK, 오류는 `UNAUTHENTICATED`와 Swift `errorCode`).
 
 ## 로그인·홈 Presenter (C3)
 
