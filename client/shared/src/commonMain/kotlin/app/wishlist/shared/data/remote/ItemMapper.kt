@@ -78,6 +78,9 @@ internal fun mapItem(dto: WishlistItemDto): ClientResult<WishlistItem> {
             ),
             purpose = ItemPurpose(
                 id = dto.purpose.id,
+                name = dto.purpose.name,
+                colorKey = dto.purpose.colorKey,
+                iconKey = dto.purpose.iconKey,
                 source = dto.purpose.source?.let { enumOr(it, ValueSource.UNKNOWN) } ?: ValueSource.UNASSIGNED,
             ),
             analysis = ItemAnalysis(analysisStatus, dto.analysis.failureCode),

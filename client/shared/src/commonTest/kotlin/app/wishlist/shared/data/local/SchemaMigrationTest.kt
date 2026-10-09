@@ -57,7 +57,60 @@ CREATE TABLE item_cache (
     PRIMARY KEY (account_id, item_id)
 )"""
 
+private const val V2_LOCAL_SUBMISSION_DDL = """
+CREATE TABLE local_submission (
+    client_submission_id TEXT NOT NULL PRIMARY KEY, source_url TEXT NOT NULL, shared_at_us INTEGER NOT NULL,
+    account_binding TEXT, status TEXT NOT NULL, retry_after_us INTEGER, error_kind TEXT, error_code TEXT,
+    error_request_id TEXT, error_current_version INTEGER, error_retry_after_seconds INTEGER
+)"""
+
 class SchemaMigrationTest {
+    @Test fun migratesV2ItemRowsToV3WithNullPurposeDisplay() {
+        val path = newTestDbPath()
+        openRawDriver(path).use { raw ->
+            raw.execute(null, V2_LOCAL_SUBMISSION_DDL, 0)
+            raw.execute(null, "CREATE TABLE app_state (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)", 0)
+            raw.execute(null, V1_ITEM_CACHE_DDL, 0)
+            raw.execute(
+                null,
+                """INSERT INTO item_cache VALUES ('A','$itemId',4,'$UUID_A','https://shop.example/x','Name',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
+                    'C026','USER',NULL,'음향','G01','PUBLIC','P1','USER','READY',NULL,'PENDING','ACTIVE','NONE',
+                    '2026-10-07T00:00:00Z','2026-10-07T00:00:01Z',NULL,'EDIT,DELETE','2026-10-06T23:59:59Z')""",
+                0,
+            )
+            raw.execute(null, "PRAGMA user_version = 2", 0)
+        }
+        openTestDriver(path).use { driver ->
+            val row = WishlistDatabase(driver).wishlistQueries.selectItem("A", itemId).executeAsOne()
+            assertEquals(listOf<String?>(null, null, null), listOf(row.purpose_name, row.purpose_color_key, row.purpose_icon_key))
+            assertEquals("P1", row.purpose_id)
+            assertEquals("USER", row.purpose_source)
+            assertEquals("Name", row.product_name)
+            assertEquals(4L, row.version)
+            assertEquals("2026-10-06T23:59:59Z", row.client_created_at)
+        }
+        deleteTestDb(path)
+    }
+
+    @Test fun migratesV1AllTheWayToV3() {
+        val path = newTestDbPath()
+        openRawDriver(path).use { raw ->
+            raw.execute(null, V1_LOCAL_SUBMISSION_DDL, 0)
+            raw.execute(null, V1_ITEM_CACHE_DDL, 0)
+            raw.execute(null, "PRAGMA user_version = 1", 0)
+        }
+        openTestDriver(path).use { driver ->
+            val columns = mutableListOf<String>()
+            driver.executeQuery(null, "PRAGMA table_info(item_cache)", { c ->
+                while (c.next().value) columns += c.getString(1)!!
+                app.cash.sqldelight.db.QueryResult.Unit
+            }, 0)
+            assertEquals(listOf("purpose_name", "purpose_color_key", "purpose_icon_key"), columns.takeLast(3))
+            assertEquals(3L, WishlistDatabase.Schema.version)
+        }
+        deleteTestDb(path)
+    }
+
     @Test fun migratesV1RowsWithMillisecondOrder() {
         val path = newTestDbPath()
         openRawDriver(path).use { raw ->

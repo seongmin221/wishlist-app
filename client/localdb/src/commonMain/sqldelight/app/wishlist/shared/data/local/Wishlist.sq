@@ -49,6 +49,9 @@ CREATE TABLE item_cache (
     manual_completion_at TEXT,
     allowed_actions TEXT NOT NULL,
     client_created_at TEXT,
+    purpose_name TEXT,
+    purpose_color_key TEXT,
+    purpose_icon_key TEXT,
     PRIMARY KEY (account_id, item_id)
 );
 

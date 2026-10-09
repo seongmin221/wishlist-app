@@ -44,6 +44,17 @@ class LocalStoreContractTest {
         }
     }
 
+    @Test fun purposeDisplayFieldsRoundTripThroughCache() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(1)).successValue()
+            assertEquals(
+                ItemPurpose("P1", ValueSource.USER, "출퇴근 헤드폰", "CORAL", "HEART"),
+                h.store.cachedItem(a, itemId).successValue()?.purpose,
+            )
+        }
+    }
+
     @Test fun pending_visibility_follows_account_binding() = runTest {
         withHarness { h ->
             val unbound = "00000000-0000-0000-0000-0000000000c1"

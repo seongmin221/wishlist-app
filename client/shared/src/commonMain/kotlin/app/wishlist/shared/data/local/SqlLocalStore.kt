@@ -303,6 +303,7 @@ private fun WishlistItem.toRow(account: String) = Item_cache(
     manual_completion_at = manualCompletionAtIso,
     allowed_actions = allowedActions.map { it.name }.sorted().joinToString(","),
     client_created_at = clientCreatedAtIso,
+    purpose_name = purpose.name, purpose_color_key = purpose.colorKey, purpose_icon_key = purpose.iconKey,
 )
 
 private fun Item_cache.toModel() = WishlistItem(
@@ -320,7 +321,7 @@ private fun Item_cache.toModel() = WishlistItem(
         missingReason = category_missing_reason?.let(CategoryMissingReason::valueOf),
         name = category_name, parentId = category_parent_id, kind = category_kind,
     ),
-    purpose = ItemPurpose(purpose_id, ValueSource.valueOf(purpose_source)),
+    purpose = ItemPurpose(purpose_id, ValueSource.valueOf(purpose_source), purpose_name, purpose_color_key, purpose_icon_key),
     analysis = ItemAnalysis(AnalysisStatus.valueOf(analysis_status), analysis_failure_code),
     reviewStatus = ReviewStatus.valueOf(review_status),
     lifecycleStatus = LifecycleStatus.valueOf(lifecycle_status),

@@ -62,6 +62,16 @@ private fun assertInvalid(result: ClientResult<*>, label: String = "") =
     assertEquals(ErrorKind.INVALID_RESPONSE, (result as? ClientResult.Failure)?.error?.kind, label)
 
 class ItemMapperTest {
+    @Test fun purposeDisplayFieldsAreKeptVerbatim() {
+        val item = mapped("purpose" to """{"id":"P1","name":"출퇴근 헤드폰","colorKey":"CORAL","iconKey":"HEART","source":"USER"}""").successValue()
+        assertEquals(ItemPurpose("P1", ValueSource.USER, "출퇴근 헤드폰", "CORAL", "HEART"), item.purpose)
+    }
+
+    @Test fun missingPurposeDisplayFieldsReadAsNull() {
+        val item = mapped("purpose" to """{"source":"UNASSIGNED"}""").successValue()
+        assertEquals(ItemPurpose(null, ValueSource.UNASSIGNED), item.purpose)
+    }
+
     @Test fun maps_every_field_of_a_full_item_and_keeps_server_policy() {
         val item = mapped().successValue()
         assertEquals("00000000-0000-4000-8000-000000000101", item.id)

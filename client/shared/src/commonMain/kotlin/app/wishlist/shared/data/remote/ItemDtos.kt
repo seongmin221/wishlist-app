@@ -55,7 +55,13 @@ internal data class CategoryDto(
 )
 
 @Serializable
-internal data class PurposeDto(val id: String? = null, val source: String? = null)
+internal data class PurposeDto(
+    val id: String? = null,
+    val name: String? = null,
+    val colorKey: String? = null,
+    val iconKey: String? = null,
+    val source: String? = null,
+)
 
 @Serializable
 internal data class AnalysisDto(val status: String, val failureCode: String? = null)

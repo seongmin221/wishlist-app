@@ -34,7 +34,7 @@ internal fun item(version: Int = 1, id: String = itemId, name: String? = "헤드
         nameSource = ValueSource.AI, imageSource = ValueSource.UNKNOWN,
     ),
     category = ItemCategory(id = "C026", source = ValueSource.USER, name = "음향", parentId = "G01", kind = "PUBLIC"),
-    purpose = ItemPurpose("P1", ValueSource.USER),
+    purpose = ItemPurpose("P1", ValueSource.USER, "출퇴근 헤드폰", "CORAL", "HEART"),
     analysis = ItemAnalysis(AnalysisStatus.PARTIAL, "F1"),
     reviewStatus = ReviewStatus.PENDING,
     lifecycleStatus = LifecycleStatus.ACTIVE,
