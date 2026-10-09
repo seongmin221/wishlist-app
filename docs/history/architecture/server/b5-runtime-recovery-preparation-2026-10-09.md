@@ -4,7 +4,7 @@
 
 ## 기준과 범위
 
-작업 브랜치는 `server/b5-analysis-runtime-recovery`다(다른 묶음의 `server/bN-...` 규칙에 맞춰 push 전 이름 변경). HEAD는 origin/develop 기준 `abae37d`이다. [B5 구현 순서](../../../architecture/server/mvp-api-implementation-order.md#b5--비동기-분석과-운영-복구)에 따라 WORK-01 → WORK-02 → OPS-01을 진행한다. C4와 클라우드 IAM·Scheduler 실호출(B11)은 범위 밖이다.
+작업 브랜치는 `server/b5-analysis-runtime-recovery`다. HEAD는 origin/develop 기준 `abae37d`이다. [B5 구현 순서](../../../architecture/server/mvp-api-implementation-order.md#b5--비동기-분석과-운영-복구)에 따라 WORK-01 → WORK-02 → OPS-01을 진행한다. C4와 클라우드 IAM·Scheduler 실호출(B11)은 범위 밖이다.
 
 ## 현재 구현과 남은 연결
 
@@ -33,16 +33,4 @@
 
 ## 확정한 규칙
 
-착수 초안의 질문 3건에 더해, lane 간 재시도 횟수 계산과 일반 lane DNS 실패 의미가 미결정이었음을 재대조에서 확인했다. 5건 모두 2026-10-09 사용자 답변으로 [B5 제품·운영 결정](../../product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md)에 확정했다.
-
-1. 재시도는 generation 전체 general+browser 합산 3회, 30분은 가장 이른 첫 시도부터.
-2. 가격 범위·상이 offer는 null, merchant는 seller → og:site_name, metadataCheckedAt은 페이지 metadata 최종 반영 시각.
-3. canonical은 같은 등록 도메인(eTLD+1)만 채택.
-4. 발행된 PENDING은 5분 정체 후 queue 조회, 조회 실패 1분·살아 있음 5분 후 재검사.
-5. 일반 lane DNS 실패는 Retryable, 차단은 Terminal.
-
-설계는 [B5 spec](../../../superpowers/specs/2026-10-09-b5-analysis-runtime-recovery-design.md)에 정리했다. spec 승인 뒤 `docs/superpowers/plans/2026-10-09-b5-analysis-runtime-recovery.md` 계획을 작성해 승인받고 구현한다.
-
-## 환경 관측
-
-초안 작성 세션에서 공용 Git metadata 접근이 `Operation not permitted`로 실패한 적이 있으나, 재대조 시점에는 git status·branch 작업이 정상 동작했다.
+재대조에서 초안의 질문 3건 외에 lane 간 재시도 횟수 계산과 일반 lane DNS 실패 의미도 미결정임을 확인했다. 5건 모두 [B5 제품·운영 결정](../../product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md)에 확정했다(합산 재시도·metadata 선택·canonical·PENDING 정체·DNS 실패). 설계는 [B5 spec](../../../superpowers/specs/2026-10-09-b5-analysis-runtime-recovery-design.md)에 있다.

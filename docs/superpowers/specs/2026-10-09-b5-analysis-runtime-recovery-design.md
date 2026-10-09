@@ -55,7 +55,7 @@
 
 ## 2. generation 재시도 예산
 
-`AnalysisJobTransitions.hasRetryBudget(now)`로 lane 인자를 없앤다.
+`LockedAnalysisJob.hasRetryBudget(lane, now)` 확장 함수(`AnalysisJobTransitions.kt`)를 `hasRetryBudget(now)`로 바꿔 lane 인자를 없앤다.
 
 ```text
 attempts = attempt_count + browser_attempt_count
@@ -106,7 +106,7 @@ data class Metadata(
 
 ## 4. 저장과 반영
 
-**migration V17** (`V17__analysis_metadata_and_recovery.sql`):
+**migration V17** (`V17__analysis_metadata_and_recovery.sql`). 현재 마지막 migration은 SQL `V15__wishlist_read_indexes.sql` 다음의 Kotlin Java-migration `server/src/main/kotlin/db/migration/V16__recoverable_read_indexes.kt`이므로(origin/develop 동일) 다음 번호는 V17이다.
 
 ```sql
 alter table wishlist_items
@@ -126,27 +126,30 @@ alter table analysis_jobs
     check ((pending_price is null) = (pending_currency is null));
 create index analysis_jobs_pending_recovery_idx on analysis_jobs (recovery_check_at nulls first, updated_at, id)
   where stage in ('GENERAL_PENDING','BROWSER_PENDING');
+create index analysis_jobs_running_recovery_idx on analysis_jobs (recovery_check_at nulls first, lease_until, id)
+  where stage in ('GENERAL_RUNNING','BROWSER_RUNNING');
 create index outbox_events_job_created_idx on outbox_events (analysis_job_id, created_at desc, id desc);
 ```
 
-정확한 SQL은 계획에서 기존 migration 문체와 index 정책(V15/V16 운영 rollout 여부)을 확인해 확정한다. 기존 V1~V16은 수정하지 않는다.
+정확한 SQL은 계획에서 기존 migration 문체를 따라 확정한다. V16은 운영 데이터가 큰 `wishlist_items` index를 `create index concurrently`로 복구 가능하게 만든 경로다. 새 index의 대상인 `analysis_jobs`·`outbox_events`에도 그 방식이 필요한지 계획에서 판단해 기록한다. 기존 V1~V16은 수정하지 않는다. 기존 `analysis_jobs_recovery_idx (stage, lease_until, id)`는 남기고, RUNNING 순환 발견은 새 `analysis_jobs_running_recovery_idx`를 쓴다.
 
 **임시 저장.** `AnalysisPendingResultRepository.saveMetadata`가 새 pending 컬럼도 저장한다. GENERAL 재claim은 기존처럼 pending metadata 전체(새 컬럼 포함)를 지우고, BROWSER 재claim은 유지한다.
 
 **최종 반영.** `AnalysisResultRepository.finishLocked`의 기존 병합 규칙을 그대로 적용한다.
 
-- brand: `BRAND`가 `user_override_fields`에 있으면 보호한다. 성공은 보호되지 않은 새 값을, PARTIAL·실패는 기존 nonnull 값을 유지하고 빈 칸만 채운다.
-- price/currency: 한 쌍으로 병합한다. 둘 다 있는 쪽만 채택해 한 칸만 바뀌는 일이 없게 한다. 사용자 편집 대상이 아니므로 보호 필드가 없다.
+- brand: `BRAND`가 `user_override_fields`에 있으면 보호한다. 보호되지 않으면 기존 `mergedMetadata` 규칙을 그대로 쓴다. 성공은 `pending ?: existing`이라 새 값이 null이면 **기존 값을 유지**한다. PARTIAL·실패는 `existing ?: pending`이다.
+- price/currency: 항상 한 쌍으로 다루며 한 칸만 바뀌지 않는다. 가격은 확인 시각에 묶인 값이므로 `metadata_checked_at`을 새로 기록하는 finish에서는 이번 읽기 결과 쌍으로 **교체**한다(결과가 null이면 null로 지움). 확인 시각을 기록하지 않는 finish는 기존 쌍을 유지한다. 이렇게 해야 확인 시각이 이전 가격을 새로 확인한 것처럼 보이지 않는다. 사용자 편집 대상이 아니므로 보호 필드가 없다. B5에서는 첫 분석이라 기존 값이 없지만 B7 재분석이 같은 규칙을 쓴다.
 - merchant: brand와 같은 병합(보호 없음).
-- `metadata_checked_at`: 이번 finish가 페이지에서 읽은 pending metadata를 가지고 있으면(`pending_canonical_url is not null`) finish transaction의 `clock_timestamp()`로 기록한다. 상태(READY/PARTIAL)와 optional 값의 null 여부와 무관하다. 페이지를 얻지 못한 PARTIAL·실패는 기존 값을 유지한다. `classified_at`으로 대체하지 않는다.
+- `metadata_checked_at`: 이번 finish가 페이지에서 읽은 pending metadata를 가지고 있으면(`pending_canonical_url is not null`) finish transaction의 `clock_timestamp()`로 기록한다. 상태(READY/PARTIAL)와 optional 값의 null 여부와 무관하다. browser 재claim은 일반 lane의 pending metadata를 유지하므로 "general이 페이지를 읽음 → NeedsBrowser → browser 실패로 PARTIAL"도 기록 대상이다(general이 페이지를 읽었기 때문). 어느 lane도 페이지를 얻지 못한 PARTIAL·실패만 기존 값을 유지한다. `classified_at`으로 대체하지 않는다.
 - category stale replacement, version 불일치, lease 만료 등 기존 무반영 경로는 그대로다.
 
 **조회.** 상세(`WishlistItemRepository`)와 목록·홈(`WishlistReadRepository`)이 공유하는 projection과 `WishlistItemRowMapper`가 새 컬럼을 읽는다(홈 목적 미리보기처럼 카드 표현을 쓰지 않는 조회는 제외). DTO는 이미 nullable `brand/price/currency/merchant/metadataCheckedAt`을 가진다. 가격은 기존 `DecimalJsonSerializer`로 JSON number다. 응답 필드 추가·이름 변경은 없다.
 
 ## 5. URL 안전과 실패 의미
 
-- `UrlSafetyPolicy.validate`의 DNS 해석 실패(`UnknownHostException`, 해석 timeout, 빈 결과)는 `DnsLookupFailed`(새 예외, `UnsafeUrlException`과 별개)로 던진다. 차단 주소·scheme·port·userinfo·local host는 기존 `UnsafeUrlException`이다.
-- 일반 lane: `DnsLookupFailed` → `ProcessingOutcome.Retryable`. 예산 소진 시 기존 경로로 FAILED_RETRYABLE(`ANALYSIS_RETRYABLE_FAILURE`). `UnsafeUrlException` → Terminal이며 pending failure code `BLOCKED_ADDRESS`를 같은 guard로 저장한 뒤 finish한다.
+- `UrlSafetyPolicy.validate`의 DNS 해석 실패(`UnknownHostException`, 빈 결과, 해석 시간 초과)는 `DnsLookupFailed`(새 예외, `UnsafeUrlException`과 별개)로 던진다. `InetAddress.getAllByName`에는 timeout이 없으므로, 기본 resolver를 bounded executor에서 실행하고 `WorkerExecution.remaining`(최대 5초)만 기다리는 wrapper를 추가한다. 시간 초과도 `DnsLookupFailed`다. 차단 주소·scheme·port·userinfo·local host·invalid URL은 기존 `UnsafeUrlException`이다.
+- 실제 DNS 조회는 `UrlSafetyPolicy`에서만 일어난다. redirect 대상도 `HttpMetadataExtractor`가 `validate`로 다시 해석한다. `SafeHttpTransport`의 OkHttp `Dns`는 이미 검증한 pinned 주소만 돌려주고, 요청 host가 아닌 이름을 조회하려 하면 `UnsafeUrlException`을 던진다. 이것은 고정 주소 우회를 막는 불변식 위반이므로 차단(Terminal)으로 유지하며 DNS 실패로 나누지 않는다.
+- 일반 lane: `DnsLookupFailed` → `ProcessingOutcome.Retryable`. 예산 소진 시 기존 경로로 FAILED_RETRYABLE(`ANALYSIS_RETRYABLE_FAILURE`). `UnsafeUrlException` → Terminal이며 pending failure code `BLOCKED_ADDRESS`를 같은 guard로 저장한 뒤 finish한다. 차단 주소뿐 아니라 scheme·port·userinfo 거부와 invalid URL도 모두 `BLOCKED_ADDRESS`로 저장한다. 해당하는 다른 공개 code가 없고, 사용자에게는 어느 쪽이든 "이 주소는 분석할 수 없음"이라 구분할 필요가 없다.
 - browser lane: 대상 DNS·연결 실패·차단·navigation timeout·사이트 차단은 PARTIAL(확정 규칙). Playwright 실행 불가·proxy 시작 실패 등 Worker 인프라 장애는 Retryable.
 - 공개 failure code 목록은 바꾸지 않는다.
 
@@ -154,7 +157,7 @@ create index outbox_events_job_created_idx on outbox_events (analysis_job_id, cr
 
 **접근 비교.** (A) 현재처럼 route에서 URL만 검사: Chromium이 DNS를 별도 조회해 rebinding을 막지 못한다. (B) **채택:** browser Worker 프로세스 내 pinning forward proxy. (C) 배포 egress firewall: B11에서 추가 방어로 적용하며 B5에서 검증할 수 없다.
 
-**EgressProxy.** browser Worker가 소유하는 loopback 전용 HTTP proxy(`127.0.0.1`, 임의 port, 인증 token 없이 프로세스 내부만 bind).
+**EgressProxy.** browser Worker가 소유하는 loopback 전용 HTTP proxy(`127.0.0.1`, 임의 port). loopback 전용이며 같은 컨테이너만 신뢰한다. loopback은 같은 컨테이너의 다른 프로세스(Chromium 포함)도 접근할 수 있으므로 별도 인증은 두지 않고, browser Worker 컨테이너에 다른 workload를 두지 않는 배포 조건을 B11에서 확인한다.
 
 - `CONNECT host:port`와 절대 URI HTTP 요청만 받는다. host마다 `UrlSafetyPolicy.validate`로 검증한 주소 중 하나에만 실제 TCP 연결한다. 검증과 연결 사이에 DNS를 다시 조회하지 않는다.
 - port는 80/443만 허용한다. 차단·DNS 실패는 연결 거부로 응답하고, 실패 종류를 해당 render에 기록해 PARTIAL 판정에 쓴다.
@@ -176,19 +179,21 @@ create index outbox_events_job_created_idx on outbox_events (analysis_job_id, cr
 
 ## 8. maintenance 실행 (OPS-01)
 
-`MaintenanceService.runOnce(): MaintenanceReport`가 아래 단계를 순서대로 실행한다. 단계별 예외는 격리해 로그(고정 문장·예외 타입)와 report에 남기고 다음 단계를 진행한다. route는 모든 단계가 정상이면 200, 하나라도 실패하면 500을 반환한다. 둘 다 JSON report를 담는다. 전체 실행 상한은 50초이며 각 단계는 남은 시간을 받는다.
+기존 `app/budget/BudgetMaintenanceService.kt`의 `MaintenanceReport`를 `BudgetMaintenanceReport`로 이름을 바꾸고, 새 `MaintenanceService.runOnce(): MaintenanceReport`가 아래 단계를 순서대로 실행한다. 단계별 예외는 격리해 로그(고정 문장·예외 타입)와 report에 남기고 다음 단계를 진행한다. route는 모든 단계가 정상이면 200, 하나라도 실패하면 500을 반환한다. 둘 다 JSON report를 담는다. 전체 실행 상한은 50초이며 각 단계는 남은 시간을 받는다.
 
 1. **outbox backlog**: `dispatchPending(limit=100, deadline)`.
 2. **만료 RUNNING 복구**: 기존 `AnalysisJobReconciler`에 합산 예산과 순환을 적용한다.
 3. **오래된 PENDING 복구**: 아래 절.
 4. **budget**: `BudgetMaintenanceService.runOnce()`.
 
-**순환 진행(2·3 공통).** 후보 발견 SQL은 `recovery_check_at is null or recovery_check_at <= clock_timestamp()` 조건과 `recovery_check_at nulls first, updated_at, id` 정렬을 쓴다. skip-locked로 건너뛰거나 처리 중 예외가 난 후보는 rollback 후 별도 짧은 transaction에서 `recovery_check_at = clock_timestamp() + 1분`으로 미룬다. 이 갱신은 job 행만 바꾸며 owner→item→job 잠금 순서와 충돌하지 않도록 `for update skip locked`로 시도하고 잠겨 있으면 생략한다. 이렇게 앞 batch 전체가 계속 실패·잠김이어도 다음 실행은 뒤 후보를 읽는다. 상태 전이·재예약 시 `recovery_check_at`은 null로 초기화한다.
+**순환 진행(2·3 공통).** 후보 발견 SQL은 `recovery_check_at is null or recovery_check_at <= clock_timestamp()` 조건을 쓰고, 정렬은 PENDING이 `recovery_check_at nulls first, updated_at, id`, RUNNING이 `recovery_check_at nulls first, lease_until, id`다. 각각 V17의 partial index와 일치한다. skip-locked로 건너뛰거나 처리 중 예외가 난 후보는 rollback 후 별도 짧은 transaction에서 `recovery_check_at = clock_timestamp() + 1분`으로 미룬다. 이 갱신은 job 행만 바꾸며 owner→item→job 잠금 순서와 충돌하지 않도록 `for update skip locked`로 시도하고 잠겨 있으면 생략한다. 이렇게 앞 batch 전체가 계속 실패·잠김이어도 다음 실행은 뒤 후보를 읽는다. `recovery_check_at`은 공통 helper `transitionAnalysisJob`에서 null로 초기화한다. claim·finish·Worker Retryable·stale replacement·reconciler가 모두 이 helper를 거치므로 한 곳에서 빠짐없이 처리된다. helper를 쓰지 않는 두 경로(claim의 lease UPDATE, PENDING 재예약 UPDATE)는 각 SQL에서 직접 null로 둔다.
 
 **PENDING 복구.**
 
-1. 발견(잠금 없음, DB 시각): stage ∈ {GENERAL_PENDING, BROWSER_PENDING}, `updated_at <= now - 5분`, 순환 조건 충족. 각 후보의 최신 outbox(`created_at desc, id desc`)를 함께 읽는다. batch 50.
-2. 최신 outbox가 미발행이면 건너뛴다(1단계 발행 대상). outbox가 없으면 MISSING으로 취급한다.
+1. 발견(잠금 없음, DB 시각): stage ∈ {GENERAL_PENDING, BROWSER_PENDING}, `updated_at <= now - 5분`, 순환 조건 충족, **최신 outbox(`created_at desc, id desc`)가 발행됐거나 없음**. batch 50. 미발행 outbox가 있는 job은 1단계 발행 대상이므로 SQL에서 제외한다. 그래서 Tasks 장애로 미발행 PENDING이 많이 쌓여도 발견 batch를 차지하지 않는다.
+2. outbox가 없는 PENDING은 MISSING으로 취급한다.
+
+발행이 계속 실패하는 동안의 PENDING은 30분이 지나도 PROCESSING에 머문다. 이는 의도한 동작이다. 30분·3회 예산은 실제 Worker 실행에 대한 상한이고, 발행되지 않은 job은 아직 한 번도 실행되지 않았다(attempt 0이면 첫 시도 시각도 없음). Tasks가 회복되면 1단계가 발행을 이어 간다. 장기 미발행은 outbox 실패 지표로 관측한다.
 3. transaction 밖에서 `TaskGateway.status(task)`를 호출한다.
    - `ALIVE` → `recovery_check_at = now + 5분`.
    - 조회 예외 → 로그 후 `recovery_check_at = now + 1분`. 상품 상태는 바꾸지 않는다.
@@ -216,7 +221,7 @@ interface TaskGateway {
 ## 10. 오류·관측
 
 - 로그는 jobId·eventId·예외 타입·단계 이름만 남기고 메시지·URL·SQL은 남기지 않는다.
-- report 필드: published/failedEvents, recoveredRunning, pendingRescheduled/pendingFailed/pendingCancelled/pendingAlive/lookupFailed, expiredReservations, deliveredAlerts, failedSteps.
+- `MaintenanceReport` 필드: publishedEvents/failedEvents, recoveredRunning, pendingRescheduled/pendingFailed/pendingCancelled/pendingAlive/lookupFailed, `budget: BudgetMaintenanceReport?`(expiredReservations·deliveredAlerts, 단계 실패 시 null), failedSteps.
 
 ## 11. 검증
 
@@ -227,11 +232,11 @@ interface TaskGateway {
 | 역할 config | 4개 역할 env 검증, API의 `/internal/**` 404, general의 browser route 404, maintenance route 존재 |
 | 예산 | 위 2절 표 전체를 claim·finish·reconciler·PENDING·replacement에서 |
 | 추출 | 단일 Offer, AggregateOffer, 상이 offer 배열, 동일 offer 배열, 통화 무효·누락, 지수·음수·scale, brand 문자열/객체, 복수 Product, seller/site_name/없음, canonical 동일·다른 eTLD+1·IP·userinfo·상대경로, tracking query 제거·variant 보존 |
-| 저장 | pending 저장·GENERAL 재claim 삭제·BROWSER 유지, 성공/PARTIAL 병합, BRAND override 보호, price 쌍 병합, metadataCheckedAt 기록·유지, CHECK 위반 거부, 상세·목록·홈 응답 값 |
-| URL | DNS 실패 → general Retryable / browser PARTIAL, 차단 → Terminal+`BLOCKED_ADDRESS` |
+| 저장 | pending 저장·GENERAL 재claim 삭제·BROWSER 유지, 성공/PARTIAL 병합, BRAND override 보호, 성공 시 brand null은 기존 유지, 확인 시각 기록 시 price 쌍 교체(null 포함)·미기록 시 유지, metadataCheckedAt 기록·유지(general 페이지 읽음 → NeedsBrowser → browser 실패 PARTIAL도 기록), RUNNING·PENDING 경로별 `recovery_check_at` 초기화, CHECK 위반 거부, 상세·목록·홈 응답 값 |
+| URL | DNS 실패·resolver 시간 초과 → general Retryable / browser PARTIAL, 차단·scheme·port·userinfo·invalid URL → Terminal+`BLOCKED_ADDRESS`, pinned Dns 불변식 위반 → Terminal |
 | egress | proxy가 검증 IP로만 연결, DNS가 공인→loopback으로 바뀌는 rebinding 시도 차단, 사설 subresource 차단, port 제한, render 종료 시 연결 정리 |
 | outbox | 첫 이벤트 실패 후 다음 발행, 시간 상한, 지정 발행 회귀, 동시 dispatcher 중복 없음 |
-| maintenance | 단계 실패 격리·500, 미발행 browser fallback 발행, queue 소진/유실 → 재예약, ALIVE·조회 장애 → 무변경과 재검사 시각, 예산 소진 → FAILED_RETRYABLE, 삭제/보관/수동 완료 → CANCELLED, 105초 마감 후 중복 ACK → 원래 실행 Retryable outbox 유지 |
+| maintenance | 단계 실패 격리·500, 미발행 PENDING 50건 초과 시에도 발행된 뒤 후보 검사, 미발행 browser fallback 발행, queue 소진/유실 → 재예약, ALIVE·조회 장애 → 무변경과 재검사 시각, 예산 소진 → FAILED_RETRYABLE, 삭제/보관/수동 완료 → CANCELLED, 105초 마감 후 중복 ACK → 원래 실행 Retryable outbox 유지 |
 | 경합(PostgreSQL) | 동시 maintenance 2개 재예약 1건, 복구 vs claim/finish/편집/삭제, 앞 batch 잠금 시 뒤 후보 진행, RUNNING 순환 |
 | upgrade | V16 데이터 → V17, 기존 행 기본값·CHECK |
 | 전체 흐름 | API 생성 → InMemoryTaskQueue → general(local HTTP 서버) → NeedsBrowser → browser → READY/PARTIAL + metadata 응답, task 유실 → maintenance → 완료 |
