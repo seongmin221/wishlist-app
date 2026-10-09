@@ -225,4 +225,98 @@ class WLNavigatorTest {
         assertFalse(navBackEnabled(isCurrent = false, overlayShowing = false, canPop = true, transitioning = false))
         assertFalse(navBackEnabled(isCurrent = true, overlayShowing = false, canPop = false, transitioning = false))
     }
+
+    private data class TestScoped(val id: String) : WLRoute {
+        override val showsTabBar = false
+        override val pushStyle = WLPushStyle.Slide
+        override val accountScoped = true
+    }
+
+    private data class TestPlain(val id: String) : WLRoute {
+        override val showsTabBar = false
+        override val pushStyle = WLPushStyle.Slide
+    }
+
+    private fun WLNavigator.settle(route: WLRoute, key: String = "k") {
+        assertTrue(push(route, key))
+        finishTransition()
+    }
+
+    @Test
+    fun leavingAnAccountDropsAccountScopedRoutesInEveryTab() {
+        val nav = WLNavigator()
+        nav.settle(TestScoped("home-item"))
+        nav.selectTab(WLTab.Category)
+        nav.finishTransition()
+        nav.settle(TestScoped("category-item"))
+        nav.settle(TestPlain("category-above"))
+        nav.drainRemoved()
+        val scopedIds = (nav.entries(WLTab.Home).drop(1) + nav.entries(WLTab.Category).drop(1)).map { it.id }.toSet()
+
+        val removed = nav.dropAccountScoped()
+
+        assertEquals(scopedIds, removed.toSet())
+        WLTab.entries.forEach { assertEquals(listOf(WLRoute.TabRoot(it)), nav.stack(it)) }
+        assertFalse(nav.isTransitioning)
+        assertEquals(WLTab.Category, nav.currentTab)
+        assertEquals(scopedIds, nav.drainRemoved().toSet())
+    }
+
+    @Test
+    fun nonScopedRoutesBelowStay() {
+        val nav = WLNavigator()
+        val settings = TestPlain("settings")
+        nav.settle(settings)
+        nav.settle(TestScoped("item"))
+        nav.settle(TestPlain("web"))
+
+        nav.dropAccountScoped()
+
+        assertEquals(listOf(WLRoute.TabRoot(WLTab.Home), settings), nav.stack(WLTab.Home))
+    }
+
+    @Test
+    fun replaceTopSwapsTheTopAndReportsTheOldId() {
+        val nav = WLNavigator()
+        assertFalse(nav.replaceTop(TestPlain("at-root")))
+        nav.settle(TestScoped("local"), key = "home/local")
+        val old = nav.entries(WLTab.Home).last()
+        nav.drainRemoved()
+
+        assertTrue(nav.replaceTop(TestScoped("item")))
+
+        val top = nav.entries(WLTab.Home).last()
+        assertEquals(listOf(WLRoute.TabRoot(WLTab.Home), TestScoped("item")), nav.stack(WLTab.Home))
+        assertTrue(top.id > old.id)
+        assertEquals("home/local", top.sourceKey)
+        assertTrue(nav.isTransitioning)
+        assertFalse(nav.replaceTop(TestScoped("again")))
+        assertEquals(listOf(old.id), nav.drainRemoved())
+        nav.finishTransition()
+        assertFalse(nav.isTransitioning)
+    }
+
+    @Test
+    fun removedIdsCoverPopGestureReplaceAndDrop() {
+        val nav = WLNavigator()
+        assertEquals(emptyList<Long>(), nav.drainRemoved())
+        nav.settle(TestPlain("popped"))
+        val popped = nav.entries(WLTab.Home).last().id
+        nav.pop()
+        nav.finishTransition()
+        nav.settle(TestPlain("gestured"))
+        val gestured = nav.entries(WLTab.Home).last().id
+        nav.beginBackGesture()
+        nav.commitBackGesture()
+        nav.finishTransition()
+        nav.settle(TestPlain("replaced"))
+        val replaced = nav.entries(WLTab.Home).last().id
+        nav.replaceTop(TestScoped("scoped"))
+        nav.finishTransition()
+        val dropped = nav.entries(WLTab.Home).last().id
+        nav.dropAccountScoped()
+
+        assertEquals(listOf(popped, gestured, replaced, dropped), nav.drainRemoved())
+        assertEquals(emptyList<Long>(), nav.drainRemoved())
+    }
 }

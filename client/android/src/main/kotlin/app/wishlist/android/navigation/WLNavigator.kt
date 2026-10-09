@@ -24,6 +24,9 @@ internal sealed interface WLNavTransition {
     data class Pop(override val tab: WLTab) : WLNavTransition
     data class Tab(val from: WLTab, override val tab: WLTab) : WLNavTransition
 
+    /** `replaceTop`: 맨 위 칸이 다른 칸으로 바뀐다(cross-fade). */
+    data class Replace(override val tab: WLTab) : WLNavTransition
+
     /** 손가락으로 끄는 중(predictive back). 놓으면 `Pop`이 되거나 취소된다. */
     data class BackGesture(override val tab: WLTab) : WLNavTransition
 }
@@ -38,6 +41,7 @@ internal sealed interface WLNavTransition {
  *   뒤로 가도 사진이나 밀던 화면이 중간에 남지 않는다.
  * - 현재 탭을 다시 고르면 전환 없이 `scrollToTopRequests`로 그 탭을 내보낸다.
  * - 끌어서 뒤로: `beginBackGesture` → (`commitBackGesture` → 모션 끝에 `finishTransition`) 또는 `cancelBackGesture`.
+ * - 스택에서 빠진 칸의 id는 `drainRemoved()`로 한 번씩 내보낸다. 화면별 ViewModelStore를 전환이 끝난 뒤 지우는 데 쓴다.
  */
 class WLNavigator(initialTab: WLTab = WLTab.Home) {
     private var nextId = 0L
@@ -56,6 +60,11 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
         private set
 
     val isTransitioning: Boolean get() = activeTransition != null
+
+    /** 아직 내보내지 않은 빠진 칸 id(빠진 순서). snapshot 상태라 `WLNavHost`가 관찰할 수 있다. 저장하지 않는다. */
+    private val removed = mutableStateListOf<Long>()
+
+    internal val hasRemoved: Boolean get() = removed.isNotEmpty()
 
     fun stack(tab: WLTab): List<WLRoute> = stacks.getValue(tab).map { it.route }
 
@@ -87,8 +96,48 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
         val stack = stacks.getValue(currentTab)
         if (stack.size <= 1) return false
         activeTransition = WLNavTransition.Pop(currentTab)
-        stack.removeAt(stack.lastIndex)
+        removed += stack.removeAt(stack.lastIndex).id
         return true
+    }
+
+    /**
+     * Replaces the current tab's top entry (cross-fade); the replaced entry's id is reported as removed.
+     * 새 칸은 새 id를 받고 이전 칸의 `sourceKey`를 이어 받는다(뒤로 갈 때 같은 요소로 돌아간다). 탭 첫 화면이거나 전환 중이면 false.
+     */
+    fun replaceTop(route: WLRoute): Boolean {
+        if (isTransitioning) return false
+        val stack = stacks.getValue(currentTab)
+        if (stack.size <= 1) return false
+        val old = stack.last()
+        activeTransition = WLNavTransition.Replace(currentTab)
+        stack[stack.lastIndex] = WLBackStackEntry(nextId++, route, old.sourceKey)
+        removed += old.id
+        return true
+    }
+
+    /**
+     * Pops, in every tab, the first account-scoped route and everything above it; no transition. Returns removed entry ids.
+     * 전환 중에도 바로 적용한다(계정이 바뀐 뒤 이전 계정 화면을 남기지 않는다). 영향받은 탭에서 끌어서 뒤로 중이었다면 그 끌기를 끝낸다.
+     */
+    internal fun dropAccountScoped(): List<Long> {
+        val dropped = mutableListOf<Long>()
+        stacks.forEach { (tab, stack) ->
+            val first = stack.indexOfFirst { it.route.accountScoped }
+            if (first < 1) return@forEach
+            dropped += stack.drop(first).map { it.id }
+            while (stack.size > first) stack.removeAt(stack.lastIndex)
+            if ((activeTransition as? WLNavTransition.BackGesture)?.tab == tab) activeTransition = null
+        }
+        removed += dropped
+        return dropped
+    }
+
+    /** Ids of entries removed by pop/commitBackGesture/replaceTop/dropAccountScoped since the last call. */
+    internal fun drainRemoved(): List<Long> {
+        if (removed.isEmpty()) return emptyList()
+        val ids = removed.toList()
+        removed.clear()
+        return ids
     }
 
     internal fun finishTransition() {
@@ -146,7 +195,7 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
         val gesture = activeTransition as? WLNavTransition.BackGesture ?: return
         activeTransition = WLNavTransition.Pop(gesture.tab)
         val stack = stacks.getValue(gesture.tab)
-        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+        if (stack.size > 1) removed += stack.removeAt(stack.lastIndex).id
     }
 
     /** 끌어서 뒤로를 취소한다(되돌림 모션이 끝난 뒤 부른다). */

@@ -18,6 +18,8 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
         WLRoute.TabRoot(WLTab.Home) -> HomeScreen()
         SettingsRoute -> SettingsScreen()
         LoginRoute -> LoginScreen(LoginMode.Pushed)
+        // 화면은 Task 10. 아직 push하는 곳은 없지만 저장된 스택 복원이 죽지 않도록 빈 화면을 둔다.
+        is ItemDetailRoute, is LocalSubmissionRoute -> Box(Modifier.fillMaxSize().background(LocalWLColors.current.background))
         else -> if (!VariantRoutes.Content(route, sourceKey)) {
             when (route) {
                 is WLRoute.TabRoot -> PlainTabRoot(route.tab)

@@ -54,6 +54,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import androidx.compose.ui.unit.IntOffset
+import androidx.lifecycle.ViewModelStoreOwner
 
 /** 화면이 `push`·`pop`을 부르기 위한 접근. */
 val LocalWLNavigator = staticCompositionLocalOf<WLNavigator> { error("WLNavHost 밖에서 LocalWLNavigator를 읽었다") }
@@ -71,11 +72,14 @@ typealias WLRouteContent = @Composable (route: WLRoute, sourceKey: String?) -> U
  *   나머지를 재생, 아니면 되돌린다. 진행값 없이 끝나는 뒤로(API 33 미만, 3버튼 내비게이션, 화면의 뒤로 버튼)는 같은 pop
  *   전환을 처음부터 재생한다.
  * - 전환 중에는 화면 전체 입력을 막고, 뒤로는 받아서 버린다(시스템에 넘기지 않는다).
+ * - `replaceTop`: 맨 위 칸만 cross-fade로 바뀐다(아래 칸은 움직이지 않는다).
+ * - 칸마다 `LocalWLEntryViewModelStoreOwner`로 그 칸의 ViewModelStore를 준다. 빠진 칸의 store는 전환이 끝난 뒤 지운다.
  */
 @Composable
-fun WLNavHost(
+internal fun WLNavHost(
     modifier: Modifier = Modifier,
     navigator: WLNavigator = LocalWLNavigator.current,
+    entryStores: WLEntryViewModelStores,
     content: WLRouteContent,
 ) {
     val c = LocalWLColors.current
@@ -96,6 +100,10 @@ fun WLNavHost(
             if (mine != null && navigator.activeTransition === mine) navigator.finishTransition()
         }
     }
+    // 빠진 칸의 ViewModel은 떠나는 모션이 끝난 뒤(전환이 없을 때) 닫는다. 계정 떠남(전환 없음)은 셸이 바로 닫는다.
+    LaunchedEffect(navigator, entryStores) {
+        snapshotFlow { !navigator.isTransitioning && navigator.hasRemoved }.collect { if (it) entryStores.clearRemoved(navigator) }
+    }
     // 탭 바 투명도는 매 프레임 바뀌므로 그리기 단계(graphicsLayer)에서만 읽는다. 보일지 여부만 derivedStateOf로 다시 그린다.
     val tabBarAlphaNow = {
         tabBarAlpha.value?.value ?: if (navigator.entries(navigator.currentTab).last().route.showsTabBar) 1f else 0f
@@ -113,7 +121,7 @@ fun WLNavHost(
                     modifier = Modifier.fillMaxSize(),
                 ) { tab ->
                     tabHolder.SaveableStateProvider(tab.name) {
-                        TabStack(tab, isCurrent = tab == currentTab, navigator, tabBarAlpha, content)
+                        TabStack(tab, isCurrent = tab == currentTab, navigator, entryStores, tabBarAlpha, content)
                     }
                 }
                 if (tabBarVisible) {
@@ -139,8 +147,12 @@ private fun tabFadeThrough(): ContentTransform {
         fadeOut(tween(Motion.tabOutgoing, easing = Curve.easeIn))
 }
 
-/** push = 새 칸이 위(id가 더 큼). 상세(위 칸) 쪽의 이동 방식으로 고른다. */
-private fun stackTransform(initial: WLBackStackEntry, target: WLBackStackEntry, interactive: Boolean): ContentTransform {
+/** push = 새 칸이 위(id가 더 큼). 상세(위 칸) 쪽의 이동 방식으로 고른다. 맨 위 교체는 cross-fade. */
+private fun stackTransform(initial: WLBackStackEntry, target: WLBackStackEntry, interactive: Boolean, replace: Boolean): ContentTransform {
+    if (replace) {
+        val spec = tween<Float>(ReplaceCrossFadeMillis, easing = Curve.easeOut)
+        return (fadeIn(spec) togetherWith fadeOut(spec)).apply { targetContentZIndex = 1f }
+    }
     val push = target.id > initial.id
     val upper = if (push) target else initial
     return when (upper.route.pushStyle) {
@@ -170,7 +182,8 @@ private fun <T> slideSpec(push: Boolean, interactive: Boolean) =
     tween<T>(if (push) Motion.pushSlideOpen else Motion.pushSlideBack, easing = if (interactive) LinearEasing else Curve.emphasized)
 
 /** 탭 바 투명도: 다음 화면 내용과 함께 사라지고 나타난다(내용 페이드와 같은 시간표). */
-private fun tabBarSpec(initial: WLBackStackEntry, target: WLBackStackEntry, interactive: Boolean) = run {
+private fun tabBarSpec(initial: WLBackStackEntry, target: WLBackStackEntry, interactive: Boolean, replace: Boolean) = run {
+    if (replace) return@run tween<Float>(ReplaceCrossFadeMillis, easing = Curve.easeOut)
     val push = target.id > initial.id
     val upper = if (push) target else initial
     when (upper.route.pushStyle) {
@@ -200,6 +213,7 @@ private fun SharedTransitionScope.TabStack(
     tab: WLTab,
     isCurrent: Boolean,
     navigator: WLNavigator,
+    entryStores: WLEntryViewModelStores,
     tabBarAlpha: MutableState<State<Float>?>,
     content: WLRouteContent,
 ) {
@@ -212,9 +226,9 @@ private fun SharedTransitionScope.TabStack(
     var known by rememberSaveable { mutableStateOf(listOf<Long>()) }
 
     LaunchedEffect(top) {
-        // 이 효과가 맡은 전환(이 탭의 Push·Pop)만 끝낸다. 애니메이션이 끊겨도(취소·예외) finally에서 반드시 끝내
+        // 이 효과가 맡은 전환(이 탭의 Push·Pop·Replace)만 끝낸다. 애니메이션이 끊겨도(취소·예외) finally에서 반드시 끝내
         // 입력이 영구히 막히지 않게 한다. 같은 전환 객체일 때만 끝내므로 두 번 끝내거나 다음 전환을 끝내지 않는다.
-        val mine = navigator.activeTransition?.takeIf { (it is WLNavTransition.Push || it is WLNavTransition.Pop) && it.tab == tab }
+        val mine = navigator.activeTransition?.takeIf { (it is WLNavTransition.Push || it is WLNavTransition.Pop || it is WLNavTransition.Replace) && it.tab == tab }
         try {
             seek.animateTo(top)
         } finally {
@@ -227,7 +241,10 @@ private fun SharedTransitionScope.TabStack(
     }
 
     val alpha = transition.animateFloat(
-        transitionSpec = { tabBarSpec(initialState, targetState, navigator.activeTransition is WLNavTransition.BackGesture) },
+        transitionSpec = {
+            val active = navigator.activeTransition
+            tabBarSpec(initialState, targetState, active is WLNavTransition.BackGesture, active is WLNavTransition.Replace)
+        },
         label = "tabBar-$tab",
     ) { if (it.route.showsTabBar) 1f else 0f }
     if (isCurrent) SideEffect { tabBarAlpha.value = alpha }
@@ -269,13 +286,19 @@ private fun SharedTransitionScope.TabStack(
     }
 
     transition.AnimatedContent(
-        transitionSpec = { stackTransform(initialState, targetState, navigator.activeTransition is WLNavTransition.BackGesture) },
+        transitionSpec = {
+            val active = navigator.activeTransition
+            stackTransform(initialState, targetState, active is WLNavTransition.BackGesture, active is WLNavTransition.Replace)
+        },
         contentKey = { it.id },
         modifier = Modifier.fillMaxSize(),
     ) { entry ->
         SideEffect { if (entry.id !in known) known = known + entry.id }
+        val owner = remember(entry.id) {
+            object : ViewModelStoreOwner { override val viewModelStore = entryStores.storeFor(entry.id) }
+        }
         holder.SaveableStateProvider(entry.id) {
-            CompositionLocalProvider(LocalWLStackScope provides this) {
+            CompositionLocalProvider(LocalWLStackScope provides this, LocalWLEntryViewModelStoreOwner provides owner) {
                 content(entry.route, entry.sourceKey)
             }
         }
@@ -312,6 +335,9 @@ private suspend fun revert(
 /** 라우터의 뒤로 처리를 켤지. 현재 탭이고, overlay가 없고, pop할 칸이 있거나 전환 중(받아서 버림)일 때만. */
 internal fun navBackEnabled(isCurrent: Boolean, overlayShowing: Boolean, canPop: Boolean, transitioning: Boolean): Boolean =
     isCurrent && !overlayShowing && (canPop || transitioning)
+
+/** `replaceTop` cross-fade 시간. 디자인 값이 없어 대화상자 나타남(200)에 맞춘 구현 기본값. */
+private const val ReplaceCrossFadeMillis = Motion.dialogIn
 
 /** 되돌림 최소 시간. 거의 끌지 않았을 때 튀어 보이지 않게 하는 구현 기본값(디자인 값 아님). */
 private const val RevertMinMillis = 120

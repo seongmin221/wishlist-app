@@ -71,3 +71,9 @@
 - 웹뷰 "방금 삭제했어요"는 `rememberSaveable`이라 프로세스 종료 복원 뒤에도 남을 수 있고, 일부만 지워진 경우에도 성공으로 보일 수 있다.
 - 홈 목록은 lazy가 아니다(`Column` + `verticalScroll`). 대기 300개에서 jank 5.6%·PSS 122MB(에뮬레이터). 실기기 profiler 뒤 정한다([C3 성능 확인](c3-performance-checks.md#c3-측정-결과-2026-10-07)).
 - 이번 에뮬레이터 DNS 문제로 온라인 SAVED 카드 화면과 네트워크 복구 자동 전송을 Task 7에서 다시 찍지 못했다(Task 5에서는 확인).
+
+## 상품 상세 내비게이션 기반 (C4)
+
+- **계정 범위 route:** `WLRoute.accountScoped`(기본 false). `ItemDetailRoute(itemId)`·`LocalSubmissionRoute(submissionId)`가 true이고 탭 바 없는 가로 밀기다(codec `["item", id]`·`["local", id]`). `WishlistApp`이 `account.state`의 `accountId`를 관찰해 `shouldDropAccountScoped(previous, next)`(이전 값이 non-null이고 다르면)일 때 `navigator.dropAccountScoped()`를 부른다. 모든 탭에서 첫 계정 범위 칸과 그 위를 전환 없이 빼고(아래의 설정 같은 칸은 남는다), 돌려받은 id의 ViewModelStore를 바로 지운다. 로그인(null → A)은 떠남이 아니다. 같은 계정 재로그인은 로그아웃(A → null)을 거쳐 잡힌다. 비교 기준은 composition 동안의 메모리 값이라 프로세스 복원 직후 첫 값은 기준값일 뿐이다(세대만 바뀌는 경우는 상세 화면의 `Initial` → pop 안전장치, Task 10·11).
+- **`replaceTop(route)`:** 현재 탭 맨 위 칸을 새 id의 칸으로 바꾸고(`sourceKey`는 이어 받음) `WLNavTransition.Replace`로 cross-fade한다(200ms, 디자인 값이 없어 `dialogIn`에 맞춘 구현 기본값). 탭 첫 화면이거나 전환 중이면 false. 로컬 대기 상세가 서버 항목으로 옮겨질 때(`MovedTo`) 쓴다.
+- **칸별 ViewModelStore:** `WLNavigator`가 pop·끌어서 뒤로 확정·`replaceTop`·`dropAccountScoped`로 빠진 칸 id를 snapshot 목록에 모으고 `drainRemoved()`로 한 번씩 내보낸다(저장하지 않는다). `WLEntryViewModelStores`(Activity ViewModelStore의 ViewModel, 구성 변경 동안 유지)가 id마다 `ViewModelStore`를 갖고, `WLNavHost`가 칸마다 `LocalWLEntryViewModelStoreOwner`로 제공한다. lifecycle-viewmodel-compose가 의존성에 없어(새 의존성은 Coil 3만) Compose의 `LocalViewModelStoreOwner` 대신 자체 CompositionLocal을 두고, 화면은 `ViewModelProvider(owner, factory)`로 Presenter owner를 만든다. `WLNavHost`는 전환이 없고 빠진 id가 있을 때 `clearRemoved`로 store를 지워 떠나는 모션 동안에는 ViewModel이 살아 있다. Activity가 끝나면 `onCleared`가 남은 store를 모두 지운다.
