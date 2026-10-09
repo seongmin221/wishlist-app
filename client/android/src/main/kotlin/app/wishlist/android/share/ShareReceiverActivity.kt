@@ -62,7 +62,8 @@ class ShareReceiverActivity : ComponentActivity() {
  * One share's receive, started once per Activity instance (kept across configuration changes).
  * The save runs in the Application scope, not this ViewModel's: leaving the card early (back,
  * home, `noHistory`) never cancels a save in progress. receive waits for the runtime at most
- * 1500ms (then STORE_FAILED); a local save itself takes milliseconds.
+ * 1500ms; after that (or when the store fails) the share goes to the app's [ShareInbox] file
+ * (DEFERRED card) and is imported once the runtime is ready. A local save itself takes milliseconds.
  */
 class ShareReceiveModel(app: WishlistApplication, text: String?, online: Boolean) : ViewModel() {
     private val mutableKind = MutableStateFlow<ShareCardKind?>(null)
@@ -70,7 +71,11 @@ class ShareReceiveModel(app: WishlistApplication, text: String?, online: Boolean
 
     init {
         val submissions = app.runtime.submissions()
-        app.appScope.launch { mutableKind.value = submissions.receiveShared(text, online) }
+        app.appScope.launch {
+            val kind = submissions.receiveShared(text, online) { app.shareInbox.write(it) }
+            mutableKind.value = kind
+            if (kind == ShareCardKind.DEFERRED) app.importShareInbox()
+        }
     }
 
     companion object {

@@ -71,6 +71,7 @@
     <string name="webview_clear_line_irreversible">This can\'t be undone</string>
     <string name="webview_clear_confirm">Clear</string>
     <string name="share_saved_title">Saved to your wishlist</string>
+    <string name="share_saved_open_app">Details arrive when you open the app</string>
     <string name="share_saved_fetching">Fetching details</string>
     <string name="share_local_title">Saved on this device</string>
     <string name="share_local_line">Sign in to fetch details</string>

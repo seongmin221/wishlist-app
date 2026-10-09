@@ -16,15 +16,15 @@ class SubmissionErrorPolicyTest {
 
     /**
      * C3-D8 with Ruling 10 (NETWORK/TIMEOUT/RATE_LIMITED stop the flush) and the 2026-10-09 review
-     * (server-side failures retry by themselves after 30s). NOT_FOUND is not in the table: retryable.
+     * (server-side failures stop the flush and retry by themselves, 30s doubling). NOT_FOUND is not in the table: retryable.
      */
     private val table: Map<ErrorKind, Decision> = mapOf(
         ErrorKind.NETWORK to Decision(PENDING, null, stopFlush = true),
         ErrorKind.TIMEOUT to Decision(PENDING, null, stopFlush = true),
-        ErrorKind.SERVER to Decision(PENDING, now + 30.seconds, stopFlush = false),
-        ErrorKind.INVALID_RESPONSE to Decision(PENDING, now + 30.seconds, stopFlush = false),
-        ErrorKind.UNAVAILABLE to Decision(PENDING, now + 30.seconds, stopFlush = false),
-        ErrorKind.NOT_FOUND to Decision(PENDING, now + 30.seconds, stopFlush = false),
+        ErrorKind.SERVER to Decision(PENDING, now + 30.seconds, stopFlush = true),
+        ErrorKind.INVALID_RESPONSE to Decision(PENDING, now + 30.seconds, stopFlush = true),
+        ErrorKind.UNAVAILABLE to Decision(PENDING, now + 30.seconds, stopFlush = true),
+        ErrorKind.NOT_FOUND to Decision(PENDING, now + 30.seconds, stopFlush = true),
         ErrorKind.RATE_LIMITED to Decision(PENDING, now + 60.seconds, stopFlush = true),
         ErrorKind.SESSION_CHANGED to Decision(PENDING, null, stopFlush = true),
         ErrorKind.UNAUTHENTICATED to Decision(PENDING, null, stopFlush = true),
@@ -45,5 +45,10 @@ class SubmissionErrorPolicyTest {
     @Test fun rateLimitedWaitsAtLeastOneSecond() {
         val decision = SubmissionErrorPolicy.decide(ClientError(ErrorKind.RATE_LIMITED, retryAfterSeconds = 0), now)
         assertEquals(Decision(PENDING, now + 1.seconds, stopFlush = true), decision)
+    }
+
+    @Test fun serverSideWaitsDoubleUpTo15Minutes() {
+        val waits = (1..8).map { SubmissionErrorPolicy.decide(ClientError(ErrorKind.SERVER), now, serverFailures = it).retryAfter }
+        assertEquals(listOf(30, 60, 120, 240, 480, 900, 900, 900).map { now + it.seconds }, waits)
     }
 }

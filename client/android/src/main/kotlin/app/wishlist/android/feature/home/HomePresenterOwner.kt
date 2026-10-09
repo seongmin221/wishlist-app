@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.StateFlow
 class HomePresenterOwner(private val presenter: HomePresenter) : ViewModel() {
     val state: StateFlow<HomeState> get() = presenter.state
 
+    /** Recomputes relative times; `HomeScreen` calls it every minute while it is shown. */
+    fun tick() = presenter.tick()
+
     /** Pull to refresh. */
     fun refresh() = presenter.refresh()
 

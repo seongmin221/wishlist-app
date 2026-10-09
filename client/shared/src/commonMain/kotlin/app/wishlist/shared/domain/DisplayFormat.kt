@@ -28,10 +28,7 @@ object DisplayFormat {
 
     /** Lowercase host without a leading "www."; the first 40 characters of [url] if it has no host. */
     fun host(url: String): String {
-        val schemeEnd = url.indexOf("://")
-        if (schemeEnd < 0) return url.take(FALLBACK_LENGTH)
-        val authority = url.substring(schemeEnd + 3).takeWhile { it != '/' && it != '?' && it != '#' }
-        val host = authority.substringAfterLast('@').substringBefore(':').lowercase().removePrefix("www.")
+        val host = ShareTextParser.hostOf(url).lowercase().removePrefix("www.")
         return host.ifEmpty { url.take(FALLBACK_LENGTH) }
     }
 

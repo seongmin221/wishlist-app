@@ -147,6 +147,32 @@ final class InboxWriterReaderTests: XCTestCase {
         XCTAssertEqual(try names(), [".tmp-\(key)", "README.txt"], "an in-progress write is never touched")
     }
 
+    /// The extension ended between the atomic temporary write and the rename: once stale, the
+    /// temporary file is moved into place and imported (it is complete; `.atomic` wrote it).
+    func testStaleTemporaryWriteIsRecoveredAndImported() async throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let key = "f0000000-0000-4000-8000-000000000007"
+        let temporary = directory.appendingPathComponent(".tmp-\(key)")
+        try JSONEncoder().encode(record(key)).write(to: temporary)
+        let written = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: temporary.path)[.modificationDate] as? Date)
+
+        var reader = ShareInboxReader(directory: directory)
+        reader.now = { written.addingTimeInterval(ShareInboxReader.staleTemporaryAge - 1) }
+        let fresh = await reader.importPending { _ in InboxImportResult(deletable: [], retained: []) }
+        XCTAssertEqual(fresh.recovered, [], "a write still in its first minute is left alone")
+        XCTAssertEqual(try names(), [".tmp-\(key)"])
+
+        reader.now = { written.addingTimeInterval(ShareInboxReader.staleTemporaryAge + 1) }
+        var offered: [String] = []
+        let outcome = await reader.importPending { records in
+            offered = records.map(\.clientSubmissionId)
+            return InboxImportResult(deletable: offered, retained: [])
+        }
+        XCTAssertEqual(outcome.recovered, [key])
+        XCTAssertEqual(offered, [key])
+        XCTAssertEqual(try names(), [])
+    }
+
     func testMissingDirectoryOrContainerReadsNothing() async {
         var called = false
         let missing = await ShareInboxReader(directory: directory).importPending { _ in

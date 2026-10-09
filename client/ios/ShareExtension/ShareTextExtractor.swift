@@ -10,7 +10,8 @@ enum ShareExtraction: Equatable {
 /// The share extension's copy of Kotlin `ShareTextParser` (C3-D4); the extension does not link
 /// Shared, so the rule is written twice and pinned by the same test vectors on both sides:
 /// first match of `https?://[^\s<>"'　]+` (case-insensitive), trailing `.,;:!?` and unpaired
-/// closing brackets trimmed repeatedly, an empty host is no link, more than 2048 UTF-16 units is
+/// closing brackets trimmed repeatedly (one pass, bracket counts kept current), an empty host
+/// (authority without userinfo and port, Kotlin `hostOf`) is no link, more than 2048 UTF-16 units is
 /// too long. Case and percent-encoding are kept (normalization is the server's job).
 enum ShareTextExtractor {
     static let maxUrlLength = 2048
@@ -42,23 +43,37 @@ enum ShareTextExtractor {
         guard let match = link.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)) else { return .noLink }
         // UTF-16 units throughout, like Kotlin `Char`/`String.length`.
         let url = trimTrailing(Array(ns.substring(with: match.range).utf16))
-        let afterScheme = url.firstIndex(of: unit(":")).map { url[($0 + 3)...] } ?? []
-        let host = afterScheme.prefix { !hostEnd.contains($0) }
-        if host.isEmpty { return .noLink }
+        if host(of: url).isEmpty { return .noLink }
         let value = String(decoding: url, as: UTF16.self)
         if (value as NSString).length > maxUrlLength { return .tooLong }
         return .link(value)
     }
 
-    private static func trimTrailing(_ candidate: [UInt16]) -> [UInt16] {
-        var url = candidate
-        while let last = url.last, isTrimmable(last, in: url) { url.removeLast() }
-        return url
+    /// The authority after `://` up to `/ ? #`, without userinfo (up to the last `@`) and port.
+    private static func host(of url: [UInt16]) -> ArraySlice<UInt16> {
+        guard let colon = url.firstIndex(of: unit(":")), colon + 3 <= url.count else { return [] }
+        let authority = url[(colon + 3)...].prefix { !hostEnd.contains($0) }
+        let afterUser = authority.lastIndex(of: unit("@")).map { authority[($0 + 1)...] } ?? authority
+        return afterUser.prefix { $0 != unit(":") }
     }
 
-    private static func isTrimmable(_ last: UInt16, in url: [UInt16]) -> Bool {
-        if trailingPunctuation.contains(last) { return true }
-        guard let opener = openerOf[last] else { return false }
-        return url.filter { $0 == opener }.count < url.filter { $0 == last }.count
+    /// Linear: each bracket's count is taken once and kept current as closers are dropped.
+    private static func trimTrailing(_ candidate: [UInt16]) -> [UInt16] {
+        let brackets = Set(openerOf.keys).union(openerOf.values)
+        var count: [UInt16: Int] = [:]
+        for unit in candidate where brackets.contains(unit) { count[unit, default: 0] += 1 }
+        var end = candidate.count
+        while end > 0 {
+            let last = candidate[end - 1]
+            if trailingPunctuation.contains(last) {
+                end -= 1
+            } else if let opener = openerOf[last], count[opener, default: 0] < count[last, default: 0] {
+                count[last, default: 0] -= 1
+                end -= 1
+            } else {
+                break
+            }
+        }
+        return Array(candidate[..<end])
     }
 }

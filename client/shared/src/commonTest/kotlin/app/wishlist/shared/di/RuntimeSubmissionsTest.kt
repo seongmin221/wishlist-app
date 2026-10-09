@@ -43,13 +43,13 @@ class RuntimeSubmissionsTest {
         assertSame(submissions, runtime.submissions())
         assertEquals(ShareCardKind.LOCAL, submissions.receiveShared("공유 $LINK", online = true))
         advanceUntilIdle()
-        assertEquals(1, submissions.view.value.local.size)
+        assertEquals(1, submissions.view.value!!.local.size)
 
         runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         advanceUntilIdle()
         assertTrue(runtime.localStore().pending().successValue().isEmpty())
-        assertEquals("fake-google-0001", submissions.view.value.accountId)
-        assertEquals(LINK, submissions.view.value.processing.single().sourceUrl)
+        assertEquals("fake-google-0001", submissions.view.value!!.accountId)
+        assertEquals(LINK, submissions.view.value!!.processing.single().sourceUrl)
         runtime.close()
     }
 
@@ -62,14 +62,14 @@ class RuntimeSubmissionsTest {
         val submissions = runtime.submissions()
         assertEquals(ShareCardKind.SAVED, submissions.receiveShared(LINK, online = true))
         advanceUntilIdle()
-        assertEquals(1, submissions.view.value.processing.size)
+        assertEquals(1, submissions.view.value!!.processing.size)
 
         now += 4.seconds
         submissions.refresh()
-        assertEquals(1, submissions.view.value.processing.size)
+        assertEquals(1, submissions.view.value!!.processing.size)
         now += 1.seconds
         submissions.refresh()
-        assertTrue(submissions.view.value.processing.isEmpty())
+        assertTrue(submissions.view.value!!.processing.isEmpty())
         runtime.close()
     }
 
@@ -139,7 +139,7 @@ class RuntimeSubmissionsTest {
         runCurrent()
         assertNull(runtime.bootstrapFailure.value)
         assertTrue(runtime.ready.value)
-        val row = submissions.view.value.local.single()
+        val row = submissions.view.value!!.local.single()
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
         assertEquals(ErrorKind.UNAVAILABLE, row.lastSubmissionError?.kind)
         assertEquals(SUBMISSION_STEP_FAILURE, row.lastSubmissionError?.code)
@@ -148,7 +148,7 @@ class RuntimeSubmissionsTest {
         explode = false
         submissions.refresh()
         assertTrue(runtime.localStore().pending().successValue().isEmpty())
-        assertEquals(1, submissions.view.value.processing.size)
+        assertEquals(1, submissions.view.value!!.processing.size)
         assertNull(runtime.bootstrapFailure.value)
         runtime.close()
     }

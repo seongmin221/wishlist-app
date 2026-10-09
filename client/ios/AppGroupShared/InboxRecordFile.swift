@@ -9,7 +9,8 @@ import Foundation
 struct InboxRecordFile: Codable, Equatable {
     static let version = 1
     static let fileExtension = "json"
-    /// In-progress writes (`inbox/.tmp-<key>`); readers never touch them.
+    /// In-progress writes (`inbox/.tmp-<key>`); the app moves one into place only once it is stale
+    /// (`ShareInboxReader.staleTemporaryAge`).
     static let temporaryPrefix = ".tmp-"
 
     let v: Int

@@ -59,6 +59,7 @@ data class ShareCardContent(@param:StringRes val title: Int, @param:StringRes va
             ShareCardKind.LOCAL -> ShareCardContent(R.string.share_local_title, R.string.share_local_line, WLLineIcon.ClockBold, ShareCardTone.PENDING)
             ShareCardKind.OFFLINE -> ShareCardContent(R.string.share_local_title, R.string.share_offline_line, WLLineIcon.CloudOff, ShareCardTone.OFFLINE)
             ShareCardKind.INVALID -> ShareCardContent(R.string.share_invalid_title, R.string.share_invalid_line, WLLineIcon.Warning, ShareCardTone.FAILED)
+            ShareCardKind.DEFERRED -> ShareCardContent(R.string.share_saved_title, R.string.share_saved_open_app, WLLineIcon.CheckBold, ShareCardTone.DONE)
             ShareCardKind.STORE_FAILED -> ShareCardContent(R.string.share_failed_title, R.string.share_failed_line, WLLineIcon.Warning, ShareCardTone.FAILED)
         }
     }

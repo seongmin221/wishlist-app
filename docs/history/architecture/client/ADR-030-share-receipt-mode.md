@@ -54,6 +54,10 @@
 - iOS가 공유 확장의 투명 표시를 공개 API로 허용하면 시트 바탕색을 없앤다.
 - 확장에서 공유 외 입력(이미지 등)을 받아야 하면 inbox 형식 버전을 올린다(`v`가 1이 아닌 파일은 앱이 건드리지 않는다).
 
+## 보완 (2026-10-09, PR #12 3차 리뷰)
+
+Android 즉시 저장은 runtime ready를 1500ms까지만 기다려, 느린 콜드 스타트에서는 링크가 어디에도 남지 않았다. 사용자 결정으로 그때(또는 저장 실패 때) Android도 iOS처럼 공유 1건을 앱 파일 inbox(`filesDir/share-inbox`)에 미귀속 record로 남기고 "위시리스트에 저장했어요 / 앱을 열면 정보를 가져와요" 카드를 보인다. 가져오기는 iOS와 같은 `SubmissionCoordinator.importInbox`다. 평소 경로(1500ms 안 저장·즉시 전송)는 바뀌지 않는다. iOS reader는 확장이 쓰기와 이름 바꾸기 사이에 끝나 남긴 임시 파일을 60초 뒤 복구한다.
+
 ## 관련 문서
 
 - [iOS 구조 C3 절](../../../architecture/client/ios.md#공유-확장inbox로그인홈설정-c3), [Android 구조 C3 절](../../../architecture/client/android.md#공유-수신로그인홈설정-c3)

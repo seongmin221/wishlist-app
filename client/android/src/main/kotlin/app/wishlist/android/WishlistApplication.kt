@@ -5,11 +5,13 @@ import app.wishlist.android.di.AppRuntimeConfig
 import app.wishlist.android.di.VariantStartup
 import app.wishlist.android.platform.ForegroundSignals
 import app.wishlist.android.platform.NetworkSignals
+import app.wishlist.android.share.ShareInbox
 import app.wishlist.shared.di.SharedRuntime
 import app.wishlist.shared.di.SharedRuntimeFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Owns the process's single shared runtime (isolated graph, one auth session) and the app-wide
@@ -26,6 +28,17 @@ class WishlistApplication : Application() {
      */
     val appScope: CoroutineScope = MainScope()
 
+    /** Shares not stored in time (cold start): imported once the runtime is ready. */
+    val shareInbox: ShareInbox by lazy { ShareInbox(File(filesDir, "share-inbox")) }
+
+    /** Imports [shareInbox] (it waits for ready) and asks for a flush when something came in. */
+    fun importShareInbox() {
+        val submissions = runtime.submissions()
+        appScope.launch {
+            if (shareInbox.importPending { submissions.importInbox(it) }.isNotEmpty()) submissions.requestFlush()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         runtime = SharedRuntimeFactory.create(this, AppRuntimeConfig.bindings(BuildConfig.DEBUG), AppRuntimeConfig.remote)
@@ -36,5 +49,6 @@ class WishlistApplication : Application() {
             ForegroundSignals { appScope.launch { submissions.refresh() } },
         )
         NetworkSignals(this) { submissions.requestFlush() }.start()
+        importShareInbox() // what a previous process deferred
     }
 }

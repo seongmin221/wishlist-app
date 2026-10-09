@@ -7,7 +7,12 @@ import app.wishlist.shared.model.WishlistItem
  * The card shown right after an Android share, decided by the state at that moment (C3-D9). The iOS
  * extension does not link Shared and has its own Swift enum (with SAVED_OPEN_APP).
  */
-enum class ShareCardKind { SAVED, LOCAL, OFFLINE, INVALID, STORE_FAILED }
+enum class ShareCardKind {
+    SAVED, LOCAL, OFFLINE, INVALID, STORE_FAILED,
+
+    /** Not stored in time (cold start) or the store failed: kept as an inbox record the app imports later. */
+    DEFERRED,
+}
 
 /** One iOS app-group inbox file (`inbox/<key>.json`), as written by the share extension. */
 data class InboxRecord(

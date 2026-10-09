@@ -41,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -197,7 +198,7 @@ internal class CoordinatorHarness(
         dispatcher = dispatcher,
     )
 
-    val view: SubmissionView get() = coordinator.view.value
+    val view: SubmissionView get() = checkNotNull(coordinator.view.value) { "no view before ready" }
 
     suspend fun signIn(provider: AuthProvider = AuthProvider.GOOGLE) {
         auth.signIn(provider).successValue()
@@ -250,11 +251,12 @@ class SubmissionCoordinatorTest {
     // --- receiveShared: card kinds -----------------------------------------------------------
 
     @Test fun loggedOutShareIsLocalUnboundAndNotSent() = runCoordinatorTest { h ->
+        val sharedAt = h.clock.now()
         assertEquals(ShareCardKind.LOCAL, h.share(online = true))
         val row = h.pending().single()
         assertEquals(LINK, row.sourceUrl)
         assertNull(row.accountBinding)
-        assertEquals(baseTime, row.sharedAt)
+        assertEquals(sharedAt, row.sharedAt)
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
         assertTrue(h.create.calls.isEmpty())
         assertNull(h.view.accountId)
@@ -472,7 +474,7 @@ class SubmissionCoordinatorTest {
         advanceUntilIdle()
         assertEquals(listOf(UUID_A), h.keysSent())
         assertTrue(h.pending().isEmpty())
-        assertEquals(1, restarted.view.value.processing.size)
+        assertEquals(1, restarted.view.value!!.processing.size)
     }
 
     @Test fun responseLossThenResendDoesNotDuplicate() = runCoordinatorTest { h ->
@@ -508,11 +510,12 @@ class SubmissionCoordinatorTest {
     @Test fun rateLimitedResendsByItselfOnceRetryAfterEnds() = runCoordinatorTest { h ->
         h.signIn()
         h.create.fail(ClientError(ErrorKind.RATE_LIMITED, retryAfterSeconds = 30))
+        val at = h.clock.now()
         h.coordinator.receiveShared(LINK, online = true)
         runCurrent()
         val row = h.pending().single()
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
-        assertEquals(baseTime + 30.seconds, row.retryAfter)
+        assertEquals(at + 30.seconds, row.retryAfter)
 
         advanceTimeBy(29_000)
         h.coordinator.requestFlush()
@@ -542,23 +545,43 @@ class SubmissionCoordinatorTest {
         h.signIn()
         h.share(online = false)
         h.share(online = false)
-        h.create.fail(ClientError(ErrorKind.SERVER))
-        h.create.fail(ClientError(ErrorKind.SERVER))
-        h.coordinator.requestFlush()
-        runCurrent()
-        assertEquals(2, h.create.calls.size)
+        val (first, second) = h.pending()
+        // The second row waits for a server-side retry recorded earlier (e.g. by a previous process).
+        h.store.markSubmission(h.session.state.value, second.clientSubmissionId, SubmissionStatus.PENDING,
+            ClientError(ErrorKind.SERVER), baseTime + 30.seconds).successValue()
 
-        // 5s later the first row hits NETWORK and stops the flush before the second row.
-        advanceTimeBy(5_000)
+        // The first row hits NETWORK and stops the flush before the second row.
         h.create.fail(ClientError(ErrorKind.NETWORK))
         h.coordinator.requestFlush()
         runCurrent()
-        assertEquals(3, h.create.calls.size)
+        assertEquals(listOf(first.clientSubmissionId), h.keysSent())
 
         // The second row's 30s wait still resends both, with no other trigger.
-        advanceTimeBy(25_001)
+        advanceTimeBy(30_001)
         runCurrent()
-        assertEquals(5, h.create.calls.size)
+        assertEquals(3, h.create.calls.size)
+        assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun serverErrorsBackOffAndStopTheFlush() = runCoordinatorTest { h ->
+        h.signIn()
+        repeat(3) { h.share(online = false) }
+        repeat(3) { h.create.fail(ClientError(ErrorKind.SERVER)) }
+        h.coordinator.requestFlush()
+        runCurrent()
+        assertEquals(1, h.create.calls.size) // one request per attempt, not the whole queue
+
+        // Waits double: 30s, then 60s, then 120s.
+        advanceTimeBy(30_001); runCurrent()
+        assertEquals(2, h.create.calls.size)
+        advanceTimeBy(59_000); runCurrent()
+        assertEquals(2, h.create.calls.size)
+        advanceTimeBy(1_001); runCurrent()
+        assertEquals(3, h.create.calls.size)
+        advanceTimeBy(119_000); runCurrent()
+        assertEquals(3, h.create.calls.size)
+        advanceTimeBy(1_001); runCurrent()
+        assertEquals(6, h.create.calls.size) // the server is back: the whole queue goes
         assertTrue(h.pending().isEmpty())
     }
 
@@ -586,11 +609,12 @@ class SubmissionCoordinatorTest {
     @Test fun serverErrorResendsByItselfAfter30s() = runCoordinatorTest { h ->
         h.signIn()
         h.create.fail(ClientError(ErrorKind.SERVER))
+        val at = h.clock.now()
         h.coordinator.receiveShared(LINK, online = true)
         runCurrent()
         val row = h.pending().single()
         assertEquals(ErrorKind.SERVER, row.lastSubmissionError?.kind)
-        assertEquals(baseTime + 30.seconds, row.retryAfter)
+        assertEquals(at + 30.seconds, row.retryAfter)
 
         advanceTimeBy(30_001)
         runCurrent()
@@ -816,7 +840,7 @@ class SubmissionCoordinatorTest {
         h.signIn()
         h.share(online = false)
         val seen = mutableListOf<SubmissionView>()
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { h.coordinator.view.collect { seen += it } }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { h.coordinator.view.collect { v -> v?.let { seen += it } } }
         // A view computation reads the queue, then (while it reads the cache) the send is accepted.
         val queueRead = CompletableDeferred<Unit>()
         val gate = CompletableDeferred<Unit>()
@@ -866,6 +890,68 @@ class SubmissionCoordinatorTest {
         assertTrue(h.pending().isEmpty())
         // The share's queued request is not a second flush once the lookups ran one for it.
         assertEquals(1, h.store.prepareFlushCalls - flushesBefore)
+    }
+
+    @Test fun slowSendsRecomputeTheViewABoundedNumberOfTimes() = runCoordinatorTest { h ->
+        h.signIn()
+        val keys = List(100) { "00000000-0000-4000-9000-" + it.toString().padStart(12, '0') }
+        keys.forEachIndexed { i, key ->
+            h.store.saveSubmission(submission(id = key, binding = GOOGLE_ID, sharedAt = baseTime + i.seconds)).successValue()
+        }
+        repeat(100) { h.create.then { real -> delay(50); real() } } // 5s of sends in all
+        h.store.pendingCalls = 0
+
+        h.flush()
+
+        assertEquals(keys, h.keysSent())
+        // One recompute per 200ms at most while sending (~25), not one per row (>= 100).
+        assertTrue(h.store.pendingCalls <= 30, "pending() calls: ${h.store.pendingCalls}")
+        assertTrue(h.view.local.isEmpty())
+    }
+
+    @Test fun noViewBeforeReadyEvenWhenTheAccountIsRestoredFirst() = runCoordinatorTest(ready = false) { h ->
+        h.storeHarness.login(GOOGLE_ID) // the DEBUG restore signs in before ready
+        advanceUntilIdle()
+        assertNull(h.coordinator.view.value) // not an empty "0 to-dos" list
+        h.ready.value = true
+        advanceUntilIdle()
+        assertEquals(GOOGLE_ID, h.view.accountId)
+    }
+
+    @Test fun shareNotStoredInTimeIsDeferredUnbound() = runCoordinatorTest(ready = false) { h ->
+        val deferred = mutableListOf<InboxRecord>()
+        val start = h.clock.now()
+        val card = async { h.coordinator.receiveShared("보세요 $LINK", online = true) { deferred += it; true } }
+        advanceTimeBy(1_501)
+        runCurrent()
+        assertEquals(ShareCardKind.DEFERRED, card.await())
+        val record = deferred.single()
+        assertEquals(LINK, record.sourceUrl)
+        assertNull(record.accountBinding)
+        assertEquals(start + 1_500.milliseconds, Instant.parse(record.sharedAtIso))
+        assertTrue(h.storeHarness.store.pending().successValue().isEmpty())
+
+        // Once ready, importing it stores the share (as unbound).
+        h.ready.value = true
+        assertEquals(listOf(record.clientSubmissionId), h.coordinator.importInbox(deferred).deletable)
+        assertEquals(LINK, h.pending().single().sourceUrl)
+    }
+
+    @Test fun storeFailureIsDeferredAndAFailedDeferIsStoreFailed() = runCoordinatorTest(store = ::failingStore) { h ->
+        assertEquals(ShareCardKind.DEFERRED, h.coordinator.receiveShared(LINK, online = true) { true })
+        assertEquals(ShareCardKind.STORE_FAILED, h.coordinator.receiveShared(LINK, online = true) { false })
+        assertEquals(ShareCardKind.STORE_FAILED, h.coordinator.receiveShared(LINK, online = true) { error("disk full") })
+    }
+
+    @Test fun rowsWithValuesThisBuildDoesNotKnowStillReadAndSend() = runCoordinatorTest { h ->
+        h.share(online = false)
+        h.storeHarness.driver.execute(null, "UPDATE local_submission SET status = 'ARCHIVED_V9', error_kind = 'MYSTERY'", 0)
+        val row = h.pending().single()
+        assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
+        assertNull(row.lastSubmissionError)
+        h.signIn()
+        assertTrue(h.pending().isEmpty())
+        assertEquals(1, h.view.processing.size)
     }
 
     @Test fun viewOrdersProcessingByCreatedAtThenId() = runCoordinatorTest { h ->

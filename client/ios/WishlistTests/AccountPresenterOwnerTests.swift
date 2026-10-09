@@ -99,8 +99,8 @@ final class HomePresenterOwnerTests: XCTestCase {
         defer { owner.close() }
         let submissions = runtime.submissions()
         let url = "https://shop.example/ios-refresh-await-\(UUID().uuidString)"
-        func queued() -> Bool { submissions.view.value.local.contains { $0.sourceUrl == url } }
-        _ = try await submissions.receiveShared(text: url, online: false)
+        func queued() -> Bool { submissions.view.value?.local.contains { $0.sourceUrl == url } ?? false }
+        _ = try await submissions.receiveShared(text: url, online: false, defer: { _ in false })
         XCTAssertTrue(queued())
 
         // The pending row's ITEM-01 is held 800ms; the refresh sends it before returning.

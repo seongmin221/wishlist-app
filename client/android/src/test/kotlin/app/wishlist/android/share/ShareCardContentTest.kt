@@ -14,6 +14,7 @@ class ShareCardContentTest {
             ShareCardKind.OFFLINE to (R.string.share_local_title to R.string.share_offline_line),
             ShareCardKind.INVALID to (R.string.share_invalid_title to R.string.share_invalid_line),
             ShareCardKind.STORE_FAILED to (R.string.share_failed_title to R.string.share_failed_line),
+            ShareCardKind.DEFERRED to (R.string.share_saved_title to R.string.share_saved_open_app),
         )
         assertEquals(ShareCardKind.entries.toSet(), expected.keys)
         expected.forEach { (kind, copy) ->

@@ -28,7 +28,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         val entries = mutableMapOf<String, Entry>()
         val submissionIds = mutableMapOf<String, String>()
         /** Item keys are canonical UUID strings, so platform casing never splits one item in two. */
-        fun entry(id: String): Entry? = uuidOrNull(id)?.let(entries::get)
+        fun entry(id: String): Entry? = canonicalUuidOrNull(id)?.let(entries::get)
         var categories: List<Category> = emptyList()
         var purposes: List<Purpose> = emptyList()
         var seeded = false
@@ -71,7 +71,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
 
     suspend fun create(command: CreateItemCommand, expected: SessionSnapshot? = null): ClientResult<WishlistItem> =
         request(ApiId.ITEM_01, expected) { owner ->
-        val key = uuidOrNull(command.submissionId)
+        val key = canonicalUuidOrNull(command.submissionId)
             ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
         val previous = owner.submissionIds[key]?.let { owner.entries.getValue(it).item }
         if (previous != null) {
@@ -95,7 +95,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     }
 
     suspend fun get(id: String): ClientResult<WishlistItem> = request(ApiId.ITEM_03) { owner ->
-        val key = uuidOrNull(id) ?: return@request invalidItemId()
+        val key = canonicalUuidOrNull(id) ?: return@request invalidItemId()
         val item = owner.entries[key]?.item
         if (item == null || item.lifecycleStatus == LifecycleStatus.DELETED)
             failure(ErrorKind.NOT_FOUND, "WISHLIST_ITEM_NOT_FOUND")
@@ -107,8 +107,8 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         if (owner.seeded) return@request ClientResult.Success(Unit)
         // Store keys use the same canonical form as every lookup; reject before any partial write.
         val items = data.items.map { item ->
-            val id = uuidOrNull(item.id) ?: return@request invalidItemId()
-            val key = uuidOrNull(item.clientSubmissionId)
+            val id = canonicalUuidOrNull(item.id) ?: return@request invalidItemId()
+            val key = canonicalUuidOrNull(item.clientSubmissionId)
                 ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
             item.copy(id = id, clientSubmissionId = key)
         }
@@ -291,10 +291,9 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     private fun <T> Patch<T>.valueOr(original: T): T = when(this) { Patch.Unchanged -> original; is Patch.Set -> value }
     private fun notFound() = failure(ErrorKind.NOT_FOUND)
     private fun invalidItemId() = failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_ID")
-    private fun missing(id: String) = if (uuidOrNull(id) == null) invalidItemId() else notFound()
+    private fun missing(id: String) = if (canonicalUuidOrNull(id) == null) invalidItemId() else notFound()
     private fun conflict(item: WishlistItem) = failure(ErrorKind.CONFLICT, currentVersion = item.version)
     private fun failure(kind: ErrorKind, code: String? = null, currentVersion: Int? = null) =
         ClientResult.Failure(ClientError(kind, code, currentVersion = currentVersion))
 }
 
-private fun uuidOrNull(value: String): String? = canonicalUuidOrNull(value)

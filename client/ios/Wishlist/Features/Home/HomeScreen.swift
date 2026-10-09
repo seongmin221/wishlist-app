@@ -25,6 +25,13 @@ struct HomeScreen: View {
         }
         .modifier(HomeRefresh(enabled: state is HomeStateLoggedIn, home: home))
         .background(c.background)
+        // "방금" → "1분 전" while the screen stays open (ends when the screen goes away).
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                home.tick()
+            }
+        }
     }
 
     private func caption(_ state: HomeState) -> String? {

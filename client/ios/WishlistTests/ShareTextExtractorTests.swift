@@ -15,6 +15,9 @@ final class ShareTextExtractorTests: XCTestCase {
         ("상품\u{3000}https://a.example/1\u{3000}끝", .link("https://a.example/1")),
         ("ftp://a.example/1", .noLink),
         ("https://", .noLink),
+        ("https://@/x", .noLink),
+        ("https://user@:8080/p", .noLink),
+        ("https://user@shop.example/p", .link("https://user@shop.example/p")),
         ("그냥 글이에요", .noLink),
         ("", .noLink),
         (nil, .noLink),
@@ -32,6 +35,13 @@ final class ShareTextExtractorTests: XCTestCase {
         XCTAssertEqual(ShareTextExtractor.extract("「https://a.example/p」!"), .link("https://a.example/p"))
         XCTAssertEqual(ShareTextExtractor.extract("https://a.example/p(1))."), .link("https://a.example/p(1)"))
         XCTAssertEqual(ShareTextExtractor.extract("https://a.example/p%20q?!"), .link("https://a.example/p%20q"))
+    }
+
+    /// Trimming is one pass: a link followed by 100k closers used to stall the extension's main thread.
+    func testManyTrailingClosersAreTrimmedInLinearTime() {
+        let started = Date()
+        XCTAssertEqual(ShareTextExtractor.extract("https://a.example/p" + String(repeating: ")", count: 100_000)), .link("https://a.example/p"))
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2)
     }
 
     func testEmptyHostAfterTrimmingIsNoLink() {

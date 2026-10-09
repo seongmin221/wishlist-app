@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Instant
 
@@ -23,15 +24,17 @@ import kotlin.time.Instant
  * Home list over the login state and the [SubmissionView]. Only a view that belongs to the
  * current account is shown: while the account and the view disagree (an account switch passes
  * through signed out, and the view follows later) the state is Loading or LoggedOut, never rows
- * of the other account. Relative times are recomputed on every state update and after every
- * coordinator refresh run ([refreshes], any trigger, also when no data changed).
+ * of the other account; before the coordinator's first view (store not ready) it is Loading too.
+ * Relative times are recomputed on every state update, after every coordinator refresh run
+ * ([refreshes], any trigger, also when no data changed) and on [tick] (the platform calls it every
+ * minute while the home screen is shown).
  *
  * Foreground refresh is app-wide (the platform asks the coordinator directly); this Presenter
  * only reacts to the view. [close] cancels everything, is idempotent, and later intents are ignored.
  */
 class HomePresenter internal constructor(
     private val auth: AuthFacade,
-    view: StateFlow<SubmissionView>,
+    view: StateFlow<SubmissionView?>,
     refreshes: StateFlow<Long>,
     private val runRefresh: suspend () -> Unit,
     private val clock: Clock,
@@ -56,6 +59,11 @@ class HomePresenter internal constructor(
         }
     }
 
+    /** Recomputes relative times ("방금" → "1분 전") without new data. Returns at once. */
+    fun tick() {
+        recompute.update { it + 1 }
+    }
+
     /** Pull-to-refresh: shows [HomeState.LoggedIn.refreshing] until the refresh finished. Returns at once. */
     fun refresh() {
         scope.launch { userRefresh() }
@@ -78,7 +86,7 @@ class HomePresenter internal constructor(
             runRefresh()
         } finally {
             refreshing.value = false
-            recompute.value++
+            recompute.update { it + 1 }
         }
     }
 
@@ -86,8 +94,8 @@ class HomePresenter internal constructor(
         scope.cancel()
     }
 
-    private fun compose(restored: Boolean, account: AuthAccount?, view: SubmissionView, busy: Boolean): HomeState {
-        if (!restored) return HomeState.Loading
+    private fun compose(restored: Boolean, account: AuthAccount?, view: SubmissionView?, busy: Boolean): HomeState {
+        if (!restored || view == null) return HomeState.Loading
         val now = clock.now()
         fun row(key: String, url: String, at: Instant, status: RowStatus) =
             HomeRow(key, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, utcOffsetSeconds), status)

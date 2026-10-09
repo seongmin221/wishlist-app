@@ -56,7 +56,7 @@ class RuntimeDebugControlsTest {
         assertTrue(rows.zipWithNext().all { (a, b) -> a.sharedAt < b.sharedAt })
         assertTrue(rows.last().sharedAt <= runtimeTime)
         // The home view picks them up without another signal.
-        assertEquals(rows, runtime.submissions().view.value.local)
+        assertEquals(rows, runtime.submissions().view.value!!.local)
         runtime.close()
     }
 
@@ -106,13 +106,13 @@ class RuntimeDebugControlsTest {
         advanceTimeBy(1_001)
         advanceUntilIdle()
         assertTrue(runtime.localStore().pending().successValue().isEmpty())
-        assertEquals(1, submissions.view.value.processing.size)
+        assertEquals(1, submissions.view.value!!.processing.size)
 
         // Consumed: the next share is sent at once.
         assertEquals(ShareCardKind.SAVED, submissions.receiveShared("https://shop.example/p/2", online = true))
         runCurrent()
         assertTrue(runtime.localStore().pending().successValue().isEmpty())
-        assertEquals(2, submissions.view.value.processing.size)
+        assertEquals(2, submissions.view.value!!.processing.size)
         runtime.close()
     }
 }

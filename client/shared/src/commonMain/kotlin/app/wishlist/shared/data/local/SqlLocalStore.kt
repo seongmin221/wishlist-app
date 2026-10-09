@@ -271,12 +271,17 @@ private fun LocalSubmission.toRow() = Local_submission(
     error_retry_after_seconds = lastSubmissionError?.retryAfterSeconds,
 )
 
+/**
+ * A value this build does not know (a newer build's status or error kind, or one the v1 migration
+ * carried over) must not make the whole queue unreadable: an unknown status reads as PENDING (resent
+ * with its own key, so the server dedupes it) and an unknown error kind as no recorded error.
+ */
 private fun Local_submission.toModel() = LocalSubmission(
     clientSubmissionId = client_submission_id, sourceUrl = source_url, sharedAt = instantOfEpochMicros(shared_at_us),
-    accountBinding = account_binding, submissionStatus = SubmissionStatus.valueOf(status),
-    lastSubmissionError = error_kind?.let {
-        ClientError(ErrorKind.valueOf(it), error_code, error_request_id,
-            error_current_version?.toInt(), error_retry_after_seconds)
+    accountBinding = account_binding,
+    submissionStatus = SubmissionStatus.entries.firstOrNull { it.name == status } ?: SubmissionStatus.PENDING,
+    lastSubmissionError = error_kind?.let { name -> ErrorKind.entries.firstOrNull { it.name == name } }?.let {
+        ClientError(it, error_code, error_request_id, error_current_version?.toInt(), error_retry_after_seconds)
     },
     retryAfter = retry_after_us?.let(::instantOfEpochMicros),
 )

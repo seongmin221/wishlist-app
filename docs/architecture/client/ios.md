@@ -72,6 +72,7 @@
 
 ### 앱 쪽 신호·세션 미러
 
+- **inbox 중단 복구(3차 리뷰):** 확장은 `.tmp-<key>`를 `.atomic`으로 쓴 뒤 이름을 바꾼다. 그 사이에 확장이 끝나면 완전한 임시 파일이 남는데, reader는 60초(`staleTemporaryAge`) 넘은 임시 파일을 제자리로 옮겨(이미 같은 record가 있으면 지움) 다른 record처럼 가져온다(`testStaleTemporaryWriteIsRecoveredAndImported`). 홈 화면은 보이는 동안 1분마다 `HomePresenterOwner.tick()`을 불러 상대 시각을 다시 계산한다.
 - `Platform/AppSignals.swift`(Ruling 1): 실행과 background에서 돌아올 때만(`ForegroundTransitions`: 첫 `.active`와 `.background` 뒤의 `.active`. 제어 센터·알림 센터·Face ID 창의 `.inactive → .active`는 앱을 떠난 것이 아니라 제외, PR #12 2차 리뷰) inbox pass(앞 pass가 끝난 뒤 순서대로) → `refresh()`. refresh는 다음 pass가 기다리지 않는다. XCTest host(`XCTestConfigurationFilePath` 환경 변수)에서는 inbox·refresh·네트워크 신호를 모두 끈다(IOS_TEST host는 설치된 debug 앱과 같은 container·DB를 쓴다). `NetworkSignals`는 `NWPathMonitor`의 unsatisfied → satisfied 전이에서 `requestFlush()`(첫 갱신은 기준값).
 - `Platform/SessionMirror.swift`: `AccountPresenterOwner.binding`(복원 전 `unknown` / `signedOut` / `signedIn(id)`)이 바뀔 때마다 app group defaults에 `wl.session.accountBinding`을 쓰거나 지운다. 복원 전에는 지난 값을 그대로 둔다. 자격 증명이 아니다.
 

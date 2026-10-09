@@ -44,7 +44,7 @@ private fun processing(id: String, at: Instant): WishlistItem =
 
 class HomePresenterTest {
     private val auth = ScriptedAuth(seen = true)
-    private val view = MutableStateFlow(SubmissionView(null, emptyList(), emptyList()))
+    private val view = MutableStateFlow<SubmissionView?>(SubmissionView(null, emptyList(), emptyList()))
     private val refreshRuns = MutableStateFlow(0L)
     private var now = T0 + 5.minutes
     private var refreshes = 0
@@ -127,6 +127,32 @@ class HomePresenterTest {
         )
         assertEquals(state.processing.size, state.processing.map { it.key }.toSet().size)
         assertFalse(state.refreshing)
+        p.close()
+    }
+
+    @Test
+    fun loadingUntilTheCoordinatorHasAView() = runTest {
+        signIn(accountA)
+        view.value = null
+        val p = presenter()
+        advanceUntilIdle()
+        assertEquals(HomeState.Loading, p.state.value)
+        view.value = SubmissionView("A", emptyList(), emptyList())
+        advanceUntilIdle()
+        assertIs<HomeState.LoggedIn>(p.state.value)
+        p.close()
+    }
+
+    @Test
+    fun tickRecomputesRelativeTimes() = runTest {
+        view.value = SubmissionView(null, listOf(local("p", T0)), emptyList())
+        val p = presenter()
+        advanceUntilIdle()
+        assertEquals(RelativeTime.Minutes(5), assertIs<HomeState.LoggedOut>(p.state.value).pending.single().savedAt)
+        now = T0 + 65.minutes
+        p.tick()
+        advanceUntilIdle()
+        assertEquals(RelativeTime.Hours(1), assertIs<HomeState.LoggedOut>(p.state.value).pending.single().savedAt)
         p.close()
     }
 
@@ -258,7 +284,7 @@ class HomePresenterTest {
         advanceUntilIdle()
         assertEquals(RelativeTime.Minutes(20), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
         now = T0 + 30.minutes
-        view.value = view.value.copy(local = view.value.local.map { it.copy(submissionStatus = SubmissionStatus.SUBMITTING) })
+        view.value = view.value!!.copy(local = view.value!!.local.map { it.copy(submissionStatus = SubmissionStatus.SUBMITTING) })
         advanceUntilIdle()
         assertEquals(RelativeTime.Minutes(30), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
         p.close()

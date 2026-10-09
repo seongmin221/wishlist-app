@@ -2,6 +2,9 @@ package app.wishlist.shared.domain
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 /** The same inputs and expectations as Task 6's Swift `ShareTextExtractorTests` (Review Focus 3). */
 class ShareTextParserTest {
@@ -16,6 +19,9 @@ class ShareTextParserTest {
         "상품　https://a.example/1　끝" to ParsedShare.Link("https://a.example/1"),
         "ftp://a.example/1" to ParsedShare.NoLink,
         "https://" to ParsedShare.NoLink,
+        "https://@/x" to ParsedShare.NoLink,
+        "https://user@:8080/p" to ParsedShare.NoLink,
+        "https://user@shop.example/p" to ParsedShare.Link("https://user@shop.example/p"),
         "그냥 글이에요" to ParsedShare.NoLink,
         "" to ParsedShare.NoLink,
         null to ParsedShare.NoLink,
@@ -49,5 +55,19 @@ class ShareTextParserTest {
     @Test fun emptyHostAfterTrimmingIsNoLink() {
         assertEquals(ParsedShare.NoLink, ShareTextParser.parse("https://."))
         assertEquals(ParsedShare.NoLink, ShareTextParser.parse("https:///path"))
+    }
+
+    /** Trimming is one pass: a link followed by 100k closers (an extension main-thread stall before). */
+    @Test fun manyTrailingClosersAreTrimmedInLinearTime() {
+        val started = TimeSource.Monotonic.markNow()
+        assertEquals(ParsedShare.Link("https://a.example/p"), ShareTextParser.parse("https://a.example/p" + ")".repeat(100_000)))
+        assertTrue(started.elapsedNow() < 2.seconds, "took ${started.elapsedNow()}")
+    }
+
+    /** The parser and the home row read the host the same way (userinfo and port dropped). */
+    @Test fun hostIsReadLikeTheHomeRow() {
+        assertEquals("shop.example", ShareTextParser.hostOf("https://user@shop.example:8080/p"))
+        assertEquals("shop.example", DisplayFormat.host("https://user@www.Shop.example:8080/p"))
+        assertEquals("", ShareTextParser.hostOf("https://@/x"))
     }
 }

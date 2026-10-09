@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,6 +69,7 @@ import app.wishlist.android.navigation.wlTabBarBottomPadding
 import app.wishlist.android.ui.SettingsRoute
 import app.wishlist.shared.presentation.HomeRow
 import app.wishlist.shared.presentation.HomeState
+import kotlinx.coroutines.delay
 
 /**
  * 홈 탭 첫 화면(C3). 로그인 전은 FHomeLoggedOut(로그인 카드 + 분석 대기), 로그인 뒤는 FHome 틀에 "분류 중" 카드만
@@ -79,6 +81,13 @@ import app.wishlist.shared.presentation.HomeState
 fun HomeScreen() {
     val owner = LocalHomeOwner.current
     val state by owner.state.collectAsState()
+    // "방금" → "1분 전" while the screen stays composed (cancelled when it leaves).
+    LaunchedEffect(owner) {
+        while (true) {
+            delay(60_000)
+            owner.tick()
+        }
+    }
     val c = LocalWLColors.current
     val scroll = rememberScrollState()
     WLScrollToTopEffect(WLTab.Home, scroll)
