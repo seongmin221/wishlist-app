@@ -36,14 +36,15 @@ object DisplayFormat {
     }
 
     /**
-     * Without kotlinx-datetime, calendar dates come from the platform's UTC offset (seconds) for
-     * [now]; the presenter supplies it. Calendar dates win over elapsed time: 23:59 → 00:01 is
-     * Yesterday, not 2 minutes.
+     * Without kotlinx-datetime, calendar dates come from the platform's UTC offset (seconds) at a
+     * given instant; the presenter supplies it. Each instant is read with its own offset, so a
+     * daylight-saving switch between [from] and [now] does not move [from] to another date.
+     * Calendar dates win over elapsed time: 23:59 → 00:01 is Yesterday, not 2 minutes.
      */
-    fun relative(from: Instant, now: Instant, utcOffsetSeconds: Int): RelativeTime {
+    fun relative(from: Instant, now: Instant, utcOffsetSeconds: (Instant) -> Int): RelativeTime {
         val elapsed = now - from
         if (elapsed < 1.minutes) return RelativeTime.JustNow
-        val days = (localDay(now, utcOffsetSeconds) - localDay(from, utcOffsetSeconds)).toInt()
+        val days = (localDay(now, utcOffsetSeconds(now)) - localDay(from, utcOffsetSeconds(from))).toInt()
         return when {
             days >= 2 -> RelativeTime.Days(days)
             days == 1 -> RelativeTime.Yesterday

@@ -2,13 +2,16 @@
 
 package app.wishlist.shared.di
 
+import app.wishlist.shared.core.ApiId
 import app.wishlist.shared.core.AuthProvider
 import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.ErrorKind
 import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.data.fake.successValue
 import app.wishlist.shared.data.local.UUID_A
+import app.wishlist.shared.domain.RelativeTime
 import app.wishlist.shared.model.SubmissionStatus
+import app.wishlist.shared.presentation.HomeState
 import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.InboxImportResult
 import app.wishlist.shared.submission.InboxRecord
@@ -21,9 +24,11 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.Uuid
 
@@ -66,6 +71,53 @@ class RuntimeSubmissionsTest {
         now += 1.seconds
         submissions.refresh(FlushTrigger.USER_REFRESH)
         assertTrue(submissions.view.value.processing.isEmpty())
+        runtime.close()
+    }
+
+    @Test fun foregroundRefreshWithoutDataChangeRecomputesLoggedOutRelativeTime() = runTest {
+        var now = runtimeTime
+        val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler), clock = Clock { now })
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        val submissions = runtime.submissions()
+        assertEquals(ShareCardKind.LOCAL, submissions.receiveShared(LINK, online = true))
+        val home = runtime.homePresenter()
+        advanceUntilIdle()
+        assertEquals(RelativeTime.JustNow, assertIs<HomeState.LoggedOut>(home.state.value).pending.single().savedAt)
+
+        // Signed out the refresh changes nothing (equal view), yet the rows get a fresh clock.now().
+        now += 3.hours
+        submissions.refresh(FlushTrigger.FOREGROUND)
+        advanceUntilIdle()
+        assertEquals(RelativeTime.Hours(3), assertIs<HomeState.LoggedOut>(home.state.value).pending.single().savedAt)
+        home.close()
+        runtime.close()
+    }
+
+    @Test fun foregroundRefreshWithoutDataChangeRecomputesLoggedInRelativeTime() = runTest {
+        var now = runtimeTime
+        // ITEM-03 unbound: the refresh cannot change the cached PROCESSING item.
+        val runtime = createRuntime(
+            debugBindings(ApiId.ITEM_03 to Backend.UNAVAILABLE),
+            dispatcher = StandardTestDispatcher(testScheduler),
+            clock = Clock { now },
+        )
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
+        val submissions = runtime.submissions()
+        assertEquals(ShareCardKind.SAVED, submissions.receiveShared(LINK, online = true))
+        val home = runtime.homePresenter()
+        advanceUntilIdle()
+        val before = submissions.view.value
+        assertEquals(RelativeTime.JustNow, assertIs<HomeState.LoggedIn>(home.state.value).processing.single().savedAt)
+
+        now += 3.hours
+        submissions.refresh(FlushTrigger.FOREGROUND)
+        advanceUntilIdle()
+        assertEquals(before, submissions.view.value)
+        assertEquals(RelativeTime.Hours(3), assertIs<HomeState.LoggedIn>(home.state.value).processing.single().savedAt)
+        home.close()
         runtime.close()
     }
 

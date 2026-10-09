@@ -26,6 +26,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
@@ -42,6 +43,7 @@ private fun processing(id: String, at: Instant): WishlistItem =
 class HomePresenterTest {
     private val auth = ScriptedAuth(seen = true)
     private val view = MutableStateFlow(SubmissionView(null, emptyList(), emptyList(), flushing = false))
+    private val refreshRuns = MutableStateFlow(0L)
     private var now = T0 + 5.minutes
     private val refreshes = mutableListOf<FlushTrigger>()
     private var refreshGate: CompletableDeferred<Unit>? = null
@@ -49,6 +51,7 @@ class HomePresenterTest {
     private fun TestScope.presenter() = HomePresenter(
         auth = auth,
         view = view,
+        refreshes = refreshRuns,
         refresh = { trigger ->
             refreshes += trigger
             refreshGate?.await()
@@ -65,7 +68,7 @@ class HomePresenterTest {
     @Test
     fun loadingUntilRestored() = runTest {
         val a = ScriptedAuth(restored = false)
-        val p = HomePresenter(a, view, {}, { now }, { 0 }, StandardTestDispatcher(testScheduler))
+        val p = HomePresenter(a, view, refreshRuns, {}, { now }, { 0 }, StandardTestDispatcher(testScheduler))
         advanceUntilIdle()
         assertEquals(HomeState.Loading, p.state.value)
         a.mutableRestored.value = true
@@ -195,6 +198,20 @@ class HomePresenterTest {
         view.value = view.value.copy(flushing = true)
         advanceUntilIdle()
         assertEquals(RelativeTime.Minutes(30), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
+        p.close()
+    }
+
+    @Test
+    fun anyCoordinatorRefreshRunRecomputesRelativeTimeWithoutViewChange() = runTest {
+        signIn(accountA)
+        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList(), flushing = false)
+        val p = presenter()
+        advanceUntilIdle()
+        assertEquals(RelativeTime.Minutes(5), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
+        now = T0 + 3.hours
+        refreshRuns.value++ // e.g. a FOREGROUND run that changed nothing
+        advanceUntilIdle()
+        assertEquals(RelativeTime.Hours(3), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
         p.close()
     }
 

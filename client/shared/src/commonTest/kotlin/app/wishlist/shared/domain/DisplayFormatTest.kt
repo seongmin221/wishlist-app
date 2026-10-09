@@ -10,7 +10,8 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class DisplayFormatTest {
-    private val kst = 9 * 3600
+    private val kst: (Instant) -> Int = { 9 * 3600 }
+    private val utc: (Instant) -> Int = { 0 }
 
     // 2026-10-07 12:00 KST.
     private val noonKst = Instant.parse("2026-10-07T03:00:00Z")
@@ -45,8 +46,8 @@ class DisplayFormatTest {
         val now = Instant.parse("2026-10-06T15:01:00Z")  // 00:01 KST the next day
         assertEquals(RelativeTime.Yesterday, DisplayFormat.relative(from, now, kst))
         // In UTC both instants are on the same day: the offset decides the calendar date.
-        assertNotEquals(DisplayFormat.relative(from, now, kst), DisplayFormat.relative(from, now, 0))
-        assertEquals(RelativeTime.Minutes(2), DisplayFormat.relative(from, now, 0))
+        assertNotEquals(DisplayFormat.relative(from, now, kst), DisplayFormat.relative(from, now, utc))
+        assertEquals(RelativeTime.Minutes(2), DisplayFormat.relative(from, now, utc))
     }
 
     @Test fun twoOrMoreCalendarDaysIsDays() {
@@ -55,5 +56,15 @@ class DisplayFormatTest {
 
     @Test fun futureTimeFromAClockGoingBackwardsIsJustNow() {
         assertEquals(RelativeTime.JustNow, DisplayFormat.relative(noonKst + 5.minutes, noonKst, kst))
+    }
+
+    @Test fun eachInstantUsesItsOwnOffsetAcrossADaylightSavingSwitch() {
+        // The device moves from UTC+0 to UTC+1 at 2026-03-29T00:00Z.
+        val switch = Instant.parse("2026-03-29T00:00:00Z")
+        val offset: (Instant) -> Int = { if (it < switch) 0 else 3600 }
+        val from = Instant.parse("2026-03-28T23:30:00Z") // 23:30 local on the 28th (UTC+0)
+        val now = Instant.parse("2026-03-29T00:45:00Z")  // 01:45 local on the 29th (UTC+1)
+        // With now's offset for both, from would read 00:30 on the 29th and give Hours(1).
+        assertEquals(RelativeTime.Yesterday, DisplayFormat.relative(from, now, offset))
     }
 }

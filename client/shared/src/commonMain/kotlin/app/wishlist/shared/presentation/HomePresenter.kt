@@ -24,7 +24,8 @@ import kotlin.time.Instant
  * Home list over the login state and the [SubmissionView]. Only a view that belongs to the
  * current account is shown: while the account and the view disagree (an account switch passes
  * through signed out, and the view follows later) the state is Loading or LoggedOut, never rows
- * of the other account. Relative times are recomputed on every state update and every refresh.
+ * of the other account. Relative times are recomputed on every state update and after every
+ * coordinator refresh run ([refreshes], any trigger, also when no data changed).
  *
  * Foreground refresh is app-wide (the platform asks the coordinator directly); this Presenter
  * only reacts to the view. [close] cancels everything, is idempotent, and later intents are ignored.
@@ -32,6 +33,7 @@ import kotlin.time.Instant
 class HomePresenter internal constructor(
     private val auth: AuthFacade,
     view: StateFlow<SubmissionView>,
+    refreshes: StateFlow<Long>,
     private val refresh: suspend (FlushTrigger) -> Unit,
     private val clock: Clock,
     private val utcOffsetSeconds: (Instant) -> Int,
@@ -47,7 +49,9 @@ class HomePresenter internal constructor(
 
     init {
         scope.launch {
-            combine(auth.restored, auth.account, view, refreshing, recompute) { restored, account, current, busy, _ ->
+            // Either revision changing only re-reads the clock (equal views are dropped by the StateFlow).
+            val ticks = combine(refreshes, recompute) { _, _ -> }
+            combine(auth.restored, auth.account, view, refreshing, ticks) { restored, account, current, busy, _ ->
                 compose(restored, account, current, busy)
             }.collect { mutableState.value = it }
         }
@@ -74,9 +78,8 @@ class HomePresenter internal constructor(
     private fun compose(restored: Boolean, account: AuthAccount?, view: SubmissionView, busy: Boolean): HomeState {
         if (!restored) return HomeState.Loading
         val now = clock.now()
-        val offset = utcOffsetSeconds(now)
         fun row(key: String, url: String, at: Instant, status: RowStatus) =
-            HomeRow(key, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, offset), status)
+            HomeRow(key, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, utcOffsetSeconds), status)
         if (account == null) {
             // A view still tied to an account is not this signed-out state's: show nothing of it.
             val unbound = if (view.accountId == null) view.local.filter { it.accountBinding == null } else emptyList()

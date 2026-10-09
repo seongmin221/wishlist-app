@@ -227,6 +227,7 @@ class SharedRuntime internal constructor(
         return HomePresenter(
             auth = auth(),
             view = submissions.view,
+            refreshes = submissions.refreshes,
             refresh = { submissions.refresh(it) },
             clock = env.clock,
             utcOffsetSeconds = env.platform.utcOffsetSeconds,

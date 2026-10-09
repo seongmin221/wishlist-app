@@ -72,6 +72,14 @@ class SubmissionCoordinator internal constructor(
     private val viewLock = Mutex()
     private val mutableView = MutableStateFlow(SubmissionView(null, emptyList(), emptyList(), flushing = false))
     val view: StateFlow<SubmissionView> = mutableView.asStateFlow()
+    private val refreshRuns = MutableStateFlow(0L)
+
+    /**
+     * How many refresh runs (any trigger, signed out too) have finished. A run that changed no data
+     * republishes an equal [view], which a StateFlow drops; the home list also follows this
+     * revision so its relative times are recomputed after every refresh.
+     */
+    internal val refreshes: StateFlow<Long> = refreshRuns.asStateFlow()
 
     init {
         scope.launch(dispatcher) { consumeRequests() }.invokeOnCompletion {
@@ -143,9 +151,11 @@ class SubmissionCoordinator internal constructor(
             ready.first { it }
             val batch = mutableListOf(requests.receive())
             while (true) batch += requests.tryReceive().getOrNull() ?: break
+            val refresh = batch.any { it.refresh }
             try {
-                guarded(Unit) { if (batch.any { it.refresh }) refreshOnce() else flushOnce() }
+                guarded(Unit) { if (refresh) refreshOnce() else flushOnce() }
             } finally {
+                if (refresh) refreshRuns.update { it + 1 }
                 batch.forEach { it.done?.complete(Unit) }
             }
         }
