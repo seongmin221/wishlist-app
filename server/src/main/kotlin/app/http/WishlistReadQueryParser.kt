@@ -48,11 +48,11 @@ object WishlistReadQueryParser {
         if (p["before"] != null || p["after"] != null) return ReadQueryParseResult.InvalidQuery
         val limit = number(p, "limit", defaultLimit, 1..100) ?: return ReadQueryParseResult.InvalidQuery
         val cursor = p["cursor"] ?: return ReadQueryParseResult.Valid(ReadQuery(scope, ReadWindow.Page(limit)))
-        for ((use, direction) in listOf(ReadCursorUse.NEXT to ReadDirection.OLDER, ReadCursorUse.PREVIOUS to ReadDirection.NEWER)) {
-            val position = WishlistReadCursorCodec.decode(owner, endpoint, scope, use, cursor) ?: continue
-            return ReadQueryParseResult.Valid(ReadQuery(scope, ReadWindow.Page(limit, position, direction)))
-        }
-        return ReadQueryParseResult.InvalidCursor
+        val (use,position) = WishlistReadCursorCodec.decodePage(owner,endpoint,scope,cursor)
+            ?: return ReadQueryParseResult.InvalidCursor
+        val direction = if(use==ReadCursorUse.NEXT || use==ReadCursorUse.NEXT_INCLUSIVE) ReadDirection.OLDER else ReadDirection.NEWER
+        val inclusive = use==ReadCursorUse.NEXT_INCLUSIVE || use==ReadCursorUse.PREVIOUS_INCLUSIVE
+        return ReadQueryParseResult.Valid(ReadQuery(scope,ReadWindow.Page(limit,position,direction,inclusive)))
     }
     private fun number(p: Parameters, key: String, default: Int, range: IntRange): Int? =
         if (p[key] == null) default else p[key]?.toIntOrNull()?.takeIf { it in range }

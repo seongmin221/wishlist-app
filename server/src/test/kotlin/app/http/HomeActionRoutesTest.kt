@@ -74,9 +74,9 @@ class HomeActionRoutesTest {
         val source=app.DatabaseFactory.dataSource("jdbc:postgresql://127.0.0.1:1/not_used","test","test");val owner=UUID.randomUUID()
         application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source)) { owner } } }
         val scope=ReadScope.Action(HomeActionGroup.INFORMATION_COMPLETION);val pos=ReadPosition(Instant.parse("2026-10-07T10:00:00Z"),UUID.randomUUID())
-        val tokens=listOf("broken",WishlistReadCursorCodec.encode(UUID.randomUUID(),ReadEndpoint.HOME_ACTION_ITEMS,scope,ReadCursorUse.NEXT,pos),
-            WishlistReadCursorCodec.encode(owner,ReadEndpoint.HOME_ACTION_ITEMS,ReadScope.Action(HomeActionGroup.CLASSIFICATION_REVIEW),ReadCursorUse.NEXT,pos),
-            WishlistReadCursorCodec.encode(owner,ReadEndpoint.WISHLIST_ITEMS,ReadScope.PurposeUnassigned,ReadCursorUse.NEXT,pos))
+        val tokens=listOf("broken",WishlistReadCursorCodec.forOwner(UUID.randomUUID()).encode(ReadEndpoint.HOME_ACTION_ITEMS,scope,ReadCursorUse.NEXT,pos),
+            WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.HOME_ACTION_ITEMS,ReadScope.Action(HomeActionGroup.CLASSIFICATION_REVIEW),ReadCursorUse.NEXT,pos),
+            WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.WISHLIST_ITEMS,ReadScope.PurposeUnassigned,ReadCursorUse.NEXT,pos))
         for (t in tokens) {
             val r=client.get("/v1/home/action-items?group=INFORMATION_COMPLETION&cursor=$t")
             assertEquals(HttpStatusCode.BadRequest,r.status)

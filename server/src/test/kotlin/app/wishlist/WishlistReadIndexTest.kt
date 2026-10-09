@@ -6,7 +6,6 @@ import app.home.HomeReadRepository
 import app.persistence.inTransaction
 import app.purpose.PurposeRepository
 import app.testutil.*
-import org.flywaydb.core.Flyway
 import java.time.Instant
 import java.util.UUID
 import javax.sql.DataSource
@@ -16,7 +15,7 @@ import kotlin.test.*
 class WishlistReadIndexTest {
     @Test fun read_indexes_cover_order_and_preserve_results() = PostgresTestContainer().use { db ->
         db.start()
-        Flyway.configure().dataSource(db.jdbcUrl, db.username, db.password).target("14").load().migrate()
+        DatabaseFactory.migrationConfiguration(db.jdbcUrl, db.username, db.password).target("14").load().migrate()
         val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)
         val owner = UUID.fromString("00000000-0000-0000-0000-000000000001")
         var custom: UUID? = null
@@ -48,23 +47,31 @@ class WishlistReadIndexTest {
         val scopes = linkedMapOf("public" to ReadScope.Category(CategoryRef.Public("C026")),
             "custom" to ReadScope.Category(CategoryRef.Custom(custom!!)), "purpose" to ReadScope.Purpose(purpose!!),
             "unassigned" to ReadScope.PurposeUnassigned)
-        val repo = WishlistReadRepository()
         val recording = ReadRecordingDataSource(source)
         val captured = linkedMapOf<String,RecordedReadQuery>()
         fun capture(name: String, operation: (java.sql.Connection) -> Unit) {
             recording.inTransaction(readOnly = true) { c -> operation(c) }
             captured[name] = recording.queries.last()
         }
-        for ((name,scope) in scopes) {
-            capture("$name-page") { c -> repo.keys(c,owner,scope,null,ReadDirection.OLDER,41) }
-            val boundary = source.inTransaction(readOnly=true) { c -> repo.keys(c,owner,scope,null,ReadDirection.OLDER,101).last() }
-            capture("$name-anchor-older") { c -> repo.keys(c,owner,scope,boundary,ReadDirection.OLDER,21) }
-            capture("$name-anchor-newer") { c -> repo.keys(c,owner,scope,boundary,ReadDirection.NEWER,21) }
+        fun captureWindow(name: String, scope: ReadScope, window: ReadWindow): ReadPage {
+            val start=recording.queries.size
+            val page=assertIs<ReadResult.Success>(WishlistReadService(recording).read(owner,ReadQuery(scope,window))).page
+            val actual=recording.queries.drop(start).filter { it.sql.trimStart().startsWith("with ") }
+            assertEquals(1,actual.size,"EXPLAIN must use the window query actually executed by the service")
+            captured[name]=actual.single()
+            return page
         }
-        for (g in HomeActionGroup.entries) {
-            val scope = ReadScope.Action(g)
-            capture("home-${g.name}-page") { c -> repo.keys(c,owner,scope,null,ReadDirection.OLDER,21) }
-            capture("home-${g.name}-count") { c -> repo.count(c,owner,scope) }
+        for ((name,scope) in scopes) {
+            val first=captureWindow("$name-page",scope,ReadWindow.Page(40))
+            val middle=ReadPosition(first.items.last().createdAt,first.items.last().id)
+            captureWindow("$name-next",scope,ReadWindow.Page(40,middle))
+            captureWindow("$name-previous",scope,ReadWindow.Page(40,middle,ReadDirection.NEWER))
+            captureWindow("$name-anchor",scope,ReadWindow.Anchor(middle,20,20))
+        }
+        for(g in HomeActionGroup.entries) {
+            val scope=ReadScope.Action(g)
+            val first=captureWindow("home-${g.name}-page",scope,ReadWindow.Page(20))
+            captureWindow("home-${g.name}-anchor",scope,ReadWindow.Anchor(ReadPosition(first.items.first().createdAt,first.items.first().id),20,20))
         }
         capture("home-summary") { c -> HomeReadRepository().groupSummaries(c,owner) }
         val start = recording.queries.size
@@ -76,7 +83,7 @@ class WishlistReadIndexTest {
         capture("purpose-summary") { c -> PurposeRepository().page(c,owner,null,3) }
         val before = measure(source,captured,"V14")
         DatabaseFactory.migrate(db.jdbcUrl,db.username,db.password)
-        val after = measure(source,captured,"V15")
+        val after = measure(source,captured,"V16 (original V15 retained)")
         println("EXPLAIN comparison: same fixture, same bound queries; rows=20000, per-owner=10000, groups=100/100/100, NONE=9700")
         for (name in captured.keys) println("$name: ${before.getValue(name)} => ${after.getValue(name)}")
         source.connection.use { c ->
@@ -97,7 +104,12 @@ class WishlistReadIndexTest {
             val page = assertIs<ReadResult.Success>(service.read(owner,ReadQuery(ReadScope.Action(g),ReadWindow.Page(20)))).page
             assertEquals(100L,page.totalCount);assertEquals(20,page.items.size)
             assertTrue(page.items.all { WishlistItemPolicy.evaluate(it.storedState.state).homeActionGroup == g })
-            assertEquals(page.items.map { it.id }, source.inTransaction(readOnly=true) { c -> repo.keys(c,owner,ReadScope.Action(g),null,ReadDirection.OLDER,20).map { it.id } })
+            val classified=WishlistReadPredicates.classified(owner)
+            val oracle=source.connection.use { c -> c.prepareStatement("with ${classified.sql} select id from classified where grp=? order by created_at desc,id desc limit 20").use { statement ->
+                (classified.parameters+g.name).forEachIndexed { n,value -> statement.setObject(n+1,value) }
+                statement.executeQuery().use { rows -> buildList { while(rows.next()) add(rows.getObject(1,UUID::class.java)) } }
+            } }
+            assertEquals(oracle,page.items.map { it.id })
         }
         for ((_,scope) in scopes) {
             val page = assertIs<ReadResult.Success>(service.read(owner,ReadQuery(scope,ReadWindow.Page(40)))).page
@@ -118,6 +130,10 @@ class WishlistReadIndexTest {
                 fun visit(node: JsonObject) { nodes.add(node);node["Plans"]?.jsonArray?.forEach { visit(it.jsonObject) } }
                 val root = explain.getValue("Plan").jsonObject;visit(root)
                 fun metric(key: String) = root[key]?.jsonPrimitive?.content ?: "0"
+                if(q.sql.contains("classified as materialized")) {
+                    assertEquals(1,nodes.count { it["Relation Name"]?.jsonPrimitive?.content=="wishlist_items" },
+                        "HOME classification must have one base-table scan in the actual EXPLAIN plan")
+                }
                 val indexes = nodes.mapNotNull { it["Index Name"]?.jsonPrimitive?.content }.distinct()
                 val scanned = nodes.filter { it["Relation Name"]?.jsonPrimitive?.content == "wishlist_items" }.sumOf {
                     (it.getValue("Actual Rows").jsonPrimitive.long + (it["Rows Removed by Filter"]?.jsonPrimitive?.long ?: 0)) * it.getValue("Actual Loops").jsonPrimitive.long }

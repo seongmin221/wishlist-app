@@ -15,10 +15,11 @@ class HomeReadService(private val dataSource: DataSource) {
         val groups = home.groupSummaries(c, owner)
         val loaded = items.load(c, owner, groups.flatMap { it.positions }).associateBy { it.id }
         val recent = purposes.page(c, owner, null, 3)
-        val previews = purposes.previews(c, owner, recent.map { it.id })
         HomeReadSummary(
-            groups.map { group -> HomeReadGroup(group.group, group.count, group.positions.map { loaded.getValue(it.id) }) },
-            recent.map { PurposeListEntry(it, previews[it.id].orEmpty()) },
+            groups.map { group -> HomeReadGroup(group.group, group.count, group.positions.map { position ->
+                checkNotNull(loaded[position.id]) { "Missing HOME-01 projection for ${position.id} in the same read snapshot" }
+            }) },
+            purposes.entries(c,owner,recent),
         )
     }
 }

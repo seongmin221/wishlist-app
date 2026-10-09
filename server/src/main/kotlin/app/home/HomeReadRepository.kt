@@ -1,20 +1,15 @@
 package app.home
 
 import app.wishlist.*
+import app.persistence.bindParameters
 import java.sql.Connection
 import java.util.UUID
 
 class HomeReadRepository {
     fun groupSummaries(c: Connection, owner: UUID): List<HomeGroupKeys> {
-        val action = WishlistReadPredicates.requiredAction("i")
-        val group = WishlistReadPredicates.homeGroup("read_required_action")
+        val classified=WishlistReadPredicates.classified(owner)
         val sql = """
-            with classified as materialized (
-                select id, created_at, $group as grp from (
-                    select i.id, i.created_at, ${action.sql} as read_required_action
-                    from wishlist_items i where i.owner_id = ? and i.lifecycle_status = 'ACTIVE'
-                ) actions
-            ), counts as (
+            with ${classified.sql}, counts as (
                 select count(*) filter (where grp = 'ANALYSIS_IN_PROGRESS') as analysis_count,
                        count(*) filter (where grp = 'INFORMATION_COMPLETION') as information_count,
                        count(*) filter (where grp = 'CLASSIFICATION_REVIEW') as review_count
@@ -34,7 +29,7 @@ class HomeReadRepository {
             order by groups.ord, ranked.created_at desc, ranked.id desc
         """.trimIndent()
         return c.prepareStatement(sql).use { statement ->
-            (action.parameters + owner).forEachIndexed { i, value -> statement.setObject(i + 1, value) }
+            statement.bindParameters(classified.parameters)
             statement.executeQuery().use { rs ->
                 val counts = linkedMapOf<HomeActionGroup, Long>()
                 val positions = mutableMapOf<HomeActionGroup, MutableList<ReadPosition>>()

@@ -1,6 +1,7 @@
 package app.wishlist
 
 import app.category.*
+import app.persistence.bindParameters
 import app.testutil.*
 import java.time.Instant
 import java.util.UUID
@@ -50,6 +51,21 @@ class WishlistReadPolicyParityTest {
                 assertEquals(fixtures.size, checked)
             }
         } }
+        // Compare the production direct-group classification, not only action -> group derivation.
+        val classified=WishlistReadPredicates.classified(owner)
+        source.connection.use { c -> c.prepareStatement("with ${classified.sql} select id,grp from classified").use { statement ->
+            statement.bindParameters(classified.parameters)
+            statement.executeQuery().use { rows ->
+                var checked=0
+                while(rows.next()) {
+                    val state=expected.getValue(rows.getObject("id",UUID::class.java)).state
+                    assertEquals(WishlistItemPolicy.evaluate(state).homeActionGroup?.name,rows.getString("grp"),state.toString())
+                    checked++
+                }
+                assertEquals(fixtures.count { it.state.lifecycleStatus==LifecycleStatus.ACTIVE },checked)
+            }
+        } }
+
     }
 
     @Test fun raw_category_blank_expression_matches_policy_without_bypassing_foreign_key() = withAnalysisDatabase { source ->

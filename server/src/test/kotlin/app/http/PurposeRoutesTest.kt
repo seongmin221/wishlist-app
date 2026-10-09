@@ -87,13 +87,18 @@ class PurposeRoutesTest {
             application { installApiHttpSupport(); routing { purposeRoutes(PurposeService(source)) { owner } } }
             val cursor = json(client.get("/v1/purposes?projection=SELECT&limit=2").bodyAsText())["nextCursor"]!!.jsonPrimitive.content
             val parts = String(java.util.Base64.getUrlDecoder().decode(cursor)).split("|").toMutableList()
-            for (micros in listOf("-9000000000000000000", "9000000000000000000")) {
+            for (micros in listOf("-9000000000000000000", "9223372036854775808")) {
                 parts[3] = micros
                 val forged = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(parts.joinToString("|").toByteArray())
                 val response = client.get("/v1/purposes?projection=SELECT&cursor=$forged")
                 assertEquals(HttpStatusCode.BadRequest, response.status, micros)
                 assertEquals("INVALID_PURPOSE_CURSOR", json(response.bodyAsText())["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
             }
+            // A valid position hint within PostgreSQL's range is allowed, even beyond year 9999.
+            parts[3]="9000000000000000000"
+            val valid=java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(parts.joinToString("|").toByteArray())
+            assertEquals(HttpStatusCode.OK,client.get("/v1/purposes?projection=SELECT&cursor=$valid").status)
+
         }
     }
 

@@ -1,6 +1,7 @@
 package app.category
 
 import app.wishlist.WishlistReadPredicates
+import app.persistence.bindParameters
 import app.common.FieldChange
 import app.ai.TaxonomyCatalog
 import app.persistence.MutationReceipts
@@ -98,8 +99,7 @@ class CategoryService(private val dataSource: DataSource) {
             select i.category_id,count(*) from wishlist_items i
             where i.owner_id=? and ${visible.sql} and i.category_id is not null group by i.category_id
         """).use { statement ->
-            statement.setObject(1, owner)
-            visible.parameters.forEachIndexed { n,v -> statement.setObject(n+2,v) }
+            statement.bindParameters(listOf(owner)+visible.parameters)
             statement.executeQuery().use { rows -> buildMap { while (rows.next()) put(rows.getString(1), rows.getLong(2)) } }
         }
     }

@@ -1,6 +1,8 @@
 package app.wishlist
 
 import app.category.CategoryRef
+import app.http.*
+import io.ktor.http.Parameters
 import app.testutil.*
 import java.time.Instant
 import java.util.UUID
@@ -57,4 +59,101 @@ class WishlistReadServiceTest {
         val empty=page(20);assertEquals(false,empty.anchorResolved);assertEquals(fixtures[20].position.id,empty.requestedAnchorItemId)
         assertNull(empty.resolvedAnchorItemId);assertTrue(empty.items.isEmpty());assertEquals(0L,empty.totalCount);assertNull(empty.previous);assertNull(empty.next)
     }
+    @Test fun empty_page_keeps_an_inclusive_return_cursor_in_both_directions() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val time = Instant.parse("2026-10-07T10:00:00Z")
+        val state = WishlistItemState(AnalysisStatus.READY,ReviewStatus.PENDING,LifecycleStatus.ACTIVE,"name","C026",null,null)
+        val fixtures = (0..3).map { ReadFixture(ReadPosition(time.minusSeconds(it.toLong()),UUID.randomUUID()),state) }
+        source.connection.use { insertReadFixtures(it,owner,fixtures) }
+        val scope = ReadScope.Category(CategoryRef.Public("C026"))
+        val service = WishlistReadService(source)
+        fun read(window: ReadWindow) = assertIs<ReadResult.Success>(service.read(owner,ReadQuery(scope,window))).page
+        fun follow(cursor: String): ReadPage {
+            val parsed = assertIs<ReadQueryParseResult.Valid>(WishlistReadQueryParser.wishlist(owner,Parameters.build {
+                append("categoryId","C026");append("cursor",cursor);append("limit","2")
+            }))
+            return assertIs<ReadResult.Success>(service.read(owner,parsed.query)).page
+        }
+        val first = read(ReadWindow.Page(2))
+        analysisSql(source,"update wishlist_items set category_id='C027' where id in ('${fixtures[2].position.id}','${fixtures[3].position.id}')")
+        val emptyOlder = read(ReadWindow.Page(2,first.next))
+        assertTrue(emptyOlder.items.isEmpty());assertEquals(2L,emptyOlder.totalCount)
+        val previous = assertNotNull(ReadWindowViewMapper.map(owner,ReadEndpoint.WISHLIST_ITEMS,scope,emptyOlder).previousCursor)
+        assertNull(emptyOlder.next)
+        assertEquals(first.items,follow(previous).items) // include boundary itself, even if it is the only survivor
+        analysisSql(source,"update wishlist_items set category_id='C026' where owner_id='$owner'")
+        val second = read(ReadWindow.Page(2,first.next))
+        analysisSql(source,"update wishlist_items set lifecycle_status='DELETED' where id in ('${fixtures[0].position.id}','${fixtures[1].position.id}')")
+        val emptyNewer = read(ReadWindow.Page(2,second.previous,ReadDirection.NEWER))
+        assertTrue(emptyNewer.items.isEmpty());assertNull(emptyNewer.previous)
+        val next = assertNotNull(ReadWindowViewMapper.map(owner,ReadEndpoint.WISHLIST_ITEMS,scope,emptyNewer).nextCursor)
+        assertEquals(second.items,follow(next).items)
+        analysisSql(source,"update wishlist_items set lifecycle_status='DELETED' where owner_id='$owner'")
+        val emptyAll = read(ReadWindow.Page(2,second.previous,ReadDirection.NEWER))
+        assertNull(emptyAll.previous);assertNull(emptyAll.next);assertEquals(0L,emptyAll.totalCount)
+    }
+
+    @Test fun first_page_has_no_opposite_exists_roundtrip() = withAnalysisDatabase { source ->
+        val owner=UUID.randomUUID()
+        val state=WishlistItemState(AnalysisStatus.READY,ReviewStatus.PENDING,LifecycleStatus.ACTIVE,"name","C026",null,null)
+        source.connection.use { insertReadFixtures(it,owner,listOf(ReadFixture(ReadPosition(Instant.now(),UUID.randomUUID()),state))) }
+        for (scope in listOf(ReadScope.Category(CategoryRef.Public("C026")),ReadScope.PurposeUnassigned,ReadScope.Action(HomeActionGroup.CLASSIFICATION_REVIEW))) {
+            val recording=ReadRecordingDataSource(source)
+            val page=assertIs<ReadResult.Success>(WishlistReadService(recording).read(owner,ReadQuery(scope,ReadWindow.Page(20)))).page
+            assertNull(page.previous);assertEquals(1,page.items.size)
+            assertEquals(2,recording.statements.size,"one public-scope window query and one projection")
+            val start=recording.statements.size
+            val item=page.items.single()
+            val anchored=assertIs<ReadResult.Success>(WishlistReadService(recording).read(owner,
+                ReadQuery(scope,ReadWindow.Anchor(ReadPosition(item.createdAt,item.id),0,0)))).page
+            assertEquals(listOf(item.id),anchored.items.map { it.id })
+            assertEquals(2,recording.statements.size-start,"anchor must not use sequential fallback/before/after round trips")
+            assertTrue(recording.statements.none { it.startsWith("select exists(") },recording.statements.toString())
+        }
+    }
+
+    @Test fun action_count_and_window_classify_once_per_request() = withAnalysisDatabase { source ->
+        val owner=UUID.randomUUID();val time=Instant.parse("2026-10-07T10:00:00Z")
+        val state=WishlistItemState(AnalysisStatus.READY,ReviewStatus.PENDING,LifecycleStatus.ACTIVE,"name","C026",null,null)
+        val fixtures=(0..4).map { ReadFixture(ReadPosition(time.minusSeconds(it.toLong()),UUID.randomUUID()),state) }
+        source.connection.use { insertReadFixtures(it,owner,fixtures) }
+        for (window in listOf(ReadWindow.Page(2),ReadWindow.Anchor(fixtures[2].position,1,1))) {
+            val recording=ReadRecordingDataSource(source)
+            val page=assertIs<ReadResult.Success>(WishlistReadService(recording).read(owner,ReadQuery(ReadScope.Action(HomeActionGroup.CLASSIFICATION_REVIEW),window))).page
+            assertEquals(5L,page.totalCount)
+            assertEquals(1,recording.statements.count { it.contains("classified as materialized") },recording.statements.toString())
+        }
+    }
+
+    @Test fun action_empty_pages_recover_after_reviews_are_completed_and_count_is_fresh() = withAnalysisDatabase { source ->
+        val owner=UUID.randomUUID();val time=Instant.parse("2026-10-07T10:00:00Z")
+        val state=WishlistItemState(AnalysisStatus.READY,ReviewStatus.PENDING,LifecycleStatus.ACTIVE,"name","C026",null,null)
+        val fixtures=(0..3).map { ReadFixture(ReadPosition(time.minusSeconds(it.toLong()),UUID.randomUUID()),state) }
+        source.connection.use { insertReadFixtures(it,owner,fixtures) }
+        val scope=ReadScope.Action(HomeActionGroup.CLASSIFICATION_REVIEW)
+        val service=WishlistReadService(source)
+        fun read(window: ReadWindow)=assertIs<ReadResult.Success>(service.read(owner,ReadQuery(scope,window))).page
+        fun follow(token: String)=assertIs<ReadResult.Success>(service.read(owner,
+            assertIs<ReadQueryParseResult.Valid>(WishlistReadQueryParser.action(owner,Parameters.build {
+                append("group","CLASSIFICATION_REVIEW");append("cursor",token);append("limit","2")
+            })).query)).page
+        val first=read(ReadWindow.Page(2))
+        analysisSql(source,"update wishlist_items set review_status='CONFIRMED' where id in ('${fixtures[2].position.id}','${fixtures[3].position.id}')")
+        val emptyOlder=read(ReadWindow.Page(2,first.next))
+        assertTrue(emptyOlder.items.isEmpty());assertEquals(2L,emptyOlder.totalCount)
+        assertEquals(first.items,follow(assertNotNull(ReadWindowViewMapper.map(owner,ReadEndpoint.HOME_ACTION_ITEMS,scope,emptyOlder).previousCursor)).items)
+        analysisSql(source,"update wishlist_items set review_status='PENDING' where owner_id='$owner'")
+        val second=read(ReadWindow.Page(2,first.next))
+        analysisSql(source,"update wishlist_items set review_status='DEFERRED' where id in ('${fixtures[0].position.id}','${fixtures[1].position.id}')")
+        val emptyNewer=read(ReadWindow.Page(2,second.previous,ReadDirection.NEWER))
+        assertTrue(emptyNewer.items.isEmpty());assertEquals(2L,emptyNewer.totalCount)
+        assertEquals(second.items,follow(assertNotNull(ReadWindowViewMapper.map(owner,ReadEndpoint.HOME_ACTION_ITEMS,scope,emptyNewer).nextCursor)).items)
+        analysisSql(source,"update wishlist_items set review_status='CONFIRMED' where owner_id='$owner'")
+        val emptyAll=read(ReadWindow.Page(2,second.previous,ReadDirection.NEWER))
+        assertEquals(0L,emptyAll.totalCount);assertNull(emptyAll.previous);assertNull(emptyAll.next)
+        val anchor=read(ReadWindow.Anchor(fixtures[1].position,1,1))
+        assertEquals(false,anchor.anchorResolved);assertEquals(fixtures[1].position.id,anchor.requestedAnchorItemId)
+        assertNull(anchor.resolvedAnchorItemId);assertTrue(anchor.items.isEmpty())
+    }
+
 }

@@ -44,9 +44,8 @@ class PurposeService(private val dataSource: DataSource) {
         return dataSource.inTransaction(readOnly = true) { c ->
             val rows = purposes.page(c, owner, after, limit + 1)
             val page = rows.take(limit)
-            val previews = if (projection == PurposeProjection.SUMMARY) purposes.previews(c, owner, page.map { it.id }) else emptyMap()
             PurposePage(
-                projection, page.map { PurposeListEntry(it, previews[it.id].orEmpty()) },
+                projection, purposes.entries(c,owner,page,includePreviews=projection==PurposeProjection.SUMMARY),
                 if (rows.size > limit) page.last().let { PurposeCursorPosition(it.activityAt, it.id) } else null,
                 purposes.count(c, owner, "ACTIVE"), purposes.count(c, owner, "ARCHIVED"),
             )

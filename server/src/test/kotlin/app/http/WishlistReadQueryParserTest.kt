@@ -24,7 +24,7 @@ class WishlistReadQueryParserTest {
         for (p in invalid) assertEquals(ReadQueryParseResult.InvalidQuery, wishlist(*p), p.contentToString())
         for (bad in listOf(parameters(), parameters("group" to "NONE"), parameters("group" to "INFORMATION_COMPLETION", "action" to "CATEGORY_ASSIGNMENT")))
             assertEquals(ReadQueryParseResult.InvalidQuery, WishlistReadQueryParser.action(owner, bad))
-        val anchor = WishlistReadCursorCodec.encode(owner, ReadEndpoint.WISHLIST_ITEMS, scope, ReadCursorUse.ANCHOR, pos)
+        val anchor = WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.WISHLIST_ITEMS, scope, ReadCursorUse.ANCHOR, pos)
         assertEquals(ReadWindow.Anchor(pos), assertIs<ReadQueryParseResult.Valid>(wishlist("purposeUnassigned" to "true", "anchor" to anchor)).query.window)
         assertEquals(ReadWindow.Anchor(pos,0,0), assertIs<ReadQueryParseResult.Valid>(wishlist("purposeUnassigned" to "true", "anchor" to anchor, "before" to "0", "after" to "0")).query.window)
         for (p in listOf(arrayOf("limit" to "40"), arrayOf("cursor" to anchor), arrayOf("before" to "21"), arrayOf("after" to "-1"), arrayOf("anchorItemId" to pos.id.toString())))
@@ -32,14 +32,14 @@ class WishlistReadQueryParserTest {
     }
     @Test fun cursor_use_and_scope_are_checked_before_io() {
         for ((use, direction) in listOf(ReadCursorUse.NEXT to ReadDirection.OLDER, ReadCursorUse.PREVIOUS to ReadDirection.NEWER)) {
-            val token = WishlistReadCursorCodec.encode(owner, ReadEndpoint.WISHLIST_ITEMS, scope, use, pos)
+            val token = WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.WISHLIST_ITEMS, scope, use, pos)
             assertEquals(ReadWindow.Page(40,pos,direction), assertIs<ReadQueryParseResult.Valid>(wishlist("purposeUnassigned" to "true", "cursor" to token)).query.window)
             assertEquals(ReadQueryParseResult.InvalidCursor, wishlist("purposeUnassigned" to "true", "anchor" to token))
         }
-        for (token in listOf("bad", WishlistReadCursorCodec.encode(UUID.randomUUID(), ReadEndpoint.WISHLIST_ITEMS, scope, ReadCursorUse.NEXT, pos),
-            WishlistReadCursorCodec.encode(owner, ReadEndpoint.HOME_ACTION_ITEMS, ReadScope.Action(HomeActionGroup.INFORMATION_COMPLETION), ReadCursorUse.NEXT, pos),
-            WishlistReadCursorCodec.encode(owner, ReadEndpoint.WISHLIST_ITEMS, ReadScope.Purpose(UUID.randomUUID()), ReadCursorUse.NEXT, pos),
-            WishlistReadCursorCodec.encode(owner, ReadEndpoint.WISHLIST_ITEMS, scope, ReadCursorUse.ANCHOR, pos)))
+        for (token in listOf("bad", WishlistReadCursorCodec.forOwner(UUID.randomUUID()).encode(ReadEndpoint.WISHLIST_ITEMS, scope, ReadCursorUse.NEXT, pos),
+            WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.HOME_ACTION_ITEMS, ReadScope.Action(HomeActionGroup.INFORMATION_COMPLETION), ReadCursorUse.NEXT, pos),
+            WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.WISHLIST_ITEMS, ReadScope.Purpose(UUID.randomUUID()), ReadCursorUse.NEXT, pos),
+            WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.WISHLIST_ITEMS, scope, ReadCursorUse.ANCHOR, pos)))
             assertEquals(ReadQueryParseResult.InvalidCursor, wishlist("purposeUnassigned" to "true", "cursor" to token))
     }
 }

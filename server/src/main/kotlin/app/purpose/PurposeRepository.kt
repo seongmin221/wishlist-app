@@ -49,6 +49,12 @@ class PurposeRepository {
         }
     }
 
+    /** Shared entry assembly, using the caller's repeatable-read connection. */
+    fun entries(c: Connection, owner: UUID, rows: List<Purpose>, includePreviews: Boolean = true): List<PurposeListEntry> {
+        val images=if(includePreviews) previews(c,owner,rows.map { it.id }) else emptyMap()
+        return rows.map { PurposeListEntry(it,images[it.id].orEmpty()) }
+    }
+
     /** Newest four saved ACTIVE candidates per purpose; same order as the ITEM-02 purpose filter. */
     fun previews(c: Connection, owner: UUID, ids: List<UUID>): Map<UUID, List<PurposePreview>> {
         if (ids.isEmpty()) return emptyMap()
