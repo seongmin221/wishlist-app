@@ -40,7 +40,7 @@ inactive는 requiredAction=NONE/group=null/allowedActions=[]로 판정한다. AC
 
 CONFIRMED/DEFERRED를 재진입 때문에 분류 검토로 돌리지 않는다. 다만 별도의 이름/category 누락이 생긴 상품은 기존 policy에 따라 정보 보완 대상일 수 있다. allowedActions는 상태별 기존 policy를 그대로 계산한다(PROCESSING은 DELETE만). 목록에 포함되는 것과 행동 가능 여부를 혼동하지 않는다.
 
-SQL predicate는 조회 전용 공통 객체에서 만들고 category count·상품 목록·홈·action 목록이 공유한다. requiredAction을 계산하는 CASE와 그 결과에서 group을 도출하는 표현은 각각 이 객체 한 곳에만 정의한다. 각 repository가 별도 CASE를 복사하지 않는다. 허용 행동은 기존 Kotlin policy로 계산한다.
+SQL predicate는 조회 전용 공통 객체에서 만들고 category count·상품 목록·홈·action 목록이 공유한다. requiredAction/group CASE는 같은 조건 생성기를 사용하고 Kotlin homeGroupFor를 공유한다. 각 repository가 별도 CASE를 복사하지 않는다. 허용 행동은 기존 Kotlin policy로 계산한다.
 
 ### Unicode blank 판정
 
@@ -87,7 +87,7 @@ HOME-01은 query를 받지 않는다.
 
 ## 정렬·cursor·anchor 복구
 
-다음 페이지는 마지막 카드보다 오래된 항목을, 이전 페이지는 첫 카드보다 최신인 가장 가까운 항목을 ASC로 요청 개수+1만큼 조회하고, 응답 항목을 DESC로 되돌린다. 다음 페이지도 DESC로 응답한다. 동일 created_at에서는 UUID id가 순서를 완전히 정한다. 페이지 경계의 항목은 중복 포함하지 않는다. 페이지의 진행 방향은 요청 개수+1 조회로 판단한다. 응답 첫 카드보다 최신/마지막 카드보다 오래된 항목에 대한 반대 방향 존재 여부는 같은 owner/scope snapshot에서 EXISTS 쿼리로 확인한다. anchor 모드는 before/after 각각 +1 조회로 양쪽 경계를 판단한다. 다른 HTTP 요청 간 snapshot은 유지하지 않는다.
+다음 page는 마지막 카드보다 오래된 항목을, previous page는 첫 카드보다 최신인 가까운 항목을 ASC 제한으로 선택한다. 응답은 항상 created_at DESC/id DESC이며 동일 시각의 UUID 순서는 PostgreSQL이 정한다. 일반 경계는 배타적이고 빈 page 복귀 cursor만 기준 항목을 포함한다. ITEM-02/HOME-02는 공통 window SQL에서 count·선택·양방향 존재·anchor fallback을 구성한다. 경계 없는 최신 첫 page의 previous는 false다. 다른 HTTP 요청 간 snapshot은 유지하지 않는다.
 
 카드마다 해당 endpoint/scope의 anchorCursor를 제공한다. HOME-01 preview의 cursor는 대응 HOME-02 group에 바인딩된다. nextCursor/previousCursor는 방향을 포함하므로 같은 cursor query에 전달하며, anchorCursor와 상호 교환하지 않는다. limit·before/after 크기를 바꾸는 것은 cursor 유효성에 영향을 주지 않는다.
 
@@ -123,7 +123,7 @@ owner digest는 token 소유자/조회 범위 검사이며 암호학적 진위 �
 
 B1~B3 WishlistItemDto를 수정 없이 카드의 `item`에 재사용한다. product metadata·category·purpose `{id,name,colorKey,iconKey,source}`·reviewStatus·requiredAction·allowedActions·version·시각을 유지한다. USER+null은 확정 미지정, UNASSIGNED는 미연결이다. 이름 없는 목적 후보의 product.name은 null/원문을 유지하고 클라이언트가 대체 제목을 표시한다.
 
-목록 envelope는 두 endpoint에서 동일하다. `totalCount`는 해당 필터 전체 집합의 Long이다. page 모드의 requestedAnchorItemId/resolvedAnchorItemId/anchorResolved는 null이다. anchor 모드의 requestedAnchorItemId는 cursor id이며 anchorResolved는 boolean이다. 목록이 비어도 requestedAnchorItemId는 유지하고 resolvedAnchorItemId는 null이다. previousCursor/nextCursor는 응답 window 바깥의 항목이 있을 때만 제공한다. 빈 window에서는 둘 다 null이다.
+목록 envelope는 두 endpoint에서 동일하다. `totalCount`는 해당 필터 전체 집합의 Long이다. page 모드의 requestedAnchorItemId/resolvedAnchorItemId/anchorResolved는 null이다. anchor 모드의 requestedAnchorItemId는 cursor id이며 anchorResolved는 boolean이다. 목록이 비어도 requestedAnchorItemId는 유지하고 resolvedAnchorItemId는 null이다. previousCursor/nextCursor는 응답 window 바깥의 항목이 있을 때만 제공한다. 빈 page에서도 반대 방향 생존 항목이 있으면 그 항목을 포함하는 복귀 cursor를 제공한다. scope 전체가 비었을 때만 둘 다 null이다.
 
 ```http
 GET /v1/wishlist-items?categoryId=C001&limit=40
@@ -164,7 +164,7 @@ HOME-02도 같은 envelope/card 구조를 사용한다.
 
 응답은 `actionGroups`와 `recentPurposes`다. actionGroups는 ANALYSIS_IN_PROGRESS → INFORMATION_COMPLETION → CLASSIFICATION_REVIEW 고정 순서로 항상 3개를 반환한다. 대상이 없으면 count=0/previews=[]이고 클라이언트가 count로 영역 표시 여부를 판단한다.
 
-각 group은 `group`, `count`, `previews`다. previews는 최근 저장순 최대 4개의 `{item,anchorCursor}`다. count와 HOME-02 totalCount는 같은 판정에 따른다. HOME-01의 count/preview는 같은 snapshot이지만 이후 HOME-02 요청은 최신 snapshot이므로 요청 사이에 변경되면 건수가 달라질 수 있다. 분석 중은 ACTIVE PROCESSING 전체를 세고 local pending은 세지 않는다. 별도 서버 할 일 합계 필드는 반환하지 않는다.
+각 group은 `group`, `count`, `previews`다. 같은 snapshot의 preview key에 대응하는 상세 row가 없으면 invariant 오류로 실패하며, 건수를 유지한 채 카드를 조용히 생략하지 않는다. previews는 최근 저장순 최대 4개의 `{item,anchorCursor}`다. count와 HOME-02 totalCount는 같은 판정에 따른다. HOME-01의 count/preview는 같은 snapshot이지만 이후 HOME-02 요청은 최신 snapshot이므로 요청 사이에 변경되면 건수가 달라질 수 있다. 분석 중은 ACTIVE PROCESSING 전체를 세고 local pending은 세지 않는다. 별도 서버 할 일 합계 필드는 반환하지 않는다.
 
 recentPurposes는 B3 PurposeSummaryItemDto 구조로 최대 3개이며 activity_at DESC/id DESC의 ACTIVE 목적을 빈 목적까지 포함한다. candidateCount는 모든 ACTIVE 후보이며 previews는 created_at DESC/id DESC의 최대 4개 후보로 imageUrl null도 포함한다.
 
@@ -195,41 +195,30 @@ recentPurposes는 B3 PurposeSummaryItemDto 구조로 최대 3개이며 activity_
 
 HOME-02는 owner·ACTIVE 정렬 범위에 공통 group CASE를 **필터**로 적용한다. group 전용 index를 가정하지 않는다. NONE 상품이 많으면 페이지를 채우기 위해 많은 행을 검사하며 totalCount는 owner의 ACTIVE 집합을 집계해야 한다. 이 분포를 EXPLAIN 표본에 포함하고 비용을 기록한다.
 
-HOME-01은 아래 형태로 group count와 preview id를 한 SQL에서 계산한다. 공통 표현 객체가 requiredAction CASE와 group mapping을 생성한다. 예시 SQL은 그 표현을 펼쳐 보여 주며 구현에서 다른 CASE를 별도로 쓰지 않는다. `:whitespace`는 고정 Kotlin 상수, `:owner`는 인증된 owner다.
+HOME-01은 아래 형태로 group count와 preview id를 한 SQL에서 계산한다. 공통 조건 생성기가 requiredAction CASE와 group CASE를 생성하며 WishlistItemPolicy.homeGroupFor를 공유한다. 예시 SQL은 그 표현을 펼쳐 보여 주며 구현에서 다른 CASE를 별도로 쓰지 않는다. `:whitespace`는 고정 Kotlin 상수, `:owner`는 인증된 owner다.
 
 ```sql
 WITH classified AS MATERIALIZED (
-  SELECT id, created_at,
-    CASE required_action
-      WHEN 'ANALYSIS_IN_PROGRESS' THEN 'ANALYSIS_IN_PROGRESS'
-      WHEN 'INFORMATION_COMPLETION' THEN 'INFORMATION_COMPLETION'
-      WHEN 'CATEGORY_ASSIGNMENT' THEN 'INFORMATION_COMPLETION'
-      WHEN 'CATEGORY_REASSIGNMENT' THEN 'INFORMATION_COMPLETION'
-      WHEN 'CLASSIFICATION_REVIEW' THEN 'CLASSIFICATION_REVIEW'
-      ELSE NULL
-    END AS grp
-  FROM (
     SELECT id, created_at,
       CASE
-        WHEN lifecycle_status <> 'ACTIVE' THEN 'NONE'
+        WHEN lifecycle_status <> 'ACTIVE' THEN NULL
         WHEN analysis_status = 'PROCESSING' THEN 'ANALYSIS_IN_PROGRESS'
         WHEN product_name IS NULL OR btrim(product_name, :whitespace) = ''
           THEN 'INFORMATION_COMPLETION'
         WHEN category_missing_reason = 'EXTRACTION_UNRESOLVED'
           THEN 'INFORMATION_COMPLETION'
         WHEN category_missing_reason IN ('AI_ABSTAINED', 'AI_RESPONSE_UNUSABLE')
-          THEN 'CATEGORY_ASSIGNMENT'
+          THEN 'INFORMATION_COMPLETION'
         WHEN category_missing_reason = 'CUSTOM_CATEGORY_DELETED'
-          THEN 'CATEGORY_REASSIGNMENT'
+          THEN 'INFORMATION_COMPLETION'
         WHEN coalesce(category_id, custom_category_id::text) IS NULL
           OR btrim(coalesce(category_id, custom_category_id::text), :whitespace) = ''
           THEN 'INFORMATION_COMPLETION'
         WHEN review_status = 'PENDING' THEN 'CLASSIFICATION_REVIEW'
-        ELSE 'NONE'
-      END AS required_action
+        ELSE NULL
+      END AS grp
     FROM wishlist_items
     WHERE owner_id = :owner AND lifecycle_status = 'ACTIVE'
-  ) actions
 ), counts AS (
   SELECT
     count(*) FILTER (WHERE grp = 'ANALYSIS_IN_PROGRESS') AS analysis_count,
@@ -300,3 +289,26 @@ TDD로 아래 실패를 확인한 뒤 구현한다. 리뷰 지적도 재현 테�
 B10에서 목적 archive가 생기면 ARCHIVED 목적에 연결된 ACTIVE 상품은 purposeUnassigned(null만)에도 특정 목적 목록(비활성 목적 404)에도 나타나지 않을 수 있다. 목적/상품 lifecycle 전이와 조회 predicate를 B10에서 함께 검증·갱신한다. B4가 목적 archive 동작을 추가하지 않는다.
 
 승인된 작업별 plan에 따라 Native 구현·독립 리뷰·보완·전체 테스트를 진행한다. architecture의 read API/state API/category 계약, inventory, implementation order, 각 INDEX와 의미 있는 구현 이력을 최종 구현에 맞춰 갱신한다. 전체 테스트는 `--rerun-tasks`의 완료 결과만 기록한다. 현재 baseline은 295 통과·RealUrlPilot 1 skip이며 B4 구현 완료를 뜻하지 않는다.
+
+## 2026-10-09 리뷰 보완
+
+빈 page에서 반대 방향 항목이 남아 있으면 가장 가까운 항목을 포함하는 복귀 cursor를 반환한다. 경계 항목만 남아도 복귀할 수 있어야 한다. NEXT_INCLUSIVE/PREVIOUS_INCLUSIVE는 opaque token 내부 용도이며 기존 NEXT/PREVIOUS 배타적 경계와 공존한다. 카드 ANCHOR와 페이지 용도는 계속 분리한다. ITEM-02 경계 없는 최신 첫 페이지의 previous 존재 조회는 생략한다.
+
+HOME-02는 공통 CASE를 owner ACTIVE 범위에서 한 번 계산하는 materialized classified와 group별 eligible key 결과를 사용한다. 하나의 SQL에서 정확한 전체 count·page/anchor key·바깥 존재·빈 page 복귀 위치를 구하고 같은 read-only repeatable-read connection에서 상세 카드를 batch 조회한다. exact totalCount 계약을 유지하므로 owner ACTIVE 전체 분류는 여전히 필요하며 캐시·생략·근삿값으로 바꾸지 않는다. 각 CTE 결과의 재읽기·정렬·임시 파일 비용을 실제 통합 SQL의 EXPLAIN으로 측정한다. 이전 독립 count/page 쿼리 실측값을 새 SQL의 성능 근거로 재사용하지 않는다.
+
+응답 하나에서 owner digest를 한 번 계산하고 카드/앞뒤 cursor에 공유한다. 페이지 decode는 token 용도를 한 번 읽어 방향을 결정한다. B3/B4는 owner digest와 epoch-microsecond 변환을 공통 helper로 사용한다. decoder 범위 검증은 유지하되 B3 encode에 신규 clock 범위 require를 추가하지 않고 B4 encode는 기존 범위를 유지한다. 홈 목적 요약과 PUR summary의 DTO mapper, category/read SQL의 순서 기반 parameter bind도 공유한다.
+
+원본 V15는 공개 여부가 불명확해 ed496fc 바이트와 checksum을 보존한다. 후속 V16 Java migration은 정상 인덱스를 유지하고 누락/INVALID 인덱스를 검사·정리·CONCURRENTLY 생성하며 canExecuteInTransaction=false로 실행한다. Flyway PostgreSQL advisory lock은 session 모드로 바꿔 동시 인덱스 생성이 자신의 transaction lock을 기다리지 않게 한다. 운영 배포·중단 복구 절차는 [인덱스 migration Q&A](../../learning/server/q-and-a/QA-SRV-014-concurrent-read-index-migration.md)를 따른다. V1~V14 파일은 수정하지 않는다.
+
+추가 리뷰에서 ITEM-02/HOME-02의 window 구성도 WishlistWindowReader로 통합했다. 일반 eligible은 NOT MATERIALIZED로 정렬/경계 index seek를 막지 않고, 홈은 같은 우선순위 조건에서 group CASE를 직접 만들어 단일 classified만 materialize한다. 동일 classified helper를 HOME-01에도 사용한다. EXPLAIN 테스트는 폐기한 repository Action 쿼리를 제거하고 실제 service가 실행한 공통 reader SQL을 capture한다. 원본 V15 최초 적용의 일반 CREATE INDEX 쓰기 잠금은 남으며 V16이 이를 소급해서 없애지 않는다.
+
+## 2026-10-09 추가 검토: 실행·변경 감지
+
+- 홈은 단일 MATERIALIZED classified에 직접 group을 계산한다. requiredAction과 group SQL은 같은 우선순위 조건을 생성하며 Kotlin group mapping을 공유한다. HOME-02의 eligible은 NOT MATERIALIZED로 두어 owner 전체를 중복 저장하지 않는다. exact totalCount의 전체 판정 비용은 남는다.
+- navigation의 has_previous는 Boolean bind를 받는 CASE로 첫 페이지의 EXISTS를 건너뛴다. 이 처리만을 위해 SQL 문자열을 분기하지 않는다. SQL 값은 모든 조회 경로에서 placeholder 순서의 List와 bindParameters로 전달하며 문자열·jsonb 연산자의 물음표를 변환하는 parser는 사용하지 않는다.
+- 목적 cursor는 PostgreSQL 최소 timestamp를 Unix microsecond로 바꾼 -210866803200000000 이상이며 signed Long으로 표현 가능한 시각을 encode/decode 양쪽에서 사용한다. 1970년 이전과 year10000은 허용한다. B4 상품 cursor의 1970~9999 범위는 해당 codec에 명시적으로 유지한다.
+- 원본 V15는 바꾸지 않는다. V16 checksum은 Gradle processResources가 묶은 V16 클래스 소스와 전용 ReadIndexRollout 소스의 CRC32이며 고정 revision 값이 아니다. 두 실행 소스는 공개 후 변경하지 않고 다음 migration을 추가한다.
+- 인덱스는 별도 배포 job의 `./gradlew runDatabaseMigrations`로 적용한다. API/Worker 시작에서는 migrate를 호출하지 않는다. 같은 DB에 job 하나만 실행한다. V16 실패만 있고 실제 resolved V16/state FAILED·JDBC type·description·applied/resolved checksum이 현재 artifact와 일치할 때만 실패 이력 repair 후 재시도한다. 다른 migration/checksum/누락 오류는 중단한다.
+- V16은 동일 table의 INVALID 또는 잘못된 정의를 concurrent drop/create로 복구한다. 다른 table의 동명 인덱스는 변경하지 않는다. 원본 V15 최초 적용의 일반 CREATE INDEX 잠금은 별도 유지보수 창이 필요하다.
+
+실제 PostgreSQL의 실행·EXPLAIN·migration job 검증은 [구현 이력](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md#권한-전환-후-전체-회귀와-배포-job-검증)의 상태를 따른다.

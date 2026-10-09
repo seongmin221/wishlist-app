@@ -149,9 +149,11 @@ anchor query 하나에 위치와 requested ID가 들어 있다. anchorItemId/anc
 
 anchor가 여전히 scope 안이면 requestedAnchorItemId=resolvedAnchorItemId, anchorResolved=true다. 삭제·이동·처리로 빠지면 요청 정렬 위치의 **다음(더 오래된) 항목**, 없으면 바로 앞(더 새로운) 항목으로 복구하고 false를 반환한다. 맨 끝 삭제도 같은 규칙이다. scope가 비면 requested ID만 남고 resolved ID=null, false, items=[]다. 연속 처리에서 false는 정상 복구이며 오류가 아니다. page 모드의 requested/resolved/anchorResolved는 모두null이다.
 
-window 바깥에 항목이 있을 때만 이전/다음 cursor를 준다. 페이지 진행 방향은 limit+1, 반대 방향은 EXISTS로 확인한다. anchor는 양방향 +1을 읽는다. 이전 페이지는 정렬상 가까운 ASC key를 제한해 가져온 뒤 DESC로 반환하므로 왕복 시 항목이 빠지지 않는다. 카드 anchor cursor와 페이지용 cursor는 서로 대체하지 않는다. totalCount는 현재 snapshot의 전체 scope count다.
+window 바깥에 항목이 있을 때만 이전/다음 cursor를 준다. ITEM-02와 HOME-02는 같은 WishlistWindowReader가 한 SQL에서 count·window·양방향 존재·anchor fallback을 구성한다. 경계 없는 최신 첫 페이지의 previous는 false로 고정한다. 일반 scope의 eligible은 NOT MATERIALIZED로 커서 경계·정렬을 인덱스에 밀어 넣을 수 있게 하고, 홈 group은 공통 materialized action/group 분류 결과를 재사용한다. 이전 페이지는 가까운 ASC key를 제한해 선택한 후 최종 SQL에서 DESC로 반환한다. 카드 anchor cursor와 페이지 cursor는 서로 대체하지 않는다. totalCount는 현재 snapshot의 전체 scope count이며 상세 카드는 같은 connection에서 batch 조회한다.
 
-cursor는 B3처럼 Base64URL 구조·owner digest·scope·endpoint·용도·UUID·시각 범위·입력 길이를 검증한다. HMAC/신규 secret은 없다. 형식 오류나 범위 불일치는400이며 암호학적 위조 방지를 보장하지 않는다. 자기 범위 안의 유효 위치를 바꾼 token을 권한으로 신뢰하지 않고 SQL이 인증 owner/scope를 계속 제한한다.
+다음/이전 page 요청 사이에 진행 방향의 항목이 모두 삭제·이동·처리되면 items=[]여도 반대쪽에 남은 가장 가까운 항목을 가리키는 복귀 cursor를 반환한다. 이 cursor를 따라가면 복귀 기준 항목 자신도 포함한다. 양방향 모두 비었을 때만 두 cursor가 null이다. opaque token 내부의 NEXT_INCLUSIVE/PREVIOUS_INCLUSIVE 용도로 이를 구분하며 query·JSON 필드는 추가하지 않는다. 기존 NEXT/PREVIOUS cursor는 계속 배타적 경계다. page의 anchor 관련 세 필드는 계속 null이다.
+
+cursor는 B3처럼 Base64URL 구조·owner digest·scope·endpoint·용도·UUID·시각 범위·입력 길이를 검증한다. HMAC/신규 secret은 없다. 응답 mapper는 owner digest를 한 번 만들어 모든 카드·페이지 cursor에 공유하며, 페이지 token은 방향을 포함해 한 번만 decode한다. 형식 오류나 범위 불일치는400이며 암호학적 위조 방지를 보장하지 않는다. 자기 범위 안의 유효 위치를 바꾼 token을 권한으로 신뢰하지 않고 SQL이 인증 owner/scope를 계속 제한한다.
 
 ### HOME-02 그룹 조회
 
@@ -161,6 +163,8 @@ GET /v1/home/action-items?group=INFORMATION_COMPLETION&cursor={nextCursor}&limit
 ```
 
 필수 group은 ANALYSIS_IN_PROGRESS·INFORMATION_COMPLETION·CLASSIFICATION_REVIEW 중 하나다. action query는 없다. INFORMATION_COMPLETION 그룹은 requiredAction의 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 포함한다. 카드별 action과 allowedActions는 그대로 둔다. PROCESSING이 먼저, 이름/category 보완이 다음, PENDING review가 마지막이라는 WishlistItemPolicy 우선순위를 SQL과 공유한다.
+
+정확한 최신 totalCount는 매 요청 유지한다. HOME-01과 공유하는 action/group CTE에서 owner ACTIVE CASE를 한 번 계산하고 materialized key 결과를 count·window·복구·존재 판정에 재사용한 뒤 카드 projection을 같은 snapshot에서 batch 조회한다. 별도 count 쿼리·반복 CASE를 제거하지만 ACTIVE 전체 판정 비용 자체는 남는다. 새 쿼리의 실제 EXPLAIN·메모리/임시 파일 비용은 [리뷰 보완 이력](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md#2026-10-09-리뷰-보완)에서 검증 상태를 확인한다.
 
 완성된 CONFIRMED/DEFERRED 상품은 검토 그룹에서 제외한다. ‘처음부터 다시 보기’는 기기 skip만 초기화하고 cursor 없이 현재 미완료 첫 페이지를 조회한다. review 상태를 되돌리거나 별도 restart API를 만들지 않는다. local pending은 서버 item으로 합치지 않는다.
 
@@ -213,7 +217,7 @@ recentPurposes는 B3 summary DTO이며 ACTIVE activity_at DESC/id DESC 최대3�
 }
 ```
 
-MATERIALIZED classified에서 requiredAction CASE를 한 번 정의하고 group을 계산한다. FILTER count와 group별 row_number key를 한 SQL로 읽으며 NONE을 ranking 전에 제외한다. 최대12개 카드 projection과 PurposeRepository.page/previews는 같은 connection snapshot에서 읽는다. N+1 상세 호출은 없다. group은 계산 filter이므로 count는 owner ACTIVE 전체를 읽는 비용이 남는다. [실측 기록](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md#task-8--v15-인덱스와-실제-sql-측정)은 정렬 index 효과와 남은 scan 비용을 구분한다.
+같은 우선순위 조건 생성기와 policy의 homeGroupFor에서 group CASE를 직접 만들고 MATERIALIZED classified에 한 번 저장한다. FILTER count와 group별 row_number key를 한 SQL로 읽으며 NONE을 ranking 전에 제외한다. 최대12개 카드 projection과 PurposeRepository.page/previews는 같은 connection snapshot에서 읽는다. preview key에 대응하는 상세 row가 없으면 명시적으로 실패하여 count를 유지한 채 카드를 생략하지 않는다. N+1 상세 호출은 없다. group은 계산 filter이므로 count는 owner ACTIVE 전체를 읽는 비용이 남는다. [실측 기록](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md#task-8--v15-인덱스와-실제-sql-측정)은 정렬 index 효과와 남은 scan 비용을 구분한다.
 
 ### 조회 오류와 헤더
 

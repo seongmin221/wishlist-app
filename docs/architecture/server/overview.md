@@ -45,7 +45,7 @@ local은 Docker PostgreSQL로 migration·repository를 통합 테스트하고 Fi
 
 production의 Neon credential과 OpenAI API key는 Secret Manager에 두고, API·Worker에 필요한 secret version만 환경변수로 주입한다. Firebase Admin SDK는 Cloud Run service identity의 Application Default Credentials를 사용하며 private key 파일을 배포하지 않는다. Cloud Tasks와 Cloud Scheduler는 전용 service account의 OIDC token으로 private Worker·API endpoint를 호출하고, CI/CD는 GitHub Actions OIDC federation으로 배포한다.
 
-DB schema는 Flyway의 versioned SQL migration 파일로 Git에서 관리한다. local Docker PostgreSQL의 빈 DB에서 Gradle task로 전체 migration과 통합 테스트를 실행하고, CI/CD의 전용 단계가 production Neon에 `validate`·`migrate`를 한 번 적용한 뒤 API·Worker를 배포한다. runtime 서비스는 migration을 실행하지 않으며 destructive change는 expand → migrate → contract로 나눈다.
+DB schema는 Flyway의 versioned migration으로 Git에서 관리한다. V15까지는 SQL 파일이며 후속 V16은 INVALID 인덱스 확인·동시 재생성을 위한 Java migration이다. migrate/validate는 DatabaseFactory.migrationConfiguration과 공통 flyway.conf를 사용하며 SQL과 Java migration이 포함된 서버 classpath를 함께 로드한다. local Docker PostgreSQL의 빈 DB에서 Gradle task로 전체 migration과 통합 테스트를 실행하고, CI/CD의 전용 `./gradlew runDatabaseMigrations` job이 production Neon에 `validate`·`migrate`를 적용한 뒤 API·Worker를 배포한다. 이 job은 실제 V16 artifact와 일치하는 V16 실패만 검사하여 repair/retry하고 다른 checksum/누락 오류는 중단한다. V16 checksum은 패키징한 migration/helper 실행 소스에서 계산한다. runtime 서비스는 migration을 실행하지 않으며 destructive change는 expand → migrate → contract로 나눈다.
 
 production migration은 API·Worker와 별도의 Neon DB role·credential을 사용한다. 일반 변경 전에는 Neon restore history를 확인하고, destructive·대량 data 변경 전에는 Neon branch 또는 snapshot을 생성한다. migration 실패 시 deployment를 중단하고, 자동 rollback 대신 forward migration 또는 복구 branch 검증을 거쳐 수동으로 대응한다.
 

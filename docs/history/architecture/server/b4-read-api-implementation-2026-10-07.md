@@ -1,6 +1,6 @@
 # B4 상품 목록·홈 조회 구현 이력
 
-> 2026-10-07 · B4 로컬 구현·독립 리뷰·전체 회귀 완료
+> 2026-10-07 구현·전체 회귀 완료 / 2026-10-09 리뷰 보완: 실제 DB 재검증 대기
 
 ## 수신과 baseline
 
@@ -96,12 +96,12 @@ reviewer가 이번 결함으로 판단하지 않은 경계도 검토했다.
 | 경계 | 유지/후속 판단과 영향 |
 | --- | --- |
 | unsigned cursor의 유효 위치 변경 | 승인된 위치 힌트 계약이며 SQL owner/scope가 권한을 제한한다. 위치 불변 요구가 추가되면 서명과 protocol 변경이 필요하다. |
-| 요청 사이 변경 후 오래된 page cursor의 빈 window | 요청 간 snapshot은 보장하지 않고 빈 page cursor는null이다. 화면 위치 복구는 anchor로 한다. cursor만 쓰는 client는 첫 페이지 새로고침/anchor 복구가 필요할 수 있다. |
+| 요청 사이 변경 후 오래된 page cursor의 빈 window | 당시 빈 page 양쪽 cursor=null을 허용했으나 반대 방향 생존 항목을 놓치는 결함이었다. 2026-10-09 리뷰에서 이를 바로잡아 inclusive 복귀 cursor를 추가했다. |
 | B8 삭제 영향·참조 해제 | 현재 삭제 mutation은 없다. 후속 구현에서 표시 count를 재사용하면 이름 없는 영향 상품을 누락한다. |
 | B10 ARCHIVED 목적 연결 상품 | 현재 archive mutation은 없다. 후속 predicate를 갱신하지 않으면 두 목적 범위 모두에서 상품이 빠질 수 있다. |
 | brand/price/metadataCheckedAt null | B5 추출/저장 경계를 유지한다. B4만으로 이 표시 데이터를 제공하지 않는다. |
 | HOME count/summary 전체 scan | 정확한 count와 공통 판정의 관측 비용을 기록했다. 큰 owner에서는 지연이 상품 수에 비례하므로 별도 실측 최적화가 필요할 수 있다. |
-| 운영 중 V15 index 생성 | 로컬 migration 검증이며 production online rollout은 검증하지 않았다. 실제 배포 시 index 생성의 쓰기 잠금 비용은 해당 DB 환경에서 확인한다. |
+| 운영 중 V15 index 생성 | 당시 일반 CREATE INDEX였으며 production online rollout은 검증하지 않았다. 추가 리뷰 후 원본 V15 checksum을 유지하고 V16의 concurrent 복구로 분리했다. V15 최초 적용 잠금과 실제 PostgreSQL 재검증은 아래 상태를 따른다. |
 
 두 실행 판단도 검토했다. 공백 category는 현재 FK로 저장할 수 없어 유효 행 parity와 derived-expression 테스트를 나눴고, 후속 FK 완화가 있어도 표현 parity가 남는다. 미구현 GET의405는 기존 POST와 경로가 같아서 발생하며, 최종401/200/400 표현 검증은 별도로 통과했다.
 
@@ -110,3 +110,72 @@ reviewer가 이번 결함으로 판단하지 않은 경계도 검토했다.
 2026-10-07 이 worktree에서 JDK17·Podman 설정으로 `./gradlew test --rerun-tasks`를 완료했다. [유효 실행 명령](../../../architecture/server/local-test-environment.md#전체-테스트-실행)의 환경을 사용했고 exit0, `BUILD SUCCESSFUL in 6m 4s`였다. JUnit 결과는 **tests321·통과320·failures0·errors0·RealUrlPilot skip1**이다. B1~B3·Worker·category·목적과 신규 목록/home 회귀를 포함했다. 중단/실패 실행을 최종 통과 수에 합치지 않았다. 실제 외부 URL pilot과 production 검증은 수행하지 않았다.
 
 변경 문서의 상대 링크·JSON 예시와 diff check를 검증했다. V1~V14 파일과 client/·design/handoff/는 변경하지 않았다. 확정 제품 문서·계약·inventory·implementation order·INDEX와 계획 checkbox를 구현 결과에 맞췄다. 코드 수정 없는 독립 리뷰 이후에는 전체 suite를 이유 없이 반복하지 않았다. 로컬 의미별 커밋으로 마무리했다.
+
+## 2026-10-09 리뷰 보완
+
+사용자 리뷰의 빈 페이지 양방향 복귀 결함을 JDBC component 테스트로 먼저 재현했다. 오래된 방향/새로운 방향의 빈 페이지와 첫 페이지 불필요한 EXISTS 테스트 3개가 기존 코드에서 실패했다. 빈 page에서도 반대 방향 생존 항목을 포함하는 복귀 cursor를 제공하고, 경계 없는 최신 첫 페이지의 반대 EXISTS를 생략했다. 앞선 Task9의 빈 page 허용 판단은 이 결함을 놓쳤으므로 유지하지 않는다.
+
+HOME-02는 owner ACTIVE CASE를 materialized 결과로 한 번 계산하여 정확한 totalCount·page/anchor·양방향 존재·빈 page 복구에 공유하는 통합 SQL로 바꿨다. 카드 batch 조회는 같은 snapshot에서 이어진다. exact count의 전체 ACTIVE 판정 비용은 남으며 stale cache나 count 생략은 도입하지 않았다. 기존 Task8 표는 **수정 전 개별 쿼리**의 관측값이다. 새 통합 page/anchor SQL의 동일 fixture EXPLAIN을 테스트에 추가했지만 아직 실행하지 못했으므로 성능 개선 수치를 주장하지 않는다.
+
+기존 PREVIOUS token이 owner digest를 두 번 계산하는 실패를 확인한 뒤 token을 한 번 decode하고 방향을 읽도록 고쳤다. 응답 owner context는 100개 카드와 두 페이지 cursor에서 digest를 한 번 공유한다. B3/B4 digest·microsecond 변환, 홈/PUR 목적 요약 mapper, category/read의 순서 기반 SQL parameter bind를 공통화했다. 유효 기존 token의 wire 형태를 유지한다.
+
+첫 리뷰에서 V15 변경을 시도했으나 추가 리뷰와 사용자 결정에 따라 원본을 복원했다. concurrent 복구는 후속 V16으로 분리하고 공통 Flyway session lock 설정을 적용했다. 세부 근거·중단 복구는 [QA-SRV-014](../../../learning/server/q-and-a/QA-SRV-014-concurrent-read-index-migration.md)에 남겼다. specs/INDEX도 추가했다.
+
+소켓이 필요 없는 직접 Kotlin/JUnit 검증으로 main/test 전체 소스 컴파일과 확장 단위/component 회귀 **83개 통과·실패0·skip0**를 확인했다. 확장 첫 실행은 저장소 루트 cwd에서 taxonomy 상대 경로를 찾지 못해82 통과·1 실패였고, server cwd로 바로잡아 전체83개를 재실행했다. 실패 실행은 통과로 합치지 않았다. Gradle는 공용 캐시 lock 쓰기와 로컬 socket 생성 제한으로 실행하지 못했다. PostgreSQL 빈 page·정확한 count·CASE 1회·통합 EXPLAIN·V15 migration 테스트는 추가/갱신했지만 아직 실행하지 않았다. 위 2026-10-07의320 통과·1 skip은 수정 전 결과이며 이번 변경의 전체 회귀 결과로 재사용하지 않는다.
+
+별도 read-only reviewer는 현재 production diff의 SQL parameter 순서·page/anchor·inclusive cursor·mapper·migration 설정을 정적으로 검토하여 구체적 결함을 찾지 않았다. 계약 문서의 기존 universal limit+1/EXISTS 설명을 갱신하라는 지적은 반영했다. 이 리뷰는 실제 PostgreSQL 실행 검증을 대신하지 않는다.
+
+## 추가 리뷰 보완
+
+공유 DB 적용 여부는 확인되지 않았고 사용자가 **원본 V15 보존**을 선택했다. ed496fc 바이트와 SHA-256 일치를 검사하여 기존 checksum을 보존했고 임시 V15 비트랜잭션 설정을 제거했다. 원본 V15는 transactional이므로 부분 DDL commit 시나리오를 일반화하지 않는다. V14 이하 DB의 최초 V15 CREATE INDEX 쓰기 잠금은 남는다.
+
+2차 보완 당시 V16 Java migration은 비트랜잭션·고정 revision checksum을 사용했다. 이 방식의 변경 감지와 복구 경계는 아래 3차 보완에서 교정했다. 정상 인덱스는 유지하고, 대상 table과 validity/정의를 확인하여 INVALID만 정리한 뒤 IF NOT EXISTS/IF EXISTS를 붙인 concurrent DDL을 실행한다. 잘못된 table/정상 정의는 변경하지 않고 중단하며 실패 이력 repair는 자동 실행하지 않는다. 두 인덱스 완료 후 세 번째 실패·재실행, foreign table 거절, varchar의 PostgreSQL text cast, 잘못된 ACTIVE literal/predicate를 component 테스트로 확인했다. 첫 varchar 표현은 잘못된 정의로 거절됐으므로 RED 확인 후 실제 predicate를 별도로 검증하도록 수정했다.
+
+Flyway lock·migration 위치는 공통 flyway.conf로 모으고 application/test의 migrate·validate를 DatabaseFactory.migrationConfiguration으로 통일했다. CLI도 같은 설정과 Java/Kotlin migration classpath를 읽어야 한다. migration 목록 기대값15→16은 후속 migration 추가가 근거이며 V1~V15 원본 파일은 유지한다. 실제 V15→V16 discovery/validate와 INVALID 인덱스 복구 fixture는 추가했지만 PostgreSQL 실행은 아직 하지 못했다.
+
+ITEM-02와 HOME-02의 page/anchor/fallback/inclusive/정렬은 WishlistWindowReader 하나로 통합했다. count/window SQL 한 번과 상세 batch 한 번으로 구성하고 custom/purpose 자원 유효성 SELECT만 별도로 둔다. 미사용 repository Action 쿼리를 제거하고 EXPLAIN 테스트를 실제 service가 실행한 reader SQL capture로 바꿨다. HOME-01/02는 같은 action/group CTE를 생성하며 별도 action materialization으로 CASE 중복 계산을 막는다. 일반 목록 eligible은 NOT MATERIALIZED로 index keyset 경계를 밀어 넣을 수 있게 한다. 이 두 materialization 문제는 독립 정적 리뷰가 지적해 보완했으며 실제 plan/성능 재현은 아직 완료하지 않았다.
+
+2차 보완에서 목적 summary entry 조립·SQL bind를 공유하고 홈 projection의 누락 row를 건너뛰게 했다. 누락 처리·named bind·decoder 범위는 아래 3차 보완에서 교정했다. Category SQL은 내부 named marker를 조합해 subquery 위치가 바뀌어도 값이 그 marker를 따라 bind되게 했다. B3 목적 encode에 새 범위 require가 생기지 않도록 기존 인코딩 동작을 복구했으며 decoder 범위와 B4 encode 검증은 유지한다. 목적 비정상 clock 인코딩과 첫 page의3회 왕복은 RED로 재현한 뒤 수정했다. 요청당 repository/reader 재생성과 중복 availability enum·미사용 owner overload도 제거했다.
+
+최신 직접 Kotlin main/test 전체 소스 컴파일은 exit0이다. 29개 단위/component 클래스의 **91개 통과·실패0·skip0**를 확인했다. 앞선83개는 첫 리뷰 단계 결과다. 별도 reviewer의 마지막 정적 검토에서는 추가 결함을 찾지 않았다. 실제 PostgreSQL 전체 회귀·통합 EXPLAIN·운영 CLI/migration 검증은 실행 제한으로 대기하며 수정 전320 통과·1 skip으로 대체하지 않는다.
+
+최종 전체 Gradle 재시도는 FileLockContentionHandler의 java.net.SocketException: Operation not permitted로 build 시작 전 exit1이었다. DB 테스트가 실행된 결과로 기록하지 않는다. 변경 문서의 상대 링크·diff check와 기존 migration 파일 변경 없음은 직접 확인했다.
+
+
+## 3차 리뷰 보완
+
+HOME-01 누락 projection과 목적 cursor의 encode/decode 불일치를 우선 수정했다. 기존 테스트는 잘못된 성공 응답·decode 실패를 기대하고 있어 기대값부터 교정했다. 두 테스트의 RED에서 각각 count=1/previews=[] 성공과 pre-1970 cursor decode=null을 확인한 뒤 production을 고쳤다. HOME-01은 같은 snapshot의 preview key에 상세 row가 없으면 ID를 포함한 invariant 오류로 실패한다. 최대4개 preview로 전체 count를 다시 계산할 수 없으므로 부분 count 보정은 사용하지 않았다.
+
+목적 cursor는 PostgreSQL 최소 timestamp를 Unix microsecond로 변환한 값 이상·signed Long 범위를 양쪽에 적용했다. pre-1970/year10000과 넓은 양수 위치의 왕복을 확인했다. 독립 reviewer가 SQL 허용 범위 아래의 음수와 기존 PurposeRoutesTest의 year9999 거절 기대값을 지적했다. 극단 음수 decode를 RED로 확인해 SQL bind 전에 거절하고, route 회귀는 PostgreSQL 밖의 음수/Long overflow=400·허용된 양수 위치=200으로 바꿨다. B4 상품 cursor의 기존 1970~9999 범위는 해당 codec에 남겼다. 기존 테스트 기대값 변경은 저장 가능한 목적 위치의 왕복과 DB 오류 방지가 근거다.
+
+V16 고정 checksum과 잘못된 정상 인덱스 거절 테스트도 RED를 확인했다. checksum은 Gradle이 패키징한 V16·전용 helper 원본 소스의 CRC32로 교체했다. 동일 table의 INVALID/다른 정의는 concurrent drop/create로 복구하고, 다른 table은 거절한다. 원본 V15 바이트는 계속 유지했다. API/Worker Main은 조사 시점부터 migrate를 호출하지 않았다. 별도 배포 `runDatabaseMigrations` job을 추가해 V16 실패만 현재 resolved artifact·type·description·양쪽 checksum까지 확인한 뒤 repair/retry한다. 독립 reviewer가 누락된 V16도 같은 실패 코드가 나온다고 지적해 info state=FAILED와 실제 checksum 일치를 추가했다. 다른 버전/checksum/누락 오류는 자동 repair하지 않는다. 운영 경계는 [QA-SRV-014](../../../learning/server/q-and-a/QA-SRV-014-concurrent-read-index-migration.md)에 정리했다.
+
+requiredAction/group은 같은 조건 생성기와 policy homeGroupFor를 공유하고 홈은 group을 직접 계산하는 MATERIALIZED classified 하나만 저장한다. eligible은 NOT MATERIALIZED로 두었다. 실제 classified와 policy를 전체 유효 fixture에서 직접 비교하는 PostgreSQL 회귀를 확장했다. 조회 bind는 순서대로 전달하는 List/bindParameters로 통일하고, 물음표를 임의 치환하던 SqlBindings와 그 구현 전용 테스트를 제거했다. 카테고리 count SQL의 기존 bind 순서가 맞았다는 점도 확인했다. 첫 페이지 has_previous는 Boolean CASE bind로 EXISTS를 생략하며 그 부분의 SQL 문자열 분기를 제거했다. 위치 설정은 flyway.conf 한 곳만 따른다.
+
+직접 Kotlin2.3.21/JDK17의 **main/test 전체 소스 컴파일 exit0**, 29개 단위/component 클래스의 **95 통과·실패0·skip0**를 확인했다. 마이그레이션 checksum 테스트에는 Gradle processResources와 동일한 두 실행 소스 resource를 준비해 사용했다. Gradle packaging 자체·실제 PostgreSQL count/window/parity/EXPLAIN·V15→V16 upgrade 및 failed 이력 재시도는 아직 실행하지 못했다. 앞선91개와 이번95개는 서로 다른 단계이며 합산하지 않는다.
+
+[전체 Gradle 재시도 명령](../../../architecture/server/local-test-environment.md#제한-환경의-b4-전체-회귀-시도)은 build 시작 전에 FileLockContentionHandler의 `SocketException: Operation not permitted`로 exit1이었다. 테스트 실행 결과가 아니다. 별도 reviewer는 최종 production 변경과 cached Flyway11.20/pgjdbc bytecode를 읽어 구체적 추가 결함을 찾지 않았으며 테스트는 실행하지 않았다. docs/spec/계약/학습/INDEX를 현재 구현에 맞췄다. Git 공용 metadata 쓰기와 네트워크 제한으로 보완 커밋·push/PR은 완료하지 않았다.
+
+
+## 권한 전환 후 전체 회귀와 배포 job 검증
+
+2026-10-09 제한 해제 환경에서 [표준 Podman 명령](../../../architecture/server/local-test-environment.md#전체-테스트-실행)으로 `./gradlew test --rerun-tasks`를 완료했다. exit0·BUILD SUCCESSFUL in 7m, **tests345·통과344·failures0·errors0·RealUrlPilot skip1**이다. 앞선 소켓 오류 실행과 직접95개 결과를 이 전체 결과에 합산하지 않았다. B1~B3·Worker, owner/filter cursor 격리, 같은 시각 정렬, 빈 page/anchor 복구, 홈 count/preview/action 일치와 목적 count, 실제 SQL/policy parity를 포함한다. V15→V16 discovery/validate·INVALID 복구·failed V16 재시도와 Gradle checksum 소스 packaging도 실제 PostgreSQL에서 통과했다.
+
+별도 일회성 PostgreSQL16-alpine 컨테이너에서 `./gradlew runDatabaseMigrations`를 직접 실행했다. 빈 DB의 V1~V16 적용 후, 임시 DB에만 다른 table의 동명 인덱스를 만들어 V16 실패를 유도했다. 해당 실행의 실패·failed 이력·foreign table 보존을 확인한 뒤 충돌 인덱스를 정리하고 같은 명령으로 repair/retry했다. 이후 success16개·failed0개·정상 인덱스를 확인했고 마지막 재실행에서는 인덱스 OID가 유지됐다. 예상 실패 호출을 성공한 Gradle 실행으로 기록하지 않는다. 이 검증용 컨테이너는 정리했으며 다른 기존 컨테이너는 수정하지 않았다. production Neon rollout과 실제 URL pilot은 수행하지 않았다.
+
+### 공통 reader 실제 EXPLAIN
+
+WishlistReadIndexTest가 현재 service의 SQL/bind를 capture하여 migration 전 V14와 원본 V15+V16 적용 후에 같은 query/fixture를 측정했다. PostgreSQL16.15/aarch64, 두 owner20,000행·owner별10,000행, 각 홈 그룹100개·NONE9700개다. 아래 ms는 해당 SQL 실행 시간이고 카드 projection/HTTP 전체 지연이 아니다. scan은 wishlist_items 노드의 Actual Rows+Rows Removed by Filter에 loops를 곱한 합계라 같은 행의 반복 읽기도 포함한다.
+
+| query | V14 ms / scan | V15+V16 ms / scan |
+| --- | --- | --- |
+| public-page | 3.352 / 10081 | 2.139 / 5121 |
+| custom-page | 3.019 / 10082 | 1.827 / 5123 |
+| purpose-page | 0.796 / 5121 | 0.886 / 5121 |
+| unassigned-page | 2.500 / 20083 | 2.018 / 20161 |
+| home-ANALYSIS_IN_PROGRESS-page | 7.140 / 10000 | 7.777 / 20000 |
+| home-INFORMATION_COMPLETION-page | 7.233 / 10000 | 7.750 / 20000 |
+| home-CLASSIFICATION_REVIEW-page | 7.062 / 10000 | 8.278 / 20000 |
+| home-summary | 7.758 / 10000 | 8.479 / 20000 |
+
+모든 캡처 query의 temp read/write는0이었다. HOME-01/02의 실제 plan은 wishlist_items base 노드1개로 분류함을 검사했다. 정렬 인덱스는 category page 스캔을 줄였으나 홈은 V14의 owner10,000행 index scan에서 전체20,000행 seq scan으로 바뀌고 실행 시간이 증가했다. 목적 미지정도 일반 page는 개선됐지만 previous는 scan30102→40102·2.882→3.380ms로 증가했다. exact totalCount와 group 필터의 비용은 남으며 인덱스가 모든 조회를 개선한다고 주장하지 않는다. 기존 Task8의 독립 query 실측과 이번 통합 SQL 관측을 구분한다.

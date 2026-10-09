@@ -36,3 +36,17 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home DOCKER_
 당시 Colima socket은 없었다. `~/.testcontainers.properties`의 `docker.client.strategy`는 `org.testcontainers.dockerclient.UnixSocketClientProviderStrategy`였고, `ls -l /var/run/docker.sock`의 대상은 `/Users/user/.local/share/containers/podman/machine/podman.sock`이었다. provider 설정과 socket 대상, 성공한 DB 테스트를 근거로 Podman 사용 환경을 확인했다.
 
 위 명령은 당시 실행 기록이며 일반 재현용으로 복사하지 않는다. 다음 실행에서는 이 문서 첫 절의 유효한 Podman DOCKER_HOST 예시를 사용한다. 환경 예시로 과거 실행 기록을 소급해서 바꾸거나 시스템 socket을 변경하지 않는다.
+
+
+## 제한 환경의 B4 전체 회귀 시도
+
+2026-10-09에는 공용 Gradle 캐시 대신 임시 캐시 복사본과 이미 설치된 Gradle9.7.1을 사용해 전체 회귀를 시도했다. 표준 출력 redirect는 생략한 실제 명령이다.
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home GRADLE_USER_HOME=/tmp/wishlist-b4-review-gradle DOCKER_HOST=unix:///var/run/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1 RUN_REAL_URL_PILOT=0 /Users/user/.gradle/wrapper/dists/gradle-9.7.1-bin/1w1c7tv4s851m17nbqdsro2tv/gradle-9.7.1/bin/gradle test --rerun-tasks --offline --no-daemon
+```
+
+Gradle의 local socket 생성이 sandbox에서 거절돼 build 시작 전 exit1이었다. DB 테스트·processResources·migration job이 실행된 결과로 기록하지 않는다. 임시 캐시 경로와 설치 경로는 재현용 공통 설정이 아니므로, 제약이 없는 환경에서는 첫 절의 wrapper 명령을 사용한다.
+
+
+권한 전환 후에는 첫 절의 표준 Podman wrapper 명령으로 전체 회귀를 완료했다. 결과는 [B4 전체 검증 이력](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md#권한-전환-후-전체-회귀와-배포-job-검증)에 구분했다. 앞선 제한 환경의 명령을 일반 실행 절차로 대체하지 않는다.
