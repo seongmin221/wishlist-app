@@ -3,6 +3,7 @@ package app.wishlist.android.share
 import app.wishlist.shared.submission.InboxImportResult
 import app.wishlist.shared.submission.InboxRecord
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -25,7 +26,10 @@ class ShareInbox(private val directory: File, private val now: () -> Long = Syst
     fun write(record: InboxRecord): Boolean = try {
         directory.mkdirs()
         val temporary = File(directory, "${record.clientSubmissionId}$TEMPORARY")
-        temporary.writeText(listOf(FORMAT, record.clientSubmissionId, record.sharedAtIso, record.sourceUrl).joinToString("\n"))
+        FileOutputStream(temporary).use { out ->
+            out.write(listOf(FORMAT, record.clientSubmissionId, record.sharedAtIso, record.sourceUrl).joinToString("\n").toByteArray())
+            out.fd.sync() // on disk before the rename: a power loss never leaves an empty `.share`
+        }
         temporary.renameTo(File(directory, "${record.clientSubmissionId}$RECORD")) || false.also { temporary.delete() }
     } catch (e: IOException) {
         false

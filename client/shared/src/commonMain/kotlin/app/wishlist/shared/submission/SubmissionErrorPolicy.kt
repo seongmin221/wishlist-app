@@ -22,12 +22,12 @@ internal object SubmissionErrorPolicy {
 
     /** [serverFailures]: server-side failures in a row, this one included (1 for the first). */
     fun decide(error: ClientError, now: Instant, serverFailures: Int = 1): Decision = when (error.kind) {
-        // Transient: keep it queued with the error recorded. The next rows would most likely fail the
-        // same way, so the flush stops (one request per attempt, not the whole queue), and the
-        // coordinator's timer retries after 30s, 60s, 120s ... up to 15 minutes. NOT_FOUND is not in
-        // C3-D8 and is treated the same way, so a misrouted endpoint never loses a share.
+        // Transient: keep it queued with the error recorded; the coordinator's timer retries after
+        // 30s, 60s, 120s ... up to 15 minutes. `stopFlush` is the coordinator's call here: it stops at
+        // the second server-side failure of one flush (one bad row must not hold back the rest).
+        // NOT_FOUND is not in C3-D8 and is treated the same way, so a misrouted endpoint never loses a share.
         ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND ->
-            Decision(SubmissionStatus.PENDING, now + serverBackoffSeconds(serverFailures).seconds, stopFlush = true)
+            Decision(SubmissionStatus.PENDING, now + serverBackoffSeconds(serverFailures).seconds, stopFlush = false)
         // Ruling 10: the next rows would fail the same way (offline, timing out, throttled), so stop.
         ErrorKind.NETWORK, ErrorKind.TIMEOUT -> Decision(SubmissionStatus.PENDING, null, stopFlush = true)
         ErrorKind.RATE_LIMITED -> {

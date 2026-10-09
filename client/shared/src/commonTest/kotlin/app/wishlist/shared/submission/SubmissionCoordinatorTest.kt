@@ -94,6 +94,9 @@ internal class ScriptedCreate(
 
     fun fail(error: ClientError) = then { ClientResult.Failure(error) }
 
+    /** Drops the scripted steps not run yet: later calls go to the Fake backend. */
+    fun clearScript() = script.clear()
+
     override suspend fun create(command: CreateItemCommand): ClientResult<WishlistItem> =
         create(command, session.state.value)
 
@@ -563,26 +566,51 @@ class SubmissionCoordinatorTest {
         assertTrue(h.pending().isEmpty())
     }
 
-    @Test fun serverErrorsBackOffAndStopTheFlush() = runCoordinatorTest { h ->
+    @Test fun aServerThatStaysDownCostsTwoRequestsPerAttemptWithGrowingWaits() = runCoordinatorTest { h ->
         h.signIn()
         repeat(3) { h.share(online = false) }
-        repeat(3) { h.create.fail(ClientError(ErrorKind.SERVER)) }
+        repeat(1_000) { h.create.fail(ClientError(ErrorKind.SERVER)) }
         h.coordinator.requestFlush()
         runCurrent()
-        assertEquals(1, h.create.calls.size) // one request per attempt, not the whole queue
+        assertEquals(2, h.create.calls.size) // stopped at the second server-side failure, not the whole queue
 
-        // Waits double: 30s, then 60s, then 120s.
-        advanceTimeBy(30_001); runCurrent()
-        assertEquals(2, h.create.calls.size)
-        advanceTimeBy(59_000); runCurrent()
-        assertEquals(2, h.create.calls.size)
-        advanceTimeBy(1_001); runCurrent()
-        assertEquals(3, h.create.calls.size)
-        advanceTimeBy(119_000); runCurrent()
-        assertEquals(3, h.create.calls.size)
-        advanceTimeBy(1_001); runCurrent()
-        assertEquals(6, h.create.calls.size) // the server is back: the whole queue goes
+        // Ten minutes of a server that stays down: waits double from 30s, so a handful of attempts.
+        advanceTimeBy(600_000)
+        runCurrent()
+        assertTrue(h.create.calls.size <= 14, "requests in 10 min: ${h.create.calls.size}") // 30s fixed, no stop: 60
+        assertEquals(3, h.pending().size)
+
+        h.create.clearScript() // the server is back: the next timer sends the whole queue
+        advanceTimeBy(900_001)
+        runCurrent()
         assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun oneRowTheServerAlwaysFailsDoesNotHoldBackTheRest() = runCoordinatorTest { h ->
+        h.signIn()
+        h.share(online = false)
+        h.share(online = false)
+        val (bad, good) = h.pending()
+        h.create.fail(ClientError(ErrorKind.SERVER))
+        h.coordinator.requestFlush()
+        runCurrent()
+        assertEquals(listOf(bad.clientSubmissionId, good.clientSubmissionId), h.keysSent())
+        assertEquals(listOf(bad.clientSubmissionId), h.pending().map { it.clientSubmissionId })
+        assertEquals(1, h.view.processing.size)
+    }
+
+    @Test fun backoffStartsOverForAnotherAccount() = runCoordinatorTest { h ->
+        h.signIn(AuthProvider.GOOGLE)
+        h.share(online = false)
+        repeat(4) { h.create.fail(ClientError(ErrorKind.SERVER)) }
+        h.coordinator.requestFlush(); runCurrent()
+        advanceTimeBy(30_001); runCurrent() // second failure in a row: the next wait would be 120s
+        h.signOut()
+        h.signIn(AuthProvider.APPLE)
+        h.share(online = false)
+        val at = h.clock.now()
+        h.coordinator.requestFlush(); runCurrent()
+        assertEquals(at + 30.seconds, h.pending().single().retryAfter) // 30s again, not 120s
     }
 
     @Test fun rateLimitHoldsEveryRowOfTheAccount() = runCoordinatorTest { h ->
@@ -928,7 +956,7 @@ class SubmissionCoordinatorTest {
         val record = deferred.single()
         assertEquals(LINK, record.sourceUrl)
         assertNull(record.accountBinding)
-        assertEquals(start + 1_500.milliseconds, Instant.parse(record.sharedAtIso))
+        assertEquals(start, Instant.parse(record.sharedAtIso)) // the share's own time, not the deferral's
         assertTrue(h.storeHarness.store.pending().successValue().isEmpty())
 
         // Once ready, importing it stores the share (as unbound).

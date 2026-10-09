@@ -100,6 +100,7 @@ class SubmissionCoordinator internal constructor(
 
     // Server-side failures in a row (consumer only); any accepted send resets it. Drives the backoff.
     private var serverFailures = 0
+    private var backoffAccount: String? = null
 
     init {
         scope.launch(dispatcher) { consumeRequests() }.invokeOnCompletion {
@@ -129,13 +130,16 @@ class SubmissionCoordinator internal constructor(
         defer: (InboxRecord) -> Boolean = { false },
     ): ShareCardKind = withContext(dispatcher) {
         val parsed = ShareTextParser.parse(text) as? ParsedShare.Link ?: return@withContext ShareCardKind.INVALID
+        // One key and time for the share, whichever way it is kept: a save that committed and then
+        // reported a failure re-imports as the same row (a no-op), never a second one.
+        val key = guarded<String?>(null) { ids.newId() } ?: return@withContext ShareCardKind.STORE_FAILED
+        val sharedAt = clock.now()
         suspend fun deferred(): ShareCardKind {
-            val record = guarded<InboxRecord?>(null) { InboxRecord(ids.newId(), parsed.url, clock.now().toString(), null) }
-            val written = record != null && guarded(false) { defer(record) }
-            return if (written) ShareCardKind.DEFERRED else ShareCardKind.STORE_FAILED
+            val record = InboxRecord(key, parsed.url, sharedAt.toString(), null)
+            return if (guarded(false) { defer(record) }) ShareCardKind.DEFERRED else ShareCardKind.STORE_FAILED
         }
         if (!awaitReady()) return@withContext deferred()
-        val saved = guarded<ClientResult<String?>>(STEP_FAILURE) { saveShare(parsed.url) }
+        val saved = guarded<ClientResult<String?>>(STEP_FAILURE) { saveShare(key, parsed.url, sharedAt) }
         if (saved !is ClientResult.Success) return@withContext deferred()
         val binding = saved.value
         guarded(Unit) { publishView() }
@@ -220,6 +224,10 @@ class SubmissionCoordinator internal constructor(
         flushWanted.value = false
         val snapshot = session.state.value
         if (snapshot.accountId == null) return if (finalPublish) publishView() else requestPublish()
+        if (snapshot.accountId != backoffAccount) {
+            backoffAccount = snapshot.accountId
+            serverFailures = 0 // another account's failures say nothing about this one's
+        }
         val retry = RetryWindow(clock)
         // A flush that could not read the queue knows no waits: it leaves the current timer as it is.
         var queueRead = false
@@ -255,6 +263,9 @@ class SubmissionCoordinator internal constructor(
         var earliest: Instant? = null
             private set
 
+        /** Server-side failures of ITEM-01 in this flush: the second one stops it (see recordFailure). */
+        var serverFailures = 0
+
         fun note(at: Instant) {
             if (at <= clock.now()) return
             earliest = earliest?.let { minOf(it, at) } ?: at
@@ -282,7 +293,7 @@ class SubmissionCoordinator internal constructor(
         val command = CreateItemCommand(id, row.sourceUrl, row.sharedAt)
         return when (val result = guarded(STEP_FAILURE) { create.create(command, snapshot) }) {
             is ClientResult.Success -> accept(snapshot, id, result, retry)
-            is ClientResult.Failure -> recordFailure(snapshot, id, result.error, retry)
+            is ClientResult.Failure -> recordFailure(snapshot, id, result.error, retry, fromServer = true)
         }
     }
 
@@ -298,17 +309,30 @@ class SubmissionCoordinator internal constructor(
         }
         // SESSION_CHANGED: the response is dropped and the row stays SUBMITTING with its binding;
         // that account's next prepareFlush resets it. Otherwise the store is suspect: record and stop.
-        if (failed.error.kind != ErrorKind.SESSION_CHANGED) recordFailure(snapshot, id, failed.error, retry)
+        if (failed.error.kind != ErrorKind.SESSION_CHANGED) recordFailure(snapshot, id, failed.error, retry, fromServer = false)
         return false
     }
 
-    /** Applies C3-D8 to the row; false stops this flush. */
-    private suspend fun recordFailure(snapshot: SessionSnapshot, id: String, error: ClientError, retry: RetryWindow): Boolean {
-        if (SubmissionErrorPolicy.isServerSide(error.kind)) serverFailures++
-        val decision = SubmissionErrorPolicy.decide(error, clock.now(), serverFailures)
+    /**
+     * Applies C3-D8 to the row; false stops this flush. [fromServer]: an ITEM-01 failure (a local
+     * accept failure neither counts toward the backoff nor takes part in the stop rule). A server-side
+     * failure stops the flush only when it is the second in this flush: one bad row (a URL the server
+     * always fails on) does not hold back the rows after it, and a server that is down still costs at
+     * most two requests per attempt.
+     */
+    private suspend fun recordFailure(
+        snapshot: SessionSnapshot, id: String, error: ClientError, retry: RetryWindow, fromServer: Boolean,
+    ): Boolean {
+        val serverSide = fromServer && SubmissionErrorPolicy.isServerSide(error.kind)
+        if (serverSide) {
+            serverFailures++
+            retry.serverFailures++
+        }
+        val decision = SubmissionErrorPolicy.decide(error, clock.now(), serverFailures.coerceAtLeast(1))
         val marked = store.markSubmission(snapshot, id, decision.status, error, decision.retryAfter)
         if (marked is ClientResult.Success) decision.retryAfter?.let(retry::note)
-        return marked is ClientResult.Success && !decision.stopFlush
+        val stop = if (serverSide) retry.serverFailures >= 2 else decision.stopFlush
+        return marked is ClientResult.Success && !stop
     }
 
     private suspend fun refreshOnce() {
@@ -361,10 +385,8 @@ class SubmissionCoordinator internal constructor(
         Unit
     }
 
-    /** Saves a new key under the current account; the value is the binding used. */
-    private suspend fun saveShare(url: String): ClientResult<String?> {
-        val key = ids.newId()
-        val sharedAt = clock.now()
+    /** Saves [key] under the current account; the value is the binding used. */
+    private suspend fun saveShare(key: String, url: String, sharedAt: Instant): ClientResult<String?> {
         var saved: ClientResult<Unit>
         var binding: String?
         var attempts = 0
