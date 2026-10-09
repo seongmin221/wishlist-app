@@ -319,4 +319,22 @@ class WLNavigatorTest {
         assertEquals(listOf(popped, gestured, replaced, dropped), nav.drainRemoved())
         assertEquals(emptyList<Long>(), nav.drainRemoved())
     }
+
+    @Test
+    fun droppingDuringABackGestureEndsTheGesture() {
+        val nav = WLNavigator()
+        nav.settle(TestScoped("item"))
+        assertTrue(nav.beginBackGesture())
+
+        nav.dropAccountScoped()
+        assertFalse(nav.isTransitioning)
+
+        nav.commitBackGesture()
+        assertFalse(nav.isTransitioning)
+        nav.cancelBackGesture()
+        assertFalse(nav.isTransitioning)
+        assertEquals(listOf(WLRoute.TabRoot(WLTab.Home)), nav.stack(WLTab.Home))
+        assertEquals(nav.entries(WLTab.Home).map { it.id }.toSet() + nav.entries(WLTab.Category).map { it.id } +
+            nav.entries(WLTab.Purpose).map { it.id }, nav.allEntryIds())
+    }
 }

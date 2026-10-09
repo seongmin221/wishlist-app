@@ -70,6 +70,9 @@ class WLNavigator(initialTab: WLTab = WLTab.Home) {
 
     internal fun entries(tab: WLTab): List<WLBackStackEntry> = stacks.getValue(tab)
 
+    /** 모든 탭 스택에 있는 칸 id. */
+    internal fun allEntryIds(): Set<Long> = stacks.values.flatMapTo(mutableSetOf()) { list -> list.map { it.id } }
+
     fun selectTab(tab: WLTab): Boolean {
         if (isTransitioning) return false
         if (tab == currentTab) {

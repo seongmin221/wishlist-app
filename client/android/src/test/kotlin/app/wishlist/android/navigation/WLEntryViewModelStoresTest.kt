@@ -64,4 +64,40 @@ class WLEntryViewModelStoresTest {
         assertTrue(a.cleared)
         assertTrue(b.cleared)
     }
+
+    @Test
+    fun aClearedEntryNeverGetsItsStoreBack() {
+        val stores = WLEntryViewModelStores()
+        val owner = stores.ownerFor(7)
+        val first = probe(owner.viewModelStore)
+        stores.clear(7)
+        assertTrue(first.cleared)
+
+        // 떠나는 모션 동안 다시 그려져 ViewModel을 또 달라고 한다.
+        val stray = probe(owner.viewModelStore)
+        assertNotSame(first, stray)
+        stores.clear(7)
+        assertFalse(stray.cleared)
+        stores.releaseStray(7)
+        assertTrue(stray.cleared)
+
+        val again = probe(owner.viewModelStore)
+        stores.retainOnly(emptySet())
+        assertFalse(again.cleared)
+        stores.releaseStray(7)
+        assertTrue(again.cleared)
+    }
+
+    @Test
+    fun retainOnlyClearsStoresOfEntriesMissingAfterRestore() {
+        val stores = WLEntryViewModelStores()
+        val live = probe(stores.storeFor(1))
+        val leftover = probe(stores.storeFor(2))
+
+        stores.retainOnly(setOf(1L, 3L))
+
+        assertFalse(live.cleared)
+        assertTrue(leftover.cleared)
+        assertSame(live, probe(stores.storeFor(1)))
+    }
 }

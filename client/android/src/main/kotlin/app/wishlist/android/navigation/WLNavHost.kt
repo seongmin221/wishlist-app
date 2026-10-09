@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
@@ -54,7 +55,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import androidx.compose.ui.unit.IntOffset
-import androidx.lifecycle.ViewModelStoreOwner
 
 /** 화면이 `push`·`pop`을 부르기 위한 접근. */
 val LocalWLNavigator = staticCompositionLocalOf<WLNavigator> { error("WLNavHost 밖에서 LocalWLNavigator를 읽었다") }
@@ -102,6 +102,8 @@ internal fun WLNavHost(
     }
     // 빠진 칸의 ViewModel은 떠나는 모션이 끝난 뒤(전환이 없을 때) 닫는다. 계정 떠남(전환 없음)은 셸이 바로 닫는다.
     LaunchedEffect(navigator, entryStores) {
+        // 복원(구성 변경) 직후: 저장되지 않은 대기 중 빠진 id(전환 도중 회전 등)의 store를 지운다.
+        entryStores.retainOnly(navigator.allEntryIds())
         snapshotFlow { !navigator.isTransitioning && navigator.hasRemoved }.collect { if (it) entryStores.clearRemoved(navigator) }
     }
     // 탭 바 투명도는 매 프레임 바뀌므로 그리기 단계(graphicsLayer)에서만 읽는다. 보일지 여부만 derivedStateOf로 다시 그린다.
@@ -258,6 +260,9 @@ private fun SharedTransitionScope.TabStack(
             events.collect { }
             return@PredictiveBackHandler
         }
+        // 이 끌기 객체. 계정 떠남(`dropAccountScoped`)이 끌기 도중 스택을 바꾸면 더는 활성 끌기가 아니다.
+        val gesture = navigator.activeTransition
+        val stillMine = { navigator.activeTransition === gesture }
         val from = navigator.entries(tab).last()
         val to = navigator.entries(tab).let { it[it.lastIndex - 1] }
         var last = 0f
@@ -271,16 +276,21 @@ private fun SharedTransitionScope.TabStack(
                 seen = true
                 last = e.progress
                 lastTime = now
-                seek.seekTo(e.progress.coerceIn(0f, 1f), to)
+                // 끌기가 끊긴 뒤에는 되감지 않는다(빠진 칸으로 seek하면 LaunchedEffect(top)의 새 맨 위 재생을 끊는다).
+                if (stillMine()) seek.seekTo(e.progress.coerceIn(0f, 1f), to)
+            }
+            if (!stillMine()) {
+                scope.launch { seek.snapTo(navigator.entries(tab).last()) }
+                return@PredictiveBackHandler
             }
             val commit = !seen || last >= Motion.interactiveBackCommitProgress || velocity >= FlingProgressPerSecond
             if (commit) {
                 navigator.commitBackGesture() // top이 바뀌면 LaunchedEffect(top)이 남은 전환을 재생하고 끝낸다.
             } else {
-                scope.launch { revert(seek, from, to, last, navigator) }
+                scope.launch { revert(seek, from, to, last, navigator, tab, gesture) }
             }
         } catch (e: CancellationException) {
-            scope.launch { revert(seek, from, to, last, navigator) }
+            scope.launch { revert(seek, from, to, last, navigator, tab, gesture) }
             throw e
         }
     }
@@ -294,9 +304,9 @@ private fun SharedTransitionScope.TabStack(
         modifier = Modifier.fillMaxSize(),
     ) { entry ->
         SideEffect { if (entry.id !in known) known = known + entry.id }
-        val owner = remember(entry.id) {
-            object : ViewModelStoreOwner { override val viewModelStore = entryStores.storeFor(entry.id) }
-        }
+        val owner = remember(entry.id) { entryStores.ownerFor(entry.id) }
+        // 빠진 뒤에도 그려지는 동안(떠나는 모션) 새로 만든 임시 store는 화면에서 사라질 때 닫는다.
+        DisposableEffect(entry.id) { onDispose { entryStores.releaseStray(entry.id) } }
         holder.SaveableStateProvider(entry.id) {
             CompositionLocalProvider(LocalWLStackScope provides this, LocalWLEntryViewModelStoreOwner provides owner) {
                 content(entry.route, entry.sourceKey)
@@ -312,7 +322,15 @@ private suspend fun revert(
     to: WLBackStackEntry,
     progress: Float,
     navigator: WLNavigator,
+    tab: WLTab,
+    gesture: WLNavTransition?,
 ) {
+    // 끌기 도중 계정 범위 칸이 정리되었으면 `from`은 이미 빠진 칸이다. 되돌리지 않고 지금 맨 위로 고정한다
+    // (빠진 칸을 다시 그리면 그 칸의 ViewModelStore를 새로 만들게 된다).
+    if (navigator.activeTransition !== gesture) {
+        seek.snapTo(navigator.entries(tab).last())
+        return
+    }
     try {
         if (seek.targetState == to && progress > 0f) {
             coroutineScope {
