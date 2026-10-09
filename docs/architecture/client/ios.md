@@ -100,3 +100,10 @@
 - `NetworkSignals`·`AppSignals`는 자동 테스트가 없다.
 - 홈 목록은 lazy가 아니다(`ScrollView` 안 `VStack`). 대기 300개에서 XCTest 측정 CPU가 N보다 빠르게 늘었다. Instruments는 `DevToolsSecurity` 승인 뒤 다시 잰다([C3 성능 확인](c3-performance-checks.md#c3-측정-결과-2026-10-07)).
 - 로그인 뒤 할 일 머리 "할 일 N개"는 0개일 때도 보인다(보드는 비지 않은 예만 있다). 영어는 plural로 "1 to-do"·"7 to-dos"다(iOS xcstrings plural variation, Android `<plurals>`).
+
+## 상품 상세 내비게이션 기반 (C4)
+
+- **계정 범위 route:** `WLRoute.accountScoped`(기본 false). `AppDestination.item(id)`·`.local(submissionId)`가 true이고 탭 바 없는 가로 밀기다(Task 11 전까지 배경만 그리는 자리 화면). `ContentView`가 `account.state.account?.accountId`의 `onChange`에서 `ContentView.shouldDropAccountScoped(previous:next:)`(이전 값이 nil이 아니고 다르면)일 때 `WLNavMotion.dropAccountScoped()` → `WLNavigator.dropAccountScoped()`를 부르고 돌려받은 id의 owner를 바로 닫는다. 모든 탭에서 첫 계정 범위 칸과 그 위를 전환 없이 뺀다(아래 설정 같은 칸은 남는다). 로그인(nil → A)은 떠남이 아니고, 첫 값은 기준값일 뿐이다(Android와 같다).
+- **전환 중 정리:** 영향받은 탭의 끌어서 뒤로·push·replace는 navigator에서 바로 끝난다(뒤이은 commit·cancel·모션 끝 콜백은 자기 전환이 아니라 무시). `WLNavMotion`은 끌기 상태와 남은 뒤로 거리를 잊고, 빠진 칸이 숨긴 원래 자리 사진을 되돌리고, 그 칸의 모션 값을 지운다. 되돌림 끝의 `cancelBackGesture`도 자기 끌기일 때만 부른다. 화면은 스택만 그리므로 남은 모션은 지금 맨 위 칸에 머문다. pop 중이면 떠나는 칸의 모션은 끝까지 간다.
+- **`replaceTop(route)`:** 맨 위 칸을 새 id의 칸으로 바꾸고(`sourceKey` 이어 받음) 바뀐 칸을 `exiting`으로 남겨 `.replace` 전환으로 cross-fade한다(칸 전체 `fade` 채널, 200 `easeOut` = `dialogIn`, Android와 같은 구현 기본값). 탭 첫 화면이거나 전환 중이면 false.
+- **칸별 owner(`WLEntryOwners`):** `ZStack`이 모든 칸을 살려 두므로 Presenter owner 수명은 뷰가 아니라 스택을 따른다. `WishlistApp`이 runtime을 `\.wlRuntime`으로 넘기고 `ContentView`가 `WLEntryOwners`를 `@State`로 만들어 `\.wlEntryOwners`로 제공한다. 화면은 `\.wlEntryID`로 `itemDetail(id)`·`localDetail(id)`(`LocalSubmissionDetailPresenterOwner`)를 받는다. navigator가 pop·끌어서 뒤로 확정·replace·drop으로 빠진 id를 모으고, `ContentView`가 "전환 없음 + 빠진 id 있음"이 되면 `drainRemoved()`의 owner를 닫는다(떠나는 모션 동안은 살아 있다). 닫은 id는 은퇴해 다시 요청하면 이미 닫힌 임시 owner를 준다.

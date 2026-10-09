@@ -29,6 +29,7 @@ struct WishlistApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(\.wlRuntime, runtime)
                 .environment(account)
                 .environment(home)
                 // Every account change (once restored) reaches the share extension's defaults.

@@ -91,8 +91,10 @@ struct WLNavHost<Content: View>: View {
         WLTab.allCases.flatMap { tab -> [WLEntryLayerModel] in
             let list = displayed(tab)
             let isCurrent = tab == navigator.currentTab
+            // replace 중 위에 그려지는 바뀐 칸은 새 칸을 밀지 않는다(둘 다 제자리에서 옅어진다).
+            let replaced = navigator.activeTransition?.kind == .replace ? navigator.exiting?.entry.id : nil
             return list.enumerated().map { index, entry in
-                let above = index + 1 < list.count ? list[index + 1] : nil
+                let above = index + 1 < list.count && list[index + 1].id != replaced ? list[index + 1] : nil
                 return WLEntryLayerModel(
                     entry: entry,
                     tab: tab,
@@ -153,6 +155,7 @@ private struct WLEntryLayer<Content: View>: View {
                 }
             }
         }
+        .modifier(WLEntryFade(channels: isRoot ? nil : motion.channels(entry.id)))
         .environment(\.wlEntryID, entry.id)
         // 밀기: 이 칸이 밀기로 열렸으면 x = (1 − phase)·W, 바로 위 칸이 밀기면 x = −parallax·W·phase(위 칸).
         .modifier(WLSlideOffset(
@@ -188,6 +191,15 @@ private struct WLTabFade: ViewModifier {
         content
             .opacity(channels.opacity)
             .scaleEffect(channels.scale)
+    }
+}
+
+/// replace cross-fade(칸 전체). 분기하지 않는다(칸의 정체성이 바뀌면 스크롤·입력 상태가 사라진다).
+private struct WLEntryFade: ViewModifier {
+    let channels: WLEntryChannels?
+
+    func body(content: Content) -> some View {
+        content.opacity(channels?.fade ?? 1)
     }
 }
 
