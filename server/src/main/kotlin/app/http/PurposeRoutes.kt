@@ -31,9 +31,7 @@ fun Route.purposeRoutes(service: PurposeService, ownerResolver: suspend (Applica
             PurposeProjection.SELECT -> ApiJson.encodeToString(PurposeSelectListDto(projection.name, page.entries.map { (p, _) ->
                 PurposeSelectItemDto(p.id.toString(), p.input.name, p.input.color.name, p.input.icon.name, p.version) },
                 next, page.activeCount, PurposeLimits.ACTIVE_LIMIT, page.archiveSummary()))
-            PurposeProjection.SUMMARY -> ApiJson.encodeToString(PurposeSummaryListDto(projection.name, page.entries.map { (p, previews) ->
-                PurposeSummaryItemDto(p.id.toString(), p.input.name, p.input.color.name, p.input.icon.name, p.version, p.input.description,
-                    p.candidateCount, p.activityDto(), previews.map { PurposePreviewDto(it.itemId.toString(), it.imageUrl) }) },
+            PurposeProjection.SUMMARY -> ApiJson.encodeToString(PurposeSummaryListDto(projection.name, page.entries.map { it.summaryDto() },
                 next, page.activeCount, PurposeLimits.ACTIVE_LIMIT, page.archiveSummary()))
         }
         call.respondText(payload, ContentType.Application.Json)

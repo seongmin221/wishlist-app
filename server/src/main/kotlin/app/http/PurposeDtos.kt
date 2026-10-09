@@ -27,3 +27,8 @@ internal fun Purpose.toDto() = PurposeDetailDto(id.toString(), input.name, input
     candidateCount, membershipVersion, version, activityDto(), createdAt.toString(), updatedAt.toString(), allowedActions.map { it.name })
 /** B3 has no archive records; count is the real ARCHIVED purpose count and titles come from B10 records. */
 internal fun PurposePage.archiveSummary() = PurposeArchiveSummaryDto(archivedCount, emptyList())
+
+internal fun PurposeListEntry.summaryDto(): PurposeSummaryItemDto = purpose.let { p ->
+    PurposeSummaryItemDto(p.id.toString(),p.input.name,p.input.color.name,p.input.icon.name,p.version,p.input.description,
+        p.candidateCount,p.activityDto(),previews.map { PurposePreviewDto(it.itemId.toString(),it.imageUrl) })
+}

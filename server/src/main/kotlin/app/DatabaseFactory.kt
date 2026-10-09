@@ -3,6 +3,8 @@ package app
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
+import org.flywaydb.core.api.configuration.FluentConfiguration
+import java.util.Properties
 import org.postgresql.ds.PGSimpleDataSource
 import javax.sql.DataSource
 
@@ -29,7 +31,16 @@ object DatabaseFactory {
             poolName = "wishlist-db"
         })
 
+    /** Application and tests use this factory; CLI reads the same resource via -configFiles. */
+    fun migrationConfiguration(url: String, username: String, password: String): FluentConfiguration {
+        val settings=Properties().apply {
+            DatabaseFactory::class.java.getResourceAsStream("/flyway.conf").use { stream ->
+                checkNotNull(stream) { "Missing shared Flyway settings" };load(stream)
+            }
+        }
+        return Flyway.configure().configuration(settings).dataSource(url,username,password)
+    }
     fun migrate(url: String, username: String, password: String) {
-        Flyway.configure().dataSource(url, username, password).locations("classpath:db/migration").load().migrate()
+        migrationConfiguration(url,username,password).load().migrate()
     }
 }

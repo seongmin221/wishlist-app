@@ -4,7 +4,6 @@ import app.DatabaseFactory
 import app.ai.TaxonomyCatalog
 import app.testutil.*
 import app.wishlist.CreateWishlistItemService
-import org.flywaydb.core.Flyway
 import java.util.UUID
 import java.sql.SQLException
 import kotlin.test.*
@@ -12,7 +11,7 @@ import kotlin.test.*
 class CategorySchemaTest {
     @Test fun `V12 keeps unknown historical public reference but rejects new references`() = PostgresTestContainer().use { db ->
         db.start()
-        Flyway.configure().dataSource(db.jdbcUrl,db.username,db.password).target("11").load().migrate()
+        DatabaseFactory.migrationConfiguration(db.jdbcUrl,db.username,db.password).target("11").load().migrate()
         val source=DatabaseFactory.dataSource(db.jdbcUrl,db.username,db.password)
         val owner=UUID.randomUUID()
         // Seed the V11 row with SQL: current item services target the latest schema.
@@ -34,7 +33,7 @@ class CategorySchemaTest {
 
     @Test fun `V10 upgrade preserves sealed public snapshot and backfills owner`() = PostgresTestContainer().use { db ->
         db.start()
-        Flyway.configure().dataSource(db.jdbcUrl,db.username,db.password).target("10").load().migrate()
+        DatabaseFactory.migrationConfiguration(db.jdbcUrl,db.username,db.password).target("10").load().migrate()
         val source=DatabaseFactory.dataSource(db.jdbcUrl,db.username,db.password)
         val owner=UUID.randomUUID(); val item=UUID.randomUUID(); val job=UUID.randomUUID()
         val snapshot="""{"categories":["C026"],"purposes":[],"category_labels":{"C026":"헤드폰"}}"""
@@ -46,7 +45,7 @@ class CategorySchemaTest {
         assertEquals(snapshot,analysisScalar(source,"select candidate_snapshot_json from analysis_jobs where id='$job'"))
         assertEquals(owner.toString(),analysisScalar(source,"select id from app_users where id='$owner'"))
         assertNull(analysisScalar(source,"select custom_category_id from wishlist_items where id='$item'"))
-        Flyway.configure().dataSource(db.jdbcUrl,db.username,db.password).load().validate()
+        DatabaseFactory.migrationConfiguration(db.jdbcUrl,db.username,db.password).load().validate()
     }
 
     @Test fun `all seeded public ids parents labels and order match versioned resource`() = withAnalysisDatabase { source ->

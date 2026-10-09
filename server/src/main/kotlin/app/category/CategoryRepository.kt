@@ -1,21 +1,29 @@
 package app.category
 
+import app.wishlist.WishlistReadPredicates
+import app.persistence.bindParameters
 import java.sql.Connection
 import java.util.UUID
 
 class CategoryRepository {
-    fun find(connection: Connection, owner: UUID, id: UUID, lock: Boolean = false): CustomCategory? = connection.prepareStatement("""
-        select c.*, (select count(*) from wishlist_items i where i.owner_id = c.owner_id and i.custom_category_id = c.id and i.lifecycle_status = 'ACTIVE') item_count
-        from custom_categories c where c.owner_id = ? and c.id = ? and c.deleted_at is null ${if (lock) "for update of c" else ""}
-    """).use { s ->
-        s.setObject(1, owner); s.setObject(2, id)
-        s.executeQuery().use { r -> if (!r.next()) null else row(r) }
-    }
+    private val visibility = WishlistReadPredicates.categoryVisible()
+    fun find(connection: Connection, owner: UUID, id: UUID, lock: Boolean = false): CustomCategory? =
+        connection.prepareStatement("""
+            select c.*, (select count(*) from wishlist_items i where i.owner_id=c.owner_id and i.custom_category_id=c.id and ${visibility.sql}) item_count
+            from custom_categories c where c.owner_id=? and c.id=? and c.deleted_at is null ${if(lock) "for update of c" else ""}
+        """).use { statement ->
+            statement.bindParameters(visibility.parameters+listOf(owner,id))
+            statement.executeQuery().use { rows -> if(rows.next()) row(rows) else null }
+        }
 
-    fun all(connection: Connection, owner: UUID): List<CustomCategory> = connection.prepareStatement("""
-        select c.*, (select count(*) from wishlist_items i where i.owner_id = c.owner_id and i.custom_category_id = c.id and i.lifecycle_status = 'ACTIVE') item_count
-        from custom_categories c where c.owner_id = ? and c.deleted_at is null order by c.parent_id, c.display_order
-    """).use { s -> s.setObject(1, owner); s.executeQuery().use { r -> buildList { while (r.next()) add(row(r)) } } }
+    fun all(connection: Connection, owner: UUID): List<CustomCategory> =
+        connection.prepareStatement("""
+            select c.*, (select count(*) from wishlist_items i where i.owner_id=c.owner_id and i.custom_category_id=c.id and ${visibility.sql}) item_count
+            from custom_categories c where c.owner_id=? and c.deleted_at is null order by c.parent_id,c.display_order
+        """).use { statement ->
+            statement.bindParameters(visibility.parameters+owner)
+            statement.executeQuery().use { rows -> buildList { while(rows.next()) add(row(rows)) } }
+        }
 
     fun count(connection: Connection, owner: UUID): Int = connection.prepareStatement(
         "select count(*) from custom_categories where owner_id = ? and deleted_at is null",

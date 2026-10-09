@@ -20,12 +20,7 @@ object WishlistItemPolicy {
             state.reviewStatus == ReviewStatus.PENDING -> RequiredAction.CLASSIFICATION_REVIEW
             else -> RequiredAction.NONE
         }
-        val group = when (required) {
-            RequiredAction.ANALYSIS_IN_PROGRESS -> HomeActionGroup.ANALYSIS_IN_PROGRESS
-            RequiredAction.INFORMATION_COMPLETION, RequiredAction.CATEGORY_ASSIGNMENT, RequiredAction.CATEGORY_REASSIGNMENT -> HomeActionGroup.INFORMATION_COMPLETION
-            RequiredAction.CLASSIFICATION_REVIEW -> HomeActionGroup.CLASSIFICATION_REVIEW
-            RequiredAction.NONE -> null
-        }
+        val group = homeGroupFor(required)
         val actions = buildSet {
             add(ItemAction.EDIT)
             add(ItemAction.DELETE)
@@ -41,4 +36,11 @@ object WishlistItemPolicy {
         }
         return ItemPolicy(required, group, actions)
     }
+    fun homeGroupFor(required: RequiredAction): HomeActionGroup? = when(required) {
+        RequiredAction.ANALYSIS_IN_PROGRESS -> HomeActionGroup.ANALYSIS_IN_PROGRESS
+        RequiredAction.INFORMATION_COMPLETION, RequiredAction.CATEGORY_ASSIGNMENT, RequiredAction.CATEGORY_REASSIGNMENT -> HomeActionGroup.INFORMATION_COMPLETION
+        RequiredAction.CLASSIFICATION_REVIEW -> HomeActionGroup.CLASSIFICATION_REVIEW
+        RequiredAction.NONE -> null
+    }
+
 }

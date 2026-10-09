@@ -8,7 +8,6 @@ import java.sql.DriverManager
 import java.sql.Connection
 import java.sql.SQLException
 import java.util.UUID
-import org.flywaydb.core.Flyway
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
@@ -17,7 +16,7 @@ class DatabaseMigrationTest {
     @Test fun `V10 upgrade adds nullable sharing time without changing V9 item job and outbox snapshots`() {
         PostgresTestContainer().use { database ->
             database.start()
-            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("9").load().migrate()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("9").load().migrate()
             database.createConnection("").use { connection ->
                 val itemId = UUID.randomUUID()
                 val jobId = UUID.randomUUID()
@@ -34,7 +33,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { s -> s.executeQuery("select client_created_at from wishlist_items").use { r ->
                     assertTrue(r.next()); assertNull(r.getObject(1))
                 } }
-                Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).load().validate()
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
             }
         }
     }
@@ -52,11 +51,11 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"), versions)
                     }
                 }
             }
-            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).load().validate()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
         }
     }
 
@@ -64,7 +63,7 @@ class DatabaseMigrationTest {
     fun `upgrade preserves legacy records and backfills state and expired running leases`() {
         PostgresTestContainer().use { database ->
             database.start()
-            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("7").load().migrate()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("7").load().migrate()
             database.createConnection("").use { connection ->
                 val owner = UUID.randomUUID()
                 val ids = (0..7).map { UUID.randomUUID() }
@@ -135,7 +134,7 @@ class DatabaseMigrationTest {
                     }
                     s.executeQuery("select count(*) from pg_indexes where indexname='analysis_jobs_recovery_idx'").use { r -> check(r.next()); assertEquals(1, r.getInt(1)) }
                 }
-                Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).load().validate()
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
             }
         }
@@ -174,7 +173,7 @@ class DatabaseMigrationTest {
     @Test fun `V13 upgrade preserves legacy purpose strings and validates owner purpose references`() {
         PostgresTestContainer().use { database ->
             database.start()
-            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("12").load().migrate()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("12").load().migrate()
             database.createConnection("").use { connection ->
                 val owner = UUID.randomUUID()
                 val ids = List(4) { UUID.randomUUID() }
@@ -206,7 +205,7 @@ class DatabaseMigrationTest {
                     }
                     assertEquals("23514", failure.sqlState)
                 }
-                Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).load().validate()
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
             }
         }
     }
@@ -214,7 +213,7 @@ class DatabaseMigrationTest {
     @Test fun `V14 raises ceilings of existing default windows so current windows keep reserving`() {
         PostgresTestContainer().use { database ->
             database.start()
-            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("13").load().migrate()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("13").load().migrate()
             database.createConnection("").use { c -> c.createStatement().use { s ->
                 s.executeUpdate("""insert into llm_budget_windows(id,window_type,window_start,reserved_microusd,settled_microusd,ceiling_microusd) values
                     ('${UUID.randomUUID()}','DAILY',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,599500,600000),

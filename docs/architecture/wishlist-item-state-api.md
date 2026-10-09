@@ -142,9 +142,9 @@ ACTIVE가 아니면 requiredAction은 NONE이고 허용 행동은 없다. ACTIVE
 - `anchorCursor`: `createdAt + itemId` 정렬 키를 담은 서버의 불투명한 값
 - `intraItemOffset`: anchor 카드 안의 상대 위치
 
-복귀 또는 새로고침 시 서버에서 anchor 앞뒤 20개를 받고 stable item ID로 로컬 목록에 병합한 뒤 `anchorItemId + intraItemOffset`으로 위치를 유지한다. 절대 항목 번호나 전체 스크롤 offset은 삽입·삭제·가변 카드 높이에 취약하므로 기준으로 사용하지 않는다.
+복귀 또는 새로고침 시 서버에서 anchor 자신1개와 앞뒤 각 최대20개(총 최대41개)를 받고 stable item ID로 로컬 목록에 병합한 뒤 `anchorItemId + intraItemOffset`으로 위치를 유지한다. 절대 항목 번호나 전체 스크롤 offset은 삽입·삭제·가변 카드 높이에 취약하므로 기준으로 사용하지 않는다.
 
-anchor 상품이 삭제되거나 다른 목록으로 이동했다면 서버는 `anchorCursor`와 가장 가까운 현재 항목을 반환하고 `anchorResolved=false`로 알린다. 클라이언트는 그 항목을 기준으로 복원한다.
+anchor 상품이 삭제되거나 다른 목록으로 이동했다면 서버는 요청 정렬 위치의 다음(더 오래된) 현재 항목을 우선 선택하고, 없으면 바로 앞(더 새로운) 항목을 반환하고 `anchorResolved=false`로 알린다. 대체 항목을 중심으로 window를 채우며 클라이언트는 그 항목을 기준으로 복원한다. 빈 목록이면 resolvedAnchorItemId=null이다. 연속 처리에서 방금 처리한 카드가 빠지는 false 응답도 정상 복구다.
 
 목록의 앞뒤 끝에 접근하면 응답의 cursor로 다음 window를 추가 조회한다. 전체 활성 목록과 전역 변경분을 매번 동기화하는 protocol은 MVP에서 제공하지 않는다. 따라서 현재 불러오지 않은 window의 다른 기기 변경은 해당 범위를 다시 조회할 때 반영될 수 있다.
 
@@ -181,26 +181,33 @@ GET /v1/wishlist-items?categoryId={id}&limit=40
 GET /v1/wishlist-items?categoryId={id}&anchor={cursor}&before=20&after=20
 ```
 
+목적 목록은 `purposeId={uuid}`, 명시적 미지정은 `purposeUnassigned=true`를 categoryId 대신 쓴다. scope는 하나만 받으며 category는 이름 있는 ACTIVE, 목적은 이름/category를 제한하지 않는 ACTIVE 전체다. 정렬은 created_at DESC/id DESC, page limit 기본40·상한100이며 clientCreatedAt은 사용하지 않는다.
+
 ```json
 {
   "items": [],
-  "requestedAnchorItemId": "item-id",
-  "resolvedAnchorItemId": "item-id",
-  "anchorResolved": true,
-  "previousCursor": "opaque-value",
-  "nextCursor": "opaque-value"
+  "totalCount": 0,
+  "requestedAnchorItemId": "00000000-0000-0000-0000-000000000001",
+  "resolvedAnchorItemId": null,
+  "anchorResolved": false,
+  "previousCursor": null,
+  "nextCursor": null
 }
 ```
 
-정렬은 최근 저장순이며 같은 저장 시각은 item ID로 안정적으로 정렬한다. cursor 내부 형식은 API 계약으로 공개하지 않는다.
+items는 `{item: WishlistItem, anchorCursor: cursor}` 카드 wrapper다. page 모드에서 요청/복구 anchor 필드는null이다. anchor는 단일 cursor이며 before/after 각각0~20·기본20, 자신 포함 최대41개다. cursor/limit과 anchor를 혼용하지 않는다. [B4 상세 조회 계약](server/wishlist-item-read-api.md#b4-공통-조회-계약)에 projection·오류·헤더·cursor 바인딩을 명시한다.
 
 ### 홈 조치 영역
 
 ```http
-GET /v1/home/action-items?action={requiredAction}&cursor={cursor}&limit=20
+GET /v1/home
+GET /v1/home/action-items?group=INFORMATION_COMPLETION&cursor={cursor}&limit=20
+GET /v1/home/action-items?group=CLASSIFICATION_REVIEW&anchor={cursor}&before=20&after=20
 ```
 
-서버가 `requiredAction`을 계산해 영역별 항목, `totalCount`와 다음 cursor를 반환한다. KMP는 여기에 기기의 `LocalSubmission`을 `ANALYSIS_PENDING`으로 합친다.
+HOME-01은 분석 중·정보 보완·분류 검토 순서로 count/최신 preview 최대4개, 최근 ACTIVE 목적 최대3개(빈 목적 포함)를 반환한다. 별도 할 일 합계는 없다. HOME-02는 같은 group predicate의 카드·totalCount·양방향 cursor·anchorResolved를 반환한다. 정보 보완 그룹에는 세 requiredAction이 함께 들어가며 개별 action과 허용 행동은 카드에 유지된다. group만 받으며 action query는 없다.
+
+HOME-02 page limit 기본20·상한100, anchor 계약은 ITEM-02와 같다. KMP는 기기의 LocalSubmission을 ANALYSIS_PENDING으로 합성하지만 서버 count에 포함시키지 않는다. 새 실행은 최신 첫 페이지, 화면이 살아 있으면 현재 anchor 재조회, 처음부터 다시 보기는 기기 skip 초기화 후 미완료 재조회다. CONFIRMED/DEFERRED 검토 대상을 되살리지 않는다. [계약 비교표](../superpowers/specs/2026-10-07-b4-read-api-design.md#기존-조회-계약과-비교)에 HOME-02의 action→group/anchor 확장과 기존 ITEM-02 복구 우선순위 구체화를 기록했다.
 
 ### 단일 상품 조회
 

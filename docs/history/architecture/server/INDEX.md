@@ -1,5 +1,6 @@
 # Server 의사결정
 
+- [B4 상품 목록·홈 조회 구현 이력](b4-read-api-implementation-2026-10-07.md) — 10-09 전체344 통과/1 skip·실제 reader EXPLAIN·원본V15/V16 배포 job·실패 재시도 검증
 - [B3 목적 구현·리뷰](b3-purpose-implementation-2026-10-07.md) — PUR-01~04·V13/V14·AI 목적 후보·입력 2,500·검증
 
 - [B2 후속 리뷰 보완](b2-review-followup-2026-10-07.md) — 공용 fallback·확정 상태·FAILED stage·V12·후보 타입/codec·API 문서 분리

@@ -42,3 +42,18 @@ tasks.register<JavaExec>("runBudgetMaintenance") {
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("app.budget.BudgetMaintenanceServiceKt")
 }
+
+// Freeze the exact V16 execution sources in its checksum artifact; never edit them after rollout.
+tasks.processResources {
+    from("src/main/kotlin") {
+        include("db/migration/V16__recoverable_read_indexes.kt", "app/persistence/ReadIndexRollout.kt")
+        into("migration-checksums/V16")
+    }
+}
+
+tasks.register<JavaExec>("runDatabaseMigrations") {
+    group = "application"
+    description = "Apply database migrations in a separate deployment job, retrying only a failed V16"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("app.DatabaseMigrationJobKt")
+}

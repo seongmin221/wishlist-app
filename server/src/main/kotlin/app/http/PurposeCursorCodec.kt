@@ -3,31 +3,28 @@ package app.http
 import app.common.parseCanonicalUuid
 import app.purpose.PurposeCursorPosition
 import app.purpose.PurposeProjection
-import java.security.MessageDigest
-import java.time.Instant
+import app.common.CursorPrimitives
 import java.util.Base64
 import java.util.UUID
 
 /** Opaque keyset cursor bound to projection and owner. Any undecodable or foreign cursor is rejected. */
 internal object PurposeCursorCodec {
+    // PostgreSQL MIN_TIMESTAMP (-211813488000000000, epoch 2000) converted to Unix microseconds.
+    private const val MIN_MICROS = -210_866_803_200_000_000L
     fun encode(owner: UUID, projection: PurposeProjection, position: PurposeCursorPosition): String {
-        val micros = Math.addExact(Math.multiplyExact(position.activityAt.epochSecond, 1_000_000L), position.activityAt.nano / 1000L)
-        val raw = "v1|${projection.name}|${ownerTag(owner)}|$micros|${position.id}"
+        val micros = CursorPrimitives.micros(position.activityAt)
+        require(micros >= MIN_MICROS)
+        val raw = "v1|${projection.name}|${CursorPrimitives.ownerTag(owner)}|$micros|${position.id}"
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.toByteArray(Charsets.UTF_8))
     }
 
     fun decode(owner: UUID, projection: PurposeProjection, cursor: String): PurposeCursorPosition? = runCatching {
         val parts = String(Base64.getUrlDecoder().decode(cursor), Charsets.UTF_8).split("|")
-        require(parts.size == 5 && parts[0] == "v1" && parts[1] == projection.name && parts[2] == ownerTag(owner))
+        require(parts.size == 5 && parts[0] == "v1" && parts[1] == projection.name && parts[2] == CursorPrimitives.ownerTag(owner))
         val micros = parts[3].toLong()
-        require(micros in 0..MAX_MICROS) // a cursor only ever carries stored activity times
-        PurposeCursorPosition(Instant.ofEpochSecond(Math.floorDiv(micros, 1_000_000L), Math.floorMod(micros, 1_000_000L) * 1000),
+        require(micros >= MIN_MICROS)
+        PurposeCursorPosition(CursorPrimitives.instant(micros),
             requireNotNull(parseCanonicalUuid(parts[4])))
     }.getOrNull()
 
-    /** 9999-12-31T23:59:59.999999Z; activity times are written by the database clock. */
-    private const val MAX_MICROS = 253_402_300_799_999_999L
-
-    private fun ownerTag(owner: UUID): String = MessageDigest.getInstance("SHA-256")
-        .digest(owner.toString().toByteArray(Charsets.UTF_8)).take(8).joinToString("") { "%02x".format(it) }
 }
