@@ -1,5 +1,6 @@
 package app.http
 
+import app.common.parseCanonicalUuid
 import app.wishlist.CreateResult
 import app.wishlist.CreateWishlistItemService
 import app.wishlist.GetWishlistItemService

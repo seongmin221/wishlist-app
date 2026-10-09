@@ -24,8 +24,8 @@ class LlmBudgetService(
     private val dataSource: DataSource,
     private val price: PriceTable = PriceTable(),
     private val modelSnapshot: String = "test-snapshot",
-    private val dailyCeilingMicrousd: Long = 600_000,
-    private val monthlyCeilingMicrousd: Long = 6_000_000,
+    private val dailyCeilingMicrousd: Long = 721_000,
+    private val monthlyCeilingMicrousd: Long = 7_210_000,
     private val allowLocalAlias: Boolean = false,
 ) {
     init { require(modelSnapshot.isNotBlank() && (allowLocalAlias || modelSnapshot != "gpt-5.6-luna")) }
@@ -47,19 +47,25 @@ class LlmBudgetService(
                 s.setObject(1, UUID.randomUUID()); s.setString(2, type); s.setTimestamp(3, Timestamp.from(start)); s.setLong(4, ceiling); s.executeUpdate()
             }
         }
+        val effective = mutableMapOf<String, Long>()
         windows.forEach { (type, start, ceiling) ->
-            val allowed = c.prepareStatement("select reserved_microusd,settled_microusd,ceiling_microusd from llm_budget_windows where window_type=? and window_start=? for update").use { s ->
-                s.setString(1, type); s.setTimestamp(2, Timestamp.from(start)); s.executeQuery().use { r -> r.next(); r.getLong(3) == ceiling && r.getLong(1) + r.getLong(2) + maximum <= ceiling }
+            val (total, stored) = c.prepareStatement("select reserved_microusd,settled_microusd,ceiling_microusd from llm_budget_windows where window_type=? and window_start=? for update").use { s ->
+                s.setString(1, type); s.setTimestamp(2, Timestamp.from(start)); s.executeQuery().use { r -> r.next(); (r.getLong(1) + r.getLong(2)) to r.getLong(3) }
             }
+            // The lower of the stored and this release's ceiling wins: an operator stop or a later release's lower
+            // ceiling is never raised, and an older release's window still reserves up to its own ceiling.
+            val limit = minOf(stored, ceiling).also { effective[type] = it }
+            val allowed = total + maximum <= limit
             if (!allowed) return@transaction ReserveResult.Exceeded
         }
         if (!AnalysisWriteGuard.lockCurrent(c, claim)) return@transaction ReserveResult.Stale
-        windows.forEach { (type, start, ceiling) ->
+        windows.forEach { (type, start, _) ->
             c.adjustWindow(type, start, maximum, 0)
             val total = c.prepareStatement("select reserved_microusd+settled_microusd from llm_budget_windows where window_type=? and window_start=?").use { s ->
                 s.setString(1,type); s.setTimestamp(2,Timestamp.from(start)); s.executeQuery().use { r -> r.next(); r.getLong(1) }
             }
-            if (total >= ceiling - ceiling / 5) c.prepareStatement("insert into llm_budget_alerts(id,window_type,window_start,threshold_percent) values(?,?,?,80) on conflict do nothing").use { s ->
+            val limit = effective.getValue(type)
+            if (total >= limit - limit / 5) c.prepareStatement("insert into llm_budget_alerts(id,window_type,window_start,threshold_percent) values(?,?,?,80) on conflict do nothing").use { s ->
                 s.setObject(1,UUID.randomUUID()); s.setString(2,type); s.setTimestamp(3,Timestamp.from(start)); s.executeUpdate()
             }
         }

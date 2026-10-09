@@ -22,4 +22,25 @@ class CandidateSnapshotCodecTest {
             """{"categories":["C026"],"purposes":[],"schema_version":"2"}""",
         )) assertNull(CandidateSnapshotCodec.decode(raw), raw)
     }
+    @Test fun `schema v3 keeps activity order and structured purpose evidence`() {
+        val ids = listOf("ffffffff-ffff-4fff-8fff-ffffffffffff", "00000000-0000-4000-8000-000000000001")
+        val purposes = ids.mapIndexed { i, id -> PurposeCandidate(id, "목적 $i ],;:", if (i == 0) "설명" else null, listOf("상품 $i")) }
+        val snapshot = CandidateSnapshot(setOf("C026"), ids.toCollection(LinkedHashSet()), ownerId = UUID.randomUUID().toString(),
+            schemaVersion = 3, purposeCandidates = purposes)
+        val decoded = assertNotNull(CandidateSnapshotCodec.decode(CandidateSnapshotCodec.encode(snapshot)))
+        assertEquals(purposes, decoded.purposeCandidates)
+        assertEquals(ids, decoded.purposeIds.toList())
+    }
+
+    @Test fun `schema v3 rejects duplicate non canonical oversized and label based purposes`() {
+        val owner = UUID.randomUUID()
+        fun raw(purposes: String, extra: String = "") =
+            """{"schema_version":3,"owner_id":"$owner","custom_categories":{},"categories":["C026"],"purposes":$purposes$extra}"""
+        val id = UUID.randomUUID().toString()
+        val row = """{"id":"$id","name":"n","description":null,"item_names":[]}"""
+        assertNotNull(CandidateSnapshotCodec.decode(raw("[$row]")))
+        for (bad in listOf(raw("[$row,$row]"), raw("""[{"id":"PUR_GIFT","name":"n","description":null,"item_names":[]}]"""),
+            raw("[" + List(11) { """{"id":"${UUID.randomUUID()}","name":"n","description":null,"item_names":[]}""" }.joinToString(",") + "]"),
+            raw("[$row]", ""","purpose_labels":{}"""), raw("""["$id"]"""))) assertNull(CandidateSnapshotCodec.decode(bad), bad)
+    }
 }

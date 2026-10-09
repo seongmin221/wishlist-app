@@ -30,7 +30,7 @@ class DatabaseMigrationTest {
                 }
                 val before = listOf("wishlist_items", "analysis_jobs", "outbox_events").associateWith { snapshot(connection, it, emptyList()) }
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
-                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, if (table == "wishlist_items") listOf("client_created_at", "custom_category_id") else emptyList())) }
+                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, if (table == "wishlist_items") listOf("client_created_at", "custom_category_id", "legacy_purpose_id") else if (table == "analysis_jobs") listOf("pending_purpose_judged") else emptyList())) }
                 connection.createStatement().use { s -> s.executeQuery("select client_created_at from wishlist_items").use { r ->
                     assertTrue(r.next()); assertNull(r.getObject(1))
                 } }
@@ -52,7 +52,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"), versions)
                     }
                 }
             }
@@ -98,8 +98,8 @@ class DatabaseMigrationTest {
                     s.executeUpdate("insert into llm_budget_reservations(id,request_id,analysis_job_id,generation,price_table_version,state,maximum_microusd,actual_microusd,lease_until) values ('${UUID.randomUUID()}','${UUID.randomUUID()}','$general',1,'v1','RESERVED',100,30,'2026-09-04T00:00:00Z')")
                     s.executeUpdate("insert into llm_budget_alerts(id,window_type,window_start,threshold_percent) values ('${UUID.randomUUID()}','MONTH','2026-09-01T00:00:00Z',80)")
                 }
-                val itemFields = "review_status,manual_completion_at,category_id,category_source,category_missing_reason,purpose_id,purpose_source,name_source,image_source,user_override_fields,current_generation,client_created_at,custom_category_id".split(",")
-                val jobFields = listOf("execution_token", "lease_until", "claimed_item_version")
+                val itemFields = "review_status,manual_completion_at,category_id,category_source,category_missing_reason,purpose_id,purpose_source,name_source,image_source,user_override_fields,current_generation,client_created_at,custom_category_id,legacy_purpose_id".split(",")
+                val jobFields = listOf("execution_token", "lease_until", "claimed_item_version", "pending_purpose_judged")
                 val queries = mapOf(
                     "wishlist_items" to itemFields, "analysis_jobs" to jobFields, "outbox_events" to emptyList(),
                     "llm_budget_windows" to emptyList(), "llm_budget_reservations" to emptyList(), "llm_budget_alerts" to emptyList(),
@@ -168,6 +168,69 @@ class DatabaseMigrationTest {
                     c.createStatement().use { it.executeUpdate("insert into analysis_jobs(id,wishlist_item_id,generation,stage) values ('${UUID.randomUUID()}','$id',0,'GENERAL_PENDING')") }
                 }
             }
+        }
+    }
+
+    @Test fun `V13 upgrade preserves legacy purpose strings and validates owner purpose references`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("12").load().migrate()
+            database.createConnection("").use { connection ->
+                val owner = UUID.randomUUID()
+                val ids = List(4) { UUID.randomUUID() }
+                // The 4th row was PENDING only because of its AI purpose (category is USER); nothing remains to review.
+                val rows = listOf(Triple("legacy-ai", "AI", "PENDING"), Triple("legacy-user", "USER", "CONFIRMED"), Triple(null, "UNASSIGNED", "NOT_REQUIRED"),
+                    Triple("legacy-ai-only", "AI", "PENDING"))
+                connection.createStatement().use { it.executeUpdate("insert into app_users(id) values ('$owner')") }
+                ids.zip(rows).forEach { (id, row) ->
+                    connection.createStatement().use { it.executeUpdate("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,
+                        product_name,category_id,category_source,category_missing_reason,purpose_id,purpose_source,review_status)
+                        values ('$id','$owner','${UUID.randomUUID()}','https://example.com/item','READY','ACTIVE','name','C026','${if (row.first == "legacy-ai-only") "USER" else "AI"}',null,
+                        ${row.first?.let { "'$it'" } ?: "null"},'${row.second}','${row.third}')""") }
+                }
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                ids.zip(rows).forEach { (id, row) ->
+                    connection.createStatement().use { s -> s.executeQuery("select purpose_id,legacy_purpose_id,purpose_source,review_status from wishlist_items where id='$id'").use { r ->
+                        check(r.next())
+                        assertNull(r.getObject("purpose_id"))
+                        assertEquals(row.first, r.getString("legacy_purpose_id"))
+                        assertEquals(if (row.second == "AI") "UNASSIGNED" else row.second, r.getString("purpose_source"))
+                        assertEquals(if (row.first == "legacy-ai-only") "NOT_REQUIRED" else row.third, r.getString("review_status"))
+                    } }
+                }
+                connection.createStatement().use { s ->
+                    s.executeQuery("select convalidated from pg_constraint where conname='wishlist_purpose_owner_fk'").use { r -> check(r.next()); assertTrue(r.getBoolean(1)) }
+                    s.executeQuery("select data_type from information_schema.columns where table_name='wishlist_items' and column_name='purpose_id'").use { r -> check(r.next()); assertEquals("uuid", r.getString(1)) }
+                    val failure = assertFailsWith<SQLException> {
+                        s.executeUpdate("insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint) values ('$owner','CREATE_PURPOSE','${UUID.randomUUID()}','${"0".repeat(64)}')")
+                    }
+                    assertEquals("23514", failure.sqlState)
+                }
+                Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
+    @Test fun `V14 raises ceilings of existing default windows so current windows keep reserving`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            Flyway.configure().dataSource(database.jdbcUrl, database.username, database.password).target("13").load().migrate()
+            database.createConnection("").use { c -> c.createStatement().use { s ->
+                s.executeUpdate("""insert into llm_budget_windows(id,window_type,window_start,reserved_microusd,settled_microusd,ceiling_microusd) values
+                    ('${UUID.randomUUID()}','DAILY',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,599500,600000),
+                    ('${UUID.randomUUID()}','MONTHLY',date_trunc('month',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,0,6000000),
+                    ('${UUID.randomUUID()}','MONTH','2026-09-01T00:00:00Z',0,0,1000)""")
+            } }
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            database.createConnection("").use { c -> c.createStatement().use { s ->
+                s.executeQuery("select window_type,ceiling_microusd from llm_budget_windows order by window_type").use { r ->
+                    val rows = buildMap { while (r.next()) put(r.getString(1), r.getLong(2)) }
+                    assertEquals(mapOf("DAILY" to 721_000L, "MONTH" to 1000L, "MONTHLY" to 7_210_000L), rows)
+                }
+            } }
+            val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+            val claim = app.testutil.newAnalysisClaim(source)
+            assertTrue(app.budget.LlmBudgetService(source).reserveBeforeCall(claim, UUID.randomUUID()) is app.budget.ReserveResult.Reserved)
         }
     }
 

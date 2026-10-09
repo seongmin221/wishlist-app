@@ -1,0 +1,96 @@
+# B3 목적 기본 관리 구현과 리뷰
+
+> 2026-10-07 · B3 수신·정책 확인·구현·독립 리뷰·전체 검증 기록
+
+## 수신과 baseline
+
+develop `1c6d949`(PR #9 B2 병합)에서 만든 독립 Orca worktree `seongmin221/server-b3-purpose-management`에서 시작했다. 시작 시 clean을 확인했다.
+이전 B1/B2 공간과 HANDOFF 파일은 사용하지 않았다. 이 공간에서 직접 실행한 baseline 전체 `--rerun-tasks`는 tests=252, failures=0, errors=0, skipped=1(RealUrlPilot)이다.
+
+## 정책 확인과 설계 리뷰
+
+제품 문서에 없던 정책을 구현 전에 사용자와 확정했다. 대상은 입력 제한, ACTIVE 30개·60초 10건·영구 receipt, 활동순, AI 근거(목적 10개·상품명 2개), 편집 후 재판단 없음, 확정·보류 상품의 빈 목적 보호, 후보 수, 기본 아이콘이다.
+설계 리뷰는 두 차례 받았다. 그 결과 입력 상한을 2,500으로 올리고 예산을 비례 상향했으며, 목적 근거를 먼저 줄이는 T0~T7 단계, 상품명 20자, snapshot v3 순서 보존, 판단/판단 없음 구분을 확정했다.
+결정은 [B3 제품 결정](../../product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md)과 [설계](../../../superpowers/specs/2026-10-07-b3-purpose-management-design.md)에 있다.
+상한 질문의 답은 [QA-AI-008](../../../learning/ai/q-and-a/QA-AI-008-input-cap-and-tier-order.md)에 남겼다.
+
+## 구현
+
+[구현 계획](../../../superpowers/plans/2026-10-07-b3-purpose-management.md) Task 1~7을 의미별 커밋으로 진행했다.
+
+1. 공용 `UserTextRules`, 목적 색 6개·아이콘 8개 stable key, 이름·설명 제한.
+2. V13: 목적 테이블, legacy 목적 문자열을 `legacy_purpose_id`에 보존, `(owner_id,purpose_id)` FK VALID, receipt 목적 대상, `pending_purpose_judged`. snapshot v3와 AI 목적 판단/판단 없음 반영 보호를 함께 넣었다.
+3. PUR-02/03 서비스. receipt·rate limit·transaction helper를 category와 공유한다.
+4. PUR-01/04 서비스. 활동순 keyset, 미리보기, archive 입구 수, expectedVersion 편집과 no-op.
+5. HTTP route·parser·cursor·오류 계약과 상품 응답의 목적 이름·색·아이콘.
+6. 입력 상한 2,500, 일·월 ceiling 721,000·7,210,000 micro USD, V14로 기존 기본 window ceiling 갱신.
+7. 목적 후보 공급, alias `P01`~`P10`·짧은 key·T0~T7 단계, 단계 로그.
+
+계약은 [목적 API](../../../architecture/server/purpose-management-api.md), AI 내부는 [AI 목적 후보](../../../architecture/server/purpose-ai-candidates.md), DB 경계는 [상태 영속성](../../../architecture/server/wishlist-state-persistence.md#b3-목적-schema와-잠금)에 있다.
+
+**구현 중 판단(ruling).** 모두 테스트만 바꿨고 production 동작에는 영향이 없다.
+- route 테스트의 상수 이름이 Ktor `HttpRequestBuilder.body`와 겹쳐 `createBody`로 바꿨다.
+- 예산 fixture의 한도 1,000은 496 예약 두 건이 들어가는 값이었다. 596 두 건이 들어가도록 1,200으로 올렸다.
+- B2 gateway 테스트의 기대값을 v2 snapshot의 `purposeJudged=false`로 바꿨다.
+- V12 upgrade 테스트는 legacy row를 현재 서비스 대신 SQL로 넣는다. 현재 서비스는 최신 schema를 전제하기 때문이다.
+
+**바뀐 기존 동작.** CONFIRMED/DEFERRED 상품의 빈 목적은 AI가 채우지 않는다. 확정 표현이 없는 문자열 목적 결과는 "판단 없음"이며 기존 연결을 유지한다. 이에 맞춰 B0/B2 회귀 테스트(목적만 AI인 검토, 확정 연결 보호)를 새 규칙으로 바꿨다.
+
+## 독립 리뷰와 보완
+
+opus 독립 리뷰의 판정은 "With fixes"였다(Critical 0, Important 1, Minor 6). 효과 기준으로 다시 분류해 다음 4건을 보완했다. 각 수정은 재현 테스트의 실패를 먼저 확인했다.
+
+- **위조 cursor.** owner tag는 맞고 timestamp만 극단값인 cursor가 400이 아니라 **200으로 통과**했다. 리뷰어는 500을 예상했다. 이제 0~9999년 범위 밖이면 `INVALID_PURPOSE_CURSOR`다.
+- **보지 못한 연결의 해제.** "목적 미지정" 판단이, 모델이 보지 못했거나 그 뒤 이름이 바뀐 현재 AI 연결을 해제하던 문제를 막았다. 현재 연결이 없거나 snapshot에 원문 그대로 있을 때만 판단으로 본다.
+- **단계 로그 누락.** 유료 호출을 보낸 뒤의 재시도·실패 응답에도 선택 단계를 붙여 로그한다.
+- **문서 최신화.** runtime·category 문서의 2,000 문구와 spec의 V14·로그·판단 문구를 고쳤다.
+
+**보류한 Minor.** receipt CHECK와 operation의 결합, ASCII `btrim`, 공용-only 요청의 `"purposes":[]`. `Assigned.purposeJudged` 기본값과 `CategoryChange` 재사용은 PR #11 리뷰에서 해결했다.
+
+**rollout 주의.** V13/V14 적용 전에 구 API/Worker를 멈춰야 한다(B0 drain과 같음). 구 버전이 uuid 컬럼에 문자열 목적을 쓰거나, 600,000 ceiling으로 새 window를 만들면 실패하거나 해당 window가 Exceeded가 된다.
+
+## PR #11 코드리뷰 반영
+
+PR #11 리뷰 9건을 코드와 대조했다. 정확성·운영 항목은 재현 테스트의 실패를 확인한 뒤 고쳤다.
+
+1. **V13의 review 재계산.** 카테고리가 USER이고 AI 목적 때문에만 PENDING이던 상품은 목적을 비우면서 NOT_REQUIRED로 바꾼다. B3 이전 provider는 목적 후보를 공급하지 않았으므로 실제로 영향받는 데이터는 없을 것으로 본다. V13은 아직 병합·배포 전이라 V13 자체를 고쳤다.
+2. **predicted_purpose_id.** 판단 결과만 기록한다. 판단하지 않은 단계(T6/T7·legacy)와 guard가 거부한 결과는 마지막 예측을 유지한다.
+3. **`Assigned.purposeJudged` 기본값.** false(판단 없음)로 바꿔, 별도 gateway·테스트 더블이 기존 연결을 끊지 않게 했다.
+4. **목록 cursor의 누락·반복.** 의도한 동작으로 판단해 계약에 명시했다. activityAt이 바뀌면 페이지 사이에서 빠지거나 반복될 수 있지만, ACTIVE ≤ 30이고 limit 기본·최대가 30이므로 limit을 생략하면 한 번의 snapshot으로 전체를 받는다.
+5. **token-count 호출.** 단계는 내용을 빼기만 하므로 token 수가 늘지 않는다. 첫 단계 검사 뒤 나머지를 이분 탐색해 최대 4회로 줄였다. B2 custom-only 회귀의 count 순서 기대값은 이에 맞춰 바꿨다.
+6. **예산 한도.** 예약 transaction이 저장 ceiling을 현재 release 값으로 맞춘 뒤 판정한다. 다른 release가 만든 window 때문에 하루 예약 전체가 Exceeded로 막히지 않는다.
+7. **상품 조회.** 목적 표시값을 상관 서브쿼리 3개 대신 left join 하나로 읽는다.
+8. **공용 helper.** code point 자르기는 `UserTextRules.truncate`, 정규 UUID 파싱은 `app.common.parseCanonicalUuid`로 합쳤다.
+9. **검증 분리와 중립 타입.** 설명 검증을 `validateDescription`으로 분리하고, PATCH 필드 의도는 중립 패키지의 `app.common.FieldChange`로 옮겨 category와 목적이 함께 쓴다.
+
+## PR #11 2차 리뷰 반영
+
+1차 반영의 두 결정을 다시 고쳤다.
+
+- **예산 한도.** 1차의 "저장 한도를 현재 값으로 덮어쓰기"는 운영자가 내린 한도와 다음 release의 낮은 한도를 되돌린다. 리뷰가 제안한 "올리기만 하기"도 0으로 내린 한도를 다시 올린다. 그래서 저장값과 현재 값 중 작은 쪽으로 판정하고 덮어쓰지 않는다.
+- **단계 선택.** 1차의 "첫 단계 뒤 전체 이분 탐색"은 가장 흔한 "T0만 넘음"을 4회로 늘리고, 미세한 token 경계에서 통과 단계를 건너뛸 위험이 있었다. 앞 3단계는 순서대로 보고, 큰 덩어리를 빼는 뒤 단계만 이분 탐색한다(흔한 경우 1~3회, 최대 6회). B2 custom-only의 count 순서는 원래대로 돌아왔다.
+- **정리.**
+  - `fits`의 실패 보관 변수와 `!!`를 없앴다.
+  - 일괄 치환으로 잘못 바뀐 `FieldChanges` 이름을 `CategoryChanges`로 되돌렸다.
+  - `PAGE_LIMIT`를 `ACTIVE_LIMIT`에 묶고 테스트로 고정했다.
+  - 카테고리 표시값도 left join으로 읽는다.
+  - 위임만 하던 wrapper를 지웠다.
+
+## 전체 검증
+
+실행 명령(server/):
+
+```sh
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home DOCKER_HOST=unix:///Users/user/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1 RUN_REAL_URL_PILOT=0 ./gradlew test --rerun-tasks
+```
+
+이 기기에는 colima socket이 없어 Testcontainers가 `/var/run/docker.sock`(podman)으로 연결했다. 2차 반영 중 영향 범위 실행과 전체 실행이 한 번씩 실패했다. 둘 다 서로 다른 테스트의 PostgreSQL 컨테이너 기동 실패였고, 원인은 podman의 임의 host port 충돌(`bind: address already in use`)이다. 코드 변경 없이 단독 재실행과 전체 재실행이 통과했으며, 실패한 실행은 통과로 기록하지 않았다.
+
+| 실행 | 결과 |
+| --- | --- |
+| 리뷰 전 | BUILD SUCCESSFUL, tests=289, failures=0, errors=0, skipped=1 |
+| 독립 리뷰 보완 후 | BUILD SUCCESSFUL, 5분25초, tests=292, failures=0, errors=0, skipped=1 → 291 통과·RealUrlPilot 1 skip |
+| PR #11 1차 리뷰 반영 후 | BUILD SUCCESSFUL, 5분31초, tests=295, failures=0, errors=0, skipped=1 → 294 통과·RealUrlPilot 1 skip |
+| PR #11 2차 리뷰 반영 후 최종 | BUILD SUCCESSFUL, 5분51초, tests=296, failures=0, errors=0, skipped=1 → **295 통과·RealUrlPilot 1 skip** |
+
+실행하지 않은 범위: 실제 OpenAI 호출, production 배포, RealUrlPilot(opt-in), B4~B11. push·PR·병합은 하지 않았다.

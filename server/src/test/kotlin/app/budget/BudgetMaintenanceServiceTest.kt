@@ -18,7 +18,7 @@ class BudgetMaintenanceServiceTest {
             CreateWishlistItemService(source).create(UUID.randomUUID(),UUID.randomUUID(),"https://example.com/item")
             val jobId = source.connection.use { c -> c.createStatement().executeQuery("select id from analysis_jobs").use { r -> r.next(); r.getObject(1,UUID::class.java) } }
             val claim = claimJob(source, jobId)
-            val budget = LlmBudgetService(source,dailyCeilingMicrousd=1000,monthlyCeilingMicrousd=1000)
+            val budget = LlmBudgetService(source,dailyCeilingMicrousd=1200,monthlyCeilingMicrousd=1200)
             val first = budget.reserveBeforeCall(claim,UUID.randomUUID()) as ReserveResult.Reserved
             budget.markInFlight(first.reservation.id)
             budget.reserveBeforeCall(claim,UUID.randomUUID())
@@ -27,7 +27,7 @@ class BudgetMaintenanceServiceTest {
             val maintenance = BudgetMaintenanceService(source) { alert -> notified.add(alert.id) }
 
             assertEquals(MaintenanceReport(2,2),maintenance.runOnce())
-            assertEquals(496L,budget.windowTotals("DAILY").settled)
+            assertEquals(596L,budget.windowTotals("DAILY").settled)
             assertEquals(0L,budget.windowTotals("DAILY").reserved)
             assertEquals(2,notified.size)
             assertEquals(MaintenanceReport(0,0),maintenance.runOnce())

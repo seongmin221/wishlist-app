@@ -1,7 +1,6 @@
 package app.http
 
-import app.category.CategoryChange
-
+import app.common.FieldChange
 import app.category.CategoryInput
 import kotlin.test.*
 
@@ -30,13 +29,13 @@ class CategoryRequestParserTest {
             parseCategoryPatchRequest("""{"expectedVersion":3,"name":"책상"}""" )).request
         assertEquals(3, renamed.expectedVersion)
         assertEquals("책상", renamed.name)
-        assertEquals(CategoryChange.Keep, renamed.description)
-        assertEquals(CategoryChange.Keep, renamed.examples)
+        assertEquals(FieldChange.Keep, renamed.description)
+        assertEquals(FieldChange.Keep, renamed.examples)
         val cleared = assertIs<CategoryRequestParseResult.Valid<CategoryPatchRequest>>(
             parseCategoryPatchRequest("""{"expectedVersion":3,"description":null,"examples":null}""")).request
         assertNull(cleared.name)
-        assertEquals(CategoryChange.Set<String?>(null), cleared.description)
-        assertEquals(CategoryChange.Set(emptyList()), cleared.examples)
+        assertEquals(FieldChange.Set<String?>(null), cleared.description)
+        assertEquals(FieldChange.Set(emptyList()), cleared.examples)
     }
 
     @Test fun `patch rejects parent even unchanged and requires exact positive version and changes`() {

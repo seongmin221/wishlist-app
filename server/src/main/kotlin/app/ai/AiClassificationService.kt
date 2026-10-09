@@ -7,6 +7,7 @@ import app.budget.LlmBudgetService
 import app.budget.ReserveResult
 import app.wishlist.AnalysisFailureCode
 import app.budget.BudgetReservation
+import app.budget.PriceTable
 import app.extraction.Metadata
 import java.util.UUID
 import javax.sql.DataSource
@@ -18,6 +19,7 @@ class AiClassificationService(
     private val gateway: (String, CandidateSnapshot, () -> Unit) -> GatewayResponse,
 ) {
     private val pending = AnalysisPendingResultRepository(dataSource)
+    private val logger = org.slf4j.LoggerFactory.getLogger(AiClassificationService::class.java)
 
     fun classify(claim: AnalysisClaim, metadata: Metadata): ProcessingOutcome {
         val candidates = pending.candidateSnapshotWithConnection(claim, candidates::snapshot)
@@ -36,6 +38,9 @@ class AiClassificationService(
                 check(!inFlight) { "Gateway entered flight more than once" }
                 budget.markInFlight(reservation.id)
                 inFlight = true
+            }
+            result.sent?.let { sent ->
+                logger.info("AI classification tier jobId={} tier={} customSent={} purposeSent={}", claim.jobId, sent.tier, sent.customCount, sent.purposeCount)
             }
             if (!inFlight && (result.inputTokens != null || result.outputTokens != null ||
                     result.classification is ClassificationResult.Assigned || result.classification == ClassificationResult.Abstained)) {
@@ -68,7 +73,7 @@ class AiClassificationService(
 
     private fun applyResponse(claim: AnalysisClaim, candidates: CandidateSnapshot, reservation: BudgetReservation,
         result: GatewayResponse, inFlight: Boolean): ProcessingOutcome {
-        val usageWithinLimit = result.inputTokens != null && result.outputTokens != null && result.inputTokens in 0..2000 && result.outputTokens in 0..80
+        val usageWithinLimit = result.inputTokens != null && result.outputTokens != null && result.inputTokens in 0..PriceTable.MAX_INPUT_TOKENS && result.outputTokens in 0..PriceTable.MAX_OUTPUT_TOKENS
         if (inFlight && usageWithinLimit) {
             budget.settle(reservation.id, result.inputTokens, result.outputTokens)
         } else if (inFlight && result.classification !is ClassificationResult.Retryable) {

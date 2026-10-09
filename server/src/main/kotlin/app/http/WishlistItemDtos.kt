@@ -58,6 +58,9 @@ data class CategoryDto(
 @Serializable
 data class PurposeDto(
     val id: String? = null,
+    val name: String? = null,
+    val colorKey: String? = null,
+    val iconKey: String? = null,
     val source: ValueSource = ValueSource.UNASSIGNED,
 )
 

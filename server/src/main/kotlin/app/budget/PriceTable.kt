@@ -12,12 +12,17 @@ class PriceTable(
         }
     }
 
-    fun maximumMicrousd(): Long = costMicrousd(2000, 80)
+    fun maximumMicrousd(): Long = costMicrousd(MAX_INPUT_TOKENS, MAX_OUTPUT_TOKENS)
 
     fun costMicrousd(inputTokens: Int, outputTokens: Int): Long {
-        require(inputTokens in 0..2000 && outputTokens in 0..80)
+        require(inputTokens in 0..MAX_INPUT_TOKENS && outputTokens in 0..MAX_OUTPUT_TOKENS)
         return kotlin.math.ceil(inputTokens * inputUsdPerMillion + outputTokens * outputUsdPerMillion).toLong()
     }
 
-    companion object { const val APPROVED_VERSION = "gpt-5.6-luna-2026-09-23" }
+    companion object {
+        const val APPROVED_VERSION = "gpt-5.6-luna-2026-09-23"
+        /** B3 decision: input 2,500 (was 2,000); ceilings scale so call capacity stays the same. */
+        const val MAX_INPUT_TOKENS = 2500
+        const val MAX_OUTPUT_TOKENS = 80
+    }
 }

@@ -28,8 +28,10 @@ class AnalysisPendingResultRepository(private val dataSource: DataSource) {
     } ?: false
 
     fun saveAssignment(claim: AnalysisClaim, result: ClassificationResult.Assigned): Boolean = guarded(claim) { c ->
-        c.prepareStatement("update analysis_jobs set pending_category_id=?,pending_purpose_id=?,pending_failure_code=null where id=?").use { s ->
-            s.setString(1, result.categoryId); s.setString(2, result.purposeId); s.setObject(3, claim.jobId); check(s.executeUpdate() == 1)
+        c.prepareStatement("""update analysis_jobs set pending_category_id=?,pending_purpose_id=?,pending_purpose_judged=?,
+            pending_failure_code=null where id=?""").use { s ->
+            s.setString(1, result.categoryId); s.setString(2, result.purposeId); s.setBoolean(3, result.purposeJudged)
+            s.setObject(4, claim.jobId); check(s.executeUpdate() == 1)
         }
         true
     } ?: false

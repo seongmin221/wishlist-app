@@ -57,7 +57,7 @@ class LlmBudgetServiceTest {
         assertEquals(ReserveResult.Stale, budget.reserveBeforeCall(claim, UUID.randomUUID()))
         assertEquals("1", analysisScalar(source, "select count(*) from llm_budget_reservations"))
         assertEquals(ReservationState.RESERVED, budget.state(reserved.id))
-        assertEquals(496L, budget.windowTotals("DAILY").reserved)
+        assertEquals(596L, budget.windowTotals("DAILY").reserved)
     }
 
     @Test fun `concurrent reservations cannot exceed either ceiling`() = withBudget { service, claim ->
@@ -67,8 +67,8 @@ class LlmBudgetServiceTest {
                 .map { it.get() }
             assertEquals(2, results.count { it is ReserveResult.Reserved })
             assertEquals(6, results.count { it is ReserveResult.Exceeded })
-        assertEquals(992L, service.windowTotals("DAILY").reserved)
-        assertEquals(992L, service.windowTotals("MONTHLY").reserved)
+        assertEquals(1192L, service.windowTotals("DAILY").reserved)
+        assertEquals(1192L, service.windowTotals("MONTHLY").reserved)
         } finally { executor.shutdownNow() }
     }
 
@@ -80,7 +80,7 @@ class LlmBudgetServiceTest {
         service.markInFlight(sent.reservation.id)
         analysisSql(source, "update llm_budget_reservations set lease_until=clock_timestamp()-interval '1 second'")
         assertEquals(2, service.reconcileExpired())
-        assertEquals(496L, service.windowTotals("DAILY").settled)
+        assertEquals(596L, service.windowTotals("DAILY").settled)
         assertEquals(0L, service.windowTotals("DAILY").reserved)
         assertEquals(ReservationState.RELEASED, service.state(before.reservation.id))
         assertEquals(ReservationState.SETTLED, service.state(sent.reservation.id))
@@ -106,6 +106,24 @@ class LlmBudgetServiceTest {
         assertEquals(2, service.pendingAlerts().size)
     }
 
+    @Test fun `reservations use the lower of the stored and configured ceiling without rewriting it`() = withAnalysisDatabase { source ->
+        val claim = newAnalysisClaim(source)
+        fun window(ceiling: Long, settled: Long) {
+            analysisSql(source, "delete from llm_budget_windows")
+            analysisSql(source, """insert into llm_budget_windows(id,window_type,window_start,reserved_microusd,settled_microusd,ceiling_microusd) values
+                ('${UUID.randomUUID()}','DAILY',date_trunc('day',clock_timestamp() at time zone 'UTC') at time zone 'UTC',0,$settled,$ceiling)""")
+        }
+        val budget = LlmBudgetService(source)
+        // An older release's window keeps working up to its lower ceiling instead of blocking the whole day.
+        window(600_000, 0); assertIs<ReserveResult.Reserved>(budget.reserveBeforeCall(claim, UUID.randomUUID()))
+        assertEquals("600000", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='DAILY'"))
+        window(600_000, 599_500); assertEquals(ReserveResult.Exceeded, budget.reserveBeforeCall(claim, UUID.randomUUID()))
+        // An operator stop (0) and a later release's lower ceiling are respected; a higher stored value cannot exceed this release.
+        window(0, 0); assertEquals(ReserveResult.Exceeded, budget.reserveBeforeCall(claim, UUID.randomUUID()))
+        assertEquals("0", analysisScalar(source, "select ceiling_microusd from llm_budget_windows where window_type='DAILY'"))
+        window(900_000, 720_500); assertEquals(ReserveResult.Exceeded, budget.reserveBeforeCall(claim, UUID.randomUUID()))
+    }
+
     private fun withBudget(block: (LlmBudgetService, AnalysisClaim) -> Unit) {
         PostgresTestContainer().use { db ->
             db.start()
@@ -114,7 +132,7 @@ class LlmBudgetServiceTest {
             CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item") as CreateResult.Created
             val jobId = source.connection.use { c -> c.createStatement().executeQuery("select id from analysis_jobs").use { it.next(); it.getObject(1, UUID::class.java) } }
             val claim = claimJob(source, jobId)
-            block(LlmBudgetService(source, dailyCeilingMicrousd = 1000, monthlyCeilingMicrousd = 1000), claim)
+            block(LlmBudgetService(source, dailyCeilingMicrousd = 1200, monthlyCeilingMicrousd = 1200), claim)
         }
     }
 }

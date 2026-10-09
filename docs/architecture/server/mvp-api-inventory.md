@@ -32,7 +32,7 @@
 
 | 종류 | 수 | 현재 상태 |
 | --- | ---: | --- |
-| 앱 서버 제품 API 동작 | **37** | B1 상품 생성·상세 2개 route 연결, 나머지 35개 route 없음. 목적 삭제 영향·표시 metadata 등 후속 확장은 각 묶음에서 완료 |
+| 앱 서버 제품 API 동작 | **37** | B1 상품 생성·상세 2개, B2 category 4개, B3 목적 4개 route 연결, 나머지 27개 route 없음. 목적 삭제 영향·표시 metadata 등 후속 확장은 각 묶음에서 완료 |
 | 내부 작업 HTTP 동작 | **3** | 일반 Worker 연결, browser는 조건부 route/service만 있고 runtime 연결 없음, maintenance 신규 제안 |
 | 공통 health HTTP 동작 | **1** | `/health` 구현 |
 | 와이어프레임 | **43** | 아래 W01~W43 모두 API 또는 기기/외부 서비스 책임에 연결 |
@@ -51,7 +51,7 @@ B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생
 | --- | --- | --- | --- | --- | --- |
 | ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, 선택 clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **구현(B1)**: 공유 시각 보관·실제 공통 mapper·신규 event 지정 발행. nullable 표시 metadata 및 후속 참조 확장은 B2/B3/B5/B6 |
 | ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 앞뒤 cursor·anchorResolved | 없음 |
-| ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 목적 deletionImpact는 B3/B8 확장 |
+| ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 목적 deletionImpact는 ITEM-05와 함께 B7 확장 |
 | ITEM-04 | `PATCH /v1/wishlist-items/{id}` | 일반 편집 한 번에 저장, 브랜드 수정·category 재지정·purpose 선택/해제 · S3/S4 | expectedVersion, 변경된 이름/brand/mediaId/categoryId/purposeId. 생략=유지, optional null=해제 | 갱신된 item·출처·review·version. 사용자 값만 수정, price/currency/sourceUrl 변경 제외 | 없음 |
 | ITEM-05 | `DELETE /v1/wishlist-items/{id}` | 일반·분석 중 삭제, 목적에서 항목 제거 · S2/S4 | item ID. 기존 계약상 expectedVersion 없음 | 204, 늦은 Worker 반영 차단. owner의 이미 삭제한 item 반복 삭제도 204 | 없음 |
 | ITEM-06 | `POST /v1/wishlist-items/{id}/analysis-attempts` | 재시도 가능한 실패를 다시 분석 · S2/S8 | attemptRequestId를 Idempotency-Key로 전달 | 새 generation·PROCESSING item, job/outbox 원자 생성. 수동 완료·terminal·PROCESSING이면 거절 | 없음 |
@@ -94,12 +94,14 @@ CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 
 
 ## 앱 서버 API — 목적 8개
 
+B3 PUR-01~04와 owner별 AI 목적 후보·반영 보호를 구현했다. [확정 계약](purpose-management-api.md)과 [AI 목적 후보](purpose-ai-candidates.md)를 따르며, 정책 경위는 [제품 결정](../../history/product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md)에 있다.
+
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| PUR-01 | `GET /v1/purposes` | 목적 탭, 상품/검토의 목적 선택 시트, 빈 목적 표시 · S3/S7 | cursor/limit, 요약/선택용 projection | ID·이름·설명·colorKey/iconKey·후보 수·최근 활동 시각·미리보기·version, archive 입구 count/요약 | 없음 |
-| PUR-02 | `POST /v1/purposes` | 목적 탭·상품·검토에서 새 목적 만들기 · S3 | 필수 이름/colorKey/iconKey, 선택 설명, Idempotency-Key | 빈 ACTIVE purpose와 ID·version. 기존 상품 전체 자동 재판단 없음 | 없음 |
-| PUR-03 | `GET /v1/purposes/{id}` | 목적 상세·빈 목적·편집 초기값 · S3/S7 | purpose ID | 목적 정보·후보 count·membershipVersion·allowedActions·version. 후보 0이면 archive 불가 | 없음 |
-| PUR-04 | `PATCH /v1/purposes/{id}` | 이름·설명·색·아이콘을 한 번에 저장 · S3/S7 | expectedVersion, 변경 필드 | 새 purpose·version·표시값. 관련 미확정 AI 결과의 재판단은 서버 내부 정책으로 처리 | 없음 |
+| PUR-01 | `GET /v1/purposes` | 목적 탭, 상품/검토의 목적 선택 시트, 빈 목적 표시 · S3/S7 | cursor/limit, 요약/선택용 projection | ID·이름·설명·colorKey/iconKey·후보 수·최근 활동 시각·미리보기·version, archive 입구 count/요약 | **구현(B3)**: SUMMARY/SELECT·활동순 keyset cursor·미리보기4·archiveSummary(현재 0) |
+| PUR-02 | `POST /v1/purposes` | 목적 탭·상품·검토에서 새 목적 만들기 · S3 | 필수 이름/colorKey/iconKey, 선택 설명, Idempotency-Key | 빈 ACTIVE purpose와 ID·version. 기존 상품 전체 자동 재판단 없음 | **구현(B3)**: owner 잠금·receipt replay·60초10건·ACTIVE30·job 없음 |
+| PUR-03 | `GET /v1/purposes/{id}` | 목적 상세·빈 목적·편집 초기값 · S3/S7 | purpose ID | 목적 정보·후보 count·membershipVersion·allowedActions·version. 후보 0이면 archive 불가 | **구현(B3)**: owner 상세·후보 수·membershipVersion·allowedActions(ARCHIVE는 후보≥1) |
+| PUR-04 | `PATCH /v1/purposes/{id}` | 이름·설명·색·아이콘을 한 번에 저장 · S3/S7 | expectedVersion, 변경 필드 | 새 purpose·version·표시값. 관련 미확정 AI 결과의 재판단은 서버 내부 정책으로 처리 | **구현(B3)**: expectedVersion·no-op·optional null·AI 재판단 없음 |
 | PUR-05 | `GET /v1/purposes/{id}/deletion-impact` | 목적 삭제 확인·목적 미지정이 될 후보 펼침 · S3 | cursor/limit | 영향 count·item 요약·cursor·purpose version·impactToken, 상품 유지·archive 비영향 | 없음 |
 | PUR-06 | `DELETE /v1/purposes/{id}` | 목적만 삭제·상품 purpose 해제 · S3 | purpose version·impactToken | 상품 유지·사용자가 확정한 목적 미지정, 관련 version 갱신. 빈 목적도 허용 | 없음 |
 | PUR-07 | `GET /v1/purposes/{id}/candidate-items` | 후보 추가 시트, 전체/상위/세부 category 필터 · S3/S7 | categoryId 또는 parentId, cursor/limit, includeCategoryFacets | 현재 목적 소속 제외한 선택 가능 item·현재 다른 목적·이동 안내·version·cursor. facets는 **전체 추가 가능 pool**의 category별 count, 현재 필터/page로 제한하지 않음 | 없음 |
@@ -107,7 +109,7 @@ CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 
 
 현재 목적 후보 목록은 ITEM-02의 purposeId 필터로 조회한다. 별도의 목적별 상품 GET을 중복 추가하지 않는다. 추가 후보 category 레일도 PUR-07의 facets를 사용해 별도 category facet API를 만들지 않는다.
 
-PUR-02의 ‘새로 만들고 이 상품에 연결’은 반환 ID를 해당 검토/편집의 초안에 적용한 후 ITEM-08/ITEM-04/ITEM-07로 저장한다. 새 목적의 후보 추가 화면은 PUR-07/PUR-08을 사용한다. 생성 후 편집 취소 시 목적을 자동 삭제하지 않는 구성을 제안하며 제품 확인 대상에 기록한다.
+PUR-02의 ‘새로 만들고 이 상품에 연결’은 반환 ID를 해당 검토/편집의 초안에 적용한 후 ITEM-08/ITEM-04/ITEM-07로 저장한다. 새 목적의 후보 추가 화면은 PUR-07/PUR-08을 사용한다. 생성 후 편집을 취소해도 목적을 자동 삭제하지 않는다(B3 확정).
 
 ## 앱 서버 API — 아카이브 9개
 
@@ -219,7 +221,7 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 | 사진 선택·압축·업로드 진행 | OS picker/클라이언트. MEDIA-01 → 저장소 upload → MEDIA-02 → item 저장 |
 | 네트워크 단절·저장 실패·409 복구 | 초안·현재 카드 유지. GET 최신 값 후 재시도. 실패 자체를 별도 저장 API로 보고하지 않음 |
 
-색·아이콘 allow-list는 버전 관리한 공통 리소스로 client/server에서 맞추는 방향을 제안한다. 목적 만들기 화면의 6색·icon 선택만을 이유로 별도 색/아이콘 HTTP API를 추가하지 않는다. 동적 remote config 요구가 생기면 재검토한다.
+색·아이콘 allow-list는 버전 관리한 공통 리소스로 client/server에서 맞춘다. B3에서 색 6개(기본 CORAL)·아이콘 8개(기본 HEART)의 stable key를 확정했다. 목적 만들기 화면의 6색·icon 선택만을 이유로 별도 색/아이콘 HTTP API를 추가하지 않는다. 동적 remote config 요구가 생기면 재검토한다.
 
 ## 반드시 계약에 포함할 예외·복구
 
@@ -250,13 +252,13 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 
 | 항목 | 현재 확인한 근거·추가 확인 | 영향 API |
 | --- | --- | --- |
-| 목적 활동순·홈 노출 | 최근 움직인 목적 2~3개. 어떤 변경이 활동인지·빈 목적 포함·노출 개수 미확정 | HOME-01/PUR-01, AI 내부 최근 후보 |
+| 목적 활동순·홈 노출 | **B3 해결**: 생성 또는 후보 유입이 활동, 빈 목적 포함, `activityAt DESC, id DESC`, AI 후보 10개. 홈 노출 개수만 B4에서 확인 | HOME-01 |
 | 후보 추가 초기 filter·선택 유지 | 한 category 목적·빈 목적·혼합 category의 초기값과 filter 변경 시 선택 유지 | PUR-07/PUR-08 |
 | 연속 처리 재진입/restart | 보드 restart는 예시 목록을 되살리지만 완료 review 재개 금지·보류 미재노출. 다시 보기 버튼의 실제 범위 필요 | HOME-02/ITEM-08 |
-| 목적·상품명·브랜드·archive 제목 입력 제한 | custom category만 정확한 길이/중복 규칙 있음. 목적명 중복 허용 등 추가 확인 | ITEM-04/ITEM-07, PUR-02/PUR-04, ARC-06 |
-| 목적/상품 후보 수 상한·bulk 최대 크기 | 상품 수 제한을 전제로 하지 않는 window 규칙은 있음. bulk 요청 크기·목적 수에 대한 제품 제한은 별도 확인 | PUR-01/PUR-07/PUR-08, ARC-01/ARC-02 |
+| 상품명·브랜드·archive 제목 입력 제한 | 목적은 **B3 해결**(이름40/설명200 code point·중복 허용). 상품명·브랜드·archive 제목은 추가 확인 | ITEM-04/ITEM-07, ARC-06 |
+| 상품 후보 수 상한·bulk 최대 크기 | 목적 수는 **B3 해결**(ACTIVE 30개·60초 10건). 상품 window 규칙은 있음. bulk 요청 크기는 별도 확인 | PUR-07/PUR-08, ARC-01/ARC-02 |
 | 중복 여러 후보·다른 판매처 동일 상품 | 현재 보드는 한 쌍. 여러 후보의 처리 단위·상품 식별 기준과 실패 URL 안내 필요 | DUP-01/DUP-02 |
-| 새 자원 만들기와 편집 취소 | category/purpose POST 완료 뒤 선택은 초안으로 두는 구성 제안. 취소 후 새 자원을 유지할지 명시 필요 | CAT-03/PUR-02 + ITEM-04/ITEM-07/ITEM-08 |
+| 새 자원 만들기와 편집 취소 | purpose는 **B3 해결**: 취소 뒤에도 생성한 목적 유지(빈 목적 자동 삭제 금지). category의 수명은 별도 확인 | CAT-03 + ITEM-04/ITEM-07/ITEM-08 |
 | archive 목적 snapshot·복원 예외 | 최신 상세는 목적 아이콘 필요. 설명/color/icon의 복원 범위·삭제 custom 참조·archive 제목 수정 후 목적 이름 복원 기준 확인 | ARC-02/ARC-04/ARC-07/ARC-08 |
 | 아카이브 후보의 분석 상태 | 일반적으로 비교 가능 item을 다루지만 PROCESSING/보완 필요 후보를 목적에 추가·archive할 수 있는지 명확히 필요 | PUR-07/PUR-08, ARC-01/ARC-02/ARC-08 |
 | archive 정렬·snapshot 후보 순서 | 최근 종료순은 디자인의 가정, 구매 item 맨앞은 최신 결정. 나머지 후보 sort 고정 필요 | ARC-03/ARC-05 |

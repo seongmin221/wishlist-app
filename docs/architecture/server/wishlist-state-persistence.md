@@ -90,7 +90,7 @@ claim·finish·reconciler의 lane별 재시도 한도는 AnalysisJobTransitions�
 
 ## B2 category 후보 보호
 
-V11 app_users를 잠금 기준으로 사용한다. 기존 owner는 backfill하고 신규 owner는 공통 helper가 lazy insert 뒤 FOR UPDATE한다. B1 생성과 Worker claim/staging/finish/recovery는 owner를 먼저 잠근다. custom snapshot v2는 owner·version·구조화된 이름/설명/예시를 저장하고 동일 connection에서 공급한다. 재사용과 최종 반영에서 stale를 검사하며 잘못된 구조는 유료 호출 없이 최종 replacement로 넘긴다. replacement는 기존 시도 횟수·최초 시각을 승계한다. CONFIRMED/DEFERRED의 기존 category·purpose와 USER/override 연결은 유효한 새 AI 결과에도 유지한다. stale AI assignment를 건너뛸 때는 기존 category 기준으로 READY/PARTIAL을 계산한다. 기존 B0 계약의 null·UNASSIGNED 목적 슬롯 신규 AI 연결은 유지한다. 세부 사항은 [AI 후보와 stale 보호](category-ai-candidates.md)를 따른다.
+V11 app_users를 잠금 기준으로 사용한다. 기존 owner는 backfill하고 신규 owner는 공통 helper가 lazy insert 뒤 FOR UPDATE한다. B1 생성과 Worker claim/staging/finish/recovery는 owner를 먼저 잠근다. custom snapshot v2는 owner·version·구조화된 이름/설명/예시를 저장하고 동일 connection에서 공급한다. 재사용과 최종 반영에서 stale를 검사하며 잘못된 구조는 유료 호출 없이 최종 replacement로 넘긴다. replacement는 기존 시도 횟수·최초 시각을 승계한다. CONFIRMED/DEFERRED의 기존 category·purpose와 USER/override 연결은 유효한 새 AI 결과에도 유지한다. stale AI assignment를 건너뛸 때는 기존 category 기준으로 READY/PARTIAL을 계산한다. B3부터 확정·보류 상품의 빈 목적 슬롯은 AI가 채우지 않는다(아래 B3 절). 세부 사항은 [AI 후보와 stale 보호](category-ai-candidates.md)를 따른다.
 
 ## Category 스키마와 구조 잠금
 
@@ -137,3 +137,32 @@ ALTER TABLE wishlist_items VALIDATE CONSTRAINT wishlist_public_category_fk;
 customUsedCount 계산은 item_count projection 없이 owner 범위 COUNT(*)를 사용한다. TaxonomyCatalog v1은 process에서 한 번 파싱한 불변 catalog를 공유한다.
 
 CAT-01은 repeatable-read transaction snapshot으로 목록과 count를 일치시킨다. 생성 receipt의 payload fingerprint는 기본값을 적용한 원문 JSON의 SHA-256이다. 생성 rate limit은 owner 잠금 뒤 단일 clock_timestamp()를 materialized asOf로 읽고 created_at > asOf - 60초의 성공 receipt를 센다. Replay는 count/rate 검사보다 먼저 처리하며 실패 transaction은 receipt를 남기지 않는다.
+
+## B3 목적 schema와 잠금
+
+V13은 `purposes`를 추가한다. 컬럼은 owner, 이름(1~40)·설명(≤200), color/icon key CHECK, `lifecycle_status` ACTIVE/ARCHIVED/DELETED,
+`version`·`membership_version`·`activity_at`·`activity_kind`, 시각이며 `unique(owner_id,id)`와 활동순 partial index를 둔다.
+B3는 ACTIVE만 만든다. 생성 시 created_at과 activity_at은 같은 clock 값이다.
+
+목적 테이블이 없던 동안 저장된 `wishlist_items.purpose_id` 문자열은 실제 목적을 가리킬 수 없었다.
+V13은 다음 순서로 legacy 값을 전환한다.
+1. 원문을 `legacy_purpose_id`에 보존한다.
+2. AI 출처는 UNASSIGNED, USER 출처는 USER+null(보호)로 바꾸고 review는 유지한다.
+3. `purpose_id`를 uuid로 바꾸고 `(owner_id,purpose_id)` 복합 FK를 VALID로 추가한다.
+
+`predicted_purpose_id`·`pending_purpose_id`는 진단·임시 문자열로 남기고 finish에서 재검증한다.
+`analysis_jobs.pending_purpose_judged`는 AI 목적 결과가 판단인지를 저장하며, claim이 false로 초기화한다.
+
+`mutation_receipts`는 category_id를 nullable로 바꾸고 `purpose_id`와 복합 FK, `num_nonnulls(category_id,purpose_id)=1` CHECK를 추가했다.
+목적 생성 receipt는 계정 수명 동안 보존하므로 **목적 row는 hard delete하지 않는다**. B8 삭제와 B10 archive/restore도 lifecycle 전환만 사용한다.
+V14는 입력 상한 2,500에 맞춰 기본값으로 만들어진 기존 `llm_budget_windows` ceiling(일 600,000·월 6,000,000)을 721,000·7,210,000으로 올린다.
+예약은 저장 ceiling과 현재 release ceiling 중 **작은 값**으로 판정하고 저장값을 덮어쓰지 않는다. 운영자가 내린 한도(예: 0)와 다음 release가 낮춘 한도는 지켜지고, 구 release가 만든 window도 자신의 한도까지는 예약할 수 있어 하루 전체가 막히지 않는다. 80% 알림도 같은 값을 쓴다. V14는 기본값으로 만들어진 현재 window를 새 한도로 미리 올린다.
+
+**잠금 순서.**
+- 사용자 구조 변경은 owner → purpose(ID순) → item(ID순) → job 순서다. PUR-02/04는 owner 잠금 뒤 목적 row를 잠근다.
+- Worker finish는 owner → item → job 뒤 목적 row(membershipVersion·activity)를 갱신한다. 모든 목적 쓰기가 owner 잠금을 먼저 잡으므로 순환 대기가 없다.
+- 이 전제는 후속 묶음도 지켜야 한다. B7 ITEM-04/07/08, B8 PUR-05~08, B10 archive/restore는 owner 잠금 없이 목적 row를 잠그거나 갱신하지 않는다.
+- 목록·상세는 잠금 없이 repeatable-read로 읽는다. 외부 HTTP/AI 동안 DB 잠금을 유지하지 않는다.
+
+사용자가 확정한 목적 미지정의 저장 표현은 `purpose_source=USER, purpose_id=null` 하나다.
+CONFIRMED/DEFERRED + UNASSIGNED는 별도 의미가 아니라 AI가 목적을 쓰지 않는 보호 조건이다.

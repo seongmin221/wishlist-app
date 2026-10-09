@@ -98,8 +98,9 @@ fun assertNormalFinishMatrix(source: DataSource, lane: AnalysisLane) {
         if (outcome == ProcessingOutcome.Complete) {
             assertEquals("C026", analysisScalar(source, "select category_id from wishlist_items where id='${job.itemId}'"))
             assertEquals("AI", analysisScalar(source, "select category_source from wishlist_items where id='${job.itemId}'"))
-            assertEquals("AI_PURPOSE", analysisScalar(source, "select purpose_id from wishlist_items where id='${job.itemId}'"))
-            assertEquals("AI", analysisScalar(source, "select purpose_source from wishlist_items where id='${job.itemId}'"))
+            // No v3 snapshot: the purpose result is "no judgement" and the empty slot stays empty.
+            assertNull(analysisScalar(source, "select purpose_id from wishlist_items where id='${job.itemId}'"))
+            assertEquals("UNASSIGNED", analysisScalar(source, "select purpose_source from wishlist_items where id='${job.itemId}'"))
             assertEquals("PENDING", analysisScalar(source, "select review_status from wishlist_items where id='${job.itemId}'"))
             assertNull(analysisScalar(source, "select category_missing_reason from wishlist_items where id='${job.itemId}'"))
             assertNull(analysisScalar(source, "select analysis_failure_code from wishlist_items where id='${job.itemId}'"))
@@ -162,17 +163,15 @@ fun assertIncompleteFinishMetadata(source: DataSource) {
 
 fun assertPurposeOnlyReview(source: DataSource) {
     for (lane in AnalysisLane.entries) for (review in listOf("NOT_REQUIRED", "PENDING", "CONFIRMED", "DEFERRED")) {
-        val job = newFinishJob(source, lane)
-        analysisSql(source, """update wishlist_items set category_id='C002',category_source='USER',category_missing_reason=null,
-            review_status='$review' where id='${job.itemId}'""")
-        val process: (AnalysisClaim) -> ProcessingOutcome = { claim -> seedFinishResult(source, claim); ProcessingOutcome.Complete }
-        val result = if (lane == AnalysisLane.GENERAL) GeneralWorkerService(source, process).runGeneral(job.jobId, 1)
-            else BrowserWorkerService(source, { Metadata("render", null, null, "https://example.com/item") }, { claim, _ -> process(claim) }).runBrowser(job.jobId, 1)
-        assertEquals(WorkerDisposition.ACKNOWLEDGE, result)
-        assertEquals("C002", analysisScalar(source, "select category_id from wishlist_items where id='${job.itemId}'"))
-        assertEquals("AI_PURPOSE", analysisScalar(source, "select purpose_id from wishlist_items where id='${job.itemId}'"))
-        assertEquals("AI", analysisScalar(source, "select purpose_source from wishlist_items where id='${job.itemId}'"))
-        assertEquals(if (review in setOf("CONFIRMED", "DEFERRED")) review else "PENDING",
-            analysisScalar(source, "select review_status from wishlist_items where id='${job.itemId}'"))
+        val owner = UUID.randomUUID(); val claim = ownedAnalysisClaim(source, owner, lane)
+        val purpose = insertPurpose(source, owner, "gift", null)
+        analysisSql(source, "update wishlist_items set category_id='C002',category_source='USER',category_missing_reason=null,review_status='$review' where id='${claim.itemId}'")
+        seedV3Snapshot(source, claim, listOf(purpose)); savePurposeResult(source, claim, purpose.toString(), judged = true)
+        assertEquals(WorkerDisposition.ACKNOWLEDGE, AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Complete))
+        val linked = review !in setOf("CONFIRMED", "DEFERRED")
+        assertEquals("C002", analysisScalar(source, "select category_id from wishlist_items where id='${claim.itemId}'"))
+        assertEquals(if (linked) purpose.toString() else null, analysisScalar(source, "select purpose_id::text from wishlist_items where id='${claim.itemId}'"), "$lane $review")
+        assertEquals(if (linked) "AI" else "UNASSIGNED", analysisScalar(source, "select purpose_source from wishlist_items where id='${claim.itemId}'"))
+        assertEquals(if (linked) "PENDING" else review, analysisScalar(source, "select review_status from wishlist_items where id='${claim.itemId}'"))
     }
 }

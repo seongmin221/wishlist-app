@@ -11,3 +11,5 @@
 
 - [구현 계획 INDEX](plans/INDEX.md) — 작업별 계획 목록
 - [B0 서버 상태·DB·Worker 기반 구현 계획](plans/2026-10-04-b0-server-foundation.md) — 상태·migration·claim·IO 기반의 9개 세부 작업
+- [B3 목적 기본 관리 설계](specs/2026-10-07-b3-purpose-management-design.md) — PUR-01~04 계약, V13 목적 참조 전환, AI 목적 후보·토큰 단계
+- [B3 목적 기본 관리 구현 계획](plans/2026-10-07-b3-purpose-management.md) — 입력 규칙·schema·서비스·HTTP·예산·AI 후보·문서 8개 작업

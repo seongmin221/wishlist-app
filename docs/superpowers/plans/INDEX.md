@@ -1,6 +1,7 @@
 # 구현 계획 INDEX
 
 - [C3 공유 저장](2026-10-07-client-c3-share-save.md) — 승인 v1, Task 0~7c 완료·Task 8 완료(draft PR), 공유 수신(iOS inbox·Android 즉시 전송)·fake 인증·전송 조정기·로그인/홈/설정
+- [B3 목적 기본 관리](2026-10-07-b3-purpose-management.md) — 완료, Task 1~8, 입력 규칙·V13/V14·PUR-01~04·AI 목적 후보·문서/검증
 - [C2 KMP 핵심](2026-10-07-client-c2-kmp-core.md) — Task 1~9 완료·Task 10 검증/문서 완료(PR 대기), SKIE 관문·모델/가격·Fake/Remote 계약·SQLDelight·Koin·Presenter
 - [B2 카테고리 기본 관리](2026-10-07-b2-category-management.md) — CAT-01~04/AI 후보·회귀 계획
 - [B0 서버 상태·DB·Worker 기반](2026-10-04-b0-server-foundation.md) — 완료, Task 1~9·초기 151개 중 150 통과·리뷰 보완 후 165개 중 164 통과/opt-in 1 skip·B1 인계

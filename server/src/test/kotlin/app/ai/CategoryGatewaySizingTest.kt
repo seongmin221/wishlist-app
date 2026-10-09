@@ -43,7 +43,7 @@ class CategoryGatewaySizingTest {
             val data=data(request)
             val size=data.getValue("custom_categories").jsonArray.size
             counts.add(size)
-            val bytes="""{"input_tokens":${if(size>0 || data.getValue("product").jsonPrimitive.content.length>160) 2001 else 1000}}""".toByteArray()
+            val bytes="""{"input_tokens":${if(size>0 || data.getValue("product").jsonPrimitive.content.length>160) 2501 else 1000}}""".toByteArray()
             exchange.sendResponseHeaders(200,bytes.size.toLong());exchange.responseBody.use { it.write(bytes) }
         }
         server.createContext("/v1/responses") { exchange ->
@@ -59,7 +59,7 @@ class CategoryGatewaySizingTest {
             val result=OpenAiResponsesGateway(OpenAiConfig("test-snapshot","secret"),baseUri=URI("http://127.0.0.1:${server.address.port}/v1"))
                 .classify("상".repeat(2400),snapshot) { flight++ }
             if(returnCustom) assertIs<ClassificationResult.Unusable>(result.classification)
-            else assertEquals(ClassificationResult.Assigned("C026",null),result.classification)
+            else assertEquals(ClassificationResult.Assigned("C026",null,purposeJudged=false),result.classification)
             assertEquals(if(customCount==0) listOf(0,0) else listOf(20,20,20,0),counts)
             assertEquals(1,paid);assertEquals(1,flight)
         } finally { server.stop(0) }

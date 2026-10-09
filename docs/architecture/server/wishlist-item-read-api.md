@@ -8,7 +8,7 @@
 
 인증이 없으면 `401 UNAUTHORIZED`, UUID 형식이 잘못되면 `400 INVALID_WISHLIST_ITEM_ID`다. 존재하지 않음·다른 owner·DELETED는 모두 `404 WISHLIST_ITEM_NOT_FOUND`다. ARCHIVED는 조회할 수 있지만 조치는 없다. 생성 key 재전송에는 기존 삭제 tombstone을 반환한다. GET과 생성·발행 JDBC 작업은 `Dispatchers.IO`에서 실행하고 취소를 전파한다.
 
-공개 projection은 이름·이미지·각 값 출처, category/purpose의 현재 ID·출처·누락 사유, analysis/review/lifecycle, version, 수동 완료 시각, 원본 URL과 저장/변경 시각을 반환한다. DB에 없는 가격·통화·brand·merchant·metadataCheckedAt은 기존 DTO의 nullable 필드로 유지한다. `classified_at`은 AI 분류 시각이므로 metadata 확인 시각으로 대신 사용하지 않는다. 목적명·후보 수를 사용하는 deletionImpact는 목적 연결이 구현되는 B3/B8에서 확장한다.
+공개 projection은 이름·이미지·각 값 출처, category/purpose의 현재 ID·출처·누락 사유, analysis/review/lifecycle, version, 수동 완료 시각, 원본 URL과 저장/변경 시각을 반환한다. DB에 없는 가격·통화·brand·merchant·metadataCheckedAt은 기존 DTO의 nullable 필드로 유지한다. `classified_at`은 AI 분류 시각이므로 metadata 확인 시각으로 대신 사용하지 않는다. 목적명·후보 수를 사용하는 deletionImpact는 상품 삭제 ITEM-05와 함께 B7에서 확장한다.
 
 ## 공유 시각과 생성 key
 
@@ -43,3 +43,10 @@ Scheduler가 있는 상태의 비동기 발행 전환과 API/Worker body 크기 
 ## B2 category 표시 확장
 
 생성 snapshot·owner GET·replay는 같은 mapper를 유지한다. category에 nullable name/parentId/kind를 추가하며 공용 C-ID와 custom UUID를 하나의 id로 표시한다. custom 이름은 owner 조건의 현재 row에서 읽으므로 편집 뒤 활성 item GET에 반영되며 item version·연결·review를 초기화하지 않는다. category 자원 관리 계약은 [B2 계약](category-management-api.md)을 따른다.
+
+## B3 purpose 표시 확장
+
+생성 snapshot·owner GET·replay의 같은 mapper가 `purpose`에 nullable `name`, `colorKey`, `iconKey`를 더한다.
+값은 owner 조건의 현재 목적 row에서 읽는다. 목적이 없으면 네 값이 모두 null이고, `source`로 미연결(UNASSIGNED)과 사용자 확정 미지정(USER)을 구분한다.
+목적 편집은 상품 version·출처·review를 바꾸지 않는다. 상품 version이 같아도 목적 표시값은 바뀔 수 있다.
+목적 자원 계약은 [목적 API](purpose-management-api.md)를 따른다.
