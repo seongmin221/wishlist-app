@@ -90,6 +90,8 @@ internal class GatedLocalStore(
     override suspend fun markSubmission(
         snapshot: SessionSnapshot, id: String, status: SubmissionStatus, error: ClientError?, retryAfter: Instant?,
     ) = gated { delegate.markSubmission(snapshot, id, status, error, retryAfter) }
+    override suspend fun deleteSubmission(snapshot: SessionSnapshot, submissionId: String) =
+        gated { delegate.deleteSubmission(snapshot, submissionId) }
     override suspend fun processingItems(snapshot: SessionSnapshot) = gated { delegate.processingItems(snapshot) }
     override suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem) =
         gated { delegate.upsertItem(snapshot, item) }
@@ -116,6 +118,8 @@ internal object ClosedLocalStore : LocalStore {
     override suspend fun markSubmission(
         snapshot: SessionSnapshot, id: String, status: SubmissionStatus, error: ClientError?, retryAfter: Instant?,
     ): ClientResult<Unit> = unavailable(RUNTIME_NOT_READY)
+    override suspend fun deleteSubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<Unit> =
+        unavailable(RUNTIME_NOT_READY)
     override suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>> =
         unavailable(RUNTIME_NOT_READY)
     override suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit> =

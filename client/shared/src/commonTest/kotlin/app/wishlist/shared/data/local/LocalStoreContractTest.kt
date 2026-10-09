@@ -500,6 +500,59 @@ class LocalStoreContractTest {
         }
     }
 
+    // --- deleteSubmission (C4 local delete) ---------------------------------------------------
+
+    @Test fun deleteRemovesPendingAndFailedRowsOfTheAccount() = runStoreTest { h ->
+        h.login("A")
+        val a = h.snapshot()
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.store.saveSubmission(submission(id = UUID_B, binding = "A")).successValue()
+        h.store.markSubmission(a, UUID_B, SubmissionStatus.FAILED, ClientError(ErrorKind.VALIDATION), null).successValue()
+        // An unbound row (visible to A until bound), stored with an uppercase key by another platform.
+        h.store.importSubmission(submission(id = UUID_C.uppercase())).successValue()
+
+        h.store.deleteSubmission(a, UUID_A).successValue()
+        h.store.deleteSubmission(a, UUID_B.uppercase()).successValue()
+        h.store.deleteSubmission(a, UUID_C).successValue()
+        assertEquals(emptyList(), h.store.pending().successValue())
+    }
+
+    @Test fun deleteRefusesASubmittingRow() = runStoreTest { h ->
+        h.login("A")
+        val a = h.snapshot()
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.store.markSubmission(a, UUID_A, SubmissionStatus.SUBMITTING, null, null).successValue()
+        val failure = h.store.deleteSubmission(a, UUID_A).error()
+        assertEquals(ErrorKind.CONFLICT, failure.kind)
+        assertEquals(SqlLocalStore.SUBMISSION_IN_FLIGHT, failure.code)
+        assertEquals(SubmissionStatus.SUBMITTING.name, h.row(UUID_A)?.status)
+    }
+
+    @Test fun signedOutDeleteRemovesOnlyUnboundRows() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.login(null)
+        h.store.saveSubmission(submission(id = UUID_B)).successValue()
+        val out = h.snapshot()
+
+        h.store.deleteSubmission(out, UUID_B).successValue()
+        assertNull(h.row(UUID_B))
+        val failure = h.store.deleteSubmission(out, UUID_A).error()
+        assertEquals(ErrorKind.NOT_FOUND, failure.kind)
+        assertEquals(SqlLocalStore.SUBMISSION_NOT_FOUND, failure.code)
+        assertNotNull(h.row(UUID_A))
+    }
+
+    @Test fun deleteNeverTouchesAnotherAccountsRow() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.login("B")
+        val b = h.snapshot()
+        assertEquals(SqlLocalStore.SUBMISSION_NOT_FOUND, h.store.deleteSubmission(b, UUID_A).failureCode())
+        assertEquals(ErrorKind.NOT_FOUND, h.store.deleteSubmission(b, UUID_C).failureKind())
+        assertEquals("A", h.row(UUID_A)?.account_binding)
+    }
+
     @Test fun appStateRoundTripsAndDeletes() = runStoreTest { h ->
         h.store.writeAppState("k", "v").successValue()
         assertEquals("v", h.store.readAppState("k").successValue())

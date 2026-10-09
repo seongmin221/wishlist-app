@@ -61,6 +61,9 @@ INSERT OR IGNORE INTO local_submission VALUES ?;
 selectSubmission:
 SELECT * FROM local_submission WHERE client_submission_id = ?;
 
+selectSubmissionByKey:
+SELECT * FROM local_submission WHERE lower(client_submission_id) = ? LIMIT 1;
+
 selectVisibleSubmissions:
 SELECT * FROM local_submission WHERE account_binding IS NULL OR account_binding = :accountId
 ORDER BY shared_at_us, client_submission_id;

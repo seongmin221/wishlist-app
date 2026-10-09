@@ -14,6 +14,7 @@ import app.wishlist.shared.data.fake.AnalysisOutcome
 import app.wishlist.shared.data.fake.FakeAuthFacade
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
+import app.wishlist.shared.data.fake.error
 import app.wishlist.shared.data.fake.successValue
 import app.wishlist.shared.data.local.CachedGetItemRepository
 import app.wishlist.shared.data.local.LazyDriver
@@ -139,9 +140,12 @@ internal class CountingStore(private val delegate: LocalStore) : LocalStore by d
     /** Runs right after a markSubmission has committed (outside the session gate). */
     var afterMark: suspend (SubmissionStatus) -> Unit = {}
 
+    /** Runs right after prepareFlush has read the queue, before the flush sees it. */
+    var afterPrepareFlush: suspend (SessionSnapshot) -> Unit = {}
+
     override suspend fun prepareFlush(snapshot: SessionSnapshot): ClientResult<List<LocalSubmission>> {
         prepareFlushCalls++
-        return delegate.prepareFlush(snapshot)
+        return delegate.prepareFlush(snapshot).also { afterPrepareFlush(snapshot) }
     }
 
     /** Runs right after every pending() read (a view computation's first read), before it returns. */
@@ -1041,5 +1045,58 @@ class SubmissionCoordinatorTest {
         assertEquals(listOf(unboundKey), h.view.local.map { it.clientSubmissionId })
         assertFalse(googleKey in h.view.local.map { it.clientSubmissionId })
         assertTrue(h.create.calls.none { it.key == googleKey })
+    }
+
+    // --- C4 local delete ----------------------------------------------------------------------
+
+    @Test fun deleteLocalPublishesAtOnce() = runCoordinatorTest { h ->
+        h.share()
+        val key = h.view.local.single().clientSubmissionId
+        val deleted = async { h.coordinator.deleteLocal(key) }
+        runCurrent()
+        deleted.await().successValue()
+        assertTrue(h.view.local.isEmpty())
+        assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun deletedAfterQueueReadIsNeverPostedAndLaterRowsStillGo() = runCoordinatorTest { h ->
+        h.signIn()
+        h.store.saveSubmission(submission(id = UUID_A, binding = GOOGLE_ID, sharedAt = baseTime)).successValue()
+        h.store.saveSubmission(submission(id = UUID_B, binding = GOOGLE_ID, sharedAt = baseTime + 1.seconds)).successValue()
+        var deleted: ClientResult<Unit>? = null
+        h.store.afterPrepareFlush = { snapshot ->
+            h.store.afterPrepareFlush = {}
+            deleted = h.store.deleteSubmission(snapshot, UUID_A) // the user deletes A after the queue was read
+        }
+
+        h.flush()
+        assertEquals(ClientResult.Success(Unit), deleted)
+        assertEquals(listOf(UUID_B), h.keysSent())
+        assertTrue(h.create.results.single() is ClientResult.Success)
+        assertTrue(h.pending().isEmpty())
+        assertEquals(listOf(UUID_B), h.view.processing.map { it.clientSubmissionId })
+    }
+
+    @Test fun aSubmittingRowCannotBeDeleted() = runCoordinatorTest { h ->
+        h.signIn()
+        h.share(online = false)
+        val key = h.pending().single().clientSubmissionId
+        val gate = CompletableDeferred<Unit>()
+        h.create.then { real -> gate.await(); real() }
+        h.coordinator.requestFlush()
+        runCurrent()
+        assertEquals(listOf(key), h.keysSent())
+
+        val deleted = async { h.coordinator.deleteLocal(key) }
+        runCurrent()
+        val failure = deleted.await().error()
+        assertEquals(ErrorKind.CONFLICT, failure.kind)
+        assertEquals(SqlLocalStore.SUBMISSION_IN_FLIGHT, failure.code)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf(key), h.keysSent())
+        assertTrue(h.pending().isEmpty())
+        assertEquals(listOf(key), h.view.processing.map { it.clientSubmissionId })
     }
 }

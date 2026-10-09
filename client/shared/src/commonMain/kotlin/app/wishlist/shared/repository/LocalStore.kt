@@ -44,6 +44,14 @@ interface LocalStore {
         retryAfter: Instant?,
     ): ClientResult<Unit>
 
+    /**
+     * Removes a local row that has not been sent, without an account (works signed out). Signed in:
+     * a row bound to the snapshot account or unbound; signed out: unbound rows only. Only PENDING and
+     * FAILED rows go; SUBMITTING is CONFLICT/SUBMISSION_IN_FLIGHT, and an absent row or one bound to
+     * another binding is NOT_FOUND/SUBMISSION_NOT_FOUND. UUIDs compare case-insensitively.
+     */
+    suspend fun deleteSubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<Unit>
+
     /** The snapshot account's cached ACTIVE items whose analysis is still PROCESSING, in no particular order (the submission view sorts them). */
     suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>>
 

@@ -177,6 +177,16 @@ class SubmissionCoordinator internal constructor(
     }
 
     /**
+     * Deletes a local row that has not been sent (signed out too) and publishes the view at once.
+     * A row already SUBMITTING is CONFLICT/SUBMISSION_IN_FLIGHT; its send goes on.
+     */
+    suspend fun deleteLocal(submissionId: String): ClientResult<Unit> = withContext(dispatcher) {
+        val deleted = guarded(STEP_FAILURE) { store.deleteSubmission(session.state.value, submissionId) }
+        if (deleted is ClientResult.Success) guarded(Unit) { publishView() }
+        deleted
+    }
+
+    /**
      * Fire-and-forget (launch, network restored, sign-in, a share, a retry timer). While a flush runs,
      * this only marks one rerun; during a refresh's lookups it runs before the next lookup.
      */
@@ -283,10 +293,13 @@ class SubmissionCoordinator internal constructor(
         }
     }
 
-    /** Sends one row with its own key; false stops this flush. */
+    /** Sends one row with its own key; false stops this flush. A row deleted since the queue was read is skipped. */
     private suspend fun send(snapshot: SessionSnapshot, row: LocalSubmission, retry: RetryWindow): Boolean {
         val id = row.clientSubmissionId
-        if (store.markSubmission(snapshot, id, SubmissionStatus.SUBMITTING, null, null) is ClientResult.Failure) return false
+        when (val marked = store.markSubmission(snapshot, id, SubmissionStatus.SUBMITTING, null, null)) {
+            is ClientResult.Failure -> return marked.error.kind == ErrorKind.NOT_FOUND // deleted since the queue was read
+            is ClientResult.Success -> Unit
+        }
         // Shown as sending without suspending here (a coalesced publish); ITEM-01 itself is bound to the
         // flush snapshot, so an account change at any point is SESSION_CHANGED and never a POST for the other account.
         requestPublish()

@@ -178,6 +178,26 @@ internal class SqlLocalStore(
         }
     }
 
+    // Not gatedForAccount: a signed-out user deletes from the local waiting screen too.
+    override suspend fun deleteSubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<Unit> =
+        gated(snapshot) { db ->
+            db.transactionWithResult {
+                val queries = db.wishlistQueries
+                val row = queries.selectSubmission(submissionId).executeAsOneOrNull()
+                    ?: canonicalUuidOrNull(submissionId)?.let { queries.selectSubmissionByKey(it).executeAsOneOrNull() }
+                val binding = row?.account_binding
+                when {
+                    row == null || (binding != null && binding != snapshot.accountId) ->
+                        failure(ErrorKind.NOT_FOUND, SUBMISSION_NOT_FOUND)
+                    row.status == SubmissionStatus.SUBMITTING.name -> failure(ErrorKind.CONFLICT, SUBMISSION_IN_FLIGHT)
+                    else -> {
+                        queries.deleteSubmission(row.client_submission_id)
+                        ClientResult.Success(Unit)
+                    }
+                }
+            }
+        }
+
     override suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>> =
         gatedForAccount(snapshot) { db, account ->
             db.transactionWithResult {
@@ -279,6 +299,7 @@ internal class SqlLocalStore(
         const val SUBMISSION_KEY_REUSED = "SUBMISSION_KEY_REUSED"
         const val SUBMISSION_ITEM_MISMATCH = "SUBMISSION_ITEM_MISMATCH"
         const val SUBMISSION_NOT_FOUND = "SUBMISSION_NOT_FOUND"
+        const val SUBMISSION_IN_FLIGHT = "SUBMISSION_IN_FLIGHT"
     }
 }
 
