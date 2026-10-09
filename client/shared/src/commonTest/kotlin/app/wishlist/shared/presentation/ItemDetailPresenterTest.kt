@@ -222,6 +222,32 @@ class ItemDetailPresenterTest {
         assertEquals(ItemDetailState.Initial, p.state.value)
     }
 
+    @Test fun retryAndRefreshRacingAnUnobservedAccountChangeDoNotRequestThePreviousItem() = runTest {
+        val lagging = LaggingSession()
+        lagging.real.changeAccount("account-a")
+        lagging.deliver()
+        val presenter = ItemDetailPresenter(repository, lagging, StandardTestDispatcher(testScheduler))
+            .also { presenters += it }
+        presenter.load(itemId)
+        runCurrent()
+        repository.calls.single().succeed(item)
+        runCurrent()
+        assertEquals(loaded(item), presenter.state.value)
+
+        // The account changes on "another thread"; retry/refresh reach the lane before the observer.
+        lagging.real.changeAccount("account-b")
+        presenter.retry()
+        presenter.refresh()
+        runCurrent()
+        assertEquals(1, repository.calls.size)
+        assertEquals(ItemDetailState.Initial, presenter.state.value)
+
+        lagging.deliver()
+        runCurrent()
+        assertEquals(1, repository.calls.size)
+        assertEquals(ItemDetailState.Initial, presenter.state.value)
+    }
+
     @Test fun refreshKeepsTheShownItemAndRepeatsTheLastId() = runTest {
         val presenter = signedIn()
         presenter.load(itemId)
@@ -514,6 +540,11 @@ class ItemDetailPresenterTest {
         assertEquals(loaded(item), presenter.state.value)
     }
 
+    /**
+     * A replaced request is cancelled without an error state. Note: the requestId guard drops a
+     * replaced request's answer anyway, so this test does not discriminate `ensureActive()`; the
+     * close tests ([close_cancels_in_flight_work_and_ignores_later_intents], [close_drops_a_late_answer]) do.
+     */
     @Test fun aRealCancellationStillPropagates() = runTest {
         val presenter = signedIn()
         val history = mutableListOf<ItemDetailState>()

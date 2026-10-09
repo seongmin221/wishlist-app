@@ -45,6 +45,10 @@ internal const val DETAIL_STEP_FAILURE = "DETAIL_STEP_FAILURE"
  *   previous session is ever published.
  * - [onLoaded] runs on the lane after each success state is published (the runtime uses it to
  *   republish the submission view from the refreshed cache).
+ *
+ * @param onLoaded called on the lane inside the session gate ([AuthSession.withCurrent]) right after
+ *   a success state is published, so it must be non-blocking and must not throw. A success that was
+ *   superseded by a newer request (or a session change) is never published and does not call it.
  * - [close] cancels everything, is idempotent, and later intents are ignored.
  * - A real cancellation (this request was replaced, the session changed, or [close]) propagates
  *   and is never an error state. A stray CancellationException from the repository while this
@@ -79,7 +83,7 @@ class ItemDetailPresenter(
 
     /** Tries the last load again after an error; same as [refresh]. */
     fun retry() {
-        scope.launch { lastId?.let { start(it) } }
+        scope.launch { repeatLast() }
     }
 
     /**
@@ -87,11 +91,17 @@ class ItemDetailPresenter(
      * load or after an account change.
      */
     fun refresh() {
-        scope.launch { lastId?.let { start(it) } }
+        scope.launch { repeatLast() }
     }
 
     override fun close() {
         scope.cancel()
+    }
+
+    private fun repeatLast() {
+        // Sync first: an account change the observer has not seen yet must clear lastId before it is read (D3).
+        followSession(session.state.value)
+        lastId?.let { start(it) }
     }
 
     private fun followSession(current: SessionSnapshot) {
