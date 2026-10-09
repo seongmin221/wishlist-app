@@ -50,7 +50,7 @@ B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
 | ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, 선택 clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **구현(B1)**: 공유 시각 보관·실제 공통 mapper·신규 event 지정 발행. nullable 표시 metadata 및 후속 참조 확장은 B2/B3/B5/B6 |
-| ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 앞뒤 cursor·anchorResolved | 없음 |
+| ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId 또는 purposeUnassigned=true, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 공용 카드 wrapper·totalCount·앞뒤 cursor·requested/resolved anchor ID·anchorResolved | **구현(B4)**: 단일 scope·page/anchor·공통 상세 mapper, 저장하지 않는 metadata는 B5까지 nullable |
 | ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 목적 deletionImpact는 ITEM-05와 함께 B7 확장 |
 | ITEM-04 | `PATCH /v1/wishlist-items/{id}` | 일반 편집 한 번에 저장, 브랜드 수정·category 재지정·purpose 선택/해제 · S3/S4 | expectedVersion, 변경된 이름/brand/mediaId/categoryId/purposeId. 생략=유지, optional null=해제 | 갱신된 item·출처·review·version. 사용자 값만 수정, price/currency/sourceUrl 변경 제외 | 없음 |
 | ITEM-05 | `DELETE /v1/wishlist-items/{id}` | 일반·분석 중 삭제, 목적에서 항목 제거 · S2/S4 | item ID. 기존 계약상 expectedVersion 없음 | 204, 늦은 Worker 반영 차단. owner의 이미 삭제한 item 반복 삭제도 204 | 없음 |
@@ -66,8 +66,8 @@ READY 항목에서 사용자 category 삭제 때문에 category가 빈 경우에
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| HOME-01 | `GET /v1/home` | 로그인 후 홈·foreground 복귀·사용자 새로고침 · S4/S8 | 인증 owner | 분석 중·정보 보완·분류 검토 count/미리보기, recent purpose 요약, 서버 할 일 수. 기기 로컬 대기는 포함하지 않음 | 없음 |
-| HOME-02 | `GET /v1/home/action-items` | 영역 펼침, 연속 처리, 캐러셀 특정 상품부터 진입 · S4/S7/S8 | action, cursor/limit 또는 anchorItemId+anchor cursor | 같은 requiredAction 기준 item 목록·totalCount·cursor·anchorResolved. 상태별 허용 행동 포함 | 없음 |
+| HOME-01 | `GET /v1/home` | 로그인 후 홈·foreground 복귀·사용자 새로고침 · S4/S8 | 인증 owner | 분석 중·정보 보완·분류 검토 count/미리보기, 최근 활동순 ACTIVE 목적 최대 3개(빈 목적 포함): 이름·색·아이콘·후보 수·최근 활동·최근 저장 후보 최대 4개(이미지 null도 포함·placeholder 표시). 별도 서버 할 일 합계 필드 없음(그룹 count 제공). 기기 로컬 대기는 서버 count에 포함하지 않음 | **구현(B4)**: 같은 snapshot의 count/preview·B3 최근 목적 summary. 10-09 공통 분류·누락 invariant 포함 전체 DB 회귀 통과 |
+| HOME-02 | `GET /v1/home/action-items` | 영역 펼침, 연속 처리, 캐러셀 특정 상품부터 진입 · S4/S7/S8 | group 필수(세 홈 그룹, action query 없음), cursor/limit 또는 anchor={cursor}+before/after | 같은 홈 그룹 predicate의 item 목록·totalCount·cursor·anchorResolved. 정보 보완 그룹은 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 함께 포함하고 item별 requiredAction·허용 행동은 유지 | **구현(B4)**: group·공통 page/anchor, 카드별 requiredAction 유지. 10-09 공통 reader·빈 page 복귀·실제 EXPLAIN 검증 |
 | DUP-01 | `GET /v1/wishlist-items/{id}/duplicate-candidates` | 새/기존 항목 비교 시트, 기존 실패/처리 상태 안내 · S3 | 새 item ID, cursor/limit | 중복 candidate ID·판단 근거와 MATCH/동일URL안내/판단대기 구분, 양쪽 metadata·저장일·category/purpose·version·기존 항목 삭제 영향 | 없음 |
 | DUP-02 | `PUT /v1/wishlist-items/{id}/duplicate-decisions` | 둘 다 두기/새 항목 지우기/기존 항목 지우기 확정 · S3 | candidate ID, KEEP_BOTH/DELETE_NEW/DELETE_EXISTING, decision/version 정보, 재전송 식별 key | 판단 기록과 선택 삭제를 같은 transaction에 반영, 남는/삭제 item IDs·갱신 상태. review 확정/보류는 별도 ITEM-08 | 없음 |
 
@@ -87,7 +87,7 @@ B2 CAT-01~04와 owner별 AI 후보·stale 보호를 구현·검증했다. [확�
 | CAT-02 | `GET /v1/custom-categories/{id}` | custom 목록 헤더·편집 폼 초기값 · S3 | custom category ID | 이름·고정 parent·설명·예시·itemCount·version. AI 후보 제외 내부 사유는 노출하지 않음 | **구현(B2)**: owner 상세·빈 custom·내부 AI 정보 제외 |
 | CAT-03 | `POST /v1/custom-categories` | 탭 + 추가, 선택 시트 안 새 category 만들기 · S3 | parentId, 이름, 선택 설명/예시, Idempotency-Key | 생성 category ID·표시값·사용 개수. 사용자당20·40/200/5×60 제한·같은 상위 normalized 이름 unique | **구현(B2)**: owner 잠금·receipt/replay·20개·60초5건 |
 | CAT-04 | `PATCH /v1/custom-categories/{id}` | 이름·설명·예시 저장 · S3 | expectedVersion, 변경 필드 | 새 category·version, 활성 표시명 반영. 부모 이동은 현재 문서 요구에 없으므로 받지 않음 | **구현(B2)**: version·no-op·null·parent 고정·현재 표시명 |
-| CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 active item 수·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | 없음 |
+| CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 ACTIVE 전체 item 수(이름 누락 포함, CAT-01/02 표시용 count와 별도)·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | 없음 |
 | CAT-06 | `DELETE /v1/custom-categories/{id}` | 삭제 확정 · S3/S4 | category version·impactToken | category 삭제·참조 해제·CUSTOM_CATEGORY_DELETED 원자 반영. 영향이 바뀌면 재확인 가능한 409 | 없음 |
 
 CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 ID를 편집 초안에 넣고 ITEM-04/ITEM-07/ITEM-08에서 연결한다. 상품 편집을 취소해도 이미 생성한 category를 삭제하지 않는다. 생성·연결을 하나의 API로 묶거나 취소 시 자동 삭제하려는 요구는 현재 근거에 없으며 후속 제품 확인 대상이다.
@@ -156,7 +156,7 @@ W ID는 manifest 순서다. 각 행의 API는 화면 진입·그 상태에서 �
 | W ID | 보드 | 화면·행동과 API 연결 | 기기 처리·주의 |
 | --- | --- | --- | --- |
 | W01 | `Home.dc.html` | 요약 HOME-01, 영역/특정 미리보기 진입 HOME-02, 목적 PUR-03/ITEM-02, 분석 중 삭제 ITEM-05 | 로컬 pending 합성·펼침·탭 이동 |
-| W02 | `HomeReviewFlow.dc.html` | HOME-02, 확정/보류 ITEM-08, category CAT-01/CAT-03, purpose PUR-01/PUR-02, 중복 DUP-01/DUP-02 | 연결 변경은 review 초안, restart는 규칙 미결정 |
+| W02 | `HomeReviewFlow.dc.html` | HOME-02, 확정/보류 ITEM-08, category CAT-01/CAT-03, purpose PUR-01/PUR-02, 중복 DUP-01/DUP-02 | 연결 변경은 review 초안. restart는 기기 skip 초기화 후 현재 미완료 대상 재조회; CONFIRMED/DEFERRED를 검토 대상으로 되돌리지 않음 |
 | W03 | `HomeFillFlow.dc.html` | HOME-02/ITEM-03, retry ITEM-06, 보완 ITEM-07 또는 재지정 ITEM-04, CAT-01/CAT-03, MEDIA-01/MEDIA-02 | skip·다음은 session, 실패 유형별 retry 조건 |
 | W04 | `DuplicateCompare.dc.html` | DUP-01, category/purpose 변경 ITEM-08 및 CAT-01/CAT-03·PUR-01/PUR-02, 결정 DUP-02 | 시트만 닫으면 두 item 유지·판단 미완료 |
 | W05 | `DuplicateConfirmBoth.dc.html` | DUP-01/DUP-02 KEEP_BOTH | confirm 취소는 무변경 |
@@ -252,9 +252,11 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 
 | 항목 | 현재 확인한 근거·추가 확인 | 영향 API |
 | --- | --- | --- |
-| 목적 활동순·홈 노출 | **B3 해결**: 생성 또는 후보 유입이 활동, 빈 목적 포함, `activityAt DESC, id DESC`, AI 후보 10개. 홈 노출 개수만 B4에서 확인 | HOME-01 |
+| 목적 활동순·홈 노출 | **B3/B4 해결**: 생성 또는 후보 유입이 활동, `activityAt DESC, id DESC`, AI 후보 10개. 홈은 최대 3개·빈 목적 포함, 이름·색·아이콘·후보 수·최근 활동·최근 저장 후보 최대 4개(이미지 null도 포함·placeholder 표시) 제공 | HOME-01 |
+| category count와 목록 표시 집합 | **B4 해결**: category count는 일반 목록과 같은 owner·ACTIVE·category 일치·비공백 제품명 집합. 공용 BROWSE 노출과 상위 합계도 동일 | CAT-01/CAT-02, ITEM-02 |
+| 서버 할 일 합계 | **B4 해결**: 별도 합계 필드 없음(C안). 그룹별 count만 반환하고 필요하면 client에서 합산 | HOME-01 |
 | 후보 추가 초기 filter·선택 유지 | 한 category 목적·빈 목적·혼합 category의 초기값과 filter 변경 시 선택 유지 | PUR-07/PUR-08 |
-| 연속 처리 재진입/restart | 보드 restart는 예시 목록을 되살리지만 완료 review 재개 금지·보류 미재노출. 다시 보기 버튼의 실제 범위 필요 | HOME-02/ITEM-08 |
+| 연속 처리 재진입/restart | **B4 해결**: 살아 있는 화면은 현재 anchor 재조회, 앱 신규 실행은 최신 첫 구간. restart는 기기 skip 초기화와 현재 미완료 재조회이며 CONFIRMED/DEFERRED 검토 재노출 없음. 별도 restart API 없음 | HOME-02/ITEM-08 |
 | 상품명·브랜드·archive 제목 입력 제한 | 목적은 **B3 해결**(이름40/설명200 code point·중복 허용). 상품명·브랜드·archive 제목은 추가 확인 | ITEM-04/ITEM-07, ARC-06 |
 | 상품 후보 수 상한·bulk 최대 크기 | 목적 수는 **B3 해결**(ACTIVE 30개·60초 10건). 상품 window 규칙은 있음. bulk 요청 크기는 별도 확인 | PUR-07/PUR-08, ARC-01/ARC-02 |
 | 중복 여러 후보·다른 판매처 동일 상품 | 현재 보드는 한 쌍. 여러 후보의 처리 단위·상품 식별 기준과 실패 URL 안내 필요 | DUP-01/DUP-02 |

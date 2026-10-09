@@ -1,6 +1,6 @@
 # 카테고리 조회·생성·편집 API 계약
 
-> 확정 계약 · CAT-01~04
+> 확정 계약 · CAT-01~04 · B4 표시용 itemCount 구현
 
 ## 적용 범위
 
@@ -23,11 +23,15 @@ parentId 생략은 모든 상위 group을 반환하고, 지정하면 해당 grou
 custom의 편집 필드·AI 내부 상태는 목록 DTO에 넣지 않는다.
 
 - SELECT: 모든 상위·87개 공용 leaf·owner의 모든 미삭제 custom을 반환한다. 상품 0개도 포함한다.
-- BROWSE: 활성 상품이 있는 공용 leaf와 모든 미삭제 custom(빈 custom 포함)을 반환한다.
+- BROWSE: 목록 표시 대상 상품이 있는 공용 leaf와 모든 미삭제 custom(빈 custom 포함)을 반환한다.
   그 결과 leaf가 있는 상위만 포함한다. 빈 DB는 빈 groups다.
 - itemCount: 해당 owner의 `lifecycle_status=ACTIVE`이고 현재 category 참조가 일치하는
-  item 수다. 예측 진단·다른 owner·ARCHIVED·DELETED는 세지 않는다.
-  group count는 반환 leaf에 속하는 활성 item 합계다.
+  상품 중 비공백 제품명이 있는 item 수다. 이름 누락은 WishlistItemPolicy의
+  `isNullOrBlank()` 기준(null·빈 문자열·탭·줄바꿈 등 공백만 있는 문자열)이다.
+  분석 상태·review는 제한하지 않는다. 예측 진단·다른 owner·ARCHIVED·DELETED는 세지 않는다.
+  group count는 반환 leaf의 itemCount 합계다. ITEM-02와 동일한 표시 집합을 사용한다.
+  이 변경은 [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md)에 따른다.
+  B4에서 count와 BROWSE 노출을 같은 predicate로 구현했다.
 - customUsedCount는 parent filter와 관계없는 owner 전체 미삭제 custom 수다.
 - 공용 group/leaf 순서는 v1 resource 순서다. custom은 공용 leaf 뒤에
   생성 당시 parent의 모든 기존 custom(삭제된 것 포함)의 최대 displayOrder + 1을 저장한다.
@@ -36,6 +40,10 @@ custom의 편집 필드·AI 내부 상태는 목록 DTO에 넣지 않는다.
 
 공용 상위 ID는 `G001`~`G011`, 공용 leaf는 `C001`~`C087`이다.
 표시 순서가 바뀌어도 ID는 재계산하지 않는다.
+
+## 표시용 집계와 B8 삭제 영향
+
+CAT-01/02 itemCount와 BROWSE 노출은 이름 존재 visibility를 따르지만, B8 CAT-05 deletion-impact는 이름 누락을 포함한 같은 owner·ACTIVE·현재 custom 참조 일치 전체를 센다. CAT-06도 이 전체 집합의 참조를 해제한다. 표시용 CustomCategory.itemCount를 삭제 영향 수로 재사용하지 않는다. B8은 별도의 ACTIVE 전체 집계 경로를 구현해야 한다. B4에서 삭제 API를 추가하지 않는다.
 
 ## CAT-03 생성과 replay
 

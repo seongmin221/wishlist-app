@@ -24,6 +24,7 @@ Firebase Emulator와 Docker는 local 실행 준비가 필요하다. 또한 fake�
 
 ## 후속 결정
 
+- 로컬 실행 명령과 container socket 설정은 [서버 로컬 테스트 환경](../../../architecture/server/local-test-environment.md)에서 관리한다.
 - Docker Compose의 service 구성, fixture 관리, test data reset과 CI에서의 실행 방법을 구현 계획에서 정한다.
 - production GCP/Firebase project, Neon production DB·branch, secret·service account·CI 권한 경계를 정한다.
 - production smoke test의 범위·실행 주체와 DB migration 적용 절차를 정한다.

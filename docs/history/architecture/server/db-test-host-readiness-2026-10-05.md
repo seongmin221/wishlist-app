@@ -21,4 +21,4 @@ TESTCONTAINERS_HOST_OVERRIDE=127.0.0.1 \
 RUN_REAL_URL_PILOT=0 ./gradlew test
 ```
 
-이 주소는 현재 기기의 Colima 경로이며 다른 기기는 해당 Docker socket을 지정한다. 시스템 Podman socket이나 Docker 전역 설정은 바꾸지 않았다.
+이 주소는 당시 검증에 사용한 기기의 Colima 경로이며 다른 기기는 해당 Docker socket을 지정한다. 당시에는 시스템 Podman socket이나 Docker 전역 설정을 바꾸지 않았다.

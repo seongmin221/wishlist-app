@@ -142,7 +142,9 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 **산출물:** category/purpose 목록과 홈에서 같은 상태·건수·허용 행동을 표시한다.
 
-**내부 순서:** ITEM-02의 category/purpose/미지정 filter·cursor/anchor → HOME-02의 requiredAction window → HOME-01의 count/미리보기·목적 요약. 홈과 연속 조회는 공통 predicate를 사용한다.
+**구현 상태:** B4 조회 API3개·CAT 표시 count·원본 V15를 구현했다. 10-09 추가 리뷰의 공통 window SQL·HOME-01 invariant·목적 cursor 왕복·V16 소스 checksum/별도 배포 재시도는 반영했으며 전체345개 중344 통과·1 skip 및 별도 배포 job의 실패 재시도를 검증했다. [조회 계약](wishlist-item-read-api.md#b4-공통-조회-계약)과 [구현/검증 이력](../../history/architecture/server/b4-read-api-implementation-2026-10-07.md)을 따른다. B5 이후 mutation·운영 복구 완성을 뜻하지 않는다.
+
+**내부 순서:** ITEM-02의 category/purpose/미지정 filter·cursor/anchor → HOME-02의 홈 그룹 window(item별 requiredAction 유지) → HOME-01의 count/미리보기·목적 요약. 홈과 연속 조회는 공통 predicate를 사용한다.
 
 **통과:** owner/filter가 다른 cursor 거절, 같은 createdAt의 안정된 페이지 순서, anchor 삭제/이동 시 복구, limit 상한, 홈 count/미리보기와 action 목록 일치, DEFERRED 자동 재노출 없음. 로컬 pending은 서버 건수에 합치지 않는다. B7의 mutation 후 같은 검증을 실제 변경 흐름으로 반복한다.
 
@@ -268,7 +270,8 @@ ARC-07 → ARC-08 → ARC-09. 현재 참조 상태와 복원 정책을 preview/�
 | 홈 보완 projection·기존 requiredAction 충돌 | B0 | category 재지정과 수동 완료 차이, 최신 계약 반영 |
 | clientCreatedAt·metadata optional 규칙 | B1 | 보관 필드·검증, 서버 createdAt 정렬 유지 |
 | 목적 입력 제한·색/icon stable key·활동순 | B3 (**해결**) | [B3 제품 결정](../../history/product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md) |
-| 홈 목적 개수·빈 목적 노출·연속 restart | B4 | 2~3개 확정, 현재 대상 재조회와 완료 검토 재개 구분 |
+| 홈 목적 개수·빈 목적 노출·연속 restart | B4 (**해결**) | [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md): 최대 3개·빈 목적 포함, restart는 현재 미완료 대상 재조회이며 CONFIRMED/DEFERRED를 검토 대상으로 되돌리지 않음 |
+| category count·서버 할 일 합계 | B4 (**해결**) | [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md): category count는 목록 표시 집합과 일치, HOME-01은 그룹별 count만 제공하고 별도 합계 필드 없음 |
 | retry 예산·deadline·즉시 발행 제한 | B5 | 일반/browser 합산과 timeout·복구, 기존 운영 계약 유지 |
 | 이미지 형식/크기·저장소·외부 이미지 보존 | B6 | upload·completion·정리·archive 장기 보존 방향 |
 | 상품명/brand 제한·생성 후 편집 취소 | B7 | CAT POST 성공 뒤 draft 취소 시 새 자원 수명. PUR는 B3에서 유지로 해결 |

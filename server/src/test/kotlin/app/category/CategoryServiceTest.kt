@@ -49,6 +49,10 @@ class CategoryServiceTest {
         assertEquals(listOf(custom.id.toString()), service.list(owner, CategoryScope.BROWSE, null).groups.single().categories.map { it.id })
         val item = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
         analysisSql(source, "update wishlist_items set category_id='C026',category_source='USER',category_missing_reason=null where id='$item'")
+        // B4 display count follows the item list; the unnamed ACTIVE item is not visible yet.
+        assertEquals(0L, service.list(owner, CategoryScope.SELECT, "G003").groups.single().categories.single { it.id == "C026" }.itemCount)
+        assertFalse(service.list(owner, CategoryScope.BROWSE, "G003").groups.single().categories.any { it.id == "C026" })
+        analysisSql(source, "update wishlist_items set product_name='named' where id='$item'")
         val browse = service.list(owner, CategoryScope.BROWSE, "G003")
         assertEquals(1L, browse.groups.single().itemCount)
         assertEquals(1L, browse.groups.single().categories.single { it.id == "C026" }.itemCount)
@@ -122,6 +126,8 @@ class CategoryServiceTest {
         assertFailsWith<java.sql.SQLException> { analysisSql(source, "update wishlist_items set custom_category_id='${category.id}',category_source='USER',category_missing_reason=null where id='$item'") }
         val ownItem = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://example.com/item").createdItemId
         analysisSql(source, "update wishlist_items set custom_category_id='${category.id}',category_source='USER',category_missing_reason=null where id='$ownItem'")
+        assertEquals(0L, service.get(owner, category.id)!!.itemCount)
+        analysisSql(source, "update wishlist_items set product_name='named' where id='$ownItem'")
         assertEquals(1L, service.get(owner, category.id)!!.itemCount)
     }
 
