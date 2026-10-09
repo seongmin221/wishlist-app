@@ -77,12 +77,12 @@
 
 ### 화면과 owner
 
-- `Features/Session/AccountPresenterOwner`·`HomePresenterOwner`: `ItemDetailPresenterOwner`와 같은 `@MainActor @Observable` 수명 소유자. `WishlistApp`이 하나씩 만들어 environment로 넣는다. `HomeState.Loading`(복원 전·계정 전환 중)은 머리만 그려 이전 계정 줄이 비치지 않는다. 당겨서 새로고침은 로그인 뒤에만 `.refreshable`(시스템 indicator)이고, Presenter의 `refreshing`이 true → false가 되면 끝난다(300ms 안에 true를 못 보면 이미 끝난 것으로 본다).
+- `Features/Session/AccountPresenterOwner`·`HomePresenterOwner`: `ItemDetailPresenterOwner`와 같은 `@MainActor @Observable` 수명 소유자. `WishlistApp`이 하나씩 만들어 environment로 넣는다. `HomeState.Loading`(복원 전·계정 전환 중)은 머리만 그려 이전 계정 줄이 비치지 않는다. 당겨서 새로고침은 로그인 뒤에만 `.refreshable`(시스템 indicator)이고, `HomePresenterOwner.refresh()`가 SKIE async로 `HomePresenter.refreshNow()`를 기다려 그 refresh가 끝나면 돌아온다(state polling 없음. 당김이 취소되면 `CancellationError`는 조용히 버리고 refresh는 Presenter에서 계속된다).
 - 첫 실행 로그인(FLogin)은 `ContentView`의 탭 셸 위 레이어다(`showFirstRunLogin`, 사라짐 opacity 260 `accelerate` — 애니메이션은 이 레이어의 컨테이너에만 걸어 같은 갱신의 탭 셸 변화에 번지지 않게 한다, 뜨는 동안 아래는 접근성에서 가림). 홈 로그인 카드·설정 "로그인"은 같은 화면을 `AppDestination.login`(가로 밀기)으로 연다. 홈 오른쪽 위 설정은 `AppDestination.settings`. 로그인 중에는 로그인·로그아웃 버튼을 막고, 실패는 화면에 남기지 않는다.
 - 홈(FHomeLoggedOut·FHome): 로그인 전은 로그인 카드 + "분석 대기"(줄마다 "원본" → `openURL`). 로그인 뒤 머리 보조 줄은 "할 일 N개"(`home.todo.count`, N = 분류 중 줄 수, Ruling 13), "분류 중" 카드 줄 상태 줄은 "상품 정보 추출 중"(Ruling 14)이고 오른쪽 동작이 없다(Ruling 15). 할 일 카드는 머리 전체와 화살표 버튼이 같은 펼치기이며 화살표 VoiceOver 이름은 "펼치기"/"접기". 줄 key는 목록 정체성으로만 쓴다.
 - 설정(FSettings·FSettingsLoggedOut): 로그아웃(먹색)·웹뷰 데이터 삭제(빨강) 확인창은 `WLConfirmDialog`. 웹뷰 삭제는 `WKWebsiteDataStore.default()`의 모든 형식, "방금 삭제했어요"는 화면 수명 동안만. 버전은 `CFBundleShortVersionString`. 라이선스 줄은 C12까지 숨긴다.
 - C1 홈 데모(`DemoHomeScreen`)는 지웠다. ⋯ 메뉴·삭제 확인창 데모는 상품 상세 데모에 있다.
-- 테스트: `ShareTextExtractorTests`·`InboxWriterReaderTests`는 확장 소스(`ShareTextExtractor.swift`·`ShareInboxWriter.swift`)를 테스트 target에도 컴파일한다. 테스트 target은 `WISHLIST_TESTS` 조건을 켜서 `ShareInboxWriter.swift`가 app group 타입을 `@testable import Wishlist`로 본다. `HomeRowTextTests`(문구 키 매핑·한영 번역 존재), `AccountPresenterOwnerTests`·`SessionMirrorTests`(owner 수명·미러).
+- 테스트: `ShareTextExtractorTests`·`InboxWriterReaderTests`는 확장 소스(`ShareTextExtractor.swift`·`ShareInboxWriter.swift`)를 테스트 target에도 컴파일한다. 테스트 target은 `WISHLIST_TESTS` 조건을 켜서 `ShareInboxWriter.swift`가 app group 타입을 `@testable import Wishlist`로 본다. `HomeRowTextTests`(문구 키 매핑·한영 번역 존재), `AccountPresenterOwnerTests`·`SessionMirrorTests`(owner 수명·미러), `HomePresenterOwnerTests`(당겨서 새로고침이 ITEM-01 800ms 지연 전송이 끝난 뒤에 돌아옴).
 - 시연 hook(C3 Task 7): 위 launch argument로 전송 중 계정 전환과 전송 중 `simctl terminate` 뒤 같은 key 재전송을 확인했다(저장소 밖 XCUITest harness로 Safari 공유 시트도 조작). 기록은 [C3 검증 기록](../../history/architecture/client/c3-verification-2026-10-07.md).
 
 ### 검증 빌드와 서명
@@ -96,6 +96,6 @@
 - 실기기 공유 확장·VoiceOver는 확인하지 않았다(개발자 팀 필요, 인증 연결 단계). Notes 앱의 링크 없는 글 공유는 자동화하지 않았고 2048자 초과 URL로 INVALID 카드를 확인했다.
 - 확장 입력 읽기는 첨부마다 3초 상한이고 넘으면 링크 없음(INVALID)으로 본다(구현 중 정한 규칙).
 - XCTest host는 앱 신호는 끄지만 runtime·debug 복원·seed는 설치된 debug 앱과 같은 `wishlist.db`에서 돈다([KMP 알려진 한계](kmp.md#알려진-한계와-인계-단계)).
-- `NetworkSignals`·`AppSignals`와 `HomePresenterOwner.refresh()`의 30ms polling(최대 30초)은 자동 테스트가 없다.
+- `NetworkSignals`·`AppSignals`는 자동 테스트가 없다.
 - 홈 목록은 lazy가 아니다(`ScrollView` 안 `VStack`). 대기 300개에서 XCTest 측정 CPU가 N보다 빠르게 늘었다. Instruments는 `DevToolsSecurity` 승인 뒤 다시 잰다([C3 성능 확인](c3-performance-checks.md#c3-측정-결과-2026-10-07)).
 - 로그인 뒤 할 일 머리 "할 일 N개"는 0개일 때도 보인다(보드는 비지 않은 예만 있다). 영어 "%d to-dos"는 1개일 때 복수형이 틀린다(두 플랫폼 공통, 문구 재검토 때 plural 처리).
