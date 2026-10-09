@@ -1,6 +1,6 @@
 # C4 상품 상세·분석 중·원본 링크 웹뷰 설계
 
-> 2026-10-09 · **확정(spec 리뷰 2회 반영)** · 제품 빈칸 확정 · 기준 `origin/develop` `abae37d`(PR #14 merge. 로컬 `develop`은 아직 `419be18`)
+> 2026-10-09 · **확정(spec 리뷰 3회 반영)** · 제품 빈칸 확정 · 기준 `origin/develop` `abae37d`(PR #14 merge. 로컬 `develop`은 아직 `419be18`)
 
 ## 목표와 범위
 
@@ -29,9 +29,9 @@
 | D15 | 웹뷰 열기·복원 | 슬라이드 push, 탭 바 숨김. 외부 앱 복귀 때 웹뷰·기록 유지, 프로세스 종료 뒤에는 원래 URL만 다시 연다 |
 | D16 | 외부 앱 판정 | 사용자 탭(Android `hasGesture()`, iOS `.linkActivated`)은 바로 열고 그 밖은 확인창. 처리할 앱이 없으면 아무 일도 하지 않는다. 확인창 문구는 보드의 "결제 앱이 열려요"를 일반화한 "다른 앱이 열려요". 국내 결제(ISP·카드사 앱)는 탭 뒤 JS로 다시 이동해 gesture로 인정되지 않아 결제마다 확인창이 뜰 수 있다. 의도한 동작으로 두고 실제 결제 흐름 확인 항목으로 남긴다(실기기·인증 연결 단계) |
 | D17 | SUBMITTING 줄 삭제 | 비활성. store도 삭제 때 상태를 다시 확인해 그 사이 시작된 전송을 지우지 않는다 |
+| D18 | 인계 결함 | UUID 대소문자·새는 취소·해독 불가 cache row·close 뒤 DB 미접촉 단언을 C4에서 정리. `.theRelease`·`RemoteConfig`는 C12 |
 | D19 | 로컬 대기 화면에서 전송 응답이 DELETED | accept가 cache를 지워 상품을 찾을 수 없으면 조용히 닫지 않고 상세 NOT_FOUND와 같은 "삭제된 상품이에요" + 닫기를 보인다(2026-10-10) |
 | D20 | PR 분할 | PR A `client/c4-product-detail`(묶음 1~3, "원본 보기"는 지금처럼 시스템 브라우저), PR B `client/c4-webview`(묶음 4, A 위에서 시작하고 A merge 뒤 develop 기준으로 rebase. 웹뷰와 원본 보기·홈 "원본" 교체)(2026-10-10) |
-| D18 | 인계 결함 | UUID 대소문자·새는 취소·해독 불가 cache row·close 뒤 DB 미접촉 단언을 C4에서 정리. `.theRelease`·`RemoteConfig`는 C12 |
 
 ## 접근 방식
 
@@ -45,7 +45,7 @@
 
 **SQLite v3.** `2.sqm`이 `item_cache`에 `purpose_name`, `purpose_color_key`, `purpose_icon_key`를 더한다. 기존 행은 NULL이고 다음 GET 때 채워진다. `SchemaMigrationTest`는 v1→v3, v2→v3을 검증한다.
 
-**같은 version 갱신(GET 경로만).** ITEM-03 GET의 cache 쓰기는 `version >=`일 때 쓴다. 목적·카테고리 자체를 편집해도 item version은 그대로라서, 같은 version이라도 GET 응답이 더 최신이다. 더 작은 version은 버린다. `accept`(ITEM-01 응답)는 지금처럼 `>`만 쓴다. 멱등 재전송의 응답이 그 순간 cache에 있는 GET 결과보다 오래된 상태일 수 있어 `>=`면 더 새 값을 덮기 때문이다. 그래서 store 쓰기는 `upsertFromGet`(>=)과 `accept` 안의 `upsertIfNewer`(>)로 나눈다. 한계 1: 같은 상품의 GET 둘이 겹치면(foreground 때 coordinator `refreshOnce`와 상세 `refresh()`) 같은 version이라 먼저 받은 응답이 나중에 commit되어 옛 목적 이름으로 덮일 수 있다. 다음 GET에서 바로잡히며 문서에 한계로 남긴다. 한계 2: 이 갱신은 그 상품을 다시 GET할 때만 일어나므로, 목적·카테고리 이름이나 색을 바꾼 뒤 다른 상품의 cache 행(C5 목록 cache 포함)은 다음 GET 전까지 옛 표시값을 가진다. C5/C6 인계에 적는다(목록·목적 조회 응답으로 표시 metadata를 갱신하는 정책).
+**같은 version 갱신(GET 경로만).** ITEM-03 GET의 cache 쓰기는 `version >=`일 때 쓴다. 목적·카테고리 자체를 편집해도 item version은 그대로라서, 같은 version이라도 GET 응답이 더 최신이다. 더 작은 version은 버린다. `accept`(ITEM-01 응답)는 지금처럼 `>`만 쓴다. 멱등 재전송의 응답이 그 순간 cache에 있는 GET 결과보다 오래된 상태일 수 있어 `>=`면 더 새 값을 덮기 때문이다. `LocalStore.upsertItem`을 쓰는 곳은 GET decorator(`CachedGetItemRepository`) 하나뿐이므로 새 메서드를 만들지 않고 계약만 "`upsertItem`은 GET 전용이고 `>=`로 쓴다"로 바꾼다. `accept` 안의 쓰기는 지금의 `>` 비교를 유지한다. 한계 1: 같은 상품의 GET 둘이 겹치면(foreground 때 coordinator `refreshOnce`와 상세 `refresh()`) 같은 version이라 먼저 받은 응답이 나중에 commit되어 옛 목적 이름으로 덮일 수 있다. 다음 GET에서 바로잡히며 문서에 한계로 남긴다. 한계 2: 이 갱신은 그 상품을 다시 GET할 때만 일어나므로, 목적·카테고리 이름이나 색을 바꾼 뒤 다른 상품의 cache 행(C5 목록 cache 포함)은 다음 GET 전까지 옛 표시값을 가진다. C5/C6 인계에 적는다(목록·목적 조회 응답으로 표시 metadata를 갱신하는 정책).
 
 **해독할 수 없는 cache row.** `SqlLocalStore.cachedItem`이 행 해독(enum·시각·필수값)에 실패하면 같은 transaction에서 그 행을 지우고 miss(null)를 돌려준다. decorator가 네트워크에서 다시 받아 쓴다. 행을 먼저 지우므로 깨진 행의 더 높은 version이 새 응답을 막지 않는다. DB 자체 실패(닫힘·I/O)는 지금처럼 `LOCAL_STORE_FAILURE`다.
 
@@ -53,7 +53,7 @@
 
 **로컬 삭제.** `LocalStore.deleteSubmission(snapshot, submissionId)`는 한 transaction에서 행이 `PENDING`/`FAILED`이고 지울 수 있는 binding일 때만 지운다. 로그인 상태면 현재 계정 또는 미귀속 행, **비로그인이면 미귀속 행만**이다. 로그인 전에도 로컬 대기 화면에서 지울 수 있어야 하므로 `gatedForAccount`(accountId가 null이면 UNAUTHENTICATED)를 쓰지 않고, `saveSubmission`·`pending`처럼 계정 없이 동작하는 `gated(snapshot)`에서 binding을 직접 비교한다. `SUBMITTING`은 `CONFLICT/SUBMISSION_IN_FLIGHT`, 없으면 `NOT_FOUND`. Gated·Closed store에도 넣고 Closed는 DB를 건드리지 않는다. `SubmissionCoordinator.deleteLocal(submissionId)`가 지운 뒤 바로 게시한다.
 
-`LocalStore.cachedItemBySubmission(snapshot, submissionId)`도 더한다(현재 계정 cache에서 `client_submission_id`를 정규 UUID로 비교, §2 `MovedTo`).
+`LocalStore.cachedItemBySubmission(snapshot, submissionId)`도 더한다(현재 계정 cache에서 `client_submission_id`를 정규 UUID로 비교, §2 `MovedTo`). cache는 계정 범위라 `gatedForAccount`를 쓰며 비로그인이면 `UNAUTHENTICATED`다. 반환은 `Success(item)`·`Success(null)`(찾지 못함)·`Failure`(조회 실패)를 구분한다.
 
 전송과의 경합은 store transaction이 막는다(`viewLock`이 아니다. `prepareFlush`·`send`는 `viewLock` 밖에서 돈다). `send`의 `markSubmission(SUBMITTING)`은 transaction 안에서 행을 다시 읽고 없으면 `NOT_FOUND`를 돌려주므로, flush가 queue를 읽은 뒤 삭제된 행은 POST되지 않는다. 반대로 SUBMITTING이 먼저 commit되면 삭제가 `SUBMISSION_IN_FLIGHT`로 거절된다. 지금 `send()`가 false면 flush 전체가 멈추므로(`SubmissionCoordinator.kt` flush 루프) 줄 하나를 지우면 뒤의 대기 줄이 다음 계기까지 밀린다. **`markSubmission`이 `NOT_FOUND`이면 그 행만 건너뛰고 계속한다**(그 밖의 실패는 지금처럼 멈춤). 테스트: queue를 읽은 직후 삭제 → 그 행 POST 없음 + 뒤 행은 같은 flush에서 전송.
 
@@ -87,7 +87,12 @@
 **`LocalSubmissionDetailPresenter`(새, `SharedRuntime.localSubmissionDetailPresenter()`).**
 
 - `load(submissionId)`는 coordinator view를 관찰한다. state `LocalDetailState(row?, canDelete, deleting, error, outcome?)`. `row`는 host·sourceUrl·savedAt·`RowStatus`(홈과 같은 대기 이유 매핑). `canDelete`는 `PENDING`/`FAILED`만.
-- `outcome`: 행이 view에서 사라지면 store의 `cachedItemBySubmission(snapshot, submissionId)`(item_cache의 `client_submission_id`, 정규 UUID로 비교)로 찾는다. `accept`는 큐 행 삭제와 cache 쓰기를 한 commit으로 하므로 행이 사라진 뒤의 조회는 항상 결과를 본다. 찾으면 `MovedTo(itemId)` → 플랫폼이 route를 `ItemDetailRoute`로 교체(분석 상태와 무관하게 같은 경로. ITEM-01이 멱등 재전송으로 이미 READY·FAILED 상품을 돌려줘도 `DetailKind`가 화면을 정한다). 못 찾으면 `RemovedOnServer` → "삭제된 상품이에요" + 닫기(D19, accept가 DELETED 응답으로 cache를 지운 경우). 계정을 떠나 행이 보이지 않게 된 경우는 셸이 화면을 닫으므로(D3) Presenter는 view의 `accountId`가 이전 계정과 달라지면 판정하지 않는다. 로그인(null → A)은 같은 행이 계속 보이므로 아무것도 하지 않는다. `Deleted`(이 화면에서 삭제 성공) → 홈. view.processing에는 기대지 않는다.
+- `outcome`: 행이 view에서 사라지면 store의 `cachedItemBySubmission(snapshot, submissionId)`(item_cache의 `client_submission_id`, 정규 UUID로 비교)로 찾는다. `accept`는 큐 행 삭제와 cache 쓰기를 한 commit으로 하므로 행이 사라진 뒤의 조회는 항상 결과를 본다. 찾으면 `MovedTo(itemId)` → 플랫폼이 route를 `ItemDetailRoute`로 교체(분석 상태와 무관하게 같은 경로. ITEM-01이 멱등 재전송으로 이미 READY·FAILED 상품을 돌려줘도 `DetailKind`가 화면을 정한다). 결과별 처리:
+  - `Success(item)` → `MovedTo(itemId)`.
+  - `Success(null)`(찾지 못함)만 `RemovedOnServer` → "삭제된 상품이에요" + 닫기(D19, accept가 DELETED 응답으로 cache를 지운 경우).
+  - `Failure`(store 실패) → `Gone`(안내 없이 닫기). 삭제로 보이지 않게 한다.
+  - 비로그인 view에서 행이 사라짐 → 조회하지 않고 `Gone`. 비로그인 상태에서는 이 화면의 삭제 말고 행이 사라질 일이 없다.
+  - 판정을 건너뛰는 것은 **이전 view의 `accountId`가 null이 아니고 값이 달라졌을 때뿐**이다(계정을 떠남, 셸이 화면을 닫음, D3). null → A(로그인)는 건너뛰지 않는다. 로그인하면 flush가 미귀속 행을 묶고 바로 POST·accept할 수 있고 view 게시는 200ms 간격으로 합쳐지므로, accountId = A인 첫 view에 행이 이미 없을 수 있다. 이때도 평소처럼 `cachedItemBySubmission`으로 판정해 `MovedTo`가 온다. `Deleted`(이 화면에서 삭제 성공) → 홈. view.processing에는 기대지 않는다.
 - `delete()`는 플랫폼 확인 뒤 부른다. IN_FLIGHT는 오류 없이 무시(곧 `MovedTo`), 그 밖 실패는 `error`("지우지 못했어요").
 - `tick()`은 홈처럼 1분마다 상대 시각을 다시 계산한다.
 - 단일 lane, 멱등 close, close 뒤 intent 무시. 생성자는 `internal`.
@@ -98,22 +103,22 @@
 
 ## 3. 화면과 내비게이션
 
-**Route.** 세 route 모두 탭 바를 숨기고 `Slide`로 연다(홈 줄에 사진이 없어 설정과 같은 가로 밀기).
+**Route.** 세 route 모두 탭 바를 숨기고 `Slide`로 연다(홈 줄에 사진이 없어 설정과 같은 가로 밀기). `ItemDetailRoute`·`LocalSubmissionRoute`와 계정 범위 정리는 PR A, `WebViewRoute`와 `web/` codec·왕복 테스트는 PR B다(D20). PR A의 상세 "원본 보기"와 홈 "원본"은 지금처럼 시스템 브라우저(Android `ACTION_VIEW`, iOS `openURL`)로 연다.
 
 | route | Android codec token | 계정 범위 |
 | --- | --- | --- |
 | `ItemDetailRoute(itemId)` | `item/<id>` | 예 |
 | `LocalSubmissionRoute(submissionId)` | `local/<id>` | 예 |
-| `WebViewRoute(url)` | `web/<base64url(url)>` | 예 |
+| `WebViewRoute(url)` (PR B) | `web/<base64url(url)>` | 예 |
 
-iOS는 `AppDestination`에 case를 더한다. `WebViewRoute`는 복원 때 원래 URL만 다시 연다. URL token은 UTF-8 base64url(padding 없음)로 인코딩해 `/`·`?`·`#`·`%`가 경로 파싱을 깨지 않게 한다. route는 factory로만 만들고 scheme이 `http`/`https`이고 host가 있는 URL만 받는다(그 밖은 null, 원본 보기 버튼 비활성). decode도 같은 검증을 거친다. 테스트: `/ ? # % & =`·한글·emoji가 든 URL 왕복, 잘못된 base64·`javascript:`·`file:` token은 null.
+iOS는 `AppDestination`에 case를 더한다. (PR B) `WebViewRoute`는 복원 때 원래 URL만 다시 연다. URL token은 UTF-8 base64url(padding 없음)로 인코딩해 `/`·`?`·`#`·`%`가 경로 파싱을 깨지 않게 한다. route는 factory로만 만들고 scheme이 `http`/`https`이고 host가 있는 URL만 받는다(그 밖은 null, 원본 보기 버튼 비활성). decode도 같은 검증을 거친다. 테스트: `/ ? # % & =`·한글·emoji가 든 URL 왕복, 잘못된 base64·`javascript:`·`file:` token은 null.
 
 - **계정 범위 정리:** 셸이 `auth.account` 변화를 관찰해, 이전 값이 계정이었을 때(로그아웃·다른 계정·같은 계정 재로그인, D3)만 각 탭 스택에서 첫 계정 범위 route부터 위를 즉시 pop한다. null → 계정(로그인)에는 pop하지 않는다. 설정·로그인은 남는다. Navigator 순수 로직으로 검증한다.
 - **`replaceTop`:** `MovedTo` 때 스택 맨 위를 교체하고 화면은 cross-fade. 교체된 entry의 owner(로컬 대기 Presenter)는 pop과 같은 경로로 닫힌다.
 - **Android entry별 ViewModel:** `WLNavHost` entry마다 `ViewModelStoreOwner`를 두고(entry id 기반 store 맵을 Activity ViewModel에 보관) pop 때 `clear()`, 구성 변경 동안 유지한다.
 - **iOS:** Android와 같은 구조로 맞춘다. ZStack이 화면 view를 유지하므로 view의 `@State`에 수명을 맡기지 않고, 셸의 `WLEntryOwners`(entry id → owner, runtime은 environment로 주입)가 owner를 만들고 보관한다. Navigator가 pop·`replaceTop`·계정 범위 정리로 entry를 없앨 때 셸이 그 entry의 owner를 `close()`하고 지운다. `deinit`은 보조다. Android·iOS 모두 "entry가 스택에서 사라지면 owner가 닫힌다"를 Navigator 테스트로 검증한다.
 
-**홈 진입점.** 로그인 뒤 "분류 중" 줄 탭 → `ItemDetailRoute`(오른쪽 동작 없음 유지). 로컬 대기 줄(로그인 전·후) 탭 → `LocalSubmissionRoute`. 로그인 전 줄의 "원본"은 시스템 브라우저 대신 `WebViewRoute`. 접근성 레이블은 "상세 보기"·"원본 열기"로 나눈다.
+**홈 진입점.** 로그인 뒤 "분류 중" 줄 탭 → `ItemDetailRoute`(오른쪽 동작 없음 유지). 로컬 대기 줄(로그인 전·후) 탭 → `LocalSubmissionRoute`. 로그인 전 줄의 "원본"은 PR A에서는 지금처럼 시스템 브라우저이고, PR B에서 `WebViewRoute`로 바꾼다. 접근성 레이블은 "상세 보기"·"원본 열기"로 나눈다.
 
 **상세 화면.** 공통 틀은 위쪽 바 56(안전 영역 + 6, 버튼 좌우 20) + 사진 자리 + 글자 묶음 + 하단 고정 "원본 보기"이고 탭 바는 숨긴다.
 
@@ -164,12 +169,12 @@ iOS는 `AppDestination`에 case를 더한다. `WebViewRoute`는 복원 때 원�
 
 **TDD.** 새 테스트마다 해당 수정만 되돌려 실패하는지 확인하고 기록한다. 실패를 고정해 보는 virtual time 테스트는 `runCurrent`를 쓴다(전송 재시도 타이머·200ms 게시 간격).
 
-- **commonTest(Android host·iOS simulator 모두 실행, NO-SOURCE/SKIPPED는 통과 아님):** `ItemMapperTest`(목적 표시), `SchemaMigrationTest`(v1/v2→v3), `LocalStoreContractTest`(GET 경로 같은 version 갱신·accept는 같은 version 무시, 해독 실패 self-heal, `deleteSubmission` 상태·계정별·비로그인 미귀속만, `cachedItemBySubmission`, 대문자 id), `CachedGetItemRepositoryTest`, `ItemDetailPresenterTest`(계정 전환 뒤 retry 무시, refresh, 새는 취소, 대문자 id refresh 유지, 상태 변화 hook), `SubmissionCoordinatorTest`(`deleteLocal` 즉시 게시, queue 읽은 뒤 삭제 → 그 행 POST 없음 + 뒤 행 전송, SUBMITTING 뒤 삭제 거절), `LocalSubmissionDetailPresenterTest`(PROCESSING·READY로 accept된 행 모두 `MovedTo`, DELETED 응답으로 cache에 없으면 `RemovedOnServer`, 로그인 null → A에서 유지, 비로그인 삭제), `DetailKind` 표 전수(lifecycle 먼저), `DisplayFormatTest`, `HomePresenterTest`(줄 target), `RuntimeCloseLeaseTest`(`CountingDriver` query·execute 카운터로 close 뒤 DB 미접촉), `SharedModulesTest`(새 Presenter 연결).
-- **Android unit:** `WLNavigatorTest`(계정을 떠날 때만 정리·로그인 때 유지·`replaceTop`), route codec 왕복·검증, entry ViewModelStore 정리, 상세·로컬·웹뷰 문구 키 전수, owner 테스트, (PR B) `WebNavigationPolicyTest`·`WebViewSettings`·intent 정화.
-- **iOS XCTest:** `WLNavigatorTests`, 문구 키 전수(ko·en), `WebNavigationPolicyTests`, 웹뷰·cleaner 같은 store, owner close/deinit, `SharedInteropTests` 계정 전환 수정, `RemoteImage` 다운샘플링.
-- **화면 확인:** `emulator-5554`·iPhone 17 Pro 시뮬레이터에서 보드 L/D 비교(FProductDetail, FProductProcessing, 로컬 대기, FWebView·Share·External). DEBUG hook(`delayItem01`, `pendingCount`, 분석 완료 5초)으로 분석 중 → 당겨서 새로고침 → 완료, 로컬 대기 → 전송 → `MovedTo`, 로컬 삭제, 계정 전환으로 상세·웹뷰 닫힘, 웹뷰 기록·새 창·외부 앱 확인, 설정 데이터 삭제 뒤 쿠키 제거.
+- **commonTest(Android host·iOS simulator 모두 실행, NO-SOURCE/SKIPPED는 통과 아님):** `ItemMapperTest`(목적 표시), `SchemaMigrationTest`(v1/v2→v3), `LocalStoreContractTest`(GET 경로 같은 version 갱신·accept는 같은 version 무시, 해독 실패 self-heal, `deleteSubmission` 상태·계정별·비로그인 미귀속만, `cachedItemBySubmission`, 대문자 id), `CachedGetItemRepositoryTest`, `ItemDetailPresenterTest`(계정 전환 뒤 retry 무시, refresh, 새는 취소, 대문자 id refresh 유지, 상태 변화 hook), `SubmissionCoordinatorTest`(`deleteLocal` 즉시 게시, queue 읽은 뒤 삭제 → 그 행 POST 없음 + 뒤 행 전송, SUBMITTING 뒤 삭제 거절), `LocalSubmissionDetailPresenterTest`(PROCESSING·READY로 accept된 행 모두 `MovedTo`, DELETED 응답으로 cache에 없으면 `RemovedOnServer`, 로그인 null → A에서 유지, 비로그인 삭제, 로그인 직후 첫 view에 행이 이미 없음 → `MovedTo`, `cachedItemBySubmission` 실패 → `Gone`(삭제 안내 없음), 비로그인에서 행 사라짐 → `Gone`), `DetailKind` 표 전수(lifecycle 먼저), `DisplayFormatTest`, `HomePresenterTest`(줄 target), `RuntimeCloseLeaseTest`(`CountingDriver` query·execute 카운터로 close 뒤 DB 미접촉), `SharedModulesTest`(새 Presenter 연결).
+- **Android unit:** `WLNavigatorTest`(계정을 떠날 때만 정리·로그인 때 유지·`replaceTop`), `item/`·`local/` codec 왕복, entry ViewModelStore 정리, 상세·로컬·웹뷰 문구 키 전수, owner 테스트, (PR B) `web/` codec 왕복·검증, `WebNavigationPolicyTest`·`WebViewSettings`·intent 정화.
+- **iOS XCTest:** `WLNavigatorTests`, 문구 키 전수(ko·en), owner close/deinit, `SharedInteropTests` 계정 전환 수정, `RemoteImage` 다운샘플링, (PR B) `WebNavigationPolicyTests`·`web/` route 검증·웹뷰와 cleaner 같은 store.
+- **화면 확인:** `emulator-5554`·iPhone 17 Pro 시뮬레이터. PR A: 보드 L/D 비교(FProductDetail, FProductProcessing, 로컬 대기), DEBUG hook(`delayItem01`, `pendingCount`, 분석 완료 5초)으로 분석 중 → 당겨서 새로고침 → 완료, 로컬 대기 → 전송 → `MovedTo`(로그인 직후 포함), 로컬 삭제(로그인 전·후), 계정을 떠날 때 상세 닫힘·로그인 때 유지. (PR B) FWebView·Share·External 비교, 웹뷰 기록·새 창·외부 앱 확인, 계정을 떠날 때 웹뷰 닫힘, 설정 데이터 삭제 뒤 쿠키 제거.
 - **성능 baseline:** [C3 성능 확인 목록](../../architecture/client/c3-performance-checks.md)의 상세 깊이 1/3/5 push/pop 20회, 이미지 있음·없음 메모리. 통과 기준이 아니라 기록이다.
-- **마무리:** KMP_TEST·ANDROID_CHECK·IOS_TEST·iOS Release simulator build·`gen_tokens --check`, push 전 독립 리뷰, draft PR(base `develop`)에 로컬 검증 결과.
+- **마무리:** KMP_TEST·ANDROID_CHECK·IOS_TEST·iOS Release simulator build·`gen_tokens --check`, PR마다 push 전 독립 리뷰, draft PR에 로컬 검증 결과. PR A는 base `develop`, PR B는 A 위에서 시작해 base `client/c4-product-detail`로 열고 A merge 뒤 develop 기준으로 rebase해 base를 `develop`으로 바꾼다(D20).
 
 **작업 단위.** 계획은 네 묶음으로 나누고 묶음마다 커밋·검증(해당 KMP_TEST/ANDROID_CHECK/IOS_TEST)·중간 확인 지점을 둔다. 묶음 1~3은 PR A, 묶음 4는 PR B다(D20). 각 PR 전에 전체 검증과 독립 리뷰를 한다.
 
@@ -184,4 +189,4 @@ iOS는 `AppDestination`에 case를 더한다. `WebViewRoute`는 복원 때 원�
 
 C5/C6 인계: 같은 version 표시 metadata 한계와 겹친 GET의 역전(§1). 실기기 확인 항목: 실제 결제 흐름의 외부 앱 확인창 빈도(D16), 새 창의 `window.opener` 손실(§4).
 
-계획 `docs/superpowers/plans/2026-10-09-client-c4-product-detail.md`, `kmp.md`·`android.md`·`ios.md` C4 절과 한계 표 상태, 로드맵 C3(merge 완료, PR #12)·C4 행, `docs/design/decisions.md`(D2·D4·D6·D8~D10·D12~D17), `server-integration-status.md`, C4 검증 history 기록, 관련 INDEX.
+계획 `docs/superpowers/plans/2026-10-09-client-c4-product-detail.md`, `kmp.md`·`android.md`·`ios.md` C4 절과 한계 표 상태, 로드맵 C3(merge 완료, PR #12)·C4 행, `docs/design/decisions.md`(D2~D4·D6·D8~D10·D12~D17·D19), `server-integration-status.md`, C4 검증 history 기록, 관련 INDEX.
