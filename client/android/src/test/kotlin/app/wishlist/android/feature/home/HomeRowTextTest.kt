@@ -21,6 +21,8 @@ class HomeRowTextTest {
             RowStatus.LOCAL_ONLY to R.string.home_pending_meta,
             RowStatus.SENDING to R.string.row_sending,
             RowStatus.WAITING_NETWORK to R.string.row_waiting_network,
+            RowStatus.RETRYING to R.string.row_retrying,
+            RowStatus.NEEDS_SIGN_IN to R.string.row_needs_sign_in,
             RowStatus.FAILED to R.string.row_failed,
             RowStatus.PROCESSING to R.string.row_processing,
         )
@@ -35,8 +37,9 @@ class HomeRowTextTest {
 
     @Test fun logged_in_caption_counts_the_sorting_rows() {
         // Ruling 13: board FHome header caption "할 일 N개".
-        assertEquals(ResText(R.string.home_todo_count, 0), HomeRowText.todoCount(0))
-        assertEquals(ResText(R.string.home_todo_count, 7), HomeRowText.todoCount(7))
+        // A plurals key ("1 to-do" / "7 to-dos" in English), picked by the count itself.
+        assertEquals(ResText(R.plurals.home_todo_count, 1, count = 1), HomeRowText.todoCount(1))
+        assertEquals(ResText(R.plurals.home_todo_count, 7, count = 7), HomeRowText.todoCount(7))
     }
 
     @Test fun only_the_local_row_meta_carries_the_saved_time() {

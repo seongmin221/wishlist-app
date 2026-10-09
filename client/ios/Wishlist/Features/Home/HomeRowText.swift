@@ -11,9 +11,12 @@ struct HomeText: Equatable {
         self.arg = arg
     }
 
+    /// Formats in the language the table was read from, so a plural variation follows that
+    /// language's rules (not the device region's: Korean has no "one", English does).
     func resolve(_ bundle: Bundle = .main) -> String {
         let format = bundle.localizedString(forKey: key, value: nil, table: nil)
-        return arg.map { String(format: format, locale: Locale.current, $0) } ?? format
+        let locale = bundle.preferredLocalizations.first.map(Locale.init(identifier:)) ?? .current
+        return arg.map { String(format: format, locale: locale, $0) } ?? format
     }
 }
 
@@ -36,6 +39,8 @@ enum HomeRowText {
         case .localOnly: "home.pending.meta"
         case .sending: "row.sending"
         case .waitingNetwork: "row.waiting.network"
+        case .retrying: "row.retrying"
+        case .needsSignIn: "row.needs.sign.in"
         case .failed: "row.failed"
         case .processing: "row.processing"
         }
@@ -49,7 +54,8 @@ enum HomeRowText {
         return String(format: format, time(row.savedAt).resolve(bundle))
     }
 
-    /// Logged-in header caption "할 일 N개" (N = the 분류 중 rows, the only to-do card in C3).
+    /// Logged-in header caption "할 일 N개" (N = the 분류 중 rows, the only to-do card in C3); a plural
+    /// variation in the catalog ("1 to-do" / "7 to-dos").
     static func todoCount(_ count: Int, bundle: Bundle = .main) -> String {
         HomeText("home.todo.count", Int32(clamping: count)).resolve(bundle)
     }

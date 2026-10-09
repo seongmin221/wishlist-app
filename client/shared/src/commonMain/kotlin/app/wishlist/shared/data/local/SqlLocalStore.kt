@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package app.wishlist.shared.data.local
 
 import app.wishlist.shared.core.*
@@ -9,7 +7,6 @@ import app.wishlist.shared.repository.LocalStore
 import kotlinx.coroutines.CancellationException
 import kotlin.concurrent.Volatile
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /**
  * Keeps the owner's resources (the SQL driver) open while one store operation runs. It is a
@@ -257,10 +254,7 @@ internal class SqlLocalStore(
 }
 
 /** UUIDs compare by value (case-insensitive); anything unparsable never matches. */
-private fun sameUuid(a: String, b: String): Boolean {
-    val left = runCatching { Uuid.parse(a) }.getOrNull() ?: return false
-    return left == runCatching { Uuid.parse(b) }.getOrNull()
-}
+private fun sameUuid(a: String, b: String): Boolean = canonicalUuidOrNull(a)?.let { it == canonicalUuidOrNull(b) } ?: false
 
 /** Epoch microseconds; sub-microsecond digits are truncated (the server's precision). */
 private fun Instant.toEpochMicros(): Long = epochSeconds * 1_000_000 + nanosecondsOfSecond / 1_000

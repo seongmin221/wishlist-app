@@ -297,4 +297,4 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         ClientResult.Failure(ClientError(kind, code, currentVersion = currentVersion))
 }
 
-private fun uuidOrNull(value: String): String? = try { Uuid.parse(value).toString() } catch (_: IllegalArgumentException) { null }
+private fun uuidOrNull(value: String): String? = canonicalUuidOrNull(value)

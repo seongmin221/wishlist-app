@@ -1,4 +1,5 @@
 import Shared
+import SwiftUI
 import XCTest
 @testable import Wishlist
 
@@ -181,8 +182,35 @@ final class InboxWriterReaderTests: XCTestCase {
         defer { runtime.close() }
         let signals = AppSignals(runtime: runtime, inboxDirectory: directory)
         signals.start()
-        signals.sceneBecameActive()
+        signals.scenePhaseChanged(.active)
         try await Task.sleep(nanoseconds: 300_000_000)
         XCTAssertEqual(try names(), ["\(written.clientSubmissionId).json"], "the inbox file was not imported")
+    }
+}
+
+/// Scene phases that are a launch or a return from the background (Android `ForegroundTransitionsTest`).
+final class ForegroundTransitionsTests: XCTestCase {
+    func testLaunchIsAForegroundOnce() {
+        var transitions = ForegroundTransitions()
+        XCTAssertFalse(transitions.isForeground(.inactive)) // the launch passes through inactive
+        XCTAssertTrue(transitions.isForeground(.active))
+        XCTAssertFalse(transitions.isForeground(.active))
+    }
+
+    func testInactiveAndBackIsNotAForeground() {
+        // Control Center, Notification Center, a Face ID sheet: the app never left.
+        var transitions = ForegroundTransitions()
+        XCTAssertTrue(transitions.isForeground(.active))
+        XCTAssertFalse(transitions.isForeground(.inactive))
+        XCTAssertFalse(transitions.isForeground(.active))
+    }
+
+    func testReturnFromTheBackgroundIsAForeground() {
+        var transitions = ForegroundTransitions()
+        XCTAssertTrue(transitions.isForeground(.active))
+        for phase: ScenePhase in [.inactive, .background, .inactive] {
+            XCTAssertFalse(transitions.isForeground(phase))
+        }
+        XCTAssertTrue(transitions.isForeground(.active))
     }
 }

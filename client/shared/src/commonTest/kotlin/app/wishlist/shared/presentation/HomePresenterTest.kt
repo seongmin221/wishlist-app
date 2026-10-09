@@ -5,7 +5,9 @@ package app.wishlist.shared.presentation
 import app.cash.turbine.test
 import app.wishlist.shared.core.AuthAccount
 import app.wishlist.shared.core.AuthProvider
+import app.wishlist.shared.core.ClientError
 import app.wishlist.shared.core.Clock
+import app.wishlist.shared.core.ErrorKind
 import app.wishlist.shared.di.TEST_UTC_OFFSET_SECONDS
 import app.wishlist.shared.domain.RelativeTime
 import app.wishlist.shared.model.AnalysisStatus
@@ -13,7 +15,6 @@ import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.model.itemFixture
-import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.SubmissionView
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -43,18 +44,18 @@ private fun processing(id: String, at: Instant): WishlistItem =
 
 class HomePresenterTest {
     private val auth = ScriptedAuth(seen = true)
-    private val view = MutableStateFlow(SubmissionView(null, emptyList(), emptyList(), flushing = false))
+    private val view = MutableStateFlow(SubmissionView(null, emptyList(), emptyList()))
     private val refreshRuns = MutableStateFlow(0L)
     private var now = T0 + 5.minutes
-    private val refreshes = mutableListOf<FlushTrigger>()
+    private var refreshes = 0
     private var refreshGate: CompletableDeferred<Unit>? = null
 
     private fun TestScope.presenter() = HomePresenter(
         auth = auth,
         view = view,
         refreshes = refreshRuns,
-        refresh = { trigger ->
-            refreshes += trigger
+        runRefresh = {
+            refreshes++
             refreshGate?.await()
         },
         clock = Clock { now },
@@ -85,7 +86,6 @@ class HomePresenterTest {
             null,
             listOf(local("new", T0 + 4.minutes), local("old", T0), local("mid", T0 + 2.minutes)),
             emptyList(),
-            flushing = false,
         )
         val p = presenter()
         advanceUntilIdle()
@@ -112,7 +112,6 @@ class HomePresenterTest {
                 processing("i2", T0 + 2.minutes),
                 processing("i1", T0 + 1.minutes),
             ),
-            flushing = false,
         )
         val p = presenter()
         advanceUntilIdle()
@@ -132,9 +131,39 @@ class HomePresenterTest {
     }
 
     @Test
+    fun pendingRowsSayWhyTheyWait() = runTest {
+        signIn(accountA)
+        // Each recorded error kind of a PENDING row, and the status its row shows.
+        val expected = mapOf<ErrorKind?, RowStatus>(
+            null to RowStatus.WAITING_NETWORK,
+            ErrorKind.NETWORK to RowStatus.WAITING_NETWORK,
+            ErrorKind.TIMEOUT to RowStatus.WAITING_NETWORK,
+            ErrorKind.SESSION_CHANGED to RowStatus.WAITING_NETWORK,
+            ErrorKind.SERVER to RowStatus.RETRYING,
+            ErrorKind.INVALID_RESPONSE to RowStatus.RETRYING,
+            ErrorKind.UNAVAILABLE to RowStatus.RETRYING,
+            ErrorKind.NOT_FOUND to RowStatus.RETRYING,
+            ErrorKind.RATE_LIMITED to RowStatus.RETRYING,
+            ErrorKind.UNAUTHENTICATED to RowStatus.NEEDS_SIGN_IN,
+        )
+        view.value = SubmissionView(
+            "A",
+            expected.keys.mapIndexed { i, kind ->
+                local("r$i", T0, binding = "A").copy(lastSubmissionError = kind?.let { ClientError(it) })
+            },
+            emptyList(),
+        )
+        val p = presenter()
+        advanceUntilIdle()
+        val state = assertIs<HomeState.LoggedIn>(p.state.value)
+        assertEquals(expected.values.toList(), state.processing.map { it.status })
+        p.close()
+    }
+
+    @Test
     fun refreshTogglesRefreshingAndResendsPending() = runTest {
         signIn(accountA)
-        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList(), flushing = false)
+        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList())
         val gate = CompletableDeferred<Unit>()
         refreshGate = gate
         val p = presenter()
@@ -148,14 +177,14 @@ class HomePresenterTest {
             assertFalse(assertIs<HomeState.LoggedIn>(awaitItem()).refreshing)
             cancelAndIgnoreRemainingEvents()
         }
-        assertEquals(listOf(FlushTrigger.USER_REFRESH), refreshes)
+        assertEquals(1, refreshes)
         p.close()
     }
 
     @Test
     fun refreshNowReturnsOnceTheRefreshFinished() = runTest {
         signIn(accountA)
-        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList(), flushing = false)
+        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList())
         val gate = CompletableDeferred<Unit>()
         refreshGate = gate
         val p = presenter()
@@ -177,17 +206,17 @@ class HomePresenterTest {
         val state = assertIs<HomeState.LoggedIn>(p.state.value)
         assertFalse(state.refreshing)
         assertEquals(RelativeTime.Minutes(20), state.processing.single().savedAt)
-        assertEquals(listOf(FlushTrigger.USER_REFRESH), refreshes)
+        assertEquals(1, refreshes)
 
         p.close()
         p.refreshNow() // closed: returns without refreshing
-        assertEquals(1, refreshes.size)
+        assertEquals(1, refreshes)
     }
 
     @Test
     fun accountSwitchNeverEmitsPreviousAccountRows() = runTest {
         signIn(accountA)
-        view.value = SubmissionView("A", listOf(local("a-row", T0, binding = "A")), emptyList(), flushing = false)
+        view.value = SubmissionView("A", listOf(local("a-row", T0, binding = "A")), emptyList())
         val p = presenter()
         advanceUntilIdle()
         val seen = mutableListOf<HomeState>()
@@ -198,7 +227,7 @@ class HomePresenterTest {
             advanceUntilIdle()
             auth.mutableAccount.value = accountB
             advanceUntilIdle()
-            view.value = SubmissionView("B", listOf(local("b-row", T0, binding = "B")), emptyList(), flushing = false)
+            view.value = SubmissionView("B", listOf(local("b-row", T0, binding = "B")), emptyList())
             advanceUntilIdle()
             seen += cancelAndConsumeRemainingEvents().filterIsInstance<app.cash.turbine.Event.Item<HomeState>>().map { it.value }
         }
@@ -220,7 +249,7 @@ class HomePresenterTest {
     @Test
     fun relativeTimeRecomputedOnRefresh() = runTest {
         signIn(accountA)
-        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList(), flushing = false)
+        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList())
         val p = presenter()
         advanceUntilIdle()
         assertEquals(RelativeTime.Minutes(5), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
@@ -229,7 +258,7 @@ class HomePresenterTest {
         advanceUntilIdle()
         assertEquals(RelativeTime.Minutes(20), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
         now = T0 + 30.minutes
-        view.value = view.value.copy(flushing = true)
+        view.value = view.value.copy(local = view.value.local.map { it.copy(submissionStatus = SubmissionStatus.SUBMITTING) })
         advanceUntilIdle()
         assertEquals(RelativeTime.Minutes(30), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
         p.close()
@@ -238,7 +267,7 @@ class HomePresenterTest {
     @Test
     fun anyCoordinatorRefreshRunRecomputesRelativeTimeWithoutViewChange() = runTest {
         signIn(accountA)
-        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList(), flushing = false)
+        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList())
         val p = presenter()
         advanceUntilIdle()
         assertEquals(RelativeTime.Minutes(5), assertIs<HomeState.LoggedIn>(p.state.value).processing.single().savedAt)
@@ -252,16 +281,16 @@ class HomePresenterTest {
     @Test
     fun closedPresenterStopsCollecting() = runTest {
         signIn(accountA)
-        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList(), flushing = false)
+        view.value = SubmissionView("A", listOf(local("p", T0, binding = "A")), emptyList())
         val p = presenter()
         advanceUntilIdle()
         val before = p.state.value
         p.close()
         p.close()
-        view.value = SubmissionView("A", emptyList(), emptyList(), flushing = false)
+        view.value = SubmissionView("A", emptyList(), emptyList())
         p.refresh()
         advanceUntilIdle()
         assertEquals(before, p.state.value)
-        assertTrue(refreshes.isEmpty())
+        assertEquals(0, refreshes)
     }
 }

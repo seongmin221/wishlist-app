@@ -31,6 +31,7 @@ import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.model.itemFixture
 import app.wishlist.shared.repository.CreateItemCommand
+import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import app.wishlist.shared.repository.LocalStore
 import kotlinx.coroutines.CancellationException
@@ -43,6 +44,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.TestResult
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -127,9 +129,12 @@ internal class CountingStore(private val delegate: LocalStore) : LocalStore by d
         return delegate.prepareFlush(snapshot)
     }
 
+    /** Runs right after every pending() read (a view computation's first read), before it returns. */
+    var afterPending: suspend () -> Unit = {}
+
     override suspend fun pending(): ClientResult<List<LocalSubmission>> {
         pendingCalls++
-        return delegate.pending()
+        return delegate.pending().also { afterPending() }
     }
 
     override suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>> {
@@ -161,19 +166,28 @@ internal class CoordinatorHarness(
     private val dispatcher = StandardTestDispatcher(test.testScheduler)
     val scope = CoroutineScope(SupervisorJob() + dispatcher)
     var beforeRefreshCalls = 0
+
+    /** Runs before every ITEM-03 lookup of a refresh. */
+    var beforeGet: suspend (String) -> Unit = {}
+    private val lookups = object : GetItemRepository {
+        override suspend fun get(id: String): ClientResult<WishlistItem> {
+            beforeGet(id)
+            return backend.get(id)
+        }
+    }
     val coordinator = newCoordinator()
     val auth = FakeAuthFacade(
         session = session,
         store = store,
         seed = { ClientResult.Success(Unit) },
-        onSignedIn = { coordinator.requestFlush(FlushTrigger.SIGNED_IN) },
+        onSignedIn = { coordinator.requestFlush() },
     )
 
     /** A second coordinator over the same DB, like the next process after a crash. */
     fun newCoordinator() = SubmissionCoordinator(
         store = store,
         create = create,
-        get = CachedGetItemRepository(backend, store, session),
+        get = CachedGetItemRepository(lookups, store, session),
         session = session,
         clock = clock,
         ids = ids,
@@ -199,7 +213,7 @@ internal class CoordinatorHarness(
         coordinator.receiveShared(text, online).also { test.advanceUntilIdle() }
 
     suspend fun flush() {
-        coordinator.requestFlush(FlushTrigger.USER_REFRESH)
+        coordinator.requestFlush()
         test.advanceUntilIdle()
     }
 
@@ -257,7 +271,6 @@ class SubmissionCoordinatorTest {
         assertTrue(view.local.isEmpty())
         assertEquals(LINK, view.processing.single().sourceUrl)
         assertEquals(AnalysisStatus.PROCESSING, view.processing.single().analysis.status)
-        assertFalse(view.flushing)
     }
 
     @Test fun loggedInOfflineShareIsOfflineAndKeptPending() = runCoordinatorTest { h ->
@@ -323,13 +336,12 @@ class SubmissionCoordinatorTest {
         val gate = CompletableDeferred<Unit>()
         h.create.then { real -> gate.await(); real() }
 
-        h.coordinator.requestFlush(FlushTrigger.USER_REFRESH)
+        h.coordinator.requestFlush()
         runCurrent()
         assertEquals(1, h.create.calls.size)
-        assertTrue(h.view.flushing)
-        h.coordinator.requestFlush(FlushTrigger.FOREGROUND)
-        h.coordinator.requestFlush(FlushTrigger.NETWORK_RESTORED)
-        h.coordinator.requestFlush(FlushTrigger.SHARE_RECEIVED)
+        h.coordinator.requestFlush()
+        h.coordinator.requestFlush()
+        h.coordinator.requestFlush()
         runCurrent()
         assertEquals(1, h.create.calls.size)
 
@@ -339,7 +351,6 @@ class SubmissionCoordinatorTest {
         assertEquals(1, h.create.calls.size)
         assertEquals(2, h.store.prepareFlushCalls - runsBefore) // the running flush + one rerun
         assertTrue(h.pending().isEmpty())
-        assertFalse(h.view.flushing)
     }
 
     @Test fun concurrentRefreshesShareOneRerunAndAllReturn() = runCoordinatorTest { h ->
@@ -348,11 +359,11 @@ class SubmissionCoordinatorTest {
         val runsBefore = h.store.prepareFlushCalls
         val gate = CompletableDeferred<Unit>()
         h.create.then { real -> gate.await(); real() }
-        h.coordinator.requestFlush(FlushTrigger.FOREGROUND)
+        h.coordinator.requestFlush()
         runCurrent()
 
-        val refreshes = List(3) { launch { h.coordinator.refresh(FlushTrigger.USER_REFRESH) } }
-        h.coordinator.requestFlush(FlushTrigger.NETWORK_RESTORED)
+        val refreshes = List(3) { launch { h.coordinator.refresh() } }
+        h.coordinator.requestFlush()
         runCurrent()
         assertTrue(refreshes.none { it.isCompleted })
 
@@ -457,7 +468,7 @@ class SubmissionCoordinatorTest {
         h.store.saveSubmission(submission(id = UUID_A, binding = GOOGLE_ID, status = SubmissionStatus.SUBMITTING)).successValue()
         // The next process: a fresh coordinator over the same database.
         val restarted = h.newCoordinator()
-        restarted.requestFlush(FlushTrigger.LAUNCH)
+        restarted.requestFlush()
         advanceUntilIdle()
         assertEquals(listOf(UUID_A), h.keysSent())
         assertTrue(h.pending().isEmpty())
@@ -472,7 +483,7 @@ class SubmissionCoordinatorTest {
         val row = h.pending().single()
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
 
-        h.coordinator.refresh(FlushTrigger.USER_REFRESH)
+        h.coordinator.refresh()
         assertEquals(listOf(row.clientSubmissionId, row.clientSubmissionId), h.keysSent())
         val item = assertNotNull(created)
         assertEquals(item.id, h.create.results.last().successValue().id)
@@ -494,20 +505,74 @@ class SubmissionCoordinatorTest {
         assertEquals(listOf(row), h.view.local)
     }
 
-    @Test fun rateLimitedSkipsUntilRetryAfter() = runCoordinatorTest { h ->
+    @Test fun rateLimitedResendsByItselfOnceRetryAfterEnds() = runCoordinatorTest { h ->
         h.signIn()
         h.create.fail(ClientError(ErrorKind.RATE_LIMITED, retryAfterSeconds = 30))
-        h.share()
+        h.coordinator.receiveShared(LINK, online = true)
+        runCurrent()
         val row = h.pending().single()
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
         assertEquals(baseTime + 30.seconds, row.retryAfter)
 
         advanceTimeBy(29_000)
-        h.flush()
+        h.coordinator.requestFlush()
+        runCurrent()
         assertEquals(1, h.create.calls.size)
 
-        advanceTimeBy(2_000)
-        h.flush()
+        // No foreground, network or pull: the retry timer alone resends it.
+        advanceTimeBy(1_001)
+        runCurrent()
+        assertEquals(2, h.create.calls.size)
+        assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun rateLimitHoldsEveryRowOfTheAccount() = runCoordinatorTest { h ->
+        h.signIn()
+        h.share(online = false)
+        h.share(online = false)
+        h.create.fail(ClientError(ErrorKind.RATE_LIMITED, retryAfterSeconds = 60))
+        h.coordinator.requestFlush()
+        runCurrent()
+        assertEquals(1, h.create.calls.size)
+
+        // A later trigger inside the window sends nothing, not the next row.
+        advanceTimeBy(5_000)
+        h.coordinator.requestFlush()
+        runCurrent()
+        assertEquals(1, h.create.calls.size)
+
+        advanceTimeBy(55_001)
+        runCurrent()
+        assertEquals(3, h.create.calls.size)
+        assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun serverErrorResendsByItselfAfter30s() = runCoordinatorTest { h ->
+        h.signIn()
+        h.create.fail(ClientError(ErrorKind.SERVER))
+        h.coordinator.receiveShared(LINK, online = true)
+        runCurrent()
+        val row = h.pending().single()
+        assertEquals(ErrorKind.SERVER, row.lastSubmissionError?.kind)
+        assertEquals(baseTime + 30.seconds, row.retryAfter)
+
+        advanceTimeBy(30_001)
+        runCurrent()
+        assertEquals(2, h.create.calls.size)
+        assertTrue(h.pending().isEmpty())
+    }
+
+    @Test fun serverErrorIsResentByAnEarlierTriggerToo() = runCoordinatorTest { h ->
+        h.signIn()
+        h.create.fail(ClientError(ErrorKind.SERVER))
+        h.coordinator.receiveShared(LINK, online = true)
+        runCurrent()
+        assertEquals(1, h.create.calls.size)
+
+        // Pull to refresh 5s later: the 30s is the timer's time, not a hold on the row.
+        advanceTimeBy(5_000)
+        h.coordinator.requestFlush()
+        runCurrent()
         assertEquals(2, h.create.calls.size)
         assertTrue(h.pending().isEmpty())
     }
@@ -520,7 +585,8 @@ class SubmissionCoordinatorTest {
             val before = h.create.calls.size
             h.create.fail(ClientError(kind))
             advanceTimeBy(120_000) // past any retryAfter from the previous round
-            h.flush()
+            h.coordinator.requestFlush()
+            runCurrent() // not until idle: the 429 retry timer would resend both rows
             assertEquals(before + 1, h.create.calls.size, "kind=$kind")
             val (first, second) = h.pending()
             assertEquals(kind, first.lastSubmissionError?.kind)
@@ -532,7 +598,8 @@ class SubmissionCoordinatorTest {
     @Test fun strayCancellationFromCreateIsRecordedAndTheConsumerSurvives() = runCoordinatorTest { h ->
         h.signIn()
         h.create.then { throw CancellationException("stray") }
-        h.share()
+        h.coordinator.receiveShared(LINK, online = true)
+        runCurrent() // not until idle: the 30s retry timer would resend it
         val row = h.pending().single()
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
         assertEquals(ErrorKind.UNAVAILABLE, row.lastSubmissionError?.kind)
@@ -543,7 +610,7 @@ class SubmissionCoordinatorTest {
     }
 
     @Test fun refreshBeforeReadyReturnsWhenTheScopeCloses() = runCoordinatorTest(ready = false) { h ->
-        val waiter = launch { h.coordinator.refresh(FlushTrigger.LAUNCH) }
+        val waiter = launch { h.coordinator.refresh() }
         runCurrent()
         h.scope.cancel()
         advanceUntilIdle()
@@ -565,7 +632,7 @@ class SubmissionCoordinatorTest {
         assertEquals(listOf(ErrorKind.VALIDATION, ErrorKind.CONFLICT), rows.map { it.lastSubmissionError?.kind })
 
         h.flush()
-        h.coordinator.refresh(FlushTrigger.USER_REFRESH)
+        h.coordinator.refresh()
         assertEquals(2, h.create.calls.size)
         assertEquals(rows, h.view.local)
     }
@@ -595,7 +662,7 @@ class SubmissionCoordinatorTest {
         assertEquals(LINK, row.source_url)
         assertEquals(Instant.parse(SHARED_ISO).micros(), row.shared_at_us)
         // Bound to another account at share time: Google neither sees nor sends it.
-        h.coordinator.refresh(FlushTrigger.FOREGROUND)
+        h.coordinator.refresh()
         assertTrue(h.view.local.isEmpty())
         assertTrue(h.create.calls.isEmpty())
     }
@@ -680,7 +747,7 @@ class SubmissionCoordinatorTest {
         h.fakeStore.completeAnalysis(item.id, 1, outcome).successValue()
         assertEquals(1, h.view.processing.size)
 
-        h.coordinator.refresh(FlushTrigger.USER_REFRESH)
+        h.coordinator.refresh()
         assertTrue(h.view.processing.isEmpty())
         assertEquals(1, h.beforeRefreshCalls)
         val cached = h.store.cachedItem(h.session.state.value, item.id).successValue()
@@ -707,7 +774,59 @@ class SubmissionCoordinatorTest {
         assertTrue(h.view.local.isEmpty())
         assertEquals(100, h.view.processing.size)
         assertEquals(h.create.results.map { it.successValue().id }, h.view.processing.map { it.id })
-        assertFalse(h.view.flushing)
+    }
+
+    @Test fun viewNeverShowsARowBothQueuedAndProcessing() = runCoordinatorTest { h ->
+        h.signIn()
+        h.share(online = false)
+        val seen = mutableListOf<SubmissionView>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { h.coordinator.view.collect { seen += it } }
+        // A view computation reads the queue, then (while it reads the cache) the send is accepted.
+        val queueRead = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        h.store.afterPending = {
+            h.store.afterPending = {}
+            queueRead.complete(Unit)
+            gate.await()
+        }
+        h.create.then { real -> queueRead.await(); real() }
+        h.coordinator.requestFlush()
+        runCurrent()
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(h.pending().isEmpty())
+        assertEquals(1, h.view.processing.size)
+        val doubled = seen.filter { v -> v.local.any { l -> v.processing.any { it.clientSubmissionId == l.clientSubmissionId } } }
+        assertTrue(doubled.isEmpty(), "views with a row in both lists: $doubled")
+    }
+
+    @Test fun refreshLookupsStepAsideForANewShare() = runCoordinatorTest { h ->
+        h.signIn()
+        repeat(3) { h.share() }
+        assertEquals(3, h.view.processing.size)
+        var lookups = 0
+        val first = CompletableDeferred<Unit>()
+        val rest = CompletableDeferred<Unit>()
+        h.beforeGet = { if (++lookups == 1) first.await() else rest.await() }
+
+        val refresh = launch { h.coordinator.refresh() }
+        runCurrent()
+        assertEquals(1, lookups)
+        launch { h.coordinator.receiveShared("https://shop.example/p/new", online = true) }
+        runCurrent()
+        assertEquals(3, h.create.calls.size)
+
+        // The new share is sent before the second lookup, not after the whole list.
+        first.complete(Unit)
+        runCurrent()
+        assertEquals(2, lookups)
+        assertEquals(4, h.create.calls.size)
+
+        rest.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(refresh.isCompleted)
+        assertTrue(h.pending().isEmpty())
     }
 
     @Test fun viewOrdersProcessingByCreatedAtThenId() = runCoordinatorTest { h ->

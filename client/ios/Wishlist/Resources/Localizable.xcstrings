@@ -402,9 +402,21 @@
           }
         },
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%d to-dos"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%d to-do"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%d to-dos"
+                }
+              }
+            }
           }
         }
       }
@@ -575,6 +587,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sends when you're online"
+          }
+        }
+      }
+    },
+    "row.retrying": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "잠시 후 다시 보내요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retrying soon"
+          }
+        }
+      }
+    },
+    "row.needs.sign.in": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 로그인하면 보내요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sends after you sign in again"
           }
         }
       }

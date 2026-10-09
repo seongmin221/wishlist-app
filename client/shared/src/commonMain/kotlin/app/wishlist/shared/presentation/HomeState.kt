@@ -2,8 +2,12 @@ package app.wishlist.shared.presentation
 
 import app.wishlist.shared.domain.RelativeTime
 
-/** What a home row tells the user; the platform maps each value to its own wording. */
-enum class RowStatus { LOCAL_ONLY, SENDING, WAITING_NETWORK, FAILED, PROCESSING }
+/**
+ * What a home row tells the user; the platform maps each value to its own wording. A queued row says
+ * why it waits: no connection yet ([WAITING_NETWORK]), a server-side failure or a 429 the app resends
+ * by itself ([RETRYING]), or a sign-in the server refused ([NEEDS_SIGN_IN]).
+ */
+enum class RowStatus { LOCAL_ONLY, SENDING, WAITING_NETWORK, RETRYING, NEEDS_SIGN_IN, FAILED, PROCESSING }
 
 /**
  * One saved link on the home list. [key] is stable per row and unique within a state, for list

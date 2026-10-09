@@ -4,31 +4,25 @@ import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import app.wishlist.android.share.ShareReceiverActivity
-import app.wishlist.shared.submission.FlushTrigger
 
 /**
  * App start/foreground signal without `ProcessLifecycleOwner` (lifecycle-process is not a declared
- * dependency): counts started activities and reports each 0 → 1 transition — [FlushTrigger.LAUNCH]
- * for the first one in this process, [FlushTrigger.FOREGROUND] afterwards (as iOS does). The share
- * card Activity is not "the app" and is not counted. A configuration change (stop → start of a
+ * dependency): counts started activities and reports each 0 → 1 transition (the first one is the
+ * app's launch; iOS reports the same moments). The share card Activity is not "the app" and is not counted. A configuration change (stop → start of a
  * recreated activity) is not a new foreground. Pure state, so it is unit-tested without Android.
  */
 class ForegroundTransitions {
     private var started = 0
     private var changingConfigurations = false
-    private var launched = false
 
-    /** The trigger to send for this start, or null when the app was already in the foreground. */
-    fun onStarted(isShareActivity: Boolean): FlushTrigger? {
-        if (isShareActivity) return null
+    /** True when this start brings the app to the foreground (false: it already was). */
+    fun onStarted(isShareActivity: Boolean): Boolean {
+        if (isShareActivity) return false
         if (changingConfigurations) {
             changingConfigurations = false
-            return null
+            return false
         }
-        if (started++ != 0) return null
-        if (launched) return FlushTrigger.FOREGROUND
-        launched = true
-        return FlushTrigger.LAUNCH
+        return started++ == 0
     }
 
     fun onStopped(isShareActivity: Boolean, changingConfigurations: Boolean) {
@@ -42,11 +36,11 @@ class ForegroundTransitions {
 }
 
 /** Lifecycle callbacks feeding [ForegroundTransitions]. Main thread only (lifecycle callbacks). */
-class ForegroundSignals(private val onTrigger: (FlushTrigger) -> Unit) : Application.ActivityLifecycleCallbacks {
+class ForegroundSignals(private val onForeground: () -> Unit) : Application.ActivityLifecycleCallbacks {
     private val transitions = ForegroundTransitions()
 
     override fun onActivityStarted(activity: Activity) {
-        transitions.onStarted(activity is ShareReceiverActivity)?.let(onTrigger)
+        if (transitions.onStarted(activity is ShareReceiverActivity)) onForeground()
     }
 
     override fun onActivityStopped(activity: Activity) {

@@ -1,8 +1,7 @@
 package app.wishlist.android.platform
 
-import app.wishlist.shared.submission.FlushTrigger
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** App start/foreground signals from started-activity counts (the share card Activity excluded). */
@@ -13,35 +12,35 @@ class ForegroundTransitionsTest {
     private fun stop(share: Boolean = false, changingConfigurations: Boolean = false) =
         transitions.onStopped(isShareActivity = share, changingConfigurations = changingConfigurations)
 
-    @Test fun first_start_is_launch_once() {
-        assertEquals(FlushTrigger.LAUNCH, start())
-        assertNull(start()) // a second activity on top: still the same foreground
+    @Test fun first_start_is_a_foreground_once() {
+        assertTrue(start())
+        assertFalse(start()) // a second activity on top: still the same foreground
     }
 
-    @Test fun background_then_foreground_is_foreground() {
-        assertEquals(FlushTrigger.LAUNCH, start())
+    @Test fun background_then_start_is_a_foreground_each_time() {
+        assertTrue(start())
         stop()
-        assertEquals(FlushTrigger.FOREGROUND, start())
+        assertTrue(start())
         stop()
-        assertEquals(FlushTrigger.FOREGROUND, start())
+        assertTrue(start())
     }
 
     @Test fun configuration_change_stop_start_is_nothing() {
-        assertEquals(FlushTrigger.LAUNCH, start())
+        assertTrue(start())
         stop(changingConfigurations = true)
-        assertNull(start())
+        assertFalse(start())
         stop()
-        assertEquals(FlushTrigger.FOREGROUND, start())
+        assertTrue(start())
     }
 
     @Test fun share_activity_is_ignored() {
-        // A process started by a share: the card is not "the app", so it neither launches nor counts.
-        assertNull(start(share = true))
+        // A process started by a share: the card is not "the app", so it neither foregrounds nor counts.
+        assertFalse(start(share = true))
         stop(share = true)
-        assertEquals(FlushTrigger.LAUNCH, start())
-        assertNull(start(share = true))
+        assertTrue(start())
+        assertFalse(start(share = true))
         stop(share = true)
         stop()
-        assertEquals(FlushTrigger.FOREGROUND, start())
+        assertTrue(start())
     }
 }

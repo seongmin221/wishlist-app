@@ -10,13 +10,19 @@ import kotlin.time.Instant
 internal object SubmissionErrorPolicy {
     const val DEFAULT_RETRY_AFTER_SECONDS = 60L
 
+    /**
+     * A server-side failure is resent by the coordinator's timer after this ("잠시 후 다시 보내요"); unlike
+     * a 429 wait it does not hold the row, so any earlier trigger resends it too.
+     */
+    const val SERVER_RETRY_SECONDS = 30L
+
     data class Decision(val status: SubmissionStatus, val retryAfter: Instant?, val stopFlush: Boolean)
 
     fun decide(error: ClientError, now: Instant): Decision = when (error.kind) {
-        // Transient: keep it queued with the error recorded. NOT_FOUND is not in C3-D8 and is
-        // treated the same way, so a misrouted endpoint never loses a share.
+        // Transient: keep it queued with the error recorded and retry it after a short wait. NOT_FOUND
+        // is not in C3-D8 and is treated the same way, so a misrouted endpoint never loses a share.
         ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND ->
-            Decision(SubmissionStatus.PENDING, null, stopFlush = false)
+            Decision(SubmissionStatus.PENDING, now + SERVER_RETRY_SECONDS.seconds, stopFlush = false)
         // Ruling 10: the next rows would fail the same way (offline, timing out, throttled), so stop.
         ErrorKind.NETWORK, ErrorKind.TIMEOUT -> Decision(SubmissionStatus.PENDING, null, stopFlush = true)
         ErrorKind.RATE_LIMITED -> {

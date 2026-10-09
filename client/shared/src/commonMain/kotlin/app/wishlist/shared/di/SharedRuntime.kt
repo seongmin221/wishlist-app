@@ -24,7 +24,6 @@ import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
 import app.wishlist.shared.repository.SnapshotCreateItemRepository
-import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.SubmissionCoordinator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -110,7 +109,7 @@ class SharedRuntime internal constructor(
                 session = mutableSession,
                 store = koin.get<LocalStore>(),
                 seed = seedOverride ?: { fakeStore.seed(BoardSeeds.create(env.clock, env.ids)) },
-                onSignedIn = { submissions().requestFlush(FlushTrigger.SIGNED_IN) },
+                onSignedIn = { submissions().requestFlush() },
             )
         } else {
             null
@@ -219,7 +218,7 @@ class SharedRuntime internal constructor(
 
     /**
      * A new home list Presenter over [auth] and the one [submissions] coordinator. Foreground
-     * refresh stays app-wide (the platform calls `submissions().refresh(FOREGROUND)`). The
+     * refresh stays app-wide (the platform calls `submissions().refresh()`). The
      * platform owner calls [HomePresenter.close].
      */
     fun homePresenter(): HomePresenter {
@@ -228,7 +227,7 @@ class SharedRuntime internal constructor(
             auth = auth(),
             view = submissions.view,
             refreshes = submissions.refreshes,
-            refresh = { submissions.refresh(it) },
+            runRefresh = submissions::refresh,
             clock = env.clock,
             utcOffsetSeconds = env.platform.utcOffsetSeconds,
             dispatcher = env.dispatchers.io,
@@ -249,7 +248,7 @@ class SharedRuntime internal constructor(
             clock = env.clock,
             ids = env.ids,
             io = env.dispatchers.io,
-            onPendingCreated = { submissions().requestFlush(FlushTrigger.LAUNCH) },
+            onPendingCreated = { submissions().requestFlush() },
         )
     }
 

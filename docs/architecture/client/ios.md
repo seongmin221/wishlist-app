@@ -72,7 +72,7 @@
 
 ### 앱 쪽 신호·세션 미러
 
-- `Platform/AppSignals.swift`(Ruling 1): scene `.active`마다 inbox pass(앞 pass가 끝난 뒤 순서대로) → `refresh(LAUNCH)`(첫 번째) / `refresh(FOREGROUND)`(그 뒤). refresh는 다음 pass가 기다리지 않는다. XCTest host(`XCTestConfigurationFilePath` 환경 변수)에서는 inbox·refresh·네트워크 신호를 모두 끈다(IOS_TEST host는 설치된 debug 앱과 같은 container·DB를 쓴다). `NetworkSignals`는 `NWPathMonitor`의 unsatisfied → satisfied 전이에서 `requestFlush(NETWORK_RESTORED)`(첫 갱신은 기준값).
+- `Platform/AppSignals.swift`(Ruling 1): 실행과 background에서 돌아올 때만(`ForegroundTransitions`: 첫 `.active`와 `.background` 뒤의 `.active`. 제어 센터·알림 센터·Face ID 창의 `.inactive → .active`는 앱을 떠난 것이 아니라 제외, PR #12 2차 리뷰) inbox pass(앞 pass가 끝난 뒤 순서대로) → `refresh()`. refresh는 다음 pass가 기다리지 않는다. XCTest host(`XCTestConfigurationFilePath` 환경 변수)에서는 inbox·refresh·네트워크 신호를 모두 끈다(IOS_TEST host는 설치된 debug 앱과 같은 container·DB를 쓴다). `NetworkSignals`는 `NWPathMonitor`의 unsatisfied → satisfied 전이에서 `requestFlush()`(첫 갱신은 기준값).
 - `Platform/SessionMirror.swift`: `AccountPresenterOwner.binding`(복원 전 `unknown` / `signedOut` / `signedIn(id)`)이 바뀔 때마다 app group defaults에 `wl.session.accountBinding`을 쓰거나 지운다. 복원 전에는 지난 값을 그대로 둔다. 자격 증명이 아니다.
 
 ### 화면과 owner
@@ -98,4 +98,4 @@
 - XCTest host는 앱 신호는 끄지만 runtime·debug 복원·seed는 설치된 debug 앱과 같은 `wishlist.db`에서 돈다([KMP 알려진 한계](kmp.md#알려진-한계와-인계-단계)).
 - `NetworkSignals`·`AppSignals`는 자동 테스트가 없다.
 - 홈 목록은 lazy가 아니다(`ScrollView` 안 `VStack`). 대기 300개에서 XCTest 측정 CPU가 N보다 빠르게 늘었다. Instruments는 `DevToolsSecurity` 승인 뒤 다시 잰다([C3 성능 확인](c3-performance-checks.md#c3-측정-결과-2026-10-07)).
-- 로그인 뒤 할 일 머리 "할 일 N개"는 0개일 때도 보인다(보드는 비지 않은 예만 있다). 영어 "%d to-dos"는 1개일 때 복수형이 틀린다(두 플랫폼 공통, 문구 재검토 때 plural 처리).
+- 로그인 뒤 할 일 머리 "할 일 N개"는 0개일 때도 보인다(보드는 비지 않은 예만 있다). 영어는 plural로 "1 to-do"·"7 to-dos"다(iOS xcstrings plural variation, Android `<plurals>`).

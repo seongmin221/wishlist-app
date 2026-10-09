@@ -24,7 +24,9 @@
     <string name="home_login_card_devices">다른 기기에서도 볼 수 있어요</string>
     <string name="home_login_button">로그인</string>
     <string name="home_todo">할 일</string>
-    <string name="home_todo_count">할 일 %1$d개</string>
+    <plurals name="home_todo_count">
+        <item quantity="other">할 일 %1$d개</item>
+    </plurals>
     <string name="home_pending_title">분석 대기</string>
     <string name="home_pending_subtitle">로그인하면 바로 정보를 가져와요</string>
     <string name="home_pending_meta">%1$s 저장 · 이 기기에만 있어요</string>
@@ -33,6 +35,8 @@
     <string name="home_processing_subtitle">상품 정보를 가져오고 있어요</string>
     <string name="row_sending">보내는 중</string>
     <string name="row_waiting_network">연결되면 보내요</string>
+    <string name="row_retrying">잠시 후 다시 보내요</string>
+    <string name="row_needs_sign_in">다시 로그인하면 보내요</string>
     <string name="row_failed">보낼 수 없는 링크예요</string>
     <string name="row_processing">상품 정보 추출 중</string>
     <string name="time_just_now">방금</string>

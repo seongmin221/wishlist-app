@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package app.wishlist.shared.submission
 
 import app.wishlist.shared.core.AuthSession
@@ -9,6 +7,7 @@ import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.ErrorKind
 import app.wishlist.shared.core.IdGenerator
 import app.wishlist.shared.core.SessionSnapshot
+import app.wishlist.shared.core.canonicalUuidOrNull
 import app.wishlist.shared.data.local.SqlLocalStore.Companion.ACCOUNT_BINDING_MISMATCH
 import app.wishlist.shared.domain.ParsedShare
 import app.wishlist.shared.domain.ShareTextParser
@@ -24,6 +23,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
@@ -42,7 +43,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /** A send or refresh step threw instead of returning a typed result. */
 internal const val SUBMISSION_STEP_FAILURE = "SUBMISSION_STEP_FAILURE"
@@ -52,8 +52,10 @@ internal const val SUBMISSION_STEP_FAILURE = "SUBMISSION_STEP_FAILURE"
  * coroutine, so at most one flush runs at a time and requests arriving meanwhile are coalesced
  * into a single rerun. A flush reads the session once and passes that snapshot to every store
  * call: binding unbound rows is committed (prepareFlush) before the first POST, each row keeps its
- * key across resends, and the C3-D8 error table decides what a failure does. Every
- * failure becomes a typed outcome; nothing thrown here escapes into the runtime scope.
+ * key across resends, and the C3-D8 error table decides what a failure does. A 429 holds every row
+ * of that account until its Retry-After; a server-side failure is resent by any trigger. A timer
+ * resends once the earliest recorded wait has passed, so a row never waits for a trigger that may not come.
+ * Every failure becomes a typed outcome; nothing thrown here escapes into the runtime scope.
  * Obtained from `SharedRuntime.submissions()`; after the runtime closes it is inert.
  */
 class SubmissionCoordinator internal constructor(
@@ -76,7 +78,7 @@ class SubmissionCoordinator internal constructor(
     // one publisher runs them, and requests arriving during a run collapse into one more run.
     private val publishRequests = Channel<Unit>(Channel.CONFLATED)
     private val viewLock = Mutex()
-    private val mutableView = MutableStateFlow(SubmissionView(null, emptyList(), emptyList(), flushing = false))
+    private val mutableView = MutableStateFlow(SubmissionView(null, emptyList(), emptyList()))
     val view: StateFlow<SubmissionView> = mutableView.asStateFlow()
     private val refreshRuns = MutableStateFlow(0L)
 
@@ -86,6 +88,12 @@ class SubmissionCoordinator internal constructor(
      * revision so its relative times are recomputed after every refresh.
      */
     internal val refreshes: StateFlow<Long> = refreshRuns.asStateFlow()
+
+    // Set by requestFlush, cleared when a flush starts: a refresh's ITEM-03 lookups step aside for it.
+    private val flushWanted = MutableStateFlow(false)
+
+    // The wake-up for the earliest future retryAfter; replaced after every flush (consumer only).
+    private var retryTimer: Job? = null
 
     init {
         scope.launch(dispatcher) { consumeRequests() }.invokeOnCompletion {
@@ -111,7 +119,7 @@ class SubmissionCoordinator internal constructor(
         guarded(Unit) { publishView() }
         when {
             binding == null -> ShareCardKind.LOCAL
-            online -> ShareCardKind.SAVED.also { requestFlush(FlushTrigger.SHARE_RECEIVED) }
+            online -> ShareCardKind.SAVED.also { requestFlush() }
             else -> ShareCardKind.OFFLINE
         }
     }
@@ -142,16 +150,21 @@ class SubmissionCoordinator internal constructor(
         InboxImportResult(deletable, retained)
     }
 
-    /** Fire-and-forget. While a flush runs, this only marks one rerun. */
-    fun requestFlush(trigger: FlushTrigger) {
+    /**
+     * Fire-and-forget (launch, network restored, sign-in, a share, a retry timer). While a flush runs,
+     * this only marks one rerun; during a refresh's lookups it runs before the next lookup.
+     */
+    fun requestFlush() {
+        flushWanted.value = true
         requests.trySend(Request(refresh = false, done = null))
     }
 
     /**
-     * flush → (DEBUG analysis step) → ITEM-03 for each cached PROCESSING item → view. Pull to refresh
-     * awaits it. Coalesced like [requestFlush]: concurrent calls share one run started after them.
+     * flush → (DEBUG analysis step) → ITEM-03 for each cached PROCESSING item → view. Launch,
+     * foreground and pull to refresh use it; pull to refresh awaits it. Coalesced like
+     * [requestFlush]: concurrent calls share one run started after them.
      */
-    suspend fun refresh(trigger: FlushTrigger) {
+    suspend fun refresh() {
         val done = CompletableDeferred<Unit>()
         if (requests.trySend(Request(refresh = true, done = done)).isFailure) return
         done.await()
@@ -175,27 +188,56 @@ class SubmissionCoordinator internal constructor(
     }
 
     private suspend fun flushOnce() {
+        flushWanted.value = false
         val snapshot = session.state.value
         if (snapshot.accountId == null) return publishView()
-        mutableView.update { it.copy(flushing = true) }
+        val retry = RetryWindow()
         try {
             // Resets stale SUBMITTING rows and binds unbound ones in one commit, before any POST.
             val queue = (store.prepareFlush(snapshot) as? ClientResult.Success)?.value ?: return
             requestPublish()
             val now = clock.now()
+            // 429 is the server pausing this account, not one row: nothing is sent until it ends.
+            val throttledUntil = queue
+                .filter { it.submissionStatus == SubmissionStatus.PENDING && it.lastSubmissionError?.kind == ErrorKind.RATE_LIMITED }
+                .mapNotNull { it.retryAfter }
+                .filter { it > now }
+                .maxOrNull()
+            if (throttledUntil != null) return retry.note(throttledUntil)
+            // Any other retryAfter (a server-side failure) only sets the timer: every trigger still resends.
             for (row in queue) {
                 if (row.submissionStatus != SubmissionStatus.PENDING) continue
-                if (row.retryAfter?.let { it > now } == true) continue
-                if (session.state.value != snapshot || !send(snapshot, row)) return
+                if (session.state.value != snapshot || !send(snapshot, row, retry)) return
             }
         } finally {
-            mutableView.update { it.copy(flushing = false) }
+            scheduleRetry(retry.earliest)
             publishView() // the final state, before the flush (and a refresh awaiting it) returns
         }
     }
 
+    /** The earliest future retryAfter met during one flush. */
+    private class RetryWindow {
+        var earliest: Instant? = null
+            private set
+
+        fun note(at: Instant) {
+            earliest = earliest?.let { minOf(it, at) } ?: at
+        }
+    }
+
+    /** Replaces the wake-up: a flush at [at], so a wait that passed while the app stays open still resends. */
+    private fun scheduleRetry(at: Instant?) {
+        retryTimer?.cancel()
+        retryTimer = at?.let {
+            scope.launch(dispatcher) {
+                delay(it - clock.now())
+                requestFlush()
+            }
+        }
+    }
+
     /** Sends one row with its own key; false stops this flush. */
-    private suspend fun send(snapshot: SessionSnapshot, row: LocalSubmission): Boolean {
+    private suspend fun send(snapshot: SessionSnapshot, row: LocalSubmission, retry: RetryWindow): Boolean {
         val id = row.clientSubmissionId
         if (store.markSubmission(snapshot, id, SubmissionStatus.SUBMITTING, null, null) is ClientResult.Failure) return false
         // Shown as sending without suspending here (a coalesced publish); ITEM-01 itself is bound to the
@@ -203,23 +245,28 @@ class SubmissionCoordinator internal constructor(
         requestPublish()
         val command = CreateItemCommand(id, row.sourceUrl, row.sharedAt)
         return when (val result = guarded(STEP_FAILURE) { create.create(command, snapshot) }) {
-            is ClientResult.Success -> accept(snapshot, id, result)
-            is ClientResult.Failure -> recordFailure(snapshot, id, result.error)
+            is ClientResult.Success -> accept(snapshot, id, result, retry)
+            is ClientResult.Failure -> recordFailure(snapshot, id, result.error, retry)
         }
     }
 
-    private suspend fun accept(snapshot: SessionSnapshot, id: String, result: ClientResult.Success<WishlistItem>): Boolean {
-        val failed = store.accept(snapshot, id, result.value) as? ClientResult.Failure ?: return true
+    private suspend fun accept(
+        snapshot: SessionSnapshot, id: String, result: ClientResult.Success<WishlistItem>, retry: RetryWindow,
+    ): Boolean {
+        // Under viewLock: accept moves the row from the queue to the cache in one commit, and a view
+        // reads both, so a view never sees the row in both (or in neither).
+        val failed = viewLock.withLock { store.accept(snapshot, id, result.value) } as? ClientResult.Failure ?: return true
         // SESSION_CHANGED: the response is dropped and the row stays SUBMITTING with its binding;
         // that account's next prepareFlush resets it. Otherwise the store is suspect: record and stop.
-        if (failed.error.kind != ErrorKind.SESSION_CHANGED) recordFailure(snapshot, id, failed.error)
+        if (failed.error.kind != ErrorKind.SESSION_CHANGED) recordFailure(snapshot, id, failed.error, retry)
         return false
     }
 
     /** Applies C3-D8 to the row; false stops this flush. */
-    private suspend fun recordFailure(snapshot: SessionSnapshot, id: String, error: ClientError): Boolean {
+    private suspend fun recordFailure(snapshot: SessionSnapshot, id: String, error: ClientError, retry: RetryWindow): Boolean {
         val decision = SubmissionErrorPolicy.decide(error, clock.now())
         val marked = store.markSubmission(snapshot, id, decision.status, error, decision.retryAfter)
+        if (marked is ClientResult.Success) decision.retryAfter?.let(retry::note)
         return marked is ClientResult.Success && !decision.stopFlush
     }
 
@@ -230,6 +277,8 @@ class SubmissionCoordinator internal constructor(
         if (snapshot.accountId != null) {
             val items = (store.processingItems(snapshot) as? ClientResult.Success)?.value.orEmpty()
             for (item in items) {
+                // A share or a network return waits at most one lookup, not the whole list.
+                if (flushWanted.value) flushOnce()
                 if (session.state.value != snapshot) break
                 guarded(STEP_FAILURE) { get.get(item.id) } // the cache decorator stores the result
             }
@@ -312,7 +361,7 @@ class SubmissionCoordinator internal constructor(
         kind == ErrorKind.SESSION_CHANGED || code == ACCOUNT_BINDING_MISMATCH
 
     private fun InboxRecord.toSubmissionOrNull(): LocalSubmission? {
-        if (runCatching { Uuid.parse(clientSubmissionId) }.isFailure) return null
+        if (canonicalUuidOrNull(clientSubmissionId) == null) return null
         val sharedAt = runCatching { Instant.parse(sharedAtIso) }.getOrNull() ?: return null
         val link = ShareTextParser.parse(sourceUrl) as? ParsedShare.Link ?: return null
         return LocalSubmission(clientSubmissionId, link.url, sharedAt, accountBinding?.takeIf { it.isNotBlank() })

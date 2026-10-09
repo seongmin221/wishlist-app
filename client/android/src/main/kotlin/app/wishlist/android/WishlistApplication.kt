@@ -7,7 +7,6 @@ import app.wishlist.android.platform.ForegroundSignals
 import app.wishlist.android.platform.NetworkSignals
 import app.wishlist.shared.di.SharedRuntime
 import app.wishlist.shared.di.SharedRuntimeFactory
-import app.wishlist.shared.submission.FlushTrigger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -32,10 +31,10 @@ class WishlistApplication : Application() {
         runtime = SharedRuntimeFactory.create(this, AppRuntimeConfig.bindings(BuildConfig.DEBUG), AppRuntimeConfig.remote)
         VariantStartup.onRuntimeAssembled(runtime)
         val submissions = runtime.submissions()
-        // No separate launch refresh: the first foreground of the app is the LAUNCH signal.
+        // No separate launch refresh: the app's first foreground is its launch refresh.
         registerActivityLifecycleCallbacks(
-            ForegroundSignals { trigger -> appScope.launch { submissions.refresh(trigger) } },
+            ForegroundSignals { appScope.launch { submissions.refresh() } },
         )
-        NetworkSignals(this) { submissions.requestFlush(FlushTrigger.NETWORK_RESTORED) }.start()
+        NetworkSignals(this) { submissions.requestFlush() }.start()
     }
 }

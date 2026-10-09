@@ -4,7 +4,6 @@ import app.wishlist.shared.core.AuthProvider
 import app.wishlist.shared.data.fake.error
 import app.wishlist.shared.data.fake.successValue
 import app.wishlist.shared.repository.LocalStore
-import app.wishlist.shared.submission.FlushTrigger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -71,7 +70,7 @@ class RuntimeCloseLeaseTest {
         runtime.ready.first { it }
         runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val seeded = runtime.catalogRepository().items(null, null).successValue().first()
-        runtime.submissions().refresh(FlushTrigger.FOREGROUND)  // settles the sign-in flush
+        runtime.submissions().refresh()  // settles the sign-in flush
         val driver = probe.drivers.single()
         val gate = ThreadGate()
         // CachedGetItemRepository holds the raw graph store: its first call is the cache read (selectItem).

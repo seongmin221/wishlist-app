@@ -4,8 +4,9 @@ import app.wishlist.shared.core.AuthAccount
 import app.wishlist.shared.core.AuthFacade
 import app.wishlist.shared.core.Clock
 import app.wishlist.shared.domain.DisplayFormat
+import app.wishlist.shared.core.ErrorKind
+import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
-import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.SubmissionView
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -32,7 +33,7 @@ class HomePresenter internal constructor(
     private val auth: AuthFacade,
     view: StateFlow<SubmissionView>,
     refreshes: StateFlow<Long>,
-    private val refresh: suspend (FlushTrigger) -> Unit,
+    private val runRefresh: suspend () -> Unit,
     private val clock: Clock,
     private val utcOffsetSeconds: (Instant) -> Int,
     dispatcher: CoroutineDispatcher,
@@ -74,7 +75,7 @@ class HomePresenter internal constructor(
         if (refreshing.value) return
         refreshing.value = true
         try {
-            refresh(FlushTrigger.USER_REFRESH)
+            runRefresh()
         } finally {
             refreshing.value = false
             recompute.value++
@@ -99,14 +100,22 @@ class HomePresenter internal constructor(
         }
         if (view.accountId != account.accountId) return HomeState.Loading
         // The view is already in display order (SubmissionView): local rows, then processing items.
-        val local = view.local.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, it.submissionStatus.toRow()) }
+        val local = view.local.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, it.rowStatus()) }
         val processing = view.processing.map { row("item-${it.id}", it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
         return HomeState.LoggedIn(local + processing, busy)
     }
 
-    private fun SubmissionStatus.toRow() = when (this) {
+    private fun LocalSubmission.rowStatus() = when (submissionStatus) {
         SubmissionStatus.SUBMITTING -> RowStatus.SENDING
-        SubmissionStatus.PENDING -> RowStatus.WAITING_NETWORK
         SubmissionStatus.FAILED -> RowStatus.FAILED
+        SubmissionStatus.PENDING -> when (lastSubmissionError?.kind) {
+            // Not tried yet, offline, or cut off by an account change: the next connection sends it.
+            null, ErrorKind.NETWORK, ErrorKind.TIMEOUT, ErrorKind.SESSION_CHANGED -> RowStatus.WAITING_NETWORK
+            ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND,
+            ErrorKind.RATE_LIMITED -> RowStatus.RETRYING
+            ErrorKind.UNAUTHENTICATED -> RowStatus.NEEDS_SIGN_IN
+            // Permanent kinds end FAILED; a PENDING row with one is still only waiting.
+            ErrorKind.VALIDATION, ErrorKind.CONFLICT -> RowStatus.WAITING_NETWORK
+        }
     }
 }

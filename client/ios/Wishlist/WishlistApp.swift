@@ -34,9 +34,7 @@ struct WishlistApp: App {
                 // Every account change (once restored) reaches the share extension's defaults.
                 .onChange(of: account.binding, initial: true) { _, binding in mirror.update(binding) }
         }
-        // Launch, then every return to the foreground: inbox import + refresh (Ruling 1).
-        .onChange(of: scenePhase, initial: true) { _, phase in
-            if phase == .active { signals.sceneBecameActive() }
-        }
+        // Launch, then every return from the background: inbox import + refresh (Ruling 1).
+        .onChange(of: scenePhase, initial: true) { _, phase in signals.scenePhaseChanged(phase) }
     }
 }

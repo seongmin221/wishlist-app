@@ -15,7 +15,7 @@
 
 ## 검증 기록
 
-- [C3 PR #12 리뷰 반영 (2026-10-09)](c3-pr12-review-2026-10-09.md) — 리뷰 10건: refresh revision으로 상대 시각 갱신, 복원 계정 첫 실행 기록, inbox import 무기한 ready 대기, 시각별 offset, 게시 합치기, Android LAUNCH 단일화, iOS `refreshNow` 대기, 정렬 단일화, parser 죽은 분기, debug hook io
+- [C3 PR #12 리뷰 반영 (2026-10-09)](c3-pr12-review-2026-10-09.md) — 리뷰 10건: refresh revision으로 상대 시각 갱신, 복원 계정 첫 실행 기록, inbox import 무기한 ready 대기, 시각별 offset, 게시 합치기, Android LAUNCH 단일화, iOS `refreshNow` 대기, 정렬 단일화, parser 죽은 분기, debug hook io. 2차 10건: 429 계정 단위 대기, 재시도 타이머(서버 오류 30초), accept·게시 한 시점, 대기 줄 문구 3종, 조회 중 새 공유 우선, iOS 실제 복귀만, `flushing`·`FlushTrigger` 삭제, 영어 plural, UUID 헬퍼 하나
 - [C3 화면 비교·예외 경로·성능 측정·최종 검증 (2026-10-07)](c3-verification-2026-10-07.md) — 보드 대비 차이와 수정, 계정 전환·강제 종료 복구, 대기 목록 20/100/300 baseline, debug 시연 hook, runtime 종료 중 DB 조회 충돌 수정(Task 7c), 최종 명령별 건수(Task 8)
 - [C2 최종 로컬 검증 (2026-10-07)](c2-final-verification-2026-10-07.md) — 실행 명령별 건수·환경·미실행과 C3/C12 인계
 - [C2 `:localdb` 모듈 분리 (2026-10-07)](c2-localdb-module-split-2026-10-07.md) — 계획의 `:shared` 단일 모듈에서 벗어난 이유(SQLDelight 생성 public 타입의 ObjC 노출 차단)

@@ -12,7 +12,6 @@ import app.wishlist.shared.data.local.UUID_A
 import app.wishlist.shared.domain.RelativeTime
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.presentation.HomeState
-import app.wishlist.shared.submission.FlushTrigger
 import app.wishlist.shared.submission.InboxImportResult
 import app.wishlist.shared.submission.InboxRecord
 import app.wishlist.shared.submission.SUBMISSION_STEP_FAILURE
@@ -66,10 +65,10 @@ class RuntimeSubmissionsTest {
         assertEquals(1, submissions.view.value.processing.size)
 
         now += 4.seconds
-        submissions.refresh(FlushTrigger.USER_REFRESH)
+        submissions.refresh()
         assertEquals(1, submissions.view.value.processing.size)
         now += 1.seconds
-        submissions.refresh(FlushTrigger.USER_REFRESH)
+        submissions.refresh()
         assertTrue(submissions.view.value.processing.isEmpty())
         runtime.close()
     }
@@ -87,7 +86,7 @@ class RuntimeSubmissionsTest {
 
         // Signed out the refresh changes nothing (equal view), yet the rows get a fresh clock.now().
         now += 3.hours
-        submissions.refresh(FlushTrigger.FOREGROUND)
+        submissions.refresh()
         advanceUntilIdle()
         assertEquals(RelativeTime.Hours(3), assertIs<HomeState.LoggedOut>(home.state.value).pending.single().savedAt)
         home.close()
@@ -113,7 +112,7 @@ class RuntimeSubmissionsTest {
         assertEquals(RelativeTime.JustNow, assertIs<HomeState.LoggedIn>(home.state.value).processing.single().savedAt)
 
         now += 3.hours
-        submissions.refresh(FlushTrigger.FOREGROUND)
+        submissions.refresh()
         advanceUntilIdle()
         assertEquals(before, submissions.view.value)
         assertEquals(RelativeTime.Hours(3), assertIs<HomeState.LoggedIn>(home.state.value).processing.single().savedAt)
@@ -134,18 +133,20 @@ class RuntimeSubmissionsTest {
 
         // The Fake ITEM-01 throws inside the flush job running on the runtime scope.
         explode = true
-        submissions.requestFlush(FlushTrigger.NETWORK_RESTORED)
-        advanceUntilIdle()
+        submissions.requestFlush()
+        // Read without suspending: while explode is set the row's 30s retry timer keeps failing, and an
+        // idle test scheduler would advance into it forever.
+        runCurrent()
         assertNull(runtime.bootstrapFailure.value)
         assertTrue(runtime.ready.value)
-        val row = runtime.localStore().pending().successValue().single()
+        val row = submissions.view.value.local.single()
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)
         assertEquals(ErrorKind.UNAVAILABLE, row.lastSubmissionError?.kind)
         assertEquals(SUBMISSION_STEP_FAILURE, row.lastSubmissionError?.code)
 
         // The same single-flight consumer still serves the next request.
         explode = false
-        submissions.refresh(FlushTrigger.USER_REFRESH)
+        submissions.refresh()
         assertTrue(runtime.localStore().pending().successValue().isEmpty())
         assertEquals(1, submissions.view.value.processing.size)
         assertNull(runtime.bootstrapFailure.value)
@@ -162,8 +163,8 @@ class RuntimeSubmissionsTest {
 
         assertSame(submissions, runtime.submissions())
         assertEquals(ShareCardKind.STORE_FAILED, submissions.receiveShared(LINK, online = true))
-        submissions.requestFlush(FlushTrigger.FOREGROUND)
-        submissions.refresh(FlushTrigger.USER_REFRESH) // returns instead of waiting forever
+        submissions.requestFlush()
+        submissions.refresh() // returns instead of waiting forever
         val record = InboxRecord(UUID_A, LINK, "2026-10-07T00:00:00Z", null)
         assertEquals(InboxImportResult(emptyList(), listOf(UUID_A)), submissions.importInbox(listOf(record)))
 
@@ -171,12 +172,12 @@ class RuntimeSubmissionsTest {
         val unused = createRuntime(releaseBindings(), dispatcher = StandardTestDispatcher(testScheduler))
         unused.close()
         assertEquals(ShareCardKind.STORE_FAILED, unused.submissions().receiveShared(LINK, online = true))
-        unused.submissions().refresh(FlushTrigger.LAUNCH)
+        unused.submissions().refresh()
     }
 
     @Test fun refreshBeforeReadyReturnsWhenTheRuntimeCloses() = runTest {
         val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler))
-        val waiter = launch { runtime.submissions().refresh(FlushTrigger.LAUNCH) } // bootstrap never started
+        val waiter = launch { runtime.submissions().refresh() } // bootstrap never started
         runCurrent()
         runtime.close()
         advanceUntilIdle()
@@ -188,7 +189,7 @@ class RuntimeSubmissionsTest {
     @Test fun releaseSharesStayLocalAndUnsent() = runTest {
         val runtime = createRuntime(releaseBindings(), dispatcher = StandardTestDispatcher(testScheduler))
         assertEquals(ShareCardKind.LOCAL, runtime.submissions().receiveShared(LINK, online = true))
-        runtime.submissions().refresh(FlushTrigger.FOREGROUND)
+        runtime.submissions().refresh()
         val row = runtime.localStore().pending().successValue().single()
         assertNull(row.accountBinding)
         assertEquals(SubmissionStatus.PENDING, row.submissionStatus)

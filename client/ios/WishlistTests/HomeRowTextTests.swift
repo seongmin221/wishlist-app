@@ -18,6 +18,8 @@ final class HomeRowTextTests: XCTestCase {
             .localOnly: "home.pending.meta",
             .sending: "row.sending",
             .waitingNetwork: "row.waiting.network",
+            .retrying: "row.retrying",
+            .needsSignIn: "row.needs.sign.in",
             .failed: "row.failed",
             .processing: "row.processing",
         ]
@@ -45,6 +47,8 @@ final class HomeRowTextTests: XCTestCase {
         XCTAssertEqual(HomeRowText.meta(processing, bundle: en), "Extracting product info")
         XCTAssertEqual(HomeRowText.todoCount(7, bundle: ko), "할 일 7개")
         XCTAssertEqual(HomeRowText.todoCount(7, bundle: en), "7 to-dos")
+        XCTAssertEqual(HomeRowText.todoCount(1, bundle: ko), "할 일 1개")
+        XCTAssertEqual(HomeRowText.todoCount(1, bundle: en), "1 to-do")
     }
 
     /// Every key of the C3 screens is in the catalog (a missing key would show the raw key on screen).
@@ -54,7 +58,7 @@ final class HomeRowTextTests: XCTestCase {
             "home.logged.out.caption", "home.login.card.title", "home.login.card.fill", "home.login.card.devices", "home.login.button",
             "home.todo", "home.todo.count", "home.pending.title", "home.pending.subtitle", "home.pending.meta", "home.original",
             "home.processing.title", "home.processing.subtitle", "home.expand", "home.collapse",
-            "row.sending", "row.waiting.network", "row.failed", "row.processing",
+            "row.sending", "row.waiting.network", "row.retrying", "row.needs.sign.in", "row.failed", "row.processing",
             "time.just.now", "time.minutes", "time.hours", "time.yesterday", "time.days",
             "settings.title", "settings.back", "settings.account", "settings.signed.in.google", "settings.signed.in.apple", "settings.logout",
             "settings.login.hint", "settings.login", "settings.original.links", "settings.webview.clear", "settings.webview.clear.hint",

@@ -9,9 +9,6 @@ import app.wishlist.shared.model.WishlistItem
  */
 enum class ShareCardKind { SAVED, LOCAL, OFFLINE, INVALID, STORE_FAILED }
 
-/** Why a flush or refresh was asked for. Every trigger runs the same single-flight flush. */
-enum class FlushTrigger { LAUNCH, FOREGROUND, NETWORK_RESTORED, SIGNED_IN, USER_REFRESH, SHARE_RECEIVED }
-
 /** One iOS app-group inbox file (`inbox/<key>.json`), as written by the share extension. */
 data class InboxRecord(
     val clientSubmissionId: String,
@@ -34,5 +31,4 @@ data class SubmissionView(
     val accountId: String?,
     val local: List<LocalSubmission>,
     val processing: List<WishlistItem>,
-    val flushing: Boolean,
 )
