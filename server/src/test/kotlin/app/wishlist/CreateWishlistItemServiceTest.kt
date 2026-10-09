@@ -10,6 +10,29 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 class CreateWishlistItemServiceTest {
+    @Test
+    fun `http schemes accept any case and preserve the original url`() = withDatabase { database, service ->
+        for ((url, lowercaseSchemeUrl) in listOf(
+            "HTTPS://A.EXAMPLE/Path" to "https://A.EXAMPLE/Path",
+            "HtTp://a.example/Path" to "http://a.example/Path",
+            "hTtPs://a.example/Path" to "https://a.example/Path",
+        )) {
+            val owner = UUID.randomUUID()
+            val key = UUID.randomUUID()
+            val created = assertIs<CreateResult.Created>(service.create(owner, key, url), url)
+            assertEquals(url, created.item.sourceUrl)
+            val replay = assertIs<CreateResult.Replayed>(service.create(owner, key, url), url)
+            assertEquals(created.itemId, replay.itemId)
+            assertEquals(url, replay.item.sourceUrl)
+            val conflict = assertIs<CreateResult.IdempotencyKeyReused>(service.create(owner, key, lowercaseSchemeUrl), url)
+            assertEquals(created.itemId, conflict.itemId)
+            assertEquals(url, conflict.item.sourceUrl)
+        }
+        assertEquals(3, databaseCount(database, "wishlist_items"))
+        assertEquals(3, databaseCount(database, "analysis_jobs"))
+        assertEquals(3, databaseCount(database, "outbox_events"))
+    }
+
     @Test fun `committed creation returns its snapshot even if further database connections fail`() = app.testutil.withAnalysisDatabase { source ->
         var committed = false
         val observed = object : javax.sql.DataSource by source {
@@ -94,7 +117,8 @@ class CreateWishlistItemServiceTest {
     fun `unsafe url is rejected before any database write`() = withDatabase { database, service ->
         for (url in listOf("http://127.0.0.1/private", "http://127.0.0.2/private", "http://0.0.0.0/private",
             "http://LOCALHOST/private", "http://shop.localhost/private", "http://[::1]/private",
-            "http://[0:0:0:0:0:0:0:1]/private", "http://[::ffff:127.0.0.1]/private", "http://[::]/private")) {
+            "http://[0:0:0:0:0:0:0:1]/private", "http://[::ffff:127.0.0.1]/private", "http://[::]/private",
+            "HTTPS://LOCALHOST/private", "HtTp://127.0.0.1/private", "hTtPs://[::1]/private")) {
             assertIs<CreateResult.InvalidUrl>(service.create(UUID.randomUUID(), UUID.randomUUID(), url), url)
         }
         assertEquals(0, databaseCount(database, "wishlist_items"))

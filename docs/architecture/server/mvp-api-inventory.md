@@ -264,7 +264,7 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 | archive 목적 snapshot·복원 예외 | 최신 상세는 목적 아이콘 필요. 설명/color/icon의 복원 범위·삭제 custom 참조·archive 제목 수정 후 목적 이름 복원 기준 확인 | ARC-02/ARC-04/ARC-07/ARC-08 |
 | 아카이브 후보의 분석 상태 | 일반적으로 비교 가능 item을 다루지만 PROCESSING/보완 필요 후보를 목적에 추가·archive할 수 있는지 명확히 필요 | PUR-07/PUR-08, ARC-01/ARC-02/ARC-08 |
 | archive 정렬·snapshot 후보 순서 | 최근 종료순은 디자인의 가정, 구매 item 맨앞은 최신 결정. 나머지 후보 sort 고정 필요 | ARC-03/ARC-05 |
-| Share Extension 직접 전송 | 직접 ITEM-01 호출 또는 local-only 뒤 본 앱 전송 미결정. ‘분석 중’ 문구의 사실성에 영향 | ITEM-01, client share 수신 |
+| Share Extension 직접 전송 | C3는 app group inbox에 기록 후 본 앱 전송으로 확정([ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)). 실제 background 직접 전송은 인증 연결 단계에서 구현·검증 | ITEM-01, client share 수신 |
 | image 저장 제한·외부 이미지 영속 보관 | 사용자 사진 선택은 확정, MIME/size·관리 저장소·archive 외부 이미지 보존 방식은 기술 설계 필요 | MEDIA-01/MEDIA-02, ITEM/ARC GET |
 
 미결정은 해당 필터·validation·정렬·snapshot 구현의 선행 조건이며, 상품 생성 응답 수정·상세 조회·공통 상태·기본 목록 구현을 모두 막지는 않는다.

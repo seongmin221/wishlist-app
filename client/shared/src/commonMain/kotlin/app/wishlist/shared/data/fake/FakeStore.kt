@@ -73,6 +73,8 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         request(ApiId.ITEM_01, expected) { owner ->
         val key = canonicalUuidOrNull(command.submissionId)
             ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
+        if (!isValidFakeClientCreatedAt(command.clientCreatedAt)) return@request failure(ErrorKind.VALIDATION, "INVALID_CLIENT_CREATED_AT")
+        if (!isValidFakeSourceUrl(command.sourceUrl)) return@request failure(ErrorKind.VALIDATION, "INVALID_URL")
         val previous = owner.submissionIds[key]?.let { owner.entries.getValue(it).item }
         if (previous != null) {
             if (previous.sourceUrl != command.sourceUrl) failure(ErrorKind.CONFLICT, "IDEMPOTENCY_KEY_REUSED")
@@ -85,7 +87,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
                 purpose = ItemPurpose(), analysis = ItemAnalysis(AnalysisStatus.PROCESSING),
                 reviewStatus = ReviewStatus.NOT_REQUIRED, lifecycleStatus = LifecycleStatus.ACTIVE,
                 requiredAction = RequiredAction.NONE, createdAt = now, updatedAt = now,
-                clientCreatedAt = command.clientCreatedAt,
+                clientCreatedAt = normalizeFakeClientCreatedAt(command.clientCreatedAt),
             ))
             check(item.id !in owner.entries) { "IdGenerator returned an existing item ID" }
             owner.entries[item.id] = Entry(item)

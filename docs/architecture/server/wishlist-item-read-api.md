@@ -12,6 +12,8 @@
 
 ## 공유 시각과 생성 key
 
+HTTP·HTTPS scheme은 대소문자 무관하게 검사하지만 `sourceUrl` 원문은 변경하지 않는다. 예를 들어 `HTTPS://A.EXAMPLE/Path`도 생성할 수 있고 같은 원문 재전송은 replay다. 같은 key로 scheme만 소문자화해서 재전송하면 다른 원문 URL이므로 409다.
+
 `sourceUrl`은 최대 2048자(UTF-16 길이)이며 UTF-8로 인코딩할 수 없는 문자열(짝 없는 surrogate)도 거절한다. 둘 다 새 오류 code 없이 기존 `422 INVALID_URL`이며 DB에 쓰기 전에 검사한다. JDBC가 짝 없는 surrogate를 `?`로 바꿔 저장하면 같은 key의 재전송이 저장 URL과 달라져 409가 되기 때문이다. 정상 surrogate 쌍(예: 이모지)은 허용하며 재전송이 일치한다. 요청 body 전체 상한은 여전히 운영 설정 범위의 후속 항목이다. 생성 시점에는 대소문자와 IPv6 괄호를 정규화해 `localhost`/`*.localhost`, IPv4 `127.0.0.0/8`·`0.0.0.0`, IPv6 loopback·unspecified literal을 DNS 조회 없이 거절한다. 사설·link-local 대역과 DNS 결과 판정은 extraction의 `UrlSafetyPolicy`가 계속 담당한다.
 
 `clientCreatedAt`은 선택 문자열이며 생략과 JSON null은 동일하게 null로 저장한다. 순수 `parseCreateRequest` 함수가 JSON wire 타입과 시각을 검증하고 URL의 허용 여부는 생성 서비스가 검사한다. 시간대가 있는 ISO 8601 날짜/시각을 Instant로 변환하며, 현지 시각과 UTC Instant 양쪽 연도가 1~9999여야 한다. 날짜만·offset 없는 시각·잘못된 날짜·문자열 이외의 값은 `422 INVALID_CLIENT_CREATED_AT`다. 기기 시계 오차를 이유로 미래 시각을 거절하지 않는다.

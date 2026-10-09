@@ -10,4 +10,4 @@ import kotlin.uuid.Uuid
  * these strings compares UUIDs by value, whatever casing a platform produced.
  */
 internal fun canonicalUuidOrNull(value: String): String? =
-    try { Uuid.parse(value).toString() } catch (_: IllegalArgumentException) { null }
+    try { Uuid.parse(value).toString().takeIf { it.equals(value, ignoreCase = true) } } catch (_: IllegalArgumentException) { null }
