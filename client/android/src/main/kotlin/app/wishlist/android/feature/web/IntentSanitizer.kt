@@ -53,7 +53,8 @@ internal object IntentSanitizer {
      * Regression note (Task 13 review): `Intent.parseUri` throws not only `URISyntaxException` but also
      * `NumberFormatException` (an `IllegalArgumentException`) for `launchFlags=q`, `i.x=zz` and malformed
      * `l.`/`f.`/`d.` extras. A page can send these without a gesture from `shouldOverrideUrlLoading`, so both
-     * are caught here and end in the fallback or Drop instead of crashing the app.
+     * are caught here and end in the fallback or Drop instead of crashing the app. Any other `RuntimeException`
+     * (e.g. `BadParcelableException`, index errors on odd extras) is caught the same way.
      */
     fun <T : IntentTarget> sanitize(uri: String, parse: (String) -> T, resolvable: (T) -> Boolean): SanitizedIntent<T> {
         val parsed = ParsedIntentUri.parse(uri) ?: return SanitizedIntent.Drop
@@ -61,7 +62,7 @@ internal object IntentSanitizer {
             parse(uri)
         } catch (_: URISyntaxException) {
             return fallbackOrDrop(parsed.fallbackUrl)
-        } catch (_: IllegalArgumentException) {
+        } catch (_: RuntimeException) {
             return fallbackOrDrop(parsed.fallbackUrl)
         }
         return sanitize(target, resolvable)

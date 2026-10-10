@@ -22,6 +22,21 @@ class OverlayHostStateTest {
         assertFalse(s.isAnimating)
     }
 
+    @Test fun dismissDialogClosesOnlyThatDialogOnTop() {
+        val s = OverlayHostState()
+        var dismissed = 0
+        val mine = spec.copy(onDismissed = { dismissed++ })
+        s.showDialog(mine)
+        assertFalse(s.dismissDialog(mine)) // still opening
+        s.settleOpen()
+        assertFalse(s.dismissDialog(spec)) // another spec
+        assertTrue(s.dismissDialog(mine))
+        s.settleClose()
+        assertTrue(s.entries.isEmpty())
+        assertEquals(1, dismissed)
+        assertFalse(s.dismissDialog(mine))
+    }
+
     @Test fun dismissDuringOpenIsIgnored() {
         val s = OverlayHostState()
         s.showSheet {}

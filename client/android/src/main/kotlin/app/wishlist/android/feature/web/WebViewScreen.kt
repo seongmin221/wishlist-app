@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -211,7 +212,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
         // Main frame only (WebView never reports iframe loads here).
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
             url?.let(promptGate::onMainFrameNavigation)
-            page = page.copy(url = url ?: page.url, title = null, loading = true, failed = false)
+            page = page.started(url)
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
@@ -252,6 +253,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
     }
 
     override fun onCleared() {
+        promptGate.close()
         externalRequests.close()
         webView?.apply {
             stopLoading()
@@ -297,6 +299,11 @@ internal fun WebViewScreen(route: WebViewRoute) {
     }
 
     val externalDialog by rememberUpdatedState(externalDialogSpec())
+    // The FWebViewExternal this screen has up: closed with the screen so it does not stay over the next one.
+    val shownPrompt = remember(holder) { ShownPrompt() }
+    DisposableEffect(holder) {
+        onDispose { shownPrompt.spec?.let(overlay::dismissDialog) }
+    }
     val currentContext by rememberUpdatedState(context)
     LaunchedEffect(holder) {
         val gate = holder.promptGate
@@ -310,16 +317,19 @@ internal fun WebViewScreen(route: WebViewRoute) {
                 ExternalPromptGate.Action.DROP -> Unit
                 ExternalPromptGate.Action.PROMPT -> {
                     var confirmed = false
-                    val shown = overlay.showDialog(
-                        externalDialog.copy(
-                            onConfirm = {
-                                confirmed = true
-                                WebExternalApps.launch(currentContext, request.target, holder::load)
-                            },
-                            onDismissed = { gate.onPromptClosed(confirmed, holder.page.url) },
-                        ),
+                    val spec = externalDialog.copy(
+                        onConfirm = {
+                            confirmed = true
+                            // The app-wide overlay can outlive this web view (popped while the dialog was up).
+                            if (gate.mayLaunchConfirmed()) WebExternalApps.launch(currentContext, request.target, holder::load)
+                        },
+                        onDismissed = {
+                            shownPrompt.spec = null // the gate allows one FWebViewExternal at a time
+                            gate.onPromptClosed(confirmed, holder.page.url)
+                        },
                     )
-                    if (!shown) gate.onPromptNotShown()
+                    val shown = overlay.showDialog(spec)
+                    if (shown) shownPrompt.spec = spec else gate.onPromptNotShown()
                 }
             }
         }
@@ -378,6 +388,11 @@ internal fun WebViewScreen(route: WebViewRoute) {
         }
         DetailNoticeLine(notice, Modifier.align(Alignment.TopCenter))
     }
+}
+
+/** The FWebViewExternal spec currently shown by one screen (null when none). */
+private class ShownPrompt {
+    var spec: WLDialogSpec? = null
 }
 
 /** The parent one `AndroidView` gave the shared WebView, so its release only undoes its own attachment. */

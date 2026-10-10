@@ -118,6 +118,16 @@ class OverlayHostState {
         return requestDismiss(top.id)
     }
 
+    /**
+     * [spec]로 연 확인창이 가장 위에 열려 있으면 닫는다(`onDismissed`가 불린다). 그 확인창을 띄운 화면이 사라질 때 쓴다.
+     * 열리는 중이거나 다른 overlay가 위에 있으면 false(호출한 쪽이 `onConfirm`을 따로 막는다).
+     */
+    fun dismissDialog(spec: WLDialogSpec): Boolean {
+        val top = entries.lastOrNull() as? DialogEntry ?: return false
+        if (top.spec !== spec) return false
+        return requestDismiss(top.id)
+    }
+
     internal fun requestDismiss(id: Long): Boolean {
         if (isAnimating) return false
         val top = entries.lastOrNull() ?: return false

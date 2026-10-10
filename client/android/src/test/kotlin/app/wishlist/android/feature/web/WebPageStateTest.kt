@@ -36,6 +36,27 @@ class WebPageStateTest {
     }
 
     @Test
+    fun failedPageShowsDomainOnly() {
+        val failed = page(title = "상품 페이지").copy(failed = true)
+        assertNull(failed.titleLine)
+        assertEquals("musinsa.com", failed.host)
+    }
+
+    @Test
+    fun onlyWebUrlsReplaceTheShownPageWhenALoadStarts() {
+        val shown = page(title = "상품 페이지")
+        val blank = shown.started("about:blank")
+        assertEquals("https://www.musinsa.com/p/1", blank.url)
+        assertNull(blank.title)
+        assertTrue(blank.loading)
+        assertEquals("https://www.musinsa.com/p/1", shown.started(null).url)
+        assertEquals("https://www.musinsa.com/p/1", shown.started("data:text/html,x").url)
+        val next = shown.copy(failed = true).started("https://m.musinsa.com/p/2")
+        assertEquals("https://m.musinsa.com/p/2", next.url)
+        assertFalse(next.failed)
+    }
+
+    @Test
     fun progressLineHidesAtHundred() {
         assertTrue(page(loading = true, progress = 40).progressVisible)
         assertFalse(page(loading = true, progress = 100).progressVisible)
