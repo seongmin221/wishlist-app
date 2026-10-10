@@ -29,12 +29,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -57,12 +58,13 @@ import app.wishlist.android.designsystem.WLText
 import app.wishlist.android.designsystem.WLTopBar
 import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
+import app.wishlist.android.feature.detail.DISABLED_ALPHA
+import app.wishlist.android.feature.web.WebViewRoute
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLScrollToTopEffect
 import app.wishlist.android.navigation.WLTab
 import app.wishlist.android.navigation.WLTabBarHeight
 import app.wishlist.android.navigation.wlTabBarBottomPadding
-import app.wishlist.android.feature.detail.openOriginal
 import app.wishlist.android.ui.ItemDetailRoute
 import app.wishlist.android.ui.LocalSubmissionRoute
 import app.wishlist.android.ui.SettingsRoute
@@ -251,19 +253,23 @@ internal fun HomeLinkRow(row: HomeRow, icon: WLLineIcon, tileSize: Dp, showsOrig
             WLText(row.host, WLType.bodyStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
             WLText(row.metaText(), WLType.label, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (showsOriginal) OriginalLink(row.sourceUrl)
+        if (showsOriginal) OriginalLink(row.sourceUrl, "home/row/${row.key}/original")
     }
 }
 
-/** "원본": C3-D5 a — 시스템 브라우저로 연다(C4에서 웹뷰). */
+/** "원본": C4 PR B — 앱 안 웹뷰([WebViewRoute])로 연다. `http`/`https`가 아니면 흐리게 두고 누를 수 없다. */
 @Composable
-private fun OriginalLink(url: String) {
-    val context = LocalContext.current
+private fun OriginalLink(url: String, sourceKey: String) {
+    val nav = LocalWLNavigator.current
+    val route = remember(url) { WebViewRoute.of(url) }
     Row(
         Modifier
             .heightIn(min = WishlistTokens.Space.minTouch)
             .clip(RoundedCornerShape(WishlistTokens.Radius.xs))
-            .clickable(role = Role.Button, onClickLabel = stringResource(HomeRowText.openOriginal)) { openOriginal(context, url) }
+            .alpha(if (route != null) 1f else DISABLED_ALPHA)
+            .clickable(enabled = route != null, role = Role.Button, onClickLabel = stringResource(HomeRowText.openOriginal)) {
+                route?.let { nav.push(it, sourceKey) }
+            }
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4),
         verticalAlignment = Alignment.CenterVertically,
