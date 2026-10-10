@@ -17,6 +17,10 @@ import androidx.compose.ui.unit.dp
 /** SVG 원(circle)을 path 문자열로(호 두 개). */
 private fun circle(cx: Float, cy: Float, r: Float) = "M${cx - r} ${cy}a$r $r 0 1 0 ${2 * r} 0a$r $r 0 1 0 ${-2 * r} 0z"
 
+/** SVG 둥근 사각형(rect x y width height rx)을 path 문자열로. */
+private fun rect(x: Float, y: Float, w: Float, h: Float, r: Float) =
+    "M${x + r} ${y}h${w - 2 * r}a$r $r 0 0 1 $r ${r}v${h - 2 * r}a$r $r 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a$r $r 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a$r $r 0 0 1 $r ${-r}z"
+
 /**
  * 기능 화면(C3 로그인·홈·설정·공유 카드)의 보드 24 격자 선 아이콘(fill 없음, stroke = 글자색). `stroke`는 보드 SVG의
  * stroke-width(24 격자 기준)다. 둥근 끝은 뒤로(디자인 수정 명세 §6)와 점이 있는 경고에만 쓰고 나머지는 SVG 기본값(butt·miter)이다.
@@ -37,7 +41,17 @@ enum class WLLineIcon(private vararg val d: String, val stroke: Float = 1.8f, va
     CloudOff("M7 18h10a4 4 0 0 0 1.6-.3M20.5 13.5A4 4 0 0 0 17.5 10 6 6 0 0 0 9 5.6M5.7 9.7A4.5 4.5 0 0 0 7 18M3 3l18 18", stroke = 2f),
     Warning("M12 4l9 16H3z", "M12 10v4M12 17h.01", stroke = 2f, round = true),
     More(circle(5f, 12f, 1.5f), circle(12f, 12f, 1.5f), circle(19f, 12f, 1.5f)),
-    Trash("M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13");
+    Trash("M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"),
+
+    // 원본 링크 웹뷰(FWebView·FWebViewShare·FWebViewExternal, gen_account.py 아이콘).
+    Close("M6 6l12 12M18 6L6 18"),
+    Lock(rect(5f, 11f, 14f, 9f, 2f), "M8 11V8a4 4 0 0 1 8 0v3"),
+    Reload("M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"),
+    Share("M12 3v12M7 8l5-5 5 5M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5"),
+    Globe(circle(12f, 12f, 9f), "M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"),
+    Copy(rect(8f, 8f, 12f, 12f, 2f), "M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"),
+    Apps(rect(4f, 4f, 7f, 7f, 2f), rect(13f, 4f, 7f, 7f, 2f), rect(4f, 13f, 7f, 7f, 2f), rect(13f, 13f, 7f, 7f, 2f)),
+    Phone(rect(7f, 3f, 10f, 18f, 2f), "M11 18h2");
 
     // 처음 그릴 때 만든다(JVM 단위 테스트에서 enum 값만 다룰 때 android Path를 만들지 않는다).
     internal val path by lazy { PathParser().parsePathString(d.joinToString("")).toPath() }

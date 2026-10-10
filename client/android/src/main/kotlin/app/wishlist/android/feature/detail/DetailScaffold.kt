@@ -165,9 +165,9 @@ private fun OriginalBar(url: String, modifier: Modifier) {
     }
 }
 
-/** 짧은 안내 줄: 위쪽 바 아래, 카드색 pill 13/400. 나타남·사라짐 opacity 200(구현 기본값). */
+/** 짧은 안내 줄: 위쪽 바 아래, 카드색 pill 13/400. 나타남·사라짐 opacity 200(구현 기본값). 웹뷰 "링크를 복사했어요"도 쓴다. */
 @Composable
-private fun DetailNoticeLine(text: String?, modifier: Modifier) {
+internal fun DetailNoticeLine(text: String?, modifier: Modifier) {
     val c = LocalWLColors.current
     var last by remember { mutableStateOf(text) }
     if (text != null) last = text

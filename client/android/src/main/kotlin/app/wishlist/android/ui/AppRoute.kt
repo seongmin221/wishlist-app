@@ -9,6 +9,7 @@ import app.wishlist.android.feature.detail.ItemDetailScreen
 import app.wishlist.android.feature.detail.LocalSubmissionScreen
 import app.wishlist.android.feature.home.HomeScreen
 import app.wishlist.android.feature.web.WebViewRoute
+import app.wishlist.android.feature.web.WebViewScreen
 import app.wishlist.android.feature.login.LoginMode
 import app.wishlist.android.feature.login.LoginScreen
 import app.wishlist.android.feature.settings.SettingsScreen
@@ -23,27 +24,13 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
         LoginRoute -> LoginScreen(LoginMode.Pushed)
         is ItemDetailRoute -> ItemDetailScreen(route.itemId)
         is LocalSubmissionRoute -> LocalSubmissionScreen(route.submissionId)
-        is WebViewRoute -> WebViewPlaceholder(route.url) // Task 14 replaces this with the FWebView screen
+        is WebViewRoute -> WebViewScreen(route)
         else -> if (!VariantRoutes.Content(route, sourceKey)) {
             when (route) {
                 is WLRoute.TabRoot -> PlainTabRoot(route.tab)
                 else -> error("No screen registered for $route")
             }
         }
-    }
-}
-
-/** PR B 진행 중 임시 화면: 아직 웹뷰 화면이 없다(Task 14). 어디서도 push하지 않는다. */
-@Composable
-private fun WebViewPlaceholder(url: String) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(LocalWLColors.current.background)
-            .statusBarsPadding()
-            .padding(horizontal = WishlistTokens.Space.screenMargin, vertical = WishlistTokens.Space.s24),
-    ) {
-        WLText(url, WLType.body)
     }
 }
 

@@ -29,7 +29,10 @@ import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLButtonKind
 import app.wishlist.android.designsystem.WishlistTokens
 
-/** 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. `target`은 제목 아래 대상 줄(썸네일 + 이름)이다. */
+/**
+ * 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. `target`은 제목 아래 대상 줄(썸네일 + 이름)이다.
+ * `icon`은 제목 위 머리 타일(보드 FWebViewExternal의 48 상태색 타일)이다.
+ */
 data class WLDialogSpec(
     val title: String,
     val bullets: List<String>,
@@ -37,6 +40,7 @@ data class WLDialogSpec(
     val confirmText: String,
     val confirmKind: WLButtonKind,
     val target: WLDialogTarget? = null,
+    val icon: (@Composable () -> Unit)? = null,
     val onConfirm: () -> Unit,
 )
 
