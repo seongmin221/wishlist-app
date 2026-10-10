@@ -10,16 +10,22 @@ struct WLDialogSpec {
     let confirmText: String
     let confirmKind: WLButtonKind
     var target: WLDialogTarget?
+    /// 제목 위 머리 타일(보드 FWebViewExternal의 48 상태색 타일).
+    var icon: AnyView?
+    /// 취소·확인·뒤로 어느 쪽이든 창이 다 닫힌 뒤 한 번 불린다(Android와 같다).
+    let onDismissed: () -> Void
     let onConfirm: () -> Void
 
     init(title: String, bullets: [String], cancelText: String, confirmText: String, confirmKind: WLButtonKind,
-         target: WLDialogTarget? = nil, onConfirm: @escaping () -> Void) {
+         target: WLDialogTarget? = nil, icon: AnyView? = nil, onDismissed: @escaping () -> Void = {}, onConfirm: @escaping () -> Void) {
         self.title = title
         self.bullets = bullets
         self.cancelText = cancelText
         self.confirmText = confirmText
         self.confirmKind = confirmKind
         self.target = target
+        self.icon = icon
+        self.onDismissed = onDismissed
         self.onConfirm = onConfirm
     }
 }
@@ -153,7 +159,9 @@ final class OverlayHostState {
     }
 
     func onClosed(_ id: Int) {
+        let closed = entries.filter { $0.id == id }
         entries.removeAll { $0.id == id }
+        for entry in closed { if case .dialog(let spec) = entry.kind { spec.onDismissed() } }
         if !entries.contains(where: { $0.phase == .closing }) {
             if dismissingAll {
                 if let top = entries.last {

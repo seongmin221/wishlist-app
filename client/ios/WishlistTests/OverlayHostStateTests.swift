@@ -179,4 +179,25 @@ final class OverlayHostStateTests: XCTestCase {
         settleClose(s); settleClose(s)
         XCTAssertTrue(s.entries.isEmpty)
     }
+
+    func testDialogReportsItsCloseOnceWhetherCancelledOrConfirmed() {
+        var dismissed = 0
+        var confirmed = 0
+        let s = OverlayHostState()
+        s.showDialog(WLDialogSpec(title: "t", bullets: [], cancelText: "취소", confirmText: "확인", confirmKind: .primary,
+                                  onDismissed: { dismissed += 1 }, onConfirm: { confirmed += 1 }))
+        settleOpen(s)
+        XCTAssertTrue(s.requestDismiss(s.entries[0].id)) // 취소
+        XCTAssertEqual(dismissed, 0) // only once the close motion ended
+        settleClose(s)
+        XCTAssertEqual(dismissed, 1)
+
+        s.showDialog(WLDialogSpec(title: "t", bullets: [], cancelText: "취소", confirmText: "확인", confirmKind: .primary,
+                                  onDismissed: { dismissed += 1 }, onConfirm: { confirmed += 1 }))
+        settleOpen(s)
+        XCTAssertTrue(s.confirm(s.entries[0].id))
+        settleClose(s)
+        XCTAssertEqual(dismissed, 2)
+        XCTAssertEqual(confirmed, 1)
+    }
 }
