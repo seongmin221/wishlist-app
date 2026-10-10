@@ -20,14 +20,18 @@ final class ExternalPromptGateTests: XCTestCase {
         XCTAssertEqual(g.onRequest(confirm: true), .prompt)
     }
 
-    func testCancelSilencesNonGestureRequestsUntilANewMainFramePage() {
+    func testCancelSilencesNonGestureRequestsUntilAMainFramePageOnAnotherHost() {
         let g = ExternalPromptGate()
         _ = g.onRequest(confirm: true)
         g.onPromptClosed(confirmed: false, currentURL: page)
         XCTAssertEqual(g.onRequest(confirm: true), .drop)
         g.onMainFrameNavigation(page) // the same page reloading itself does not lift it
         XCTAssertEqual(g.onRequest(confirm: true), .drop)
-        g.onMainFrameNavigation("https://shop.com/next")
+        // Ruling 13: the silence is keyed on the host, so `?n=2` loops and www./case variants stay silent.
+        g.onMainFrameNavigation(page + "?n=2")
+        g.onMainFrameNavigation("https://WWW.Shop.com/next")
+        XCTAssertEqual(g.onRequest(confirm: true), .drop)
+        g.onMainFrameNavigation("https://other.com/")
         XCTAssertEqual(g.onRequest(confirm: true), .prompt)
     }
 
