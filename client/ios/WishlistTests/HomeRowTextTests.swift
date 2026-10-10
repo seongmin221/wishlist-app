@@ -35,14 +35,23 @@ final class HomeRowTextTests: XCTestCase {
         }
     }
 
+    /// VoiceOver names the row's two actions apart (Android `home_row_open_detail` / `home_row_open_original`).
+    func testRowsNameTheirTwoActionsApart() throws {
+        XCTAssertEqual(HomeRowText.openDetailKey, "home.row.open.detail")
+        XCTAssertEqual(HomeRowText.openOriginalKey, "home.row.open.original")
+        let ko = try XCTUnwrap(HomeRowText.bundle(for: "ko"))
+        XCTAssertEqual(ko.localizedString(forKey: HomeRowText.openDetailKey, value: nil, table: nil), "상세 보기")
+        XCTAssertEqual(ko.localizedString(forKey: HomeRowText.openOriginalKey, value: nil, table: nil), "원본 열기")
+    }
+
     /// Resolution in a fixed language (the catalog's ko and en tables), independent of the simulator locale.
     func testMetaAndHeaderTextResolveInBothLanguages() throws {
         let ko = try XCTUnwrap(HomeRowText.bundle(for: "ko"))
         let en = try XCTUnwrap(HomeRowText.bundle(for: "en"))
-        let local = HomeRow(key: "local-1", host: "musinsa.com", sourceUrl: "https://musinsa.com/p/1", savedAt: RelativeTimeDays(value: 2), status: .localOnly)
+        let local = HomeRow(key: "local-1", target: HomeRowTargetLocal(submissionId: "1"), host: "musinsa.com", sourceUrl: "https://musinsa.com/p/1", savedAt: RelativeTimeDays(value: 2), status: .localOnly)
         XCTAssertEqual(HomeRowText.meta(local, bundle: ko), "2일 전 저장 · 이 기기에만 있어요")
         XCTAssertEqual(HomeRowText.meta(local, bundle: en), "Saved 2 days ago · Only on this device")
-        let processing = HomeRow(key: "item-1", host: "29cm.co.kr", sourceUrl: "https://29cm.co.kr/p", savedAt: RelativeTimeJustNow.shared, status: .processing)
+        let processing = HomeRow(key: "item-1", target: HomeRowTargetItem(itemId: "1"), host: "29cm.co.kr", sourceUrl: "https://29cm.co.kr/p", savedAt: RelativeTimeJustNow.shared, status: .processing)
         XCTAssertEqual(HomeRowText.meta(processing, bundle: ko), "상품 정보 추출 중")
         XCTAssertEqual(HomeRowText.meta(processing, bundle: en), "Extracting product info")
         XCTAssertEqual(HomeRowText.todoCount(7, bundle: ko), "할 일 7개")

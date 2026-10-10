@@ -1,16 +1,33 @@
 import Observation
 import Shared
+import SwiftUI
 
 /// Lifetime owner of one shared `ItemDetailPresenter` (no UI). It collects the Presenter's
 /// thread-safe state in a main-actor task and republishes the concrete item/error/loading for
 /// SwiftUI. `close()` or `deinit` cancels that collection and closes the Presenter; C4's detail
 /// screen keeps this ownership.
+///
+/// The screen's per-entry facts live here, not in view state, so a recreated view (the navigator keeps
+/// every entry drawn) neither loads again nor repeats a notice: `loadOnce`, `seenWork` (for
+/// `shouldClose`), the announced error (`refreshNotices`) and the foreground transitions.
 @MainActor
 @Observable
 final class ItemDetailPresenterOwner {
     private(set) var item: WishlistItem?
     private(set) var error: ClientError?
     private(set) var loading = false
+    /// Bumped once per failed refresh while an item is shown; the screen shows the short notice on each change.
+    private(set) var refreshNotices = 0
+    /// A state other than Initial was seen (the first load started), so a later Initial means the account moved on.
+    @ObservationIgnored private(set) var seenWork = false
+
+    @ObservationIgnored private var started = false
+    @ObservationIgnored private var noticedError: ClientError?
+    @ObservationIgnored private var transitions: ForegroundTransitions = {
+        var t = ForegroundTransitions()
+        _ = t.isForeground(.active) // the screen opens while the app is in the foreground
+        return t
+    }()
 
     // Read from the nonisolated deinit; both are safe from any thread (Task / Kotlin close).
     @ObservationIgnored private nonisolated(unsafe) let presenter: ItemDetailPresenter
@@ -41,6 +58,54 @@ final class ItemDetailPresenterOwner {
         presenter.retry()
     }
 
+    /// The screen's first appearance loads; a recreated view asking again does not.
+    func loadOnce(id: String) {
+        if started { return }
+        started = true
+        load(id: id)
+    }
+
+    /// Pull to refresh and foreground returns; keeps the shown item. Nothing before the first load or after an account change.
+    func refresh() {
+        presenter.refresh()
+    }
+
+    /// For `.refreshable`: refreshes and returns once that refresh ended (Ruling 2). Returns at once
+    /// when nothing is shown (no load yet, or the account moved on: the Presenter has nothing to repeat).
+    /// Cancelling the pull ends only the wait.
+    func refreshAndWait() async {
+        guard item != nil || error != nil else { return }
+        try? await presenter.refreshNow()
+        // The collection may not have delivered the final state yet; the pull ends showing it.
+        // (Applying it twice is harmless: the notice is keyed by the error instance.)
+        apply(presenter.state.value)
+    }
+
+    /// The scene's phase; a return from the background refreshes (C3 `ForegroundTransitions`). True when it refreshed.
+    @discardableResult
+    func scenePhaseChanged(_ phase: ScenePhase) -> Bool {
+        guard transitions.isForeground(phase) else { return false }
+        refresh()
+        return true
+    }
+
+    /// The screen closes itself (Android `shouldClose`).
+    var shouldClose: Bool { Self.shouldClose(item: item, loading: loading, error: error, seenWork: seenWork) }
+
+    /// Initial after work started (the account generation changed), or signed out with nothing shown
+    /// (a stack restored while signed out): the screen closes.
+    nonisolated static func shouldClose(item: WishlistItem?, loading: Bool, error: ClientError?, seenWork: Bool) -> Bool {
+        (seenWork && item == nil && !loading && error == nil) || (item == nil && !loading && error?.kind == .unauthenticated)
+    }
+
+    /// Whether this state carries a failed refresh not announced yet: an item is shown, the load ended
+    /// with an error, and that error instance is new.
+    func takeRefreshNotice(item: WishlistItem?, loading: Bool, error: ClientError?) -> Bool {
+        guard item != nil, let error, !loading, error !== noticedError else { return false }
+        noticedError = error
+        return true
+    }
+
     /// Idempotent: stops collecting and closes the Presenter; later intents are ignored.
     func close() {
         collection?.cancel()
@@ -54,8 +119,10 @@ final class ItemDetailPresenterOwner {
     }
 
     private func apply(_ state: ItemDetailState) {
+        if state.item != nil || state.loading || state.error != nil { seenWork = true }
         item = state.item
         error = state.error
         loading = state.loading
+        if takeRefreshNotice(item: state.item, loading: state.loading, error: state.error) { refreshNotices += 1 }
     }
 }

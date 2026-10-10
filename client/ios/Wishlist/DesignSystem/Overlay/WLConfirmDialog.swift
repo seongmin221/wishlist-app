@@ -1,6 +1,7 @@
 import SwiftUI
 
 private let dialogBody = WLTextStyle.body.resized(15, lineHeight: 15 * 1.6)
+private let dialogTarget = WLTextStyle.bodyBold.resized(15)
 
 /// 확인창 카드: 제목 + 글머리표 영향 + 취소(왼쪽)·확인(오른쪽, 더 넓음). 모서리 xl 36, 시트색 불투명.
 struct WLConfirmDialogCard: View {
@@ -14,6 +15,16 @@ struct WLConfirmDialogCard: View {
         VStack(alignment: .leading, spacing: WishlistTokens.Space.s12) {
             WLText(spec.title, wlSheetTitleStyle, color: c.text)
                 .accessibilityAddTraits(.isHeader)
+            if let target = spec.target {
+                HStack(spacing: WishlistTokens.Space.s12) {
+                    target.thumbnail
+                    WLText(target.text, dialogTarget, color: c.text)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(10)
+                .background(c.sheetField, in: RoundedRectangle(cornerRadius: WishlistTokens.Radius.m, style: .continuous))
+                .accessibilityElement(children: .combine)
+            }
             if !spec.bullets.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(Array(spec.bullets.enumerated()), id: \.offset) { _, b in

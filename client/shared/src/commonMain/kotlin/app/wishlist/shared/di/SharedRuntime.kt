@@ -19,6 +19,8 @@ import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.presentation.AccountPresenter
 import app.wishlist.shared.presentation.HomePresenter
 import app.wishlist.shared.presentation.ItemDetailPresenter
+import app.wishlist.shared.presentation.LocalSubmissionDetailPresenter
+import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.repository.CatalogRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
@@ -179,12 +181,13 @@ class SharedRuntime internal constructor(
 
     // Created on first use (never opens the driver by itself) over the gated facades; repository
     // work runs on the io dispatcher. DEBUG with the Fake ITEM-03 advances fake analysis before refresh.
+    // DEBUG with the Fake ITEM-03 only (null otherwise, and after close): stands in for the server's analysis.
+    private val debugAnalysis: DebugAnalysisDriver? by lazy {
+        if (env.bindings.backendOf(ApiId.ITEM_03) == Backend.FAKE) guard.use { koin.get<DebugAnalysisDriver>() } else null
+    }
+
     private val coordinator: SubmissionCoordinator by lazy {
-        val analysis = if (env.bindings.backendOf(ApiId.ITEM_03) == Backend.FAKE) {
-            guard.use { koin.get<DebugAnalysisDriver>() }
-        } else {
-            null
-        }
+        val analysis = debugAnalysis
         SubmissionCoordinator(
             store = localStore(),
             create = gatedCreate(),
@@ -208,10 +211,39 @@ class SharedRuntime internal constructor(
     /**
      * A new item detail Presenter over the gated ITEM-03 facade and this runtime's one [session].
      * Repository work runs on the runtime's background (I/O) dispatcher, never on the caller's UI
-     * thread. The platform owner that requested it calls [ItemDetailPresenter.close].
+     * thread. Each successful load asks [submissions] to republish its view, so the home list picks up
+     * the refreshed cache. The platform owner that requested it calls [ItemDetailPresenter.close].
      */
     fun itemDetailPresenter(): ItemDetailPresenter =
-        ItemDetailPresenter(repository = getItemRepository(), session = session, dispatcher = env.dispatchers.io)
+        ItemDetailPresenter(
+            repository = detailRepository(),
+            session = session,
+            dispatcher = env.dispatchers.io,
+            onLoaded = { submissions().requestViewPublish() },
+        )
+
+    /**
+     * The detail's ITEM-03 facade. DEBUG with the Fake ITEM-03 first advances the fake analysis (as the
+     * coordinator does before a refresh), so entering or pulling a processing detail shows it finished
+     * once it is due (spec D7). Any other binding is the plain gated facade.
+     */
+    private fun detailRepository(): GetItemRepository {
+        val base = getItemRepository()
+        if (env.bindings.backendOf(ApiId.ITEM_03) != Backend.FAKE) return base
+        return object : GetItemRepository {
+            override suspend fun get(id: String): ClientResult<WishlistItem> {
+                // Its failure only means nothing finished; the GET still runs (a real cancel propagates).
+                try {
+                    debugAnalysis?.advance()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // DEBUG stand-in only: never let it break the detail lookup.
+                }
+                return base.get(id)
+            }
+        }
+    }
 
     /** A new login Presenter over [auth]; the platform owner calls [AccountPresenter.close]. */
     fun accountPresenter(): AccountPresenter = AccountPresenter(auth = auth(), dispatcher = env.dispatchers.io)
@@ -228,6 +260,26 @@ class SharedRuntime internal constructor(
             view = submissions.view,
             refreshes = submissions.refreshes,
             runRefresh = submissions::refresh,
+            clock = env.clock,
+            utcOffsetSeconds = env.platform.utcOffsetSeconds,
+            dispatcher = env.dispatchers.io,
+        )
+    }
+
+    /**
+     * A new local (not yet sent) link detail Presenter over the one [submissions] coordinator's view,
+     * this runtime's [session] and the gated local store (accepted-link lookup); deleting goes through
+     * the coordinator so the view is republished at once. The platform owner calls
+     * [LocalSubmissionDetailPresenter.close].
+     */
+    fun localSubmissionDetailPresenter(): LocalSubmissionDetailPresenter {
+        val submissions = submissions()
+        val store = localStore()
+        return LocalSubmissionDetailPresenter(
+            view = submissions.view,
+            lookup = store::cachedItemBySubmission,
+            delete = submissions::deleteLocal,
+            session = session,
             clock = env.clock,
             utcOffsetSeconds = env.platform.utcOffsetSeconds,
             dispatcher = env.dispatchers.io,

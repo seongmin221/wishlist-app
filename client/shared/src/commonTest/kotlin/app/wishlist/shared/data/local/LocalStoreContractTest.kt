@@ -1,5 +1,6 @@
 package app.wishlist.shared.data.local
 
+import app.wishlist.shared.repository.SUBMISSION_IN_FLIGHT
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
@@ -41,6 +42,17 @@ class LocalStoreContractTest {
             h.store.upsertItem(a, item(3)).successValue()
             h.reopen()
             assertEquals(item(3), h.store.cachedItem(a, itemId).successValue())
+        }
+    }
+
+    @Test fun purposeDisplayFieldsRoundTripThroughCache() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(1)).successValue()
+            assertEquals(
+                ItemPurpose("P1", ValueSource.USER, "출퇴근 헤드폰", "CORAL", "HEART"),
+                h.store.cachedItem(a, itemId).successValue()?.purpose,
+            )
         }
     }
 
@@ -127,14 +139,14 @@ class LocalStoreContractTest {
         }
     }
 
-    @Test fun lower_and_same_versions_are_skipped_and_only_higher_replaces() = runTest {
+    @Test fun lower_version_is_skipped_and_same_or_higher_replaces() = runTest {
         withHarness { h ->
             val a = h.session.login("A")
             h.store.upsertItem(a, item(5, name = "five")).successValue()
             h.store.upsertItem(a, item(4, name = "four")).successValue()
             assertEquals("five", h.store.cachedItem(a, itemId).successValue()!!.product.name)
             h.store.upsertItem(a, item(5, name = "same")).successValue()
-            assertEquals("five", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+            assertEquals("same", h.store.cachedItem(a, itemId).successValue()!!.product.name)
             h.store.upsertItem(a, item(6, name = "six")).successValue()
             assertEquals(6, h.store.cachedItem(a, itemId).successValue()!!.version)
             assertEquals("six", h.store.cachedItem(a, itemId).successValue()!!.product.name)
@@ -395,6 +407,161 @@ class LocalStoreContractTest {
         h.login("B")
         assertEquals(listOf(ids[3]), h.store.processingItems(h.snapshot()).successValue().map { it.id })
         assertEquals(ErrorKind.SESSION_CHANGED, h.store.processingItems(a).failureKind())
+    }
+
+    @Test fun getUpsertReplacesTheSameVersion() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, name = "옛 이름")).successValue()
+            h.store.upsertItem(a, item(version = 3, name = "새 이름")).successValue()
+            assertEquals("새 이름", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+        }
+    }
+
+    @Test fun getUpsertStillIgnoresAnOlderVersion() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, name = "v3")).successValue()
+            h.store.upsertItem(a, item(version = 2, name = "v2")).successValue()
+            val cached = h.store.cachedItem(a, itemId).successValue()!!
+            assertEquals(3, cached.version)
+            assertEquals("v3", cached.product.name)
+        }
+    }
+
+    @Test fun acceptKeepsANewerSameVersionCacheRow() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, name = "GET 결과")).successValue()
+            h.store.saveSubmission(submission(binding = "A")).successValue()
+            h.store.accept(a, submissionId, item(version = 3, name = "멱등 응답")).successValue()
+            assertEquals("GET 결과", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+            assertEquals(emptyList(), h.store.pending().successValue())
+        }
+    }
+
+    private fun itemRowCount(h: StoreHarness): Long =
+        h.driver.executeQuery(null, "SELECT COUNT(*) FROM item_cache", { c ->
+            app.cash.sqldelight.db.QueryResult.Value(if (c.next().value) c.getLong(0) else 0L)
+        }, 0).value ?: 0L
+
+    @Test fun undecodableRowIsDroppedOnRead() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3)).successValue()
+            h.driver.execute(null, "UPDATE item_cache SET analysis_status = 'NOT_A_STATUS'", 0)
+            assertNull(h.store.cachedItem(a, itemId).successValue())
+            assertEquals(0L, itemRowCount(h))
+        }
+    }
+
+    @Test fun undecodableProcessingRowDoesNotHideTheOthers() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            val good = "00000000-0000-4000-8000-000000000201"
+            val bad = "00000000-0000-4000-8000-000000000202"
+            h.store.upsertItem(a, itemFixture(analysis = AnalysisStatus.PROCESSING, id = good)).successValue()
+            h.store.upsertItem(a, itemFixture(analysis = AnalysisStatus.PROCESSING, id = bad)).successValue()
+            h.driver.execute(null, "UPDATE item_cache SET created_at = 'broken' WHERE item_id = '$bad'", 0)
+            assertEquals(listOf(good), h.store.processingItems(a).successValue().map { it.id })
+            assertEquals(1L, itemRowCount(h))
+        }
+    }
+
+    @Test fun uppercaseIdReadsAndRemovesTheCanonicalRow() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.upsertItem(a, item(version = 3, id = UUID_A)).successValue()
+            assertEquals(UUID_A, h.store.cachedItem(a, UUID_A.uppercase()).successValue()!!.id)
+            h.store.removeCachedItem(a, UUID_A.uppercase(), 3).successValue()
+            assertNull(h.store.cachedItem(a, UUID_A).successValue())
+        }
+    }
+
+    @Test fun cachedItemBySubmissionFindsTheAcceptedItem() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.saveSubmission(submission(id = UUID_B, binding = "A")).successValue()
+            h.store.accept(a, UUID_B, item(version = 1).copy(clientSubmissionId = UUID_B)).successValue()
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B).successValue()!!.id)
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B.uppercase()).successValue()!!.id)
+        }
+    }
+
+    @Test fun cachedItemBySubmissionMatchesCaseInsensitivelyBothWays() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.saveSubmission(submission(id = UUID_B, binding = "A")).successValue()
+            h.store.accept(a, UUID_B, item(version = 1).copy(clientSubmissionId = UUID_B.uppercase())).successValue()
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B).successValue()!!.id)
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B.uppercase()).successValue()!!.id)
+        }
+    }
+
+    @Test fun cachedItemBySubmissionIsNullWhenAbsent() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            assertNull(h.store.cachedItemBySubmission(a, submissionId).successValue())
+        }
+    }
+
+    @Test fun cachedItemBySubmissionNeedsAnAccount() = runTest {
+        withHarness { h ->
+            assertEquals(ErrorKind.UNAUTHENTICATED, h.store.cachedItemBySubmission(h.snapshot(), submissionId).failureKind())
+        }
+    }
+
+    // --- deleteSubmission (C4 local delete) ---------------------------------------------------
+
+    @Test fun deleteRemovesPendingAndFailedRowsOfTheAccount() = runStoreTest { h ->
+        h.login("A")
+        val a = h.snapshot()
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.store.saveSubmission(submission(id = UUID_B, binding = "A")).successValue()
+        h.store.markSubmission(a, UUID_B, SubmissionStatus.FAILED, ClientError(ErrorKind.VALIDATION), null).successValue()
+        // An unbound row (visible to A until bound), stored with an uppercase key by another platform.
+        h.store.importSubmission(submission(id = UUID_C.uppercase())).successValue()
+
+        h.store.deleteSubmission(a, UUID_A).successValue()
+        h.store.deleteSubmission(a, UUID_B.uppercase()).successValue()
+        h.store.deleteSubmission(a, UUID_C).successValue()
+        assertEquals(emptyList(), h.store.pending().successValue())
+    }
+
+    @Test fun deleteRefusesASubmittingRow() = runStoreTest { h ->
+        h.login("A")
+        val a = h.snapshot()
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.store.markSubmission(a, UUID_A, SubmissionStatus.SUBMITTING, null, null).successValue()
+        val failure = h.store.deleteSubmission(a, UUID_A).error()
+        assertEquals(ErrorKind.CONFLICT, failure.kind)
+        assertEquals(SUBMISSION_IN_FLIGHT, failure.code)
+        assertEquals(SubmissionStatus.SUBMITTING.name, h.row(UUID_A)?.status)
+    }
+
+    @Test fun signedOutDeleteRemovesOnlyUnboundRows() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.login(null)
+        h.store.saveSubmission(submission(id = UUID_B)).successValue()
+        val out = h.snapshot()
+
+        h.store.deleteSubmission(out, UUID_B).successValue()
+        assertNull(h.row(UUID_B))
+        val failure = h.store.deleteSubmission(out, UUID_A).error()
+        assertEquals(ErrorKind.NOT_FOUND, failure.kind)
+        assertEquals(SqlLocalStore.SUBMISSION_NOT_FOUND, failure.code)
+        assertNotNull(h.row(UUID_A))
+    }
+
+    @Test fun deleteNeverTouchesAnotherAccountsRow() = runStoreTest { h ->
+        h.login("A")
+        h.store.saveSubmission(submission(id = UUID_A, binding = "A")).successValue()
+        h.login("B")
+        val b = h.snapshot()
+        assertEquals(SqlLocalStore.SUBMISSION_NOT_FOUND, h.store.deleteSubmission(b, UUID_A).failureCode())
+        assertEquals(ErrorKind.NOT_FOUND, h.store.deleteSubmission(b, UUID_C).failureKind())
+        assertEquals("A", h.row(UUID_A)?.account_binding)
     }
 
     @Test fun appStateRoundTripsAndDeletes() = runStoreTest { h ->

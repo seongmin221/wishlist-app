@@ -190,4 +190,181 @@ final class WLNavigatorTests: XCTestCase {
         XCTAssertEqual(nav.stack(.home), [.tabRoot(.home), list])
         XCTAssertEqual(nav.entries(.home).last?.sourceKey, "home/chip/headphone")
     }
+
+    // MARK: C4 계정 범위 화면 정리 (Android Task 7과 같은 사례)
+
+    private let settings = AppDestination.settings.route
+    private let web = WLRoute(destination: "web", pushStyle: .slide)
+
+    /// push 후 전환을 끝낸다.
+    private func open(_ nav: WLNavigator, _ route: WLRoute, _ key: String = "k") {
+        XCTAssertTrue(nav.push(route, sourceKey: key))
+        nav.finishTransition()
+    }
+
+    func testLeavingAnAccountDropsAccountScopedRoutesInEveryTab() {
+        let nav = WLNavigator()
+        open(nav, AppDestination.item("i1").route)
+        XCTAssertTrue(nav.selectTab(.category))
+        nav.finishTransition()
+        open(nav, AppDestination.local("l1").route)
+        let homeDetail = nav.entries(.home)[1].id
+        let categoryDetail = nav.entries(.category)[1].id
+
+        let dropped = nav.dropAccountScoped()
+
+        XCTAssertEqual(Set(dropped), [homeDetail, categoryDetail])
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home)])
+        XCTAssertEqual(nav.stack(.category), [.tabRoot(.category)])
+        XCTAssertEqual(nav.stack(.purpose), [.tabRoot(.purpose)])
+        XCTAssertFalse(nav.isTransitioning)
+        XCTAssertNil(nav.exiting)
+    }
+
+    /// 로그인(null → 계정)은 떠남이 아니다. 로그아웃·다른 계정만 떠남이다.
+    func testSigningInKeepsAccountScopedRoutes() {
+        XCTAssertFalse(ContentView.shouldDropAccountScoped(previous: nil, next: "a"))
+        XCTAssertFalse(ContentView.shouldDropAccountScoped(previous: nil, next: nil))
+        XCTAssertFalse(ContentView.shouldDropAccountScoped(previous: "a", next: "a"))
+        XCTAssertTrue(ContentView.shouldDropAccountScoped(previous: "a", next: nil))
+        XCTAssertTrue(ContentView.shouldDropAccountScoped(previous: "a", next: "b"))
+    }
+
+    func testNonScopedRoutesBelowStay() {
+        let nav = WLNavigator()
+        open(nav, settings)
+        open(nav, AppDestination.item("i1").route)
+        open(nav, web)
+        let ids = nav.entries(.home).map(\.id)
+
+        XCTAssertEqual(nav.dropAccountScoped(), [ids[2], ids[3]])
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home), settings])
+        XCTAssertEqual(nav.dropAccountScoped(), [])
+    }
+
+    func testReplaceTopSwapsTheTopAndReportsTheOldId() {
+        let nav = WLNavigator()
+        XCTAssertFalse(nav.replaceTop(AppDestination.item("i1").route)) // tab root
+        open(nav, AppDestination.local("l1").route, "home/row/l1")
+        let old = nav.entries(.home)[1]
+        _ = nav.drainRemoved()
+
+        let item = AppDestination.item("i1").route
+        XCTAssertTrue(nav.replaceTop(item))
+
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home), item])
+        let top = nav.entries(.home)[1]
+        XCTAssertNotEqual(top.id, old.id)
+        XCTAssertEqual(top.sourceKey, "home/row/l1")
+        XCTAssertEqual(nav.activeTransition?.kind, .replace)
+        XCTAssertEqual(nav.exiting?.entry, old)
+        // 전환 중에는 거절한다.
+        XCTAssertFalse(nav.replaceTop(web))
+        nav.finishTransition()
+        XCTAssertNil(nav.exiting)
+        XCTAssertEqual(nav.drainRemoved(), [old.id])
+    }
+
+    func testRemovedIdsCoverPopGestureReplaceAndDrop() {
+        let nav = WLNavigator()
+        XCTAssertEqual(nav.drainRemoved(), [])
+
+        open(nav, detail)
+        let popped = nav.entries(.home)[1].id
+        XCTAssertTrue(nav.pop())
+        nav.finishTransition()
+
+        open(nav, detail)
+        let gestured = nav.entries(.home)[1].id
+        XCTAssertTrue(nav.beginBackGesture())
+        nav.commitBackGesture()
+        nav.finishTransition()
+
+        open(nav, AppDestination.local("l1").route)
+        let replaced = nav.entries(.home)[1].id
+        XCTAssertTrue(nav.replaceTop(AppDestination.item("i1").route))
+        nav.finishTransition()
+        let dropped = nav.entries(.home)[1].id
+        XCTAssertEqual(nav.dropAccountScoped(), [dropped])
+
+        XCTAssertEqual(nav.drainRemoved(), [popped, gestured, replaced, dropped])
+        XCTAssertEqual(nav.drainRemoved(), [])
+        XCTAssertFalse(nav.hasRemoved)
+    }
+
+    func testItemAndLocalDestinationsAreAccountScopedSlidesWithoutTabBar() {
+        for destination in [AppDestination.item("i1"), .local("l1")] {
+            let route = destination.route
+            XCTAssertTrue(route.accountScoped)
+            XCTAssertFalse(route.showsTabBar)
+            XCTAssertEqual(route.pushStyle, .slide)
+            XCTAssertEqual(route.destination.base as? AppDestination, destination)
+        }
+        XCTAssertFalse(AppDestination.settings.route.accountScoped)
+        XCTAssertFalse(AppDestination.login.route.accountScoped)
+        XCTAssertFalse(WLRoute.tabRoot(.home).accountScoped)
+    }
+
+    /// 끌어서 뒤로 도중 정리되면 끌기가 끝나 뒤이은 확정·취소는 아무 일도 하지 않는다.
+    func testDroppingDuringABackGestureEndsTheGesture() {
+        let nav = WLNavigator()
+        open(nav, AppDestination.item("i1").route)
+        XCTAssertTrue(nav.beginBackGesture())
+
+        XCTAssertEqual(nav.dropAccountScoped().count, 1)
+        XCTAssertFalse(nav.isTransitioning)
+        nav.commitBackGesture()
+        nav.cancelBackGesture()
+        XCTAssertFalse(nav.isTransitioning)
+        XCTAssertNil(nav.exiting)
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home)])
+    }
+
+    /// 정리된 칸을 그리던 push·replace 전환도 끝난다(모션이 끝나기를 기다리지 않는다). 다른 탭의 전환은 그대로다.
+    func testDroppingEndsAPushOrReplaceOfADroppedEntry() {
+        let nav = WLNavigator()
+        XCTAssertTrue(nav.push(AppDestination.item("i1").route, sourceKey: "k"))
+        _ = nav.dropAccountScoped()
+        XCTAssertFalse(nav.isTransitioning)
+
+        open(nav, AppDestination.local("l1").route)
+        XCTAssertTrue(nav.replaceTop(AppDestination.item("i1").route))
+        _ = nav.dropAccountScoped()
+        XCTAssertFalse(nav.isTransitioning)
+        XCTAssertNil(nav.exiting)
+
+        open(nav, AppDestination.item("i2").route)
+        XCTAssertTrue(nav.selectTab(.category))
+        XCTAssertEqual(nav.dropAccountScoped().count, 1)
+        XCTAssertEqual(nav.activeTransition?.kind, .tab(from: .home))
+    }
+
+    /// A `MovedTo` that arrives while the local screen still slides in: the change waits for the transition, then applies.
+    @MainActor
+    func testWhenSettledRetriesAfterTheTransition() async throws {
+        let nav = WLNavigator()
+        XCTAssertTrue(nav.push(AppDestination.local("l1").route, sourceKey: "home/row/l1"))
+        let localId = try XCTUnwrap(nav.entries(.home).last?.id)
+        let item = AppDestination.item("i1").route
+        let settled = Task { @MainActor in await nav.whenSettled(entryID: localId) { nav.replaceTop(item) } }
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(nav.stack(.home).last, AppDestination.local("l1").route) // refused mid-push: still waiting
+        nav.finishTransition()
+        await settled.value
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home), item])
+    }
+
+    /// The entry is no longer the top (the user left, or another screen came over it): nothing happens.
+    @MainActor
+    func testWhenSettledGivesUpWhenTheEntryIsNotTheTop() async throws {
+        let nav = WLNavigator()
+        XCTAssertTrue(nav.push(AppDestination.item("i1").route, sourceKey: "a"))
+        nav.finishTransition()
+        let itemId = try XCTUnwrap(nav.entries(.home).last?.id)
+        XCTAssertTrue(nav.push(AppDestination.settings.route, sourceKey: "b"))
+        let settled = Task { @MainActor in await nav.whenSettled(entryID: itemId) { nav.pop() } }
+        nav.finishTransition()
+        await settled.value
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home), AppDestination.item("i1").route, AppDestination.settings.route])
+    }
 }

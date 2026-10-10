@@ -19,16 +19,17 @@ internal class CachedGetItemRepository(
     private fun changed(snapshot: SessionSnapshot) = session.state.value != snapshot
 
     override suspend fun get(id: String): ClientResult<WishlistItem> {
+        val key = canonicalUuidOrNull(id) ?: id
         val snapshot = session.state.value
-        if (snapshot.accountId == null) return delegate.get(id)
+        if (snapshot.accountId == null) return delegate.get(key)
 
-        val observed = when (val read = localStore.cachedItem(snapshot, id)) {
+        val observed = when (val read = localStore.cachedItem(snapshot, key)) {
             is ClientResult.Failure -> return read
             is ClientResult.Success -> read.value?.version
         }
         if (changed(snapshot)) return sessionChanged()
 
-        val response = delegate.get(id)
+        val response = delegate.get(key)
         if (changed(snapshot)) return sessionChanged()
 
         when (response) {
@@ -37,7 +38,7 @@ internal class CachedGetItemRepository(
                 if (write is ClientResult.Failure) return write
             }
             is ClientResult.Failure -> if (response.error.kind == ErrorKind.NOT_FOUND && observed != null) {
-                val remove = localStore.removeCachedItem(snapshot, id, observed)
+                val remove = localStore.removeCachedItem(snapshot, key, observed)
                 if (remove is ClientResult.Failure) return remove
             }
         }

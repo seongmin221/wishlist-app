@@ -3,6 +3,7 @@ package app.wishlist.shared.data.remote
 import app.wishlist.shared.core.ClientError
 import app.wishlist.shared.core.ClientResult
 import app.wishlist.shared.core.ErrorKind
+import app.wishlist.shared.core.canonicalUuidOrNull
 import app.wishlist.shared.domain.sanitizeAllowedActions
 import app.wishlist.shared.model.*
 import kotlinx.serialization.json.Json
@@ -53,7 +54,7 @@ internal fun mapItem(dto: WishlistItemDto): ClientResult<WishlistItem> {
 
     return ClientResult.Success(
         WishlistItem(
-            id = dto.id,
+            id = canonicalUuidOrNull(dto.id) ?: dto.id,
             clientSubmissionId = dto.clientSubmissionId,
             version = version,
             sourceUrl = dto.sourceUrl,
@@ -78,6 +79,9 @@ internal fun mapItem(dto: WishlistItemDto): ClientResult<WishlistItem> {
             ),
             purpose = ItemPurpose(
                 id = dto.purpose.id,
+                name = dto.purpose.name,
+                colorKey = dto.purpose.colorKey,
+                iconKey = dto.purpose.iconKey,
                 source = dto.purpose.source?.let { enumOr(it, ValueSource.UNKNOWN) } ?: ValueSource.UNASSIGNED,
             ),
             analysis = ItemAnalysis(analysisStatus, dto.analysis.failureCode),

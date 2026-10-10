@@ -42,6 +42,12 @@ internal class CountingDriver(private val delegate: SqlDriver, private val path:
     @Volatile var closes = 0
         private set
 
+    /** Statements that reached this driver: SELECTs ([executeQuery]) and writes ([execute]). */
+    @Volatile var queries = 0
+        private set
+    @Volatile var executes = 0
+        private set
+
     /** Test seam: runs on the querying thread right before each SELECT reaches SQLite. */
     @Volatile var beforeQuery: (sql: String) -> Unit = {}
 
@@ -52,8 +58,19 @@ internal class CountingDriver(private val delegate: SqlDriver, private val path:
         parameters: Int,
         binders: (SqlPreparedStatement.() -> Unit)?,
     ): QueryResult<R> {
+        queries++
         beforeQuery(sql)
         return delegate.executeQuery(identifier, sql, mapper, parameters, binders)
+    }
+
+    override fun execute(
+        identifier: Int?,
+        sql: String,
+        parameters: Int,
+        binders: (SqlPreparedStatement.() -> Unit)?,
+    ): QueryResult<Long> {
+        executes++
+        return delegate.execute(identifier, sql, parameters, binders)
     }
 
     override fun close() {

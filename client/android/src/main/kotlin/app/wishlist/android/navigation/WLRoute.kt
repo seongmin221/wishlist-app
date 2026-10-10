@@ -8,6 +8,9 @@ interface WLRoute {
     val showsTabBar: Boolean
     val pushStyle: WLPushStyle
 
+    /** 로그인한 계정의 데이터를 보이는 화면. 계정을 떠나면(로그아웃·다른 계정) 모든 탭에서 이 칸과 그 위가 닫힌다. */
+    val accountScoped: Boolean get() = false
+
     data class TabRoot(val tab: WLTab) : WLRoute {
         override val showsTabBar = true
         override val pushStyle = WLPushStyle.Slide

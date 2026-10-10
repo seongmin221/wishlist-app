@@ -21,12 +21,15 @@ struct WLRoute: Hashable {
     let showsTabBar: Bool
     let pushStyle: WLPushStyle
     let rootTab: WLTab?
+    /// 로그인한 계정의 데이터를 보이는 화면. 계정을 떠나면(로그아웃·다른 계정) `WLNavigator.dropAccountScoped()`가 닫는다.
+    let accountScoped: Bool
 
-    init(destination: AnyHashable, showsTabBar: Bool = false, pushStyle: WLPushStyle) {
+    init(destination: AnyHashable, showsTabBar: Bool = false, pushStyle: WLPushStyle, accountScoped: Bool = false) {
         self.destination = destination
         self.showsTabBar = showsTabBar
         self.pushStyle = pushStyle
         self.rootTab = nil
+        self.accountScoped = accountScoped
     }
 
     private init(tab: WLTab) {
@@ -34,6 +37,7 @@ struct WLRoute: Hashable {
         showsTabBar = true
         pushStyle = .slide
         rootTab = tab
+        accountScoped = false
     }
 
     static func tabRoot(_ tab: WLTab) -> WLRoute { WLRoute(tab: tab) }

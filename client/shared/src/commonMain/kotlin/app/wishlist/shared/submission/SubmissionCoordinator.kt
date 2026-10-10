@@ -177,6 +177,16 @@ class SubmissionCoordinator internal constructor(
     }
 
     /**
+     * Deletes a local row that has not been sent (signed out too) and publishes the view at once.
+     * A row already SUBMITTING is CONFLICT/SUBMISSION_IN_FLIGHT; its send goes on.
+     */
+    suspend fun deleteLocal(submissionId: String): ClientResult<Unit> = withContext(dispatcher) {
+        val deleted = guarded(STEP_FAILURE) { store.deleteSubmission(session.state.value, submissionId) }
+        if (deleted is ClientResult.Success) guarded(Unit) { publishView() }
+        deleted
+    }
+
+    /**
      * Fire-and-forget (launch, network restored, sign-in, a share, a retry timer). While a flush runs,
      * this only marks one rerun; during a refresh's lookups it runs before the next lookup.
      */
@@ -283,10 +293,13 @@ class SubmissionCoordinator internal constructor(
         }
     }
 
-    /** Sends one row with its own key; false stops this flush. */
+    /** Sends one row with its own key; false stops this flush. A row deleted since the queue was read is skipped. */
     private suspend fun send(snapshot: SessionSnapshot, row: LocalSubmission, retry: RetryWindow): Boolean {
         val id = row.clientSubmissionId
-        if (store.markSubmission(snapshot, id, SubmissionStatus.SUBMITTING, null, null) is ClientResult.Failure) return false
+        when (val marked = store.markSubmission(snapshot, id, SubmissionStatus.SUBMITTING, null, null)) {
+            is ClientResult.Failure -> return marked.error.kind == ErrorKind.NOT_FOUND // deleted since the queue was read
+            is ClientResult.Success -> Unit
+        }
         // Shown as sending without suspending here (a coalesced publish); ITEM-01 itself is bound to the
         // flush snapshot, so an account change at any point is SESSION_CHANGED and never a POST for the other account.
         requestPublish()
@@ -355,9 +368,12 @@ class SubmissionCoordinator internal constructor(
         publishRequests.trySend(Unit)
     }
 
+    /** Asks for a view republish (the detail Presenter calls it after each successful load). */
+    internal fun requestViewPublish() = requestPublish()
+
     /**
      * Recomputes the view for the current session; the one place that orders it (see [SubmissionView]):
-     * local rows keep the store's (sharedAt, key) order, processing items are sorted by (createdAt, id).
+     * local rows keep the store's (sharedAt, key) order, processing items are sorted by (savedAt, id), the time their row shows.
      * Lock order: viewLock → session gate (here only to publish; [accept] takes the same order).
      */
     private suspend fun publishView(): Unit = viewLock.withLock {
@@ -369,7 +385,7 @@ class SubmissionCoordinator internal constructor(
         val processing = when (snapshot.accountId) {
             null -> emptyList()
             else -> (store.processingItems(snapshot) as? ClientResult.Success)?.value
-                ?.sortedWith(compareBy({ it.createdAt }, { it.id }))
+                ?.sortedWith(compareBy({ it.savedAt }, { it.id }))
         }
         // Published inside the session gate, so it cannot land after a newer account is current;
         // a stale snapshot publishes nothing (the newer session publishes its own view). A failed read

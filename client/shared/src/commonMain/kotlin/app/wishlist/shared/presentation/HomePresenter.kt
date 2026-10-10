@@ -97,33 +97,34 @@ class HomePresenter internal constructor(
     private fun compose(restored: Boolean, account: AuthAccount?, view: SubmissionView?, busy: Boolean): HomeState {
         if (!restored || view == null) return HomeState.Loading
         val now = clock.now()
-        fun row(key: String, url: String, at: Instant, status: RowStatus) =
-            HomeRow(key, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, utcOffsetSeconds), status)
+        fun row(key: String, target: HomeRowTarget, url: String, at: Instant, status: RowStatus) =
+            HomeRow(key, target, DisplayFormat.host(url), url, DisplayFormat.relative(at, now, utcOffsetSeconds), status)
         if (account == null) {
             // A view still tied to an account is not this signed-out state's: show nothing of it.
             val unbound = if (view.accountId == null) view.local.filter { it.accountBinding == null } else emptyList()
             return HomeState.LoggedOut(
-                unbound.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, RowStatus.LOCAL_ONLY) },
+                unbound.map { row("local-${it.clientSubmissionId}", HomeRowTarget.Local(it.clientSubmissionId), it.sourceUrl, it.sharedAt, RowStatus.LOCAL_ONLY) },
             )
         }
         if (view.accountId != account.accountId) return HomeState.Loading
         // The view is already in display order (SubmissionView): local rows, then processing items.
-        val local = view.local.map { row("local-${it.clientSubmissionId}", it.sourceUrl, it.sharedAt, it.rowStatus()) }
-        val processing = view.processing.map { row("item-${it.id}", it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
+        val local = view.local.map { row("local-${it.clientSubmissionId}", HomeRowTarget.Local(it.clientSubmissionId), it.sourceUrl, it.sharedAt, it.rowStatus()) }
+        val processing = view.processing.map { row("item-${it.id}", HomeRowTarget.Item(it.id), it.sourceUrl, it.savedAt, RowStatus.PROCESSING) }
         return HomeState.LoggedIn(local + processing, busy)
     }
+}
 
-    private fun LocalSubmission.rowStatus() = when (submissionStatus) {
-        SubmissionStatus.SUBMITTING -> RowStatus.SENDING
-        SubmissionStatus.FAILED -> RowStatus.FAILED
-        SubmissionStatus.PENDING -> when (lastSubmissionError?.kind) {
-            // Not tried yet, offline, or cut off by an account change: the next connection sends it.
-            null, ErrorKind.NETWORK, ErrorKind.TIMEOUT, ErrorKind.SESSION_CHANGED -> RowStatus.WAITING_NETWORK
-            ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND,
-            ErrorKind.RATE_LIMITED -> RowStatus.RETRYING
-            ErrorKind.UNAUTHENTICATED -> RowStatus.NEEDS_SIGN_IN
-            // Permanent kinds end FAILED; a PENDING row with one is still only waiting.
-            ErrorKind.VALIDATION, ErrorKind.CONFLICT -> RowStatus.WAITING_NETWORK
-        }
+/** Why a signed-in local row waits (or that it is sending/failed); shared by the home and local detail Presenters. */
+internal fun LocalSubmission.rowStatus(): RowStatus = when (submissionStatus) {
+    SubmissionStatus.SUBMITTING -> RowStatus.SENDING
+    SubmissionStatus.FAILED -> RowStatus.FAILED
+    SubmissionStatus.PENDING -> when (lastSubmissionError?.kind) {
+        // Not tried yet, offline, or cut off by an account change: the next connection sends it.
+        null, ErrorKind.NETWORK, ErrorKind.TIMEOUT, ErrorKind.SESSION_CHANGED -> RowStatus.WAITING_NETWORK
+        ErrorKind.SERVER, ErrorKind.INVALID_RESPONSE, ErrorKind.UNAVAILABLE, ErrorKind.NOT_FOUND,
+        ErrorKind.RATE_LIMITED -> RowStatus.RETRYING
+        ErrorKind.UNAUTHENTICATED -> RowStatus.NEEDS_SIGN_IN
+        // Permanent kinds end FAILED; a PENDING row with one is still only waiting.
+        ErrorKind.VALIDATION, ErrorKind.CONFLICT -> RowStatus.WAITING_NETWORK
     }
 }
