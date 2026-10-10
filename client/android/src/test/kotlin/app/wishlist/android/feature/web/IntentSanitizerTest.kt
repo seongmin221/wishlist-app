@@ -117,7 +117,8 @@ class IntentSanitizerTest {
         val numberFormat: (String) -> ParsedIntentUri = { throw NumberFormatException("q") }
         val illegal: (String) -> ParsedIntentUri = { throw IllegalArgumentException("bad") }
         val syntax: (String) -> ParsedIntentUri = { throw java.net.URISyntaxException(it, "bad") }
-        for (parse in listOf(numberFormat, illegal, syntax)) {
+        val other: (String) -> ParsedIntentUri = { throw IndexOutOfBoundsException("odd extra") }
+        for (parse in listOf(numberFormat, illegal, syntax, other)) {
             assertEquals(SanitizedIntent.Fallback("https://m.shop.com"), IntentSanitizer.sanitize(withFallback, parse, always))
             assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize("intent://x#Intent;i.x=zz;end", parse, always))
         }

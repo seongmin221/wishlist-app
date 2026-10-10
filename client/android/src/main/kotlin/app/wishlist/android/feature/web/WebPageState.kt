@@ -22,13 +22,28 @@ internal data class WebPageState(
     /** Lock icon only for https (D14). */
     val secure: Boolean get() = url.startsWith("https:", ignoreCase = true)
 
-    /** Second line; null (domain only, D13) when the page has no title or WebView reports the URL as one. */
+    /**
+     * Second line; null (domain only, D13) when the page has no title, WebView reports the URL as one, or the
+     * load failed (the failure overlay covers the page, so its title would be stale).
+     */
     val titleLine: String?
         get() {
+            if (failed) return null
             val t = title?.trim().orEmpty()
             if (t.isEmpty() || t == url || t == url.substringAfter("://")) return null
             return t
         }
+
+    /**
+     * `onPageStarted` of the main frame: a new load with no title yet. Only a web URL replaces [url] (like iOS
+     * `adopt(currentURL:)`), so `about:blank` or a null URL keeps the bar and the share sheet on the last page.
+     */
+    fun started(startedUrl: String?): WebPageState = copy(
+        url = startedUrl?.takeIf(WebUrl::isWeb) ?: url,
+        title = null,
+        loading = true,
+        failed = false,
+    )
 
     /** The 2px line hides once the load reaches 100 (D13). */
     val progressVisible: Boolean get() = loading && progress < 100
