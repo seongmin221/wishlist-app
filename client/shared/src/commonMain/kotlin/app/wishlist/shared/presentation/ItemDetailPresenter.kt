@@ -94,6 +94,20 @@ class ItemDetailPresenter(
         scope.launch { repeatLast() }
     }
 
+    /**
+     * [refresh], awaited: returns once that request ended (iOS `.refreshable` awaits it). Returns at
+     * once when there is nothing to repeat or after [close]. Cancelling the caller stops only the wait;
+     * a newer request or a session change ends this one, and the wait with it.
+     */
+    suspend fun refreshNow() {
+        var started: Job? = null
+        scope.launch {
+            repeatLast()
+            started = inFlight
+        }.join()
+        started?.join()
+    }
+
     override fun close() {
         scope.cancel()
     }

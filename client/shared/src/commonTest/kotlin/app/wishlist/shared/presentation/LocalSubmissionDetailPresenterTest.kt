@@ -272,6 +272,19 @@ class LocalSubmissionDetailPresenterTest {
         assertEquals(LocalDetailOutcome.MovedTo(item.id), d.state.outcome)
     }
 
+    @Test fun deleteOfARowAlreadyGoneIsNotAFailure() = runDetailTest { d ->
+        d.h.signIn()
+        val key = d.shareAndOpen()
+        // The row left the store (sent and accepted) before this screen saw a new view.
+        d.h.store.deleteSubmission(d.h.session.state.value, key).successValue()
+        assertTrue(d.state.canDelete)
+        d.presenter.delete()
+        runCurrent()
+        assertEquals(ErrorKind.NOT_FOUND, d.deletes.single().error().kind)
+        assertFalse(d.state.deleting)
+        assertFalse(d.state.deleteFailed)
+    }
+
     @Test fun tickRecomputesSavedAt() = runDetailTest { d ->
         d.shareAndOpen()
         assertEquals(RelativeTime.JustNow, d.row.savedAt)

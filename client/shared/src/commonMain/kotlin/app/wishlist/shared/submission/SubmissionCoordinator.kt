@@ -373,7 +373,7 @@ class SubmissionCoordinator internal constructor(
 
     /**
      * Recomputes the view for the current session; the one place that orders it (see [SubmissionView]):
-     * local rows keep the store's (sharedAt, key) order, processing items are sorted by (createdAt, id).
+     * local rows keep the store's (sharedAt, key) order, processing items are sorted by (savedAt, id), the time their row shows.
      * Lock order: viewLock → session gate (here only to publish; [accept] takes the same order).
      */
     private suspend fun publishView(): Unit = viewLock.withLock {
@@ -385,7 +385,7 @@ class SubmissionCoordinator internal constructor(
         val processing = when (snapshot.accountId) {
             null -> emptyList()
             else -> (store.processingItems(snapshot) as? ClientResult.Success)?.value
-                ?.sortedWith(compareBy({ it.createdAt }, { it.id }))
+                ?.sortedWith(compareBy({ it.savedAt }, { it.id }))
         }
         // Published inside the session gate, so it cannot land after a newer account is current;
         // a stale snapshot publishes nothing (the newer session publishes its own view). A failed read

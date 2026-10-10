@@ -1019,6 +1019,25 @@ class SubmissionCoordinatorTest {
         assertEquals(listOf("1", "4", "2", "3"), h.view.processing.map { it.id.last().toString() })
     }
 
+    @Test fun viewOrdersProcessingBySavedAtNotServerCreatedAt() = runCoordinatorTest { h ->
+        h.signIn()
+        val snapshot = h.session.state.value
+        // Shared offline first (earlier clientCreatedAt) but sent last (later createdAt): it shows the older time, so it sorts first.
+        val sentLate = itemFixture(
+            analysis = AnalysisStatus.PROCESSING,
+            id = "00000000-0000-4000-a000-000000000001",
+            clientSubmissionId = "00000000-0000-4000-b000-000000000001",
+        ).copy(createdAt = baseTime + 10.seconds, clientCreatedAt = baseTime)
+        val sentEarly = itemFixture(
+            analysis = AnalysisStatus.PROCESSING,
+            id = "00000000-0000-4000-a000-000000000002",
+            clientSubmissionId = "00000000-0000-4000-b000-000000000002",
+        ).copy(createdAt = baseTime + 5.seconds)
+        listOf(sentEarly, sentLate).forEach { h.store.upsertItem(snapshot, it).successValue() }
+        h.flush()
+        assertEquals(listOf(sentLate.id, sentEarly.id), h.view.processing.map { it.id })
+    }
+
     @Test fun viewKeepsLocalRowsInSharedOrder() = runCoordinatorTest { h ->
         h.store.saveSubmission(submission(id = UUID_C, sharedAt = baseTime + 1.seconds)).successValue()
         h.store.saveSubmission(submission(id = UUID_B, sharedAt = baseTime)).successValue()

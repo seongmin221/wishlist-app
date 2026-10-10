@@ -84,8 +84,9 @@ class LocalSubmissionDetailPresenter internal constructor(
 
     /**
      * Deletes the link (signed out too). Ignored unless [LocalDetailState.canDelete] and no delete is
-     * running. A row that started sending meanwhile only clears [LocalDetailState.deleting] (its
-     * MovedTo follows); any other failure also sets [LocalDetailState.deleteFailed].
+     * running. A row that started sending meanwhile, or that already left the store (NOT_FOUND), only
+     * clears [LocalDetailState.deleting] (the view decides MovedTo/Gone); any other failure also sets
+     * [LocalDetailState.deleteFailed].
      */
     fun delete() {
         scope.launch {
@@ -100,6 +101,8 @@ class LocalSubmissionDetailPresenter internal constructor(
                     result is ClientResult.Success -> state.copy(deleting = false, outcome = state.outcome ?: LocalDetailOutcome.Deleted)
                     result is ClientResult.Failure && result.error.kind == ErrorKind.CONFLICT &&
                         result.error.code == SUBMISSION_IN_FLIGHT -> state.copy(deleting = false)
+                    // Already gone (accepted, or deleted elsewhere) before this screen saw the view: the next view decides.
+                    result is ClientResult.Failure && result.error.kind == ErrorKind.NOT_FOUND -> state.copy(deleting = false)
                     else -> state.copy(deleting = false, deleteFailed = true)
                 }
             }
