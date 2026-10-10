@@ -116,7 +116,10 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         }
         owner.categories = data.categories.toList()
         owner.purposes = data.purposes.toList()
-        items.forEach { item ->
+        val displayed = items.map { item ->
+            if (item.purpose.id == null) item else item.copy(purpose = purpose(owner, item.purpose.id, item.purpose.source))
+        }
+        displayed.forEach { item ->
             if (item.id !in owner.entries && item.clientSubmissionId !in owner.submissionIds) {
                 owner.entries[item.id] = Entry(withPolicy(item))
                 owner.submissionIds[item.clientSubmissionId] = item.id
@@ -278,9 +281,14 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         },
         purpose = when (val value = patch.purposeId) {
             Patch.Unchanged -> item.purpose
-            is Patch.Set -> ItemPurpose(value.value, if(value.value == null) ValueSource.UNASSIGNED else ValueSource.USER)
+            is Patch.Set -> value.value?.let { purpose(owner, it, ValueSource.USER) } ?: ItemPurpose()
         },
     )
+    /** Like the server's B3 PurposeDto: display fields from the owner's purpose, keys in wire form (`CORAL`, `MUSIC`). */
+    private fun purpose(owner: OwnerStore, id: String, source: ValueSource): ItemPurpose {
+        val definition = owner.purposes.firstOrNull { it.id == id }
+        return ItemPurpose(id, source, definition?.name, definition?.colorKey?.uppercase(), definition?.iconKey?.uppercase())
+    }
     private fun category(owner: OwnerStore, id: String?, source: ValueSource): ItemCategory {
         val definition = owner.categories.firstOrNull { it.id == id }
         return ItemCategory(id, source, null, definition?.name, definition?.parentId, definition?.kind)
