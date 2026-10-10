@@ -39,6 +39,18 @@ class RuntimeConfigTest {
         assertFailsWith<IllegalArgumentException> { RuntimeConfig.fromEnvironment(db + ("APP_ROLE" to "scheduler")) }
     }
 
+    @Test fun `maintenance requires the database and production queue settings`() {
+        val db = mapOf("DATABASE_URL" to "jdbc:postgresql://example/db", "DATABASE_USER" to "user", "DATABASE_PASSWORD" to "password")
+        assertFailsWith<IllegalArgumentException> { RuntimeConfig.fromEnvironment(mapOf("APP_ROLE" to "maintenance")) }
+        val local = RuntimeConfig.fromEnvironment(db + ("APP_ROLE" to "maintenance"))
+        assertEquals(RuntimeRole.MAINTENANCE, local.role)
+        assertEquals(2, local.databasePool.maximumPoolSize)
+        val production = db + mapOf("APP_ROLE" to "maintenance", "APP_ENV" to "production")
+        assertFailsWith<IllegalArgumentException> { RuntimeConfig.fromEnvironment(production) }
+        assertEquals(RuntimeRole.MAINTENANCE, RuntimeConfig.fromEnvironment(production + mapOf("TASKS_PROJECT_ID" to "p",
+            "GENERAL_WORKER_URL" to "https://g", "BROWSER_WORKER_URL" to "https://b", "TASKS_CALLER_SERVICE_ACCOUNT" to "sa")).role)
+    }
+
     @Test fun `worker requires database and OpenAI settings`() {
         val worker = mapOf(
                 "APP_ENV" to "production", "APP_ROLE" to "general-worker",

@@ -51,6 +51,22 @@ class HealthRouteTest {
         }
     }
 
+    @Test fun `maintenance role exposes only its run route`() {
+        app.testutil.PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            val queue = app.testutil.InMemoryTaskQueue()
+            testApplication {
+                application { module(mapOf("APP_ENV" to "local", "APP_ROLE" to "maintenance", "DATABASE_URL" to database.jdbcUrl,
+                    "DATABASE_USER" to database.username, "DATABASE_PASSWORD" to database.password), RuntimeResources(), queue) }
+                assertEquals(HttpStatusCode.OK, client.post("/internal/maintenance/run").status)
+                assertEquals(HttpStatusCode.NotFound, client.post("/internal/worker/general") {
+                    setBody("""{"jobId":"00000000-0000-0000-0000-000000000001","generation":1}""")
+                }.status)
+            }
+        }
+    }
+
     @Test fun `failed startup closes resources without waiting for normal shutdown`() {
         val resources = RuntimeResources()
         var closes = 0
