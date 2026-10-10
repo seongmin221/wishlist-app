@@ -40,3 +40,12 @@ fun isAboutBlank(url: String): Boolean {
     if (!url.startsWith("about:", ignoreCase = true)) return false
     return url.substring("about:".length).takeWhile { it != '?' && it != '#' }.equals("blank", ignoreCase = true)
 }
+
+/**
+ * The scheme [WebNavigationPolicy.decide] reads: the text before the first `:`, or "" when a `/ ? #` comes first
+ * or there is no colon (the policy blocks ""). Case is kept; the policy lowercases.
+ */
+fun schemeOf(url: String): String {
+    val end = url.indexOfFirst { it == ':' || it == '/' || it == '?' || it == '#' }
+    return if (end > 0 && url[end] == ':') url.substring(0, end) else ""
+}
