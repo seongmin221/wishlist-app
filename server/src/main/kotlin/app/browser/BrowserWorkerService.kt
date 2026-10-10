@@ -2,6 +2,7 @@ package app.browser
 
 import app.analysis.*
 import app.extraction.Metadata
+import app.extraction.DnsLookupFailed
 import app.extraction.UnsafeUrlException
 import java.util.UUID
 import javax.sql.DataSource
@@ -36,6 +37,7 @@ class BrowserWorkerService(
                 catch (_: BrowserSiteBlocked) { null }
                 catch (_: BrowserTargetUnavailable) { null }
                 catch (_: UnsafeUrlException) { null }
+                catch (_: DnsLookupFailed) { null }
             when {
                 metadata == null -> ProcessingOutcome.Partial
                 !pending.saveMetadata(claim, metadata) -> ProcessingOutcome.Stale

@@ -6,7 +6,7 @@ import java.net.URI
 class UnsafeUrlException(message: String) : IllegalArgumentException(message)
 
 class UrlSafetyPolicy(
-    private val resolve: (String) -> List<InetAddress> = { host -> InetAddress.getAllByName(host).toList() },
+    private val resolve: (String) -> List<InetAddress> = BoundedResolver.default,
 ) {
     fun validate(url: String): List<InetAddress> {
         val uri = runCatching { URI(url) }.getOrElse { throw UnsafeUrlException("invalid URL") }
@@ -18,8 +18,13 @@ class UrlSafetyPolicy(
             val literal = runCatching { InetAddress.getByName(host) }.getOrElse { throw UnsafeUrlException("invalid IP address") }
             if (isBlocked(literal)) throw UnsafeUrlException("blocked address")
         }
-        val addresses = runCatching { resolve(host) }.getOrElse { throw UnsafeUrlException("DNS lookup failed") }
-        if (addresses.isEmpty() || addresses.any(::isBlocked)) throw UnsafeUrlException("blocked address")
+        val addresses = try { resolve(host) } catch (cause: Exception) {
+            // Deadline and cancellation keep their meaning; any other resolver failure is a DNS failure, not a block.
+            if (cause is DnsLookupFailed || cause is app.analysis.ProcessingDeadlineExceeded || cause is kotlinx.coroutines.CancellationException) throw cause
+            throw DnsLookupFailed()
+        }
+        if (addresses.isEmpty()) throw DnsLookupFailed()
+        if (addresses.any(::isBlocked)) throw UnsafeUrlException("blocked address")
         return addresses
     }
 

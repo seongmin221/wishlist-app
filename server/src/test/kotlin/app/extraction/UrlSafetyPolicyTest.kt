@@ -30,6 +30,26 @@ class UrlSafetyPolicyTest {
     }
 
     @Test
+    fun `dns failures are not reported as blocked addresses`() {
+        for (resolve in listOf<(String) -> List<InetAddress>>({ throw java.net.UnknownHostException("nx") }, { emptyList() },
+            { throw IllegalStateException("resolver crashed") }, { throw DnsLookupFailed() })) {
+            assertFailsWith<DnsLookupFailed> { UrlSafetyPolicy(resolve).validate("https://shop.example/item") }
+        }
+    }
+
+    @Test
+    fun `scheme port credentials local hosts and malformed URLs are unsafe`() {
+        val policy = UrlSafetyPolicy { listOf(InetAddress.getByName("93.184.215.14")) }
+        for (url in listOf("ftp://shop.example/item", "https://shop.example:8443/item", "https://user@shop.example/item",
+            "https://localhost/item", "https://printer.local/item", "https://127.0.0.1/item", "https://[::1]/item", "http://exa mple.com/")) {
+            assertFailsWith<UnsafeUrlException>(url) { policy.validate(url) }
+        }
+        for (address in listOf("127.0.0.1", "10.0.0.1", "169.254.169.254", "100.64.0.1")) {
+            assertFailsWith<UnsafeUrlException>(address) { UrlSafetyPolicy { listOf(InetAddress.getByName(address)) }.validate("https://shop.example/item") }
+        }
+    }
+
+    @Test
     fun `json ld product name wins over open graph and title`() {
         val policy = UrlSafetyPolicy { listOf(InetAddress.getByName("93.184.215.14")) }
         val extractor = HttpMetadataExtractor(policy) { _, _ ->

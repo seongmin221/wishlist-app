@@ -87,6 +87,13 @@ class GeneralExtractionProcessorTest {
         }
     }
 
+    @Test fun `dns lookup failure retries instead of failing terminally`() = withAnalysisDatabase { source ->
+        val claim = newAnalysisClaim(source)
+        val outcome = GeneralExtractionProcessor(source, { throw DnsLookupFailed() }, { _, _ -> error("classification must not run") }).process(claim)
+        assertEquals(ProcessingOutcome.Retryable, outcome)
+        assertNull(analysisScalar(source, "select pending_failure_code from analysis_jobs where id='${claim.jobId}'"))
+    }
+
     @Test
     fun `blocked redirect is terminal without retry`() {
         PostgresTestContainer().use { database ->
@@ -100,9 +107,10 @@ class GeneralExtractionProcessorTest {
             val processor = GeneralExtractionProcessor(source, { throw UnsafeUrlException("private redirect") }, { _, _ -> error("classification must not run") })
             assertEquals(WorkerDisposition.ACKNOWLEDGE, GeneralWorkerService(source, processor::process).runGeneral(jobId, 1))
             database.createConnection("").use { connection ->
-                connection.createStatement().executeQuery("select analysis_status from wishlist_items").use { rows ->
+                connection.createStatement().executeQuery("select analysis_status, analysis_failure_code from wishlist_items").use { rows ->
                     rows.next()
                     assertEquals("FAILED_TERMINAL", rows.getString(1))
+                    assertEquals("BLOCKED_ADDRESS", rows.getString(2))
                 }
             }
         }

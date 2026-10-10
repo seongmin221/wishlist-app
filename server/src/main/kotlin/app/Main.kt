@@ -58,7 +58,7 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = model, allowLocalAlias = env["APP_ENV"] != "production"),
             CategoryCandidateProvider(), gateway::classify)
         val transport = resources.own(SafeHttpTransport())
-        val extractor = HttpMetadataExtractor(UrlSafetyPolicy(), transport::fetch)
+        val extractor = HttpMetadataExtractor(UrlSafetyPolicy(resources.own(BoundedResolver())), transport::fetch)
         val processor = GeneralExtractionProcessor(source, extractor::extract, classifier::classify)
         val execution = resources.own(WorkerExecution())
         routing {
