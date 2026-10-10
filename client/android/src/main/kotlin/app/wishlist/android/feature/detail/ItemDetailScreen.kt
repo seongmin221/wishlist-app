@@ -279,7 +279,7 @@ private fun InfoRow(label: String, value: @Composable () -> Unit) {
 
 @Composable
 private fun SavedLine(item: WishlistItem, now: Instant) {
-    val label = DisplayFormat.saved(item.createdAt, now, ::deviceUtcOffsetSeconds)
+    val label = DisplayFormat.saved(item.savedAt, now, ::deviceUtcOffsetSeconds)
     WLText(DetailText.savedText(label).resolve(), DetailStyles.caption, color = LocalWLColors.current.textSecondary, maxLines = 1)
 }
 

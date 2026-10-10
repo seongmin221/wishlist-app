@@ -106,6 +106,7 @@
     <string name="local_delete_title">링크를 삭제할까요?</string>
     <string name="local_delete_target">%1$s · 이 기기에만 있어요</string>
     <string name="local_delete_line_unsent">아직 보내지 않은 링크예요</string>
+    <string name="local_delete_line_irreversible">되돌릴 수 없어요</string>
     <string name="local_delete_failed">지우지 못했어요</string>
     <string name="home_row_open_detail">상세 보기</string>
     <string name="home_row_open_original">원본 열기</string>

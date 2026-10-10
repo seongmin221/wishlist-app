@@ -251,7 +251,7 @@ private struct SavedLine: View {
 
     var body: some View {
         DetailMinuteClock { now in
-            let label = DisplayFormat.shared.saved(at: item.createdAt, now: DetailClock.instant(now), utcOffsetSeconds: DetailClock.utcOffset)
+            let label = DisplayFormat.shared.saved(at: item.savedAt, now: DetailClock.instant(now), utcOffsetSeconds: DetailClock.utcOffset)
             WLText(DetailText.savedText(label).resolve(), DetailStyles.caption, color: c.textSecondary, maxLines: 1)
         }
     }

@@ -19,6 +19,7 @@ import app.wishlist.shared.data.fake.successValue
 import app.wishlist.shared.data.local.CachedGetItemRepository
 import app.wishlist.shared.data.local.LazyDriver
 import app.wishlist.shared.data.local.SqlLocalStore
+import app.wishlist.shared.repository.SUBMISSION_IN_FLIGHT
 import app.wishlist.shared.data.local.StoreHarness
 import app.wishlist.shared.data.local.UUID_A
 import app.wishlist.shared.data.local.UUID_B
@@ -1091,7 +1092,7 @@ class SubmissionCoordinatorTest {
         runCurrent()
         val failure = deleted.await().error()
         assertEquals(ErrorKind.CONFLICT, failure.kind)
-        assertEquals(SqlLocalStore.SUBMISSION_IN_FLIGHT, failure.code)
+        assertEquals(SUBMISSION_IN_FLIGHT, failure.code)
 
         gate.complete(Unit)
         advanceUntilIdle()

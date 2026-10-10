@@ -43,12 +43,12 @@ internal const val DETAIL_STEP_FAILURE = "DETAIL_STEP_FAILURE"
  *   nothing) and resets to [ItemDetailState.Initial]. Each answer is published only inside
  *   [AuthSession.withCurrent] for the snapshot it was requested under, so no answer from a
  *   previous session is ever published.
- * - [onLoaded] runs on the lane after each success state is published (the runtime uses it to
- *   republish the submission view from the refreshed cache).
+ * - [onLoaded] runs on the lane after each success or NOT_FOUND state is published (the runtime uses
+ *   it to republish the submission view from the refreshed cache; NOT_FOUND already dropped the row).
  *
  * @param onLoaded called on the lane inside the session gate ([AuthSession.withCurrent]) right after
- *   a success state is published, so it must be non-blocking and must not throw. A success that was
- *   superseded by a newer request (or a session change) is never published and does not call it.
+ *   a success or NOT_FOUND state is published, so it must be non-blocking and must not throw. An
+ *   answer that was superseded by a newer request (or a session change) is never published and does not call it.
  * - [close] cancels everything, is idempotent, and later intents are ignored.
  * - A real cancellation (this request was replaced, the session changed, or [close]) propagates
  *   and is never an error state. A stray CancellationException from the repository while this
@@ -147,7 +147,9 @@ class ItemDetailPresenter(
                             error = result.error,
                         )
                     }
-                    if (result is ClientResult.Success) onLoaded()
+                    if (result is ClientResult.Success ||
+                        (result is ClientResult.Failure && result.error.kind == ErrorKind.NOT_FOUND)
+                    ) onLoaded()
                 }
                 ClientResult.Success(Unit)
             }

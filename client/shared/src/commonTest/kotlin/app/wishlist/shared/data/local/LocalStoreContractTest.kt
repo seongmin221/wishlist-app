@@ -1,5 +1,6 @@
 package app.wishlist.shared.data.local
 
+import app.wishlist.shared.repository.SUBMISSION_IN_FLIGHT
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
@@ -487,6 +488,16 @@ class LocalStoreContractTest {
         }
     }
 
+    @Test fun cachedItemBySubmissionMatchesCaseInsensitivelyBothWays() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            h.store.saveSubmission(submission(id = UUID_B, binding = "A")).successValue()
+            h.store.accept(a, UUID_B, item(version = 1).copy(clientSubmissionId = UUID_B.uppercase())).successValue()
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B).successValue()!!.id)
+            assertEquals(itemId, h.store.cachedItemBySubmission(a, UUID_B.uppercase()).successValue()!!.id)
+        }
+    }
+
     @Test fun cachedItemBySubmissionIsNullWhenAbsent() = runTest {
         withHarness { h ->
             val a = h.session.login("A")
@@ -524,7 +535,7 @@ class LocalStoreContractTest {
         h.store.markSubmission(a, UUID_A, SubmissionStatus.SUBMITTING, null, null).successValue()
         val failure = h.store.deleteSubmission(a, UUID_A).error()
         assertEquals(ErrorKind.CONFLICT, failure.kind)
-        assertEquals(SqlLocalStore.SUBMISSION_IN_FLIGHT, failure.code)
+        assertEquals(SUBMISSION_IN_FLIGHT, failure.code)
         assertEquals(SubmissionStatus.SUBMITTING.name, h.row(UUID_A)?.status)
     }
 

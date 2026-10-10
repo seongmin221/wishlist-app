@@ -9,7 +9,7 @@ import app.wishlist.shared.core.ErrorKind
 import app.wishlist.shared.core.SessionSnapshot
 import app.wishlist.shared.data.fake.error
 import app.wishlist.shared.data.fake.successValue
-import app.wishlist.shared.data.local.SqlLocalStore
+import app.wishlist.shared.repository.SUBMISSION_IN_FLIGHT
 import app.wishlist.shared.data.local.withHarness
 import app.wishlist.shared.di.TEST_UTC_OFFSET_SECONDS
 import app.wishlist.shared.domain.RelativeTime
@@ -260,7 +260,7 @@ class LocalSubmissionDetailPresenterTest {
         runCurrent()
         val failure = d.deletes.single().error()
         assertEquals(ErrorKind.CONFLICT, failure.kind)
-        assertEquals(SqlLocalStore.SUBMISSION_IN_FLIGHT, failure.code)
+        assertEquals(SUBMISSION_IN_FLIGHT, failure.code)
         assertFalse(d.state.deleting)
         assertFalse(d.state.deleteFailed)
         assertNull(d.state.outcome)

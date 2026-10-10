@@ -1611,6 +1611,23 @@
         }
       }
     },
+    "local.delete.line.irreversible": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "되돌릴 수 없어요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This can't be undone"
+          }
+        }
+      }
+    },
     "local.delete.failed": {
       "extractionState": "manual",
       "localizations": {

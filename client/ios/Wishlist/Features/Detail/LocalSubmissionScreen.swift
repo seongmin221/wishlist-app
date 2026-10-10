@@ -133,7 +133,7 @@ private struct LocalMoreButton: View {
         let owner = owner
         return WLDialogSpec(
             title: DetailLine("local.delete.title").resolve(),
-            bullets: [DetailLine("local.delete.line.unsent").resolve(), DetailLine("webview.clear.line.irreversible").resolve()],
+            bullets: [DetailLine("local.delete.line.unsent").resolve(), DetailLine("local.delete.line.irreversible").resolve()],
             cancelText: DetailLine("dialog.cancel").resolve(),
             confirmText: DetailLine("local.delete").resolve(),
             confirmKind: .danger,

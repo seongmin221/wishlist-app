@@ -108,6 +108,7 @@
     <string name="local_delete_title">Delete this link?</string>
     <string name="local_delete_target">%1$s · Only on this device</string>
     <string name="local_delete_line_unsent">This link hasn\'t been sent yet</string>
+    <string name="local_delete_line_irreversible">This can\'t be undone</string>
     <string name="local_delete_failed">Couldn\'t delete</string>
     <string name="home_row_open_detail">View details</string>
     <string name="home_row_open_original">Open original</string>

@@ -27,6 +27,9 @@ data class WishlistItem(
     val updatedAtIso: String get() = updatedAt.toString()
     val manualCompletionAtIso: String? get() = manualCompletionAt?.toString()
     val clientCreatedAtIso: String? get() = clientCreatedAt?.toString()
+
+    /** When the user saved it: the shared time ([clientCreatedAt]), else the server creation time. */
+    val savedAt: Instant get() = clientCreatedAt ?: createdAt
 }
 
 data class ProductSnapshot(

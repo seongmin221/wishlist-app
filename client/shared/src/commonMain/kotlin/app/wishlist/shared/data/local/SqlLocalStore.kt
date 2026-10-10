@@ -4,6 +4,7 @@ import app.wishlist.shared.core.*
 import app.wishlist.shared.di.RUNTIME_NOT_READY
 import app.wishlist.shared.model.*
 import app.wishlist.shared.repository.LocalStore
+import app.wishlist.shared.repository.SUBMISSION_IN_FLIGHT
 import kotlinx.coroutines.CancellationException
 import kotlin.concurrent.Volatile
 import kotlin.time.Instant
@@ -299,7 +300,6 @@ internal class SqlLocalStore(
         const val SUBMISSION_KEY_REUSED = "SUBMISSION_KEY_REUSED"
         const val SUBMISSION_ITEM_MISMATCH = "SUBMISSION_ITEM_MISMATCH"
         const val SUBMISSION_NOT_FOUND = "SUBMISSION_NOT_FOUND"
-        const val SUBMISSION_IN_FLIGHT = "SUBMISSION_IN_FLIGHT"
     }
 }
 

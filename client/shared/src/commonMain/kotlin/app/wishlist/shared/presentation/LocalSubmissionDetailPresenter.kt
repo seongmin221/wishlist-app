@@ -6,11 +6,11 @@ import app.wishlist.shared.core.Clock
 import app.wishlist.shared.core.ErrorKind
 import app.wishlist.shared.core.SessionSnapshot
 import app.wishlist.shared.core.canonicalUuidOrNull
-import app.wishlist.shared.data.local.SqlLocalStore
 import app.wishlist.shared.domain.DisplayFormat
 import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.model.WishlistItem
+import app.wishlist.shared.repository.SUBMISSION_IN_FLIGHT
 import app.wishlist.shared.submission.SubmissionView
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -99,7 +99,7 @@ class LocalSubmissionDetailPresenter internal constructor(
                 when {
                     result is ClientResult.Success -> state.copy(deleting = false, outcome = state.outcome ?: LocalDetailOutcome.Deleted)
                     result is ClientResult.Failure && result.error.kind == ErrorKind.CONFLICT &&
-                        result.error.code == SqlLocalStore.SUBMISSION_IN_FLIGHT -> state.copy(deleting = false)
+                        result.error.code == SUBMISSION_IN_FLIGHT -> state.copy(deleting = false)
                     else -> state.copy(deleting = false, deleteFailed = true)
                 }
             }

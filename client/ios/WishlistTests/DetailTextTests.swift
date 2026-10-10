@@ -94,7 +94,7 @@ final class DetailTextTests: XCTestCase {
             "detail.saved.date", "detail.saved.date.year", "detail.processing.note", "detail.incomplete.info",
             "detail.incomplete.category", "detail.incomplete.reassign", "detail.error.network", "detail.error.server",
             "detail.retry", "detail.not.found", "detail.close",
-            "local.delete", "local.delete.title", "local.delete.target", "local.delete.line.unsent", "local.delete.failed",
+            "local.delete", "local.delete.title", "local.delete.target", "local.delete.line.unsent", "local.delete.line.irreversible", "local.delete.failed",
             "home.row.open.detail", "home.row.open.original",
         ]
         let expected: [String: (String, String)] = [
@@ -109,6 +109,7 @@ final class DetailTextTests: XCTestCase {
             "detail.not.found": ("삭제된 상품이에요", "This item was deleted"),
             "local.delete.title": ("링크를 삭제할까요?", "Delete this link?"),
             "local.delete.line.unsent": ("아직 보내지 않은 링크예요", "This link hasn't been sent yet"),
+            "local.delete.line.irreversible": ("되돌릴 수 없어요", "This can't be undone"),
             "local.delete.failed": ("지우지 못했어요", "Couldn't delete"),
             "home.row.open.detail": ("상세 보기", "View details"),
             "home.row.open.original": ("원본 열기", "Open original"),

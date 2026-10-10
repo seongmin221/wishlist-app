@@ -86,7 +86,7 @@ internal fun LocalSubmissionScreen(submissionId: String) {
     val deleteDialog = row?.let {
         WLDialogSpec(
             title = stringResource(R.string.local_delete_title),
-            bullets = listOf(stringResource(R.string.local_delete_line_unsent), stringResource(R.string.webview_clear_line_irreversible)),
+            bullets = listOf(stringResource(R.string.local_delete_line_unsent), stringResource(R.string.local_delete_line_irreversible)),
             cancelText = stringResource(R.string.dialog_cancel),
             confirmText = stringResource(R.string.local_delete),
             confirmKind = WLButtonKind.Danger,

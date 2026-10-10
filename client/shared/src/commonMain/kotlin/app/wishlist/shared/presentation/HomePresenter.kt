@@ -109,7 +109,7 @@ class HomePresenter internal constructor(
         if (view.accountId != account.accountId) return HomeState.Loading
         // The view is already in display order (SubmissionView): local rows, then processing items.
         val local = view.local.map { row("local-${it.clientSubmissionId}", HomeRowTarget.Local(it.clientSubmissionId), it.sourceUrl, it.sharedAt, it.rowStatus()) }
-        val processing = view.processing.map { row("item-${it.id}", HomeRowTarget.Item(it.id), it.sourceUrl, it.createdAt, RowStatus.PROCESSING) }
+        val processing = view.processing.map { row("item-${it.id}", HomeRowTarget.Item(it.id), it.sourceUrl, it.savedAt, RowStatus.PROCESSING) }
         return HomeState.LoggedIn(local + processing, busy)
     }
 }

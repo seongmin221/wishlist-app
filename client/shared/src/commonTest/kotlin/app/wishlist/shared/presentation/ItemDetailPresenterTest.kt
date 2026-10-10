@@ -290,6 +290,28 @@ class ItemDetailPresenterTest {
         assertEquals(ItemDetailState(item = lettered, loading = true, error = null), presenter.state.value)
     }
 
+    @Test fun onLoadedRunsOnceForNotFoundButNotForOtherFailures() = runTest {
+        launch { session.changeAccount("account-a") }
+        advanceUntilIdle()
+        var hooks = 0
+        val presenter = ItemDetailPresenter(repository, session, StandardTestDispatcher(testScheduler)) { hooks++ }
+            .also { presenters += it }
+        presenter.load(itemId)
+        runCurrent()
+        repository.calls[0].fail(ErrorKind.SERVER)
+        runCurrent()
+        presenter.retry()
+        runCurrent()
+        repository.calls[1].fail(ErrorKind.NETWORK)
+        runCurrent()
+        assertEquals(0, hooks)
+        presenter.retry()
+        runCurrent()
+        repository.calls[2].fail(ErrorKind.NOT_FOUND)
+        runCurrent()
+        assertEquals(1, hooks)
+    }
+
     @Test fun onLoadedRunsAfterEverySuccessfulLoad() = runTest {
         launch { session.changeAccount("account-a") }
         advanceUntilIdle()

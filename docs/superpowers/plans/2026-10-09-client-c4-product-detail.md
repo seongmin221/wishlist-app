@@ -50,7 +50,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
 ## 문구 표
 
-키는 Android `strings.xml` 이름이고, iOS는 같은 키를 `.`로 바꾼다(`detail_open_original` → `detail.open.original`). 기존 키(`row_processing`, `row_*`, `time_*`, `dialog_cancel`, `webview_clear_line_irreversible`, `home_original`)는 재사용한다.
+키는 Android `strings.xml` 이름이고, iOS는 같은 키를 `.`로 바꾼다(`detail_open_original` → `detail.open.original`). 기존 키(`row_processing`, `row_*`, `time_*`, `dialog_cancel`, `home_original`)는 재사용한다.
 
 | 키 | 한국어 | English |
 | --- | --- | --- |
@@ -80,6 +80,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 | `local_delete_title` | 링크를 삭제할까요? | Delete this link? |
 | `local_delete_target` | %1$s · 이 기기에만 있어요 | %1$s · Only on this device |
 | `local_delete_line_unsent` | 아직 보내지 않은 링크예요 | This link hasn't been sent yet |
+| `local_delete_line_irreversible` | 되돌릴 수 없어요 | This can't be undone |
 | `local_delete_failed` | 지우지 못했어요 | Couldn't delete |
 | `home_row_open_detail` | 상세 보기 | View details |
 | `home_row_open_original` | 원본 열기 | Open original |
@@ -681,7 +682,7 @@ static func shouldDropAccountScoped(previous: String?, next: String?) -> Bool //
     - `item != null`: `DetailKinds.of(item)`. PROCESSING: 사진 자리 분석 중 타일 + `row_processing`, 제목 host, `detail_processing_note`, 저장 시점. READY/INCOMPLETE: `ProductPhoto`, 브랜드(없으면 숨김), 이름(INCOMPLETE에서 없으면 host + `detail_name_empty`), `PriceText`(없으면 숨김) + `metadataCheckedAt`이 있으면 `detail_price_checked`, 정보 카드(카테고리 이름 또는 `detail_category_empty` / 목적 색 점 + 이름 또는 `detail_purpose_none`), INCOMPLETE notice 한 줄, 저장 시점. GONE → `detail_not_found`. ⋯ 없음.
     - 오류인데 항목이 있으면 항목 유지 + 짧은 안내(C1 토스트 부품, 없으면 상단 안내 줄).
     - 목적 색: `purposeColor(colorKey: String?)` = `colorKey?.lowercase()`가 `PurposeKeys.colorKeys`에 있으면 그 토큰, 아니면 중립(`textSecondary`). 표시 계층 함수 하나에 둔다.
-  - `LocalSubmissionScreen(submissionId)`: PROCESSING 틀 + 대기 타일과 `HomeRowText`의 상태 문구, host 제목, 저장 시점, ⋯에 `local_delete`(`canDelete` false면 비활성). 확인창(`WLConfirmDialog`): `local_delete_title` / 썸네일 자리 + `local_delete_target` / 글머리표 `local_delete_line_unsent`·`webview_clear_line_irreversible` / `dialog_cancel`·`local_delete`(빨강). outcome: `MovedTo` → `navigator.replaceTop(ItemDetailRoute(id))`, `Deleted` → `pop()`, `RemovedOnServer` → `detail_not_found` + 닫기, `Gone` → `pop()`. `deleteFailed` → `local_delete_failed` 짧은 안내.
+  - `LocalSubmissionScreen(submissionId)`: PROCESSING 틀 + 대기 타일과 `HomeRowText`의 상태 문구, host 제목, 저장 시점, ⋯에 `local_delete`(`canDelete` false면 비활성). 확인창(`WLConfirmDialog`): `local_delete_title` / 썸네일 자리 + `local_delete_target` / 글머리표 `local_delete_line_unsent`·`local_delete_line_irreversible` / `dialog_cancel`·`local_delete`(빨강). outcome: `MovedTo` → `navigator.replaceTop(ItemDetailRoute(id))`, `Deleted` → `pop()`, `RemovedOnServer` → `detail_not_found` + 닫기, `Gone` → `pop()`. `deleteFailed` → `local_delete_failed` 짧은 안내.
   - 홈: 로그인 뒤 분류 중 줄 `clickable` → `push(ItemDetailRoute(target.itemId))`, 로컬 줄(로그인 전·후) → `push(LocalSubmissionRoute(id))`. 접근성 `home_row_open_detail`, "원본" 버튼 `home_row_open_original`(PR A는 `ACTION_VIEW` 그대로).
 - [ ] **Step 1: 실패하는 테스트.** `DetailTextTest`: `DetailNotice.entries`·`SavedLabel` 각 형태·`ErrorKind.entries` 전수 → 키. `LocalSubmissionPresenterOwnerTest`: owner가 `ViewModelStore.clear()`에서 Presenter를 닫는다(C3 owner 테스트처럼 runtime 경유). `HomeRowTextTest`: 새 접근성 키.
 - [ ] **Step 2~4: RED → 구현 → GREEN.** ANDROID_CHECK.
