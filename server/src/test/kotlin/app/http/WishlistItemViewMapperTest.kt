@@ -47,6 +47,18 @@ class WishlistItemViewMapperTest {
         }
     }
 
+    @Test fun `stored product metadata is exposed with an exact decimal price`() {
+        val dto = WishlistItemViewMapper.map(item(AnalysisStatus.READY, null).copy(brand = "Mizuno", price = java.math.BigDecimal("12900.5000"),
+            currency = "KRW", merchant = "Mizuno Store", metadataCheckedAt = Instant.parse("2026-10-09T01:02:03Z")))
+        val product = Json.parseToJsonElement(ApiJson.encodeToString(dto)).jsonObject.getValue("product").jsonObject
+        assertEquals("Mizuno", product.getValue("brand").jsonPrimitive.content)
+        assertEquals("12900.5000", product.getValue("price").jsonPrimitive.content)
+        assertFalse(product.getValue("price").jsonPrimitive.isString)
+        assertEquals("KRW", product.getValue("currency").jsonPrimitive.content)
+        assertEquals("Mizuno Store", product.getValue("merchant").jsonPrimitive.content)
+        assertEquals("2026-10-09T01:02:03Z", product.getValue("metadataCheckedAt").jsonPrimitive.content)
+    }
+
     private fun item(status: AnalysisStatus, failure: String?, lifecycle: LifecycleStatus = LifecycleStatus.ACTIVE) = WishlistItem(
         storedState = StoredWishlistItemState(UUID.randomUUID(), UUID.randomUUID(), 7, 1,
             WishlistItemState(status, ReviewStatus.CONFIRMED, lifecycle, "보관 상품", "C026", null, null),
