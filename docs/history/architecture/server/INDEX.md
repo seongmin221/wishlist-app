@@ -1,5 +1,6 @@
 # Server 의사결정
 
+- [B5 비동기 분석·운영 복구 구현 이력](b5-analysis-runtime-implementation-2026-10-09.md) — 435 tests 433 통과/2 opt-in skip·독립 리뷰 Important 3+재등급 1 반영·B11 이관
 - [B5 runtime·복구 착수 대조](b5-runtime-recovery-preparation-2026-10-09.md) — 현재 구현·확정 제약·정책 5건 확정
 - [B4 상품 목록·홈 조회 구현 이력](b4-read-api-implementation-2026-10-07.md) — 10-09 전체344 통과/1 skip·실제 reader EXPLAIN·원본V15/V16 배포 job·실패 재시도 검증
 - [B3 목적 구현·리뷰](b3-purpose-implementation-2026-10-07.md) — PUR-01~04·V13/V14·AI 목적 후보·입력 2,500·검증

@@ -1,6 +1,8 @@
 # B5 비동기 분석과 운영 복구 설계
 
-> 2026-10-09 · **spec 승인(2026-10-10) · 구현 계획 검토 대기** · 제품·운영 정책 확정
+> 2026-10-09 · **spec 승인(2026-10-10) · 구현·독립 리뷰 반영 완료** · 제품·운영 정책 확정
+>
+> 구현 후 리뷰 반영(2026-10-10): maintenance 발행은 30초까지만 쓰고 budget은 항상 실행, browser proxy는 render마다 생성, IPv6 ULA·변환 대역과 proxy IPv6 literal 차단, JSON null은 값 없음. 아래 본문은 승인 당시 설계이며 차이는 [구현 이력](../../history/architecture/server/b5-analysis-runtime-implementation-2026-10-09.md)에 있다.
 
 ## 목표와 범위
 

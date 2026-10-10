@@ -16,6 +16,10 @@ RUN_REAL_URL_PILOT=0 ./gradlew test --rerun-tasks
 
 `RUN_REAL_URL_PILOT=0`은 외부 URL pilot을 실행하지 않는 설정이다. 실제 결과는 통과·실패·오류·skip으로 구분하여 기록한다. `--rerun-tasks`는 이전 Gradle 실행 결과를 재사용하지 않고 전체 작업을 실행한다.
 
+## 실제 Chromium opt-in 테스트
+
+`PlaywrightRealBrowserTest`는 `RUN_BROWSER_TESTS=1`일 때만 실행하고 그 외에는 skip한다. Playwright가 설치한 Chromium(`~/Library/Caches/ms-playwright`)이 필요하다. 위 명령 앞에 `RUN_BROWSER_TESTS=1`을 붙이고 `--tests 'app.browser.PlaywrightRealBrowserTest'`로 실행한다. skip은 통과로 세지 않는다.
+
 ## Testcontainers socket 선택
 
 - `DOCKER_HOST`는 Docker client가 사용할 endpoint 지정이다. 로컬 Testcontainers 설정에 특정 provider가 지정돼 있으면 실제 선택한 provider와 socket도 함께 확인한다.

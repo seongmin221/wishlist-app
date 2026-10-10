@@ -10,7 +10,7 @@
 
 **Spec:** [승인된 B5 설계](../specs/2026-10-09-b5-analysis-runtime-recovery-design.md). [제품·운영 결정](../../history/product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md), [착수 대조](../../history/architecture/server/b5-runtime-recovery-preparation-2026-10-09.md).
 
-> 상태: 계획 작성 · 사용자 검토 대기 · 구현·테스트 미실행.
+> 상태: Native Task1~12 구현 완료 · 독립 리뷰 Important 3+재등급 1 반영 · 전체 435 tests 433 통과/2 opt-in skip. [구현 이력](../../history/architecture/server/b5-analysis-runtime-implementation-2026-10-09.md).
 
 ## Global Constraints
 
@@ -96,9 +96,9 @@ b5_gradle() {
 **Interfaces:**
 - Produces: 컬럼 `wishlist_items.{product_brand text, product_price numeric(19,4), product_currency char(3), merchant_name text, metadata_checked_at timestamptz}`, `analysis_jobs.{pending_brand, pending_price, pending_currency, pending_merchant, recovery_seq int not null default 0, recovery_check_at timestamptz}`, `outbox_events.not_before timestamptz`. index `analysis_jobs_pending_recovery_idx`, `analysis_jobs_running_recovery_idx`, `outbox_events_job_created_idx`.
 
-- [ ] RED: `all Flyway migrations apply to an empty postgres database`의 기대 버전 목록 끝에 `"17"`을 추가한다.
-- [ ] RED: `V17 upgrade keeps V16 rows and adds nullable metadata and recovery defaults` 추가. `migrationConfiguration(...).target("16").load().migrate()` 후 item·job·outbox 1건씩 insert, 전체 migrate, 기존 컬럼 snapshot 불변(`snapshot(...)` helper)과 새 컬럼 null·`recovery_seq=0` 확인.
-- [ ] RED: `V17 constraints reject half price pairs and invalid currency` 추가. 다음 UPDATE가 모두 `PSQLException`으로 실패해야 한다.
+- [x] RED: `all Flyway migrations apply to an empty postgres database`의 기대 버전 목록 끝에 `"17"`을 추가한다.
+- [x] RED: `V17 upgrade keeps V16 rows and adds nullable metadata and recovery defaults` 추가. `migrationConfiguration(...).target("16").load().migrate()` 후 item·job·outbox 1건씩 insert, 전체 migrate, 기존 컬럼 snapshot 불변(`snapshot(...)` helper)과 새 컬럼 null·`recovery_seq=0` 확인.
+- [x] RED: `V17 constraints reject half price pairs and invalid currency` 추가. 다음 UPDATE가 모두 `PSQLException`으로 실패해야 한다.
   ```kotlin
   for (sql in listOf(
       "update wishlist_items set product_price=1000 where id='$item'",
@@ -109,8 +109,8 @@ b5_gradle() {
   )) assertFailsWith<org.postgresql.util.PSQLException> { c.createStatement().use { it.executeUpdate(sql) } }
   ```
   `product_price=12900.5,product_currency='KRW'`은 성공한다.
-- [ ] RED 실행: `b5_gradle test --tests 'app.DatabaseMigrationTest'`. 버전 목록 불일치·컬럼 없음으로 실패해야 한다.
-- [ ] 구현: 아래 SQL을 작성한다. 운영 배포는 B11 이전이고 대상이 작업 단위 테이블이므로 V16의 concurrently rollout 대신 transaction 안의 일반 `create index`를 쓴다. 이 근거를 B5 구현 이력에 기록한다.
+- [x] RED 실행: `b5_gradle test --tests 'app.DatabaseMigrationTest'`. 버전 목록 불일치·컬럼 없음으로 실패해야 한다.
+- [x] 구현: 아래 SQL을 작성한다. 운영 배포는 B11 이전이고 대상이 작업 단위 테이블이므로 V16의 concurrently rollout 대신 transaction 안의 일반 `create index`를 쓴다. 이 근거를 B5 구현 이력에 기록한다.
   ```sql
   alter table wishlist_items
       add column product_brand text,
@@ -140,8 +140,8 @@ b5_gradle() {
   alter table outbox_events add column not_before timestamptz;
   create index outbox_events_job_created_idx on outbox_events (analysis_job_id, created_at desc, id desc);
   ```
-- [ ] GREEN: 같은 명령 + `--tests 'app.wishlist.ReadIndexRecoveryTest' --tests 'app.DatabaseMigrationRetryTest'`(V16 경로 회귀).
-- [ ] 커밋: `feature(server): B5 metadata·복구 컬럼 migration 추가`.
+- [x] GREEN: 같은 명령 + `--tests 'app.wishlist.ReadIndexRecoveryTest' --tests 'app.DatabaseMigrationRetryTest'`(V16 경로 회귀).
+- [x] 커밋: `feature(server): B5 metadata·복구 컬럼 migration 추가`.
 
 ### Task 2: metadata·canonical 추출 (WORK-01)
 
@@ -165,10 +165,10 @@ b5_gradle() {
   ```
 - `HttpMetadataExtractor.extract`는 `Complete(Metadata(..., canonicalUrl = UrlCanonicalizer.choose(parsed.declaredCanonical, current)))`를 만든다. title이 없으면 기존처럼 `NeedsBrowser`(데이터 없음).
 
-- [ ] RED `UrlCanonicalizerTest`:
+- [x] RED `UrlCanonicalizerTest`:
   - `normalize`: `HTTPS://Shop.EXAMPLE.com/p/1?utm_source=a&color=red&fbclid=x#reviews` → `https://shop.example.com/p/1?color=red`. query 순서·값 보존, 모든 tracking 제거 시 `?` 없음.
   - `choose`: `https://m.example.com/p/1`(final) + `https://www.example.com/p/1` → 선언 채택. 다른 eTLD+1(`https://other.com/p/1`), `http://user@example.com/`, `https://93.184.216.34/p`, `https://www.example.com:8443/p`, `ftp://example.com/p`, null, `"not a url"` → final 정규화 값. 상대 경로 `/p/1?ref=x`는 final 기준 resolve 후 판정. `example.co.uk` 계열은 `topPrivateDomain()` 결과로 판정.
-- [ ] RED `ProductMetadataParserTest`(HTML fixture는 `MetadataFixtures`에 둔다):
+- [x] RED `ProductMetadataParserTest`(HTML fixture는 `MetadataFixtures`에 둔다):
   | 사례 | 기대 |
   | --- | --- |
   | 단일 Offer `{"price":"12900","priceCurrency":"krw"}` | 12900·KRW |
@@ -186,11 +186,11 @@ b5_gradle() {
   | seller.name 있음 / 없고 og:site_name / 둘 다 없음 | 각각 seller / site_name / null |
   | brand 201자 | null |
   | `link[rel=canonical]`와 `og:url` 둘 다 | canonical 링크 우선 |
-- [ ] RED `HttpMetadataExtractorTest`: redirect 뒤 최종 URL 기준 canonical 채택, truncated 문서의 일반 `<title>`만 있으면 `NeedsBrowser` 유지, `Complete`에 brand·price·merchant 포함.
-- [ ] RED 실행: `b5_gradle test --tests 'app.extraction.*'`. 신규 symbol compile 실패를 확인한다.
-- [ ] 구현: 파서는 JSON-LD를 `runCatching`으로 개별 파싱하고 Product 후보를 모두 모은다. 가격은 문자열을 `^\d{1,15}(\.\d{1,4})?$`로 검사한 뒤 `BigDecimal(text)`로 만든다(JSON number는 `content` 문자열을 같은 검사에 통과시킨다). 통화는 `uppercase()` 후 `Currency.getAvailableCurrencies()` 코드 집합에 있을 때만 채택한다. 금액과 통화 중 하나라도 무효면 둘 다 null.
-- [ ] GREEN: 같은 명령 + `--tests 'app.browser.*' --tests 'app.http.LocalClassificationPathTest'`.
-- [ ] 커밋: `feature(server): 상품 brand·가격·판매처·canonical 추출`.
+- [x] RED `HttpMetadataExtractorTest`: redirect 뒤 최종 URL 기준 canonical 채택, truncated 문서의 일반 `<title>`만 있으면 `NeedsBrowser` 유지, `Complete`에 brand·price·merchant 포함.
+- [x] RED 실행: `b5_gradle test --tests 'app.extraction.*'`. 신규 symbol compile 실패를 확인한다.
+- [x] 구현: 파서는 JSON-LD를 `runCatching`으로 개별 파싱하고 Product 후보를 모두 모은다. 가격은 문자열을 `^\d{1,15}(\.\d{1,4})?$`로 검사한 뒤 `BigDecimal(text)`로 만든다(JSON number는 `content` 문자열을 같은 검사에 통과시킨다). 통화는 `uppercase()` 후 `Currency.getAvailableCurrencies()` 코드 집합에 있을 때만 채택한다. 금액과 통화 중 하나라도 무효면 둘 다 null.
+- [x] GREEN: 같은 명령 + `--tests 'app.browser.*' --tests 'app.http.LocalClassificationPathTest'`.
+- [x] 커밋: `feature(server): 상품 brand·가격·판매처·canonical 추출`.
 
 ### Task 3: metadata 임시 저장·최종 병합·조회
 
@@ -218,7 +218,7 @@ b5_gradle() {
   `NAME`·`IMAGE` 보호는 기존 `source == "USER" || field in overrides`, `BRAND`는 `"BRAND" in overrides`. `recordCheckedAt == pending.pageRead`. 가격 쌍은 `recordCheckedAt`이면 pending 쌍, 아니면 existing 쌍. `assignments()`의 `metadata_checked_at` 값은 `recordCheckedAt`이면 SQL 식 `clock_timestamp()`, 아니면 기존 유지(`metadata_checked_at`)로 만든다.
 - `WishlistItem`에 `brand`, `price: BigDecimal?`, `currency`, `merchant`, `metadataCheckedAt: Instant?` 추가. RowMapper `columns`에 `i.product_brand, i.product_price, i.product_currency, i.merchant_name, i.metadata_checked_at`.
 
-- [ ] RED `AnalysisMetadataMergeTest`(DB 없음):
+- [x] RED `AnalysisMetadataMergeTest`(DB 없음):
   | 사례 | 기대 |
   | --- | --- |
   | 성공·pending brand null·existing "A" | "A" 유지 |
@@ -228,16 +228,16 @@ b5_gradle() {
   | 실패·pageRead·pending 2000/USD | 2000/USD, recordCheckedAt=true |
   | pageRead=false(pending canonical null) | 가격 쌍·확인 시각 유지 |
   | NAME USER source | name 유지, nameSource 유지 |
-- [ ] RED `MetadataPersistenceTest`(실제 PostgreSQL):
+- [x] RED `MetadataPersistenceTest`(실제 PostgreSQL):
   - `saveMetadata`가 pending brand·price·currency·merchant를 저장하고, GENERAL 재claim은 새 pending 컬럼까지 지우며 BROWSER 재claim은 유지한다.
   - 성공 finish 뒤 item의 다섯 컬럼과 `metadata_checked_at`이 finish transaction의 DB 시각(`metadata_checked_at = updated_at`)이다.
   - general `NeedsBrowser` → browser render null(PARTIAL) → `metadata_checked_at` null 유지.
   - PARTIAL·실패의 병합, BRAND override 보호, version은 finish당 1 증가.
-- [ ] RED `WishlistItemViewMapperTest`/상세·목록 응답: `product.brand/price/currency/merchant/metadataCheckedAt`이 저장값으로 나오고 가격이 JSON number(`12900.5`)다. `classified_at`만 있는 상품은 `metadataCheckedAt` null.
-- [ ] RED 실행: `b5_gradle test --tests 'app.analysis.AnalysisMetadataMergeTest' --tests 'app.analysis.MetadataPersistenceTest' --tests 'app.http.WishlistItemViewMapperTest'`.
-- [ ] 구현: `finishLocked`의 name/image/description/canonical 계산과 `mergedMetadata`/`mergedSource`를 `mergeMetadata` 호출로 바꾸고 `values`에 `assignments()`를 합친다. bind는 기존처럼 문자열 외에 `BigDecimal`·SQL 식을 다룰 수 있게 `setObject`로 바꾼다. `readItem`/`readPending`의 metadata 부분은 새 helper로 옮겨 중복을 없앤다. `AnalysisClaimRepository`의 GENERAL `clearMetadata`에 `pending_brand=null,pending_price=null,pending_currency=null,pending_merchant=null`을 추가한다.
-- [ ] GREEN: 같은 명령 + `--tests 'app.analysis.*' --tests 'app.browser.*' --tests 'app.http.Wishlist*' --tests 'app.wishlist.*'`.
-- [ ] 커밋: `feature(server): 추출 metadata 저장과 확인 시각 반영`.
+- [x] RED `WishlistItemViewMapperTest`/상세·목록 응답: `product.brand/price/currency/merchant/metadataCheckedAt`이 저장값으로 나오고 가격이 JSON number(`12900.5`)다. `classified_at`만 있는 상품은 `metadataCheckedAt` null.
+- [x] RED 실행: `b5_gradle test --tests 'app.analysis.AnalysisMetadataMergeTest' --tests 'app.analysis.MetadataPersistenceTest' --tests 'app.http.WishlistItemViewMapperTest'`.
+- [x] 구현: `finishLocked`의 name/image/description/canonical 계산과 `mergedMetadata`/`mergedSource`를 `mergeMetadata` 호출로 바꾸고 `values`에 `assignments()`를 합친다. bind는 기존처럼 문자열 외에 `BigDecimal`·SQL 식을 다룰 수 있게 `setObject`로 바꾼다. `readItem`/`readPending`의 metadata 부분은 새 helper로 옮겨 중복을 없앤다. `AnalysisClaimRepository`의 GENERAL `clearMetadata`에 `pending_brand=null,pending_price=null,pending_currency=null,pending_merchant=null`을 추가한다.
+- [x] GREEN: 같은 명령 + `--tests 'app.analysis.*' --tests 'app.browser.*' --tests 'app.http.Wishlist*' --tests 'app.wishlist.*'`.
+- [x] 커밋: `feature(server): 추출 metadata 저장과 확인 시각 반영`.
 
 ### Task 4: generation 합산 예산·소진 처리·Worker 응답
 
@@ -264,7 +264,7 @@ b5_gradle() {
   ```
   `failExhausted`: `transitionAnalysisJob(jobId, "FAILED")` → `mergeMetadata(readStoredMetadata(itemId), readPendingMetadata(jobId), complete = false)` → 단일 UPDATE로 `analysis_status='FAILED_RETRYABLE'`, metadata assignments, `version=version+1`, `updated_at=clock_timestamp()`. `failRetryableItem`은 version 불일치 취소 경로 전용으로 남긴다.
 
-- [ ] RED `GenerationBudgetTest`(실제 PostgreSQL, spec §2 표 전체):
+- [x] RED `GenerationBudgetTest`(실제 PostgreSQL, spec §2 표 전체):
   - general 1회 후 NeedsBrowser → BROWSER_PENDING, browser claim 2회까지 허용, 3번째 browser claim은 Exhausted.
   - general attempt 2(SQL로 설정) 상태의 3번째 general 실행이 NeedsBrowser → browser outbox 없음, job FAILED, item FAILED_RETRYABLE, version +1.
   - `first_attempt_at`를 31분 전으로 둔 browser claim → Exhausted.
@@ -272,18 +272,18 @@ b5_gradle() {
   - stale replacement: 예산 남음 → 새 generation, 합산값·첫 시각 승계, 원래 pending metadata 미반영. 예산 소진 → `failExhausted` 반영.
   - RUNNING 복구와 재claim은 attempt를 바꾸지 않는다(복구는 0, 재claim만 +1).
   - 수동 편집으로 version이 바뀐 finish는 metadata를 반영하지 않는다(`failRetryableItem` 경로).
-- [ ] RED Worker 응답:
+- [x] RED Worker 응답:
   - `GeneralWorkerServiceTest`의 `retry persists new outbox even when duplicate delivery already acknowledged running job`을 기대 `ACKNOWLEDGE`로 바꾸고, 새 outbox의 `not_before - created_at`이 첫 실패 10초(±1초), 두 번째 20초임을 확인한다.
   - `WorkerRoutesTest`의 현재 실행 fault는 204, claim 전 마감(`WorkerExecution(processingMillis=1, timeoutMillis=2)`)·executor 포화·90초 timeout은 503.
   - `BrowserWorkerServiceTest`의 `infrastructure failure retries current browser execution without fallback duplication`도 204 + retry outbox 1건.
-- [ ] RED 실행: `b5_gradle test --tests 'app.analysis.*' --tests 'app.browser.*' --tests 'app.http.WorkerRoutesTest' --tests 'app.category.CategoryAiIntegrationTest'`.
-- [ ] 구현:
+- [x] RED 실행: `b5_gradle test --tests 'app.analysis.*' --tests 'app.browser.*' --tests 'app.http.WorkerRoutesTest' --tests 'app.category.CategoryAiIntegrationTest'`.
+- [x] 구현:
   - 모든 `hasRetryBudget(lane, now)` 호출을 `hasRetryBudget(now)`로 바꾼다. claim 소진·reconciler 소진·replacement 소진은 `failRetryableItem` 대신 `failExhausted`.
   - `finishLocked` NeedsBrowser 분기: `!job.browserAttempted && job.hasRetryBudget(now)`일 때만 BROWSER_PENDING. 소진이면 `failExhausted`로 끝내고 ACKNOWLEDGE.
   - Retryable 분기: 예산 남음 → PENDING + outbox(`not_before = clock_timestamp() + make_interval(secs => ?)`, 값은 `retryBackoffSeconds(job.attempts + job.browserAttempts)`) → `ACKNOWLEDGE`. 소진 → `failExhausted` → ACKNOWLEDGE.
   - `transitionAnalysisJob`의 UPDATE에 `recovery_check_at=null`, claim lease UPDATE에도 `recovery_check_at=null`.
-- [ ] GREEN: 같은 명령 전체. 기존 lane별 기대값을 쓰던 테스트(`expired limits fail once using lane attempts and database deadline`, `third retryable attempt becomes failed retryable`, `expired thirty minute deadline prevents another attempt`)는 합산 규칙으로 기대값을 고치고, 테스트명도 의미에 맞게 바꾼다.
-- [ ] 커밋: `feature(server): generation 합산 재시도 예산과 Retryable ACK 적용`.
+- [x] GREEN: 같은 명령 전체. 기존 lane별 기대값을 쓰던 테스트(`expired limits fail once using lane attempts and database deadline`, `third retryable attempt becomes failed retryable`, `expired thirty minute deadline prevents another attempt`)는 합산 규칙으로 기대값을 고치고, 테스트명도 의미에 맞게 바꾼다.
+- [x] 커밋: `feature(server): generation 합산 재시도 예산과 Retryable ACK 적용`.
 
 ### Task 5: DNS 실패 분리와 차단 code (WORK-01 마무리)
 
@@ -301,14 +301,14 @@ b5_gradle() {
   ```
   `BoundedResolver.default`는 테스트·편의용 공유 인스턴스(daemon thread)이고, Worker 역할은 자기 인스턴스를 `resources.own`으로 소유한다.
 
-- [ ] RED `UrlSafetyPolicyTest`: resolver가 `UnknownHostException`·빈 목록을 내면 `DnsLookupFailed`, loopback/사설/메타데이터 주소는 `UnsafeUrlException`, scheme·port·userinfo·invalid URL도 `UnsafeUrlException`.
-- [ ] RED `BoundedResolverTest`: latch로 막힌 lookup에 대해 `remaining`이 다하면 `DnsLookupFailed`, threads+queue를 모두 채운 뒤 다음 호출은 즉시 `DnsLookupFailed`(포화 거부), close 뒤 호출 거부.
-- [ ] RED `GeneralExtractionProcessorTest`(DB): extract가 `DnsLookupFailed` → `Retryable`이며 pending failure 없음. `UnsafeUrlException` → `Terminal`이고 finish 뒤 item `analysis_failure_code='BLOCKED_ADDRESS'`·FAILED_TERMINAL. SafeHttpTransport의 다른 host DNS 요청(`unexpected DNS lookup`)도 Terminal.
-- [ ] RED `BrowserWorkerServiceTest`: render가 `DnsLookupFailed` → PARTIAL, 재시도 outbox 없음.
-- [ ] RED 실행: `b5_gradle test --tests 'app.extraction.*' --tests 'app.browser.BrowserWorkerServiceTest'`.
-- [ ] 구현: `validate`의 `runCatching { resolve(host) }`를 `DnsLookupFailed` 전파와 그 외 예외의 `DnsLookupFailed` 변환으로 바꾸고 빈 결과도 `DnsLookupFailed`. processor는 `catch (_: DnsLookupFailed) { return Retryable }`, `catch (_: UnsafeUrlException) { pending.saveFailure(claim, BLOCKED_ADDRESS); return Terminal }`(저장 실패 시 Stale).
-- [ ] GREEN: 같은 명령 + `--tests 'app.http.RealUrlPilotTest'`(skip 확인).
-- [ ] 커밋: `feature(server): DNS 실패를 재시도로 분리하고 차단 code 기록`.
+- [x] RED `UrlSafetyPolicyTest`: resolver가 `UnknownHostException`·빈 목록을 내면 `DnsLookupFailed`, loopback/사설/메타데이터 주소는 `UnsafeUrlException`, scheme·port·userinfo·invalid URL도 `UnsafeUrlException`.
+- [x] RED `BoundedResolverTest`: latch로 막힌 lookup에 대해 `remaining`이 다하면 `DnsLookupFailed`, threads+queue를 모두 채운 뒤 다음 호출은 즉시 `DnsLookupFailed`(포화 거부), close 뒤 호출 거부.
+- [x] RED `GeneralExtractionProcessorTest`(DB): extract가 `DnsLookupFailed` → `Retryable`이며 pending failure 없음. `UnsafeUrlException` → `Terminal`이고 finish 뒤 item `analysis_failure_code='BLOCKED_ADDRESS'`·FAILED_TERMINAL. SafeHttpTransport의 다른 host DNS 요청(`unexpected DNS lookup`)도 Terminal.
+- [x] RED `BrowserWorkerServiceTest`: render가 `DnsLookupFailed` → PARTIAL, 재시도 outbox 없음.
+- [x] RED 실행: `b5_gradle test --tests 'app.extraction.*' --tests 'app.browser.BrowserWorkerServiceTest'`.
+- [x] 구현: `validate`의 `runCatching { resolve(host) }`를 `DnsLookupFailed` 전파와 그 외 예외의 `DnsLookupFailed` 변환으로 바꾸고 빈 결과도 `DnsLookupFailed`. processor는 `catch (_: DnsLookupFailed) { return Retryable }`, `catch (_: UnsafeUrlException) { pending.saveFailure(claim, BLOCKED_ADDRESS); return Terminal }`(저장 실패 시 Stale).
+- [x] GREEN: 같은 명령 + `--tests 'app.http.RealUrlPilotTest'`(skip 확인).
+- [x] 커밋: `feature(server): DNS 실패를 재시도로 분리하고 차단 code 기록`.
 
 ### Task 6: EgressProxy (WORK-02)
 
@@ -329,16 +329,16 @@ b5_gradle() {
   ```
 - 요청 처리: 첫 줄이 `CONNECT host:port HTTP/1.1`이면 port ∈ {443, 80}, `safety.validate("https://host/")`(80이면 `http://host/`)의 주소 중 첫 번째에 `connect` → `HTTP/1.1 200 Connection Established` → 양방향 복사. 첫 줄이 절대 URI(`GET http://host/path HTTP/1.1`)면 같은 검증 후 origin-form으로 바꿔 전달. 그 외 메서드/형식·차단·DNS 실패는 `HTTP/1.1 403 Forbidden` 후 종료. 헤더는 8KiB 상한. 연결 timeout과 socket read timeout은 30초 상한.
 
-- [ ] RED `EgressProxyTest`(Playwright 없음, 로컬 socket):
+- [x] RED `EgressProxyTest`(Playwright 없음, 로컬 socket):
   - fake resolver가 `shop.test` → `93.184.216.34`를 내고 `connect`는 그 주소 요청을 로컬 echo 서버로 돌린다. CONNECT 성공·데이터 왕복과 `connect`가 받은 주소가 검증 주소와 같음을 확인한다. resolver 호출은 정확히 1회(재해석 없음).
   - rebinding: resolver가 첫 호출 공인 IP, 이후 `127.0.0.1`을 내도 proxy는 첫 검증 주소로만 연결한다.
   - resolver가 `127.0.0.1`·`10.0.0.1`을 내면 403, `connect` 미호출.
   - `CONNECT shop.test:8443`, `CONNECT [::1]:443`, `CONNECT localhost.:443`, `CONNECT SHOP.TEST:443`(대문자는 정상 처리), 절대 URI가 아닌 `GET /path`는 각각 기대대로 403/정상.
   - `closeActiveConnections()`·`close()` 뒤 열린 터널이 닫히고 새 연결이 거부된다.
-- [ ] RED 실행: `b5_gradle test --tests 'app.browser.EgressProxyTest'`.
-- [ ] 구현: `ServerSocket(0, 50, InetAddress.getLoopbackAddress())`, 고정 크기 daemon executor(`maxConnections`, 초과 시 즉시 close). host는 `lowercase().trimEnd('.')` 후 검증한다. IP literal host는 `UrlSafetyPolicy`의 literal 검사에 맡긴다.
-- [ ] GREEN: 같은 명령.
-- [ ] 커밋: `feature(server): browser egress pinning proxy 추가`.
+- [x] RED 실행: `b5_gradle test --tests 'app.browser.EgressProxyTest'`.
+- [x] 구현: `ServerSocket(0, 50, InetAddress.getLoopbackAddress())`, 고정 크기 daemon executor(`maxConnections`, 초과 시 즉시 close). host는 `lowercase().trimEnd('.')` 후 검증한다. IP literal host는 `UrlSafetyPolicy`의 literal 검사에 맡긴다.
+- [x] GREEN: 같은 명령.
+- [x] 커밋: `feature(server): browser egress pinning proxy 추가`.
 
 ### Task 7: browser runtime 역할
 
@@ -359,14 +359,14 @@ b5_gradle() {
   `launchArguments`: `--proxy-server=http://127.0.0.1:$port`, `--proxy-bypass-list=<-loopback>`, `--disable-quic`, `--force-webrtc-ip-handling-policy=disable_non_proxied_udp`. context는 `setServiceWorkers(ServiceWorkerPolicy.BLOCK)`, `setAcceptDownloads(false)`. 기존 route 단위 `canRequest` 검사와 최종 URL `validate`는 유지하고, render 종료 시 `proxy.closeActiveConnections()`.
   기존 `workerRoutes(general, browser)`는 두 함수에 위임하는 테스트 호환용으로 남긴다.
 
-- [ ] RED `PlaywrightGatewayTest`: `launchArguments(4567)`이 위 네 인자를 정확히 포함한다.
-- [ ] RED `RuntimeConfigTest`: `browser-worker`는 general-worker와 같은 필수 env를 요구하고 pool 2. `maintenance`는 DB 3개 필수, production은 Tasks 4개 필수, local은 Tasks 없이 허용, pool 2. 알 수 없는 role 거부.
-- [ ] RED `HealthRouteTest`: local `browser-worker` module이 `/internal/worker/browser`에 204(없는 job → Ignored), `/internal/worker/general`에 404. local `general-worker`는 `/internal/worker/browser`에 404.
-- [ ] RED 실행: `b5_gradle test --tests 'app.browser.PlaywrightGatewayTest' --tests 'app.RuntimeConfigTest' --tests 'app.HealthRouteTest' --tests 'app.http.WorkerRoutesTest'`.
-- [ ] 구현: Main의 GENERAL_WORKER/BROWSER_WORKER 조립을 공통 함수(`workerClassifier(env, source)`)로 묶어 OpenAI·budget·candidate 구성을 공유한다. BROWSER_WORKER는 `BoundedResolver`·`EgressProxy`·`WorkerExecution`을 `resources.own`하고 `BrowserWorkerService(source, BrowserRenderProcessor(source, gateway::render)::render, classifier::classify, execution)`를 `browserWorkerRoute`에 연결한다.
-- [ ] opt-in `PlaywrightRealBrowserTest`(`RUN_BROWSER_TESTS=1`): 로컬 HTTP 서버를 fake resolver의 공인 주소로 매핑한 proxy를 거쳐 실제 Chromium이 페이지를 렌더하고, `127.0.0.1` subresource 요청은 차단된다.
-- [ ] GREEN: 같은 명령. Chromium이 있으면 `RUN_BROWSER_TESTS=1 b5_gradle test --tests 'app.browser.PlaywrightRealBrowserTest'`도 실행하고, 없으면 미실행으로 기록한다.
-- [ ] 커밋: `feature(server): browser Worker 실행 역할 조립`.
+- [x] RED `PlaywrightGatewayTest`: `launchArguments(4567)`이 위 네 인자를 정확히 포함한다.
+- [x] RED `RuntimeConfigTest`: `browser-worker`는 general-worker와 같은 필수 env를 요구하고 pool 2. `maintenance`는 DB 3개 필수, production은 Tasks 4개 필수, local은 Tasks 없이 허용, pool 2. 알 수 없는 role 거부.
+- [x] RED `HealthRouteTest`: local `browser-worker` module이 `/internal/worker/browser`에 204(없는 job → Ignored), `/internal/worker/general`에 404. local `general-worker`는 `/internal/worker/browser`에 404.
+- [x] RED 실행: `b5_gradle test --tests 'app.browser.PlaywrightGatewayTest' --tests 'app.RuntimeConfigTest' --tests 'app.HealthRouteTest' --tests 'app.http.WorkerRoutesTest'`.
+- [x] 구현: Main의 GENERAL_WORKER/BROWSER_WORKER 조립을 공통 함수(`workerClassifier(env, source)`)로 묶어 OpenAI·budget·candidate 구성을 공유한다. BROWSER_WORKER는 `BoundedResolver`·`EgressProxy`·`WorkerExecution`을 `resources.own`하고 `BrowserWorkerService(source, BrowserRenderProcessor(source, gateway::render)::render, classifier::classify, execution)`를 `browserWorkerRoute`에 연결한다.
+- [x] opt-in `PlaywrightRealBrowserTest`(`RUN_BROWSER_TESTS=1`): 로컬 HTTP 서버를 fake resolver의 공인 주소로 매핑한 proxy를 거쳐 실제 Chromium이 페이지를 렌더하고, `127.0.0.1` subresource 요청은 차단된다.
+- [x] GREEN: 같은 명령. Chromium이 있으면 `RUN_BROWSER_TESTS=1 b5_gradle test --tests 'app.browser.PlaywrightRealBrowserTest'`도 실행하고, 없으면 미실행으로 기록한다.
+- [x] 커밋: `feature(server): browser Worker 실행 역할 조립`.
 
 ### Task 8: TaskGateway 조회·예약 시각과 outbox 실패 격리 (OPS-01)
 
@@ -389,17 +389,17 @@ b5_gradle() {
   `InMemoryTaskQueue : TaskGateway`: `created: List<AnalysisTask>`, 같은 이름 재생성은 무시, `drop(name)`, `failLookups: Boolean`, `failCreates: Set<String>`, `deliver(name, worker: (UUID, Int) -> WorkerDisposition)`(ACK면 제거, RETRY면 유지).
 - `CloudTasksGateway`: `scheduleAt`이 있으면 `Task.setScheduleTime`. `status`는 `client.getTask(TaskName)` 성공 ALIVE, `NotFoundException` MISSING. getTask 설정도 재시도 없이 총 5초(`clientSettings()`에 추가).
 
-- [ ] RED `OutboxDispatcherTest`:
+- [x] RED `OutboxDispatcherTest`:
   - `first failed event does not block later events in the same run`: 이벤트 3건 중 첫 번째만 `failCreates` → report(published=2, failed=1), 첫 번째는 미발행·lease 해제.
   - deadline 이미 지남 → 0건 시도.
   - `not_before`가 미래인 outbox → `scheduleAt` 전달, 과거면 null.
   - 이미 같은 이름 task가 있음(`AlreadyExists` 경로를 흉내 내는 gateway) → 발행됨 기록.
   - 기존 지정 발행·동시 lease 테스트는 변경 없이 통과.
-- [ ] RED `CloudTasksGatewayTest`: `buildTask`가 scheduleTime을 설정/미설정하고, `clientSettings()`의 getTask 총 timeout 5초·재시도 code 없음.
-- [ ] RED 실행: `b5_gradle test --tests 'app.tasks.*'`.
-- [ ] 구현: claim SQL에 `and not (e.id = any(?))`(이번 실행에서 실패한 ID 배열)를 추가하고 `e.not_before`를 함께 읽는다. `repeat` 대신 `while (published + failed < limit && System.nanoTime() < deadlineNanos)` 루프. 기존 `dispatchPending(limit): Int` 호출처는 `.published`로 바꾼다.
-- [ ] GREEN: 같은 명령 + `--tests 'app.wishlist.CreateWishlistItemServiceTest' --tests 'app.http.WishlistRoutesTest'`.
-- [ ] 커밋: `feature(server): outbox 발행 실패 격리와 task 조회 추가`.
+- [x] RED `CloudTasksGatewayTest`: `buildTask`가 scheduleTime을 설정/미설정하고, `clientSettings()`의 getTask 총 timeout 5초·재시도 code 없음.
+- [x] RED 실행: `b5_gradle test --tests 'app.tasks.*'`.
+- [x] 구현: claim SQL에 `and not (e.id = any(?))`(이번 실행에서 실패한 ID 배열)를 추가하고 `e.not_before`를 함께 읽는다. `repeat` 대신 `while (published + failed < limit && System.nanoTime() < deadlineNanos)` 루프. 기존 `dispatchPending(limit): Int` 호출처는 `.published`로 바꾼다.
+- [x] GREEN: 같은 명령 + `--tests 'app.wishlist.CreateWishlistItemServiceTest' --tests 'app.http.WishlistRoutesTest'`.
+- [x] 커밋: `feature(server): outbox 발행 실패 격리와 task 조회 추가`.
 
 ### Task 9: RUNNING 순환과 PENDING 복구
 
@@ -436,7 +436,7 @@ b5_gradle() {
 - 재예약 SQL(잠금·재검증 뒤): `update analysis_jobs set recovery_seq=recovery_seq+1, recovery_check_at=null, updated_at=clock_timestamp() where id=? returning recovery_seq` + outbox insert, task 이름 `${if (browser) "browser" else "analysis"}-$jobId-$generation-pending-$seq`, `not_before` null.
 - RUNNING 발견은 기존 조건에 `(recovery_check_at is null or recovery_check_at <= clock_timestamp())`를 더하고 `order by recovery_check_at nulls first, lease_until, id`. skip-locked로 false가 된 후보와 예외 후보는 `deferRecoveryCheck(id, 60)`.
 
-- [ ] RED `PendingJobRecoveryTest`(실제 PostgreSQL + `InMemoryTaskQueue`):
+- [x] RED `PendingJobRecoveryTest`(실제 PostgreSQL + `InMemoryTaskQueue`):
   - 5분 미만 PENDING은 발견하지 않는다(`updated_at`을 SQL로 4분 59초 전/5분 1초 전).
   - 미발행 outbox가 있는 PENDING 60건 + 발행된 유실 PENDING 1건(가장 늦은 `updated_at`) → batch 50이어도 유실 1건이 재예약된다.
   - ALIVE → 무변경, `recovery_check_at ≈ now + 5분`. 조회 실패 → 무변경, `≈ now + 1분`, 상품 PROCESSING 유지.
@@ -448,11 +448,11 @@ b5_gradle() {
   - 늦은 Worker Retryable finish가 status 조회 중 commit → `updated_at`·최신 outbox가 바뀌어 무변경, outbox는 finish의 1건만.
   - 두 `PendingJobRecovery`가 같은 후보를 동시에 처리(latch) → 재예약 1건, UNIQUE 위반 후보는 무변경으로 집계.
   - 105초 마감 뒤 중복 ACK → 원래 실행 Retryable outbox가 남아 있으면 발견하지 않는다(미발행) → 발행 뒤 정상 흐름.
-- [ ] RED `AnalysisJobReconcilerTest`: `locked first batch does not starve later candidates` — batch 2, 앞 2건의 item을 다른 connection으로 잠근 채 1차 실행 → 둘 다 `recovery_check_at` 미래, 2차 실행이 뒤 후보를 복구. 기존 `recovery bounds discovery and resumes remaining candidates on later scans` 유지.
-- [ ] RED 실행: `b5_gradle test --tests 'app.analysis.PendingJobRecoveryTest' --tests 'app.analysis.AnalysisJobReconcilerTest'`.
-- [ ] 구현: 후보별로 (1) status 조회를 transaction 밖에서 수행 (2) MISSING만 `lockAnalysisOwner`→`lockAnalysisItem`→`lockAnalysisJob`(skipLocked=true) 후 재검증 (3) 결과 처리. 후보 단위 try/catch로 실패를 격리하고 `CancellationException`/`InterruptedException`은 다시 던진다. UNIQUE 위반(`SQLState 23505`)은 rollback 후 무변경.
-- [ ] GREEN: 같은 명령 + `--tests 'app.analysis.*'`.
-- [ ] 커밋: `feature(server): 오래된 PENDING 복구와 순환 검사 추가`.
+- [x] RED `AnalysisJobReconcilerTest`: `locked first batch does not starve later candidates` — batch 2, 앞 2건의 item을 다른 connection으로 잠근 채 1차 실행 → 둘 다 `recovery_check_at` 미래, 2차 실행이 뒤 후보를 복구. 기존 `recovery bounds discovery and resumes remaining candidates on later scans` 유지.
+- [x] RED 실행: `b5_gradle test --tests 'app.analysis.PendingJobRecoveryTest' --tests 'app.analysis.AnalysisJobReconcilerTest'`.
+- [x] 구현: 후보별로 (1) status 조회를 transaction 밖에서 수행 (2) MISSING만 `lockAnalysisOwner`→`lockAnalysisItem`→`lockAnalysisJob`(skipLocked=true) 후 재검증 (3) 결과 처리. 후보 단위 try/catch로 실패를 격리하고 `CancellationException`/`InterruptedException`은 다시 던진다. UNIQUE 위반(`SQLState 23505`)은 rollback 후 무변경.
+- [x] GREEN: 같은 명령 + `--tests 'app.analysis.*'`.
+- [x] 커밋: `feature(server): 오래된 PENDING 복구와 순환 검사 추가`.
 
 ### Task 10: maintenance 실행 역할
 
@@ -479,15 +479,15 @@ b5_gradle() {
   ```
   `Application.module(env, resources, taskGateway: TaskGateway? = null)`: MAINTENANCE는 주입 gateway → 설정이 있으면 `CloudTasksGateway` → 없으면(local) 모든 호출이 실패하는 gateway(발행 실패·조회 실패로 무변경) 순서로 고른다. route 실행은 `resources.runIfOpen` 안에서만.
 
-- [ ] RED `MaintenanceServiceTest`(단위): 단계 순서 dispatch→reconcile→pending→budget, 두 번째 단계 예외에도 3·4단계 실행·`failedSteps=["reconcile"]`·`budget` 값 존재, budget 예외면 `budget=null`. 남은 시간이 각 단계에 감소하며 전달되고, 50초가 지나면 남은 단계는 실행하지 않고 `failedSteps`에 `timeout:<step>`을 남긴다.
-- [ ] RED `MaintenanceRoutesTest`: 정상 200, 실패 단계 있으면 500, 둘 다 JSON에 `publishedEvents` 등 포함. 로그에 예외 메시지가 없음(`ListAppender` 대신 고정 문장 assertion은 로그 함수 주입으로 확인).
-- [ ] RED `HealthRouteTest`: local `maintenance` module(+`InMemoryTaskQueue` 주입)이 `/internal/maintenance/run` 200, `/internal/worker/general` 404.
-- [ ] RED `ApiRouteExposureTest`: `routing { apiRoutes(...) }`에 `/internal/worker/general`·`/internal/worker/browser`·`/internal/maintenance/run` POST가 404.
-- [ ] RED `BudgetMaintenanceServiceTest`: 이름 변경 후 기존 검증 유지.
-- [ ] RED 실행: `b5_gradle test --tests 'app.maintenance.*' --tests 'app.http.MaintenanceRoutesTest' --tests 'app.http.ApiRouteExposureTest' --tests 'app.HealthRouteTest' --tests 'app.budget.*'`.
-- [ ] 구현: Main의 API routing 블록을 `apiRoutes`로 옮기고, MAINTENANCE 분기에서 pool·Tasks client를 소유해 `MaintenanceService`를 조립한다. 단계 예외 로그는 `"Maintenance step failed step={} exceptionType={}"`.
-- [ ] GREEN: 같은 명령.
-- [ ] 커밋: `feature(server): maintenance 실행 역할과 단계별 복구 연결`.
+- [x] RED `MaintenanceServiceTest`(단위): 단계 순서 dispatch→reconcile→pending→budget, 두 번째 단계 예외에도 3·4단계 실행·`failedSteps=["reconcile"]`·`budget` 값 존재, budget 예외면 `budget=null`. 남은 시간이 각 단계에 감소하며 전달되고, 50초가 지나면 남은 단계는 실행하지 않고 `failedSteps`에 `timeout:<step>`을 남긴다.
+- [x] RED `MaintenanceRoutesTest`: 정상 200, 실패 단계 있으면 500, 둘 다 JSON에 `publishedEvents` 등 포함. 로그에 예외 메시지가 없음(`ListAppender` 대신 고정 문장 assertion은 로그 함수 주입으로 확인).
+- [x] RED `HealthRouteTest`: local `maintenance` module(+`InMemoryTaskQueue` 주입)이 `/internal/maintenance/run` 200, `/internal/worker/general` 404.
+- [x] RED `ApiRouteExposureTest`: `routing { apiRoutes(...) }`에 `/internal/worker/general`·`/internal/worker/browser`·`/internal/maintenance/run` POST가 404.
+- [x] RED `BudgetMaintenanceServiceTest`: 이름 변경 후 기존 검증 유지.
+- [x] RED 실행: `b5_gradle test --tests 'app.maintenance.*' --tests 'app.http.MaintenanceRoutesTest' --tests 'app.http.ApiRouteExposureTest' --tests 'app.HealthRouteTest' --tests 'app.budget.*'`.
+- [x] 구현: Main의 API routing 블록을 `apiRoutes`로 옮기고, MAINTENANCE 분기에서 pool·Tasks client를 소유해 `MaintenanceService`를 조립한다. 단계 예외 로그는 `"Maintenance step failed step={} exceptionType={}"`.
+- [x] GREEN: 같은 명령.
+- [x] 커밋: `feature(server): maintenance 실행 역할과 단계별 복구 연결`.
 
 ### Task 11: local 전체 흐름
 
@@ -496,25 +496,25 @@ b5_gradle() {
 **Interfaces:**
 - Consumes: 앞 Task 전부. AI는 기존 `LocalClassificationPathTest`처럼 `AiClassificationService(source, LlmBudgetService(...), candidateProvider, fakeClassify)`, fetch는 `MetadataFixtures`의 URL→HTML map, browser render는 fixture HTML을 `HttpMetadataExtractor`로 파싱하는 fake(Playwright 없음).
 
-- [ ] RED `create to ready through general and browser with fake queue`: API `POST /v1/wishlist-items`(testApplication) → `InMemoryTaskQueue`에 general task → `deliver`로 general Worker 실행 → fixture가 제목 없는 HTML이라 NeedsBrowser → `MaintenanceService.runOnce()`가 browser outbox 발행 → `deliver`로 browser Worker → READY. `GET /v1/wishlist-items/{id}` 응답의 brand·price·currency·merchant·metadataCheckedAt 값 확인.
-- [ ] RED `lost general task is recovered by maintenance`: 생성 후 queue에서 `drop` → `updated_at`을 5분 전으로 이동 → `runOnce()`가 `…-pending-1` 재예약 → 발행·전달 → READY. attempt 합계 1.
-- [ ] RED `retryable fault acknowledges and backs off`: 첫 general 실행이 인프라 예외 → 204 → retry outbox `not_before` 10초 → `runOnce()` 발행 task의 `scheduleAt` 존재 → 전달 → READY.
-- [ ] RED `exhausted generation becomes failed retryable with read metadata`: Complete 저장 뒤 AI Retryable 3회 → FAILED_RETRYABLE, 응답 product에 읽은 title·가격과 `metadataCheckedAt`.
-- [ ] RED 실행: `b5_gradle test --tests 'app.AnalysisRuntimeFlowTest'`. 앞 Task가 완료돼 있으면 RED가 통과할 수 있다. 이 경우 각 사례의 핵심 assertion을 일시적으로 반대로 바꿔 실패를 한 번 확인한 뒤 되돌리고, 그 사실을 이력에 기록한다.
-- [ ] GREEN: 같은 명령.
-- [ ] 커밋: `feature(server): B5 분석 runtime 전체 흐름 테스트 추가`.
+- [x] RED `create to ready through general and browser with fake queue`: API `POST /v1/wishlist-items`(testApplication) → `InMemoryTaskQueue`에 general task → `deliver`로 general Worker 실행 → fixture가 제목 없는 HTML이라 NeedsBrowser → `MaintenanceService.runOnce()`가 browser outbox 발행 → `deliver`로 browser Worker → READY. `GET /v1/wishlist-items/{id}` 응답의 brand·price·currency·merchant·metadataCheckedAt 값 확인.
+- [x] RED `lost general task is recovered by maintenance`: 생성 후 queue에서 `drop` → `updated_at`을 5분 전으로 이동 → `runOnce()`가 `…-pending-1` 재예약 → 발행·전달 → READY. attempt 합계 1.
+- [x] RED `retryable fault acknowledges and backs off`: 첫 general 실행이 인프라 예외 → 204 → retry outbox `not_before` 10초 → `runOnce()` 발행 task의 `scheduleAt` 존재 → 전달 → READY.
+- [x] RED `exhausted generation becomes failed retryable with read metadata`: Complete 저장 뒤 AI Retryable 3회 → FAILED_RETRYABLE, 응답 product에 읽은 title·가격과 `metadataCheckedAt`.
+- [x] RED 실행: `b5_gradle test --tests 'app.AnalysisRuntimeFlowTest'`. 앞 Task가 완료돼 있으면 RED가 통과할 수 있다. 이 경우 각 사례의 핵심 assertion을 일시적으로 반대로 바꿔 실패를 한 번 확인한 뒤 되돌리고, 그 사실을 이력에 기록한다.
+- [x] GREEN: 같은 명령.
+- [x] 커밋: `feature(server): B5 분석 runtime 전체 흐름 테스트 추가`.
 
 ### Task 12: 문서·독립 리뷰·전체 회귀·PR
 
 **Files:** Modify `docs/architecture/wishlist-item-state-api.md`(가격 단위·통화 확정), `docs/architecture/server/{wishlist-item-read-api,extraction-pipeline,analysis-pending-recovery,runtime-resources,overview,wishlist-state-persistence,mvp-api-inventory,mvp-api-implementation-order,INDEX}.md`, `docs/superpowers/specs/2026-10-09-b5-analysis-runtime-recovery-design.md`(§9 TaskGateway 기본 구현 반영·상태), 이 계획의 상태; create `docs/history/architecture/server/b5-analysis-runtime-implementation-2026-10-09.md`; `docs/learning/server/q-and-a/`에 pinning proxy·generation 예산 Q&A와 INDEX.
 
-- [ ] 문서: 상태 계약에 price 단위(원래 통화의 decimal, scale≤4)·ISO 4217 대문자·쌍 규칙과 `metadataCheckedAt` 의미를 확정한다. read API의 "B5까지 null" 문구를 실제 값으로 바꾼다. `analysis-pending-recovery.md`의 503 유지 문단을 ACK·`not_before`·재예약 상한으로 교체한다. `wishlist-state-persistence.md:74`의 "RETRY/HTTP 503"과 `mvp-api-inventory.md:146`의 "인프라 retry 503"을 갱신하고 inventory의 WORK-01/WORK-02/OPS-01 상태를 구현으로 바꾼다. 구현 순서 문서의 B5 상태와 "retry 예산·deadline·즉시 발행 제한" 미결정 행을 해결로 표시한다. learning Q&A 두 건(DNS rebinding과 pinning proxy, generation 합산 예산과 Retryable ACK)을 추가한다.
-- [ ] 독립 리뷰: 구현에 참여하지 않은 reviewer가 spec·계획과 `origin/develop...HEAD` diff를 대조한다. 확인 범위는 잠금 순서·transaction 경계, 예산 판정의 모든 호출처, metadata 병합·확인 시각, proxy 우회 경로, outbox 실패 격리, PENDING 재검증·UNIQUE, 역할별 route 노출, 로그 누출이다.
-- [ ] 보완: 지적마다 재현 테스트를 먼저 실패시킨 뒤 최소 수정한다(`bugfix: …`). 재현되지 않는 지적은 근거와 함께 이력에 남긴다.
-- [ ] 전체 회귀: `b5_gradle test --rerun-tasks`. exit 0과 JUnit XML 합산 tests/pass/fail/error/skip을 이력에 기록한다. RealUrlPilot·opt-in browser skip은 통과로 세지 않는다.
-- [ ] 문서 검증: `git diff --check`, 변경 문서의 상대 링크 존재 확인, INDEX 갱신.
-- [ ] 커밋: `docs: B5 계약과 구현 이력 기록`. author/committer 확인, clean 확인.
-- [ ] PR: `git push -u origin server/b5-analysis-runtime-recovery` 후 `gh pr create --base develop`. 본문에 범위·결정 6건·검증 결과·B11 이관 항목을 요약하고 끝에 `🤖 Generated with [Claude Code](https://claude.com/claude-code)`를 붙인다. push·PR 생성 직전에 사용자 확인을 받는다.
+- [x] 문서: 상태 계약에 price 단위(원래 통화의 decimal, scale≤4)·ISO 4217 대문자·쌍 규칙과 `metadataCheckedAt` 의미를 확정한다. read API의 "B5까지 null" 문구를 실제 값으로 바꾼다. `analysis-pending-recovery.md`의 503 유지 문단을 ACK·`not_before`·재예약 상한으로 교체한다. `wishlist-state-persistence.md:74`의 "RETRY/HTTP 503"과 `mvp-api-inventory.md:146`의 "인프라 retry 503"을 갱신하고 inventory의 WORK-01/WORK-02/OPS-01 상태를 구현으로 바꾼다. 구현 순서 문서의 B5 상태와 "retry 예산·deadline·즉시 발행 제한" 미결정 행을 해결로 표시한다. learning Q&A 두 건(DNS rebinding과 pinning proxy, generation 합산 예산과 Retryable ACK)을 추가한다.
+- [x] 독립 리뷰: 구현에 참여하지 않은 reviewer가 spec·계획과 `origin/develop...HEAD` diff를 대조한다. 확인 범위는 잠금 순서·transaction 경계, 예산 판정의 모든 호출처, metadata 병합·확인 시각, proxy 우회 경로, outbox 실패 격리, PENDING 재검증·UNIQUE, 역할별 route 노출, 로그 누출이다.
+- [x] 보완: 지적마다 재현 테스트를 먼저 실패시킨 뒤 최소 수정한다(`bugfix: …`). 재현되지 않는 지적은 근거와 함께 이력에 남긴다.
+- [x] 전체 회귀: `b5_gradle test --rerun-tasks`. exit 0과 JUnit XML 합산 tests/pass/fail/error/skip을 이력에 기록한다. RealUrlPilot·opt-in browser skip은 통과로 세지 않는다.
+- [x] 문서 검증: `git diff --check`, 변경 문서의 상대 링크 존재 확인, INDEX 갱신.
+- [x] 커밋: `docs: B5 계약과 구현 이력 기록`. author/committer 확인, clean 확인.
+- [x] PR: `git push -u origin server/b5-analysis-runtime-recovery` 후 `gh pr create --base develop`. 본문에 범위·결정 6건·검증 결과·B11 이관 항목을 요약하고 끝에 `🤖 Generated with [Claude Code](https://claude.com/claude-code)`를 붙인다. push·PR 생성 직전에 사용자 확인을 받는다.
 
 ## 자체 검토와 실행 인계
 
