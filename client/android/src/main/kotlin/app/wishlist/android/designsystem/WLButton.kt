@@ -19,6 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
+/** 누를 수 없는 버튼·메뉴 항목·링크를 흐리게 그리는 불투명도. */
+const val DISABLED_ALPHA = 0.4f
+
 enum class WLButtonKind { Primary, Secondary, Danger }
 
 /** 높이 52 pill. 큰 글자 크기에서는 늘어난다. Primary=반전색, Secondary=카드색(시트·확인창 위는 sheetField), Danger=위험 빨강(확인창 안에서만). */
@@ -41,7 +44,7 @@ fun WLButton(
     Box(
         modifier = modifier
             .heightIn(min = 52.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .clip(RoundedCornerShape(WishlistTokens.Radius.pill))
             .background(bg)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)

@@ -58,7 +58,7 @@ import app.wishlist.android.designsystem.WLText
 import app.wishlist.android.designsystem.WLTopBar
 import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
-import app.wishlist.android.feature.detail.DISABLED_ALPHA
+import app.wishlist.android.designsystem.DISABLED_ALPHA
 import app.wishlist.android.feature.web.WebViewRoute
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLScrollToTopEffect

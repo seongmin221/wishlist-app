@@ -37,11 +37,13 @@ internal data class WebPageState(
     /**
      * `onPageStarted` of the main frame: a new load with no title yet. Only a web URL replaces [url] (like iOS
      * `adopt(currentURL:)`), so `about:blank` or a null URL keeps the bar and the share sheet on the last page.
+     * Progress starts over, so the line shows again after a page that reached 100.
      */
     fun started(startedUrl: String?): WebPageState = copy(
         url = startedUrl?.takeIf(WebUrl::isWeb) ?: url,
         title = null,
         loading = true,
+        progress = 0,
         failed = false,
     )
 

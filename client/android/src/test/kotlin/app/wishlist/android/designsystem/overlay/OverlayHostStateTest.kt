@@ -188,4 +188,27 @@ class OverlayHostStateTest {
         assertEquals(2, closed)
         assertEquals(1, confirmed)
     }
+
+    @Test fun queuedDialogThatNeverOpensReportsDroppedNotDismissed() {
+        // Replaced by a later show, cleared by dismissAll, or taken back with dismissDialog while waiting.
+        for (discard in listOf<(OverlayHostState, WLDialogSpec) -> Unit>(
+            { s, _ -> s.showSheet {} },
+            { s, _ -> s.dismissAll() },
+            { s, d -> assertTrue(s.dismissDialog(d)) },
+        )) {
+            var dropped = 0
+            var dismissed = 0
+            val waiting = spec.copy(onDismissed = { dismissed++ }, onDropped = { dropped++ })
+            val s = OverlayHostState()
+            s.showSheet {}; s.settleOpen()
+            s.dismiss()
+            assertTrue(s.showDialog(waiting)) // queued behind the closing sheet
+            discard(s, waiting)
+            assertEquals(1, dropped)
+            s.settleClose(); s.settleOpen(); s.settleClose()
+            assertTrue(s.entries.none { it is DialogEntry && it.spec === waiting })
+            assertEquals(0, dismissed)
+            assertEquals(1, dropped)
+        }
+    }
 }
