@@ -277,10 +277,7 @@ internal class SqlLocalStore(
     }
 
     /** GET results may carry a same-version edit (purpose/category edits do not bump the item version). */
-    private fun WishlistDatabase.upsertFromGet(account: String, item: WishlistItem) {
-        val existing = wishlistQueries.selectItem(account, item.id).executeAsOneOrNull()?.version
-        if (existing == null || item.version >= existing) wishlistQueries.insertItem(item.toRow(account))
-    }
+    private fun WishlistDatabase.upsertFromGet(account: String, item: WishlistItem) = upsert(account, item, sameVersion = true)
 
     /** A row this build cannot decode is deleted in the caller's transaction and reads as absent. */
     private fun WishlistDatabase.decodeOrDrop(row: Item_cache): WishlistItem? =
@@ -289,9 +286,13 @@ internal class SqlLocalStore(
             null
         }
 
-    private fun WishlistDatabase.upsertIfNewer(account: String, item: WishlistItem) {
+    private fun WishlistDatabase.upsertIfNewer(account: String, item: WishlistItem) = upsert(account, item, sameVersion = false)
+
+    /** Writes [item] when no row exists or it is newer; [sameVersion] also accepts an equal version. */
+    private fun WishlistDatabase.upsert(account: String, item: WishlistItem, sameVersion: Boolean) {
         val existing = wishlistQueries.selectItem(account, item.id).executeAsOneOrNull()?.version
-        if (existing == null || item.version > existing) wishlistQueries.insertItem(item.toRow(account))
+        val write = existing == null || if (sameVersion) item.version >= existing else item.version > existing
+        if (write) wishlistQueries.insertItem(item.toRow(account))
     }
 
     internal companion object {

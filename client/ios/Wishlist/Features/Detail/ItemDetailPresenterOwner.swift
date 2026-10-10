@@ -70,28 +70,15 @@ final class ItemDetailPresenterOwner {
         presenter.refresh()
     }
 
-    /// For `.refreshable`: refreshes and returns once that refresh ended (Ruling 2: a state with
-    /// loading = true, then loading = false). Returns at once when nothing is shown (no load yet, or
-    /// the account moved on: the Presenter has nothing to repeat), and when the refresh never started
-    /// within 2s (e.g. an account change raced it).
+    /// For `.refreshable`: refreshes and returns once that refresh ended (Ruling 2). Returns at once
+    /// when nothing is shown (no load yet, or the account moved on: the Presenter has nothing to repeat).
+    /// Cancelling the pull ends only the wait.
     func refreshAndWait() async {
         guard item != nil || error != nil else { return }
-        let before = presenter.state.value
-        presenter.refresh()
-        var began = false
-        for _ in 0..<40 {
-            let now = presenter.state.value
-            if now.loading || now != before {
-                began = true
-                break
-            }
-            try? await Task.sleep(nanoseconds: 50_000_000)
-            if Task.isCancelled { return }
-        }
-        guard began else { return }
-        while presenter.state.value.loading, !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 50_000_000)
-        }
+        try? await presenter.refreshNow()
+        // The collection may not have delivered the final state yet; the pull ends showing it.
+        // (Applying it twice is harmless: the notice is keyed by the error instance.)
+        apply(presenter.state.value)
     }
 
     /// The scene's phase; a return from the background refreshes (C3 `ForegroundTransitions`). True when it refreshed.

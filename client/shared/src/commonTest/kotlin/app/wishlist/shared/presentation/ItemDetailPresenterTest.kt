@@ -248,6 +248,30 @@ class ItemDetailPresenterTest {
         assertEquals(ItemDetailState.Initial, presenter.state.value)
     }
 
+    @Test fun refreshNowReturnsWhenThatRequestEnds() = runTest {
+        val presenter = signedIn()
+        presenter.load(itemId)
+        runCurrent()
+        repository.calls[0].succeed(item)
+        runCurrent()
+
+        var done = false
+        launch { presenter.refreshNow(); done = true }
+        runCurrent()
+        assertFalse(done)
+        // The same item again: nothing in the state differs from before, yet the wait still ends.
+        repository.calls[1].succeed(item)
+        runCurrent()
+        assertTrue(done)
+        assertEquals(loaded(item), presenter.state.value)
+    }
+
+    @Test fun refreshNowBeforeTheFirstLoadReturnsAtOnce() = runTest {
+        val presenter = signedIn()
+        presenter.refreshNow()
+        assertTrue(repository.calls.isEmpty())
+    }
+
     @Test fun refreshKeepsTheShownItemAndRepeatsTheLastId() = runTest {
         val presenter = signedIn()
         presenter.load(itemId)

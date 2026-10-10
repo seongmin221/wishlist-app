@@ -10,8 +10,8 @@ import SwiftUI
 /// transition finished, `dropAccountScoped()` at once).
 ///
 /// A closed id is retired (navigator ids are never reused): asking for it again, e.g. from a screen
-/// still drawn during its exit, returns a throwaway owner that is already closed, so the previous
-/// account's Presenter never comes back.
+/// still drawn during its exit, returns one shared owner per kind that is already closed, so the previous
+/// account's Presenter never comes back and no Presenter is built per request.
 @MainActor
 final class WLEntryOwners {
     private let makeItem: () -> ItemDetailPresenter
@@ -21,6 +21,16 @@ final class WLEntryOwners {
     private var locals: [Int: LocalSubmissionPresenterOwner] = [:]
     private var webs: [Int: WebViewModel] = [:]
     private var retired: Set<Int> = []
+    private lazy var closedItem: ItemDetailPresenterOwner = {
+        let owner = ItemDetailPresenterOwner(presenter: makeItem())
+        owner.close()
+        return owner
+    }()
+    private lazy var closedLocal: LocalSubmissionPresenterOwner = {
+        let owner = LocalSubmissionPresenterOwner(presenter: makeLocal())
+        owner.close()
+        return owner
+    }()
 
     init(
         makeItem: @escaping () -> ItemDetailPresenter,
@@ -38,22 +48,16 @@ final class WLEntryOwners {
 
     func itemDetail(_ entryId: Int) -> ItemDetailPresenterOwner {
         if let owner = items[entryId] { return owner }
+        if retired.contains(entryId) { return closedItem }
         let owner = ItemDetailPresenterOwner(presenter: makeItem())
-        if retired.contains(entryId) {
-            owner.close()
-            return owner
-        }
         items[entryId] = owner
         return owner
     }
 
     func localDetail(_ entryId: Int) -> LocalSubmissionPresenterOwner {
         if let owner = locals[entryId] { return owner }
+        if retired.contains(entryId) { return closedLocal }
         let owner = LocalSubmissionPresenterOwner(presenter: makeLocal())
-        if retired.contains(entryId) {
-            owner.close()
-            return owner
-        }
         locals[entryId] = owner
         return owner
     }

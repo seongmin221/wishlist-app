@@ -62,6 +62,12 @@ private fun assertInvalid(result: ClientResult<*>, label: String = "") =
     assertEquals(ErrorKind.INVALID_RESPONSE, (result as? ClientResult.Failure)?.error?.kind, label)
 
 class ItemMapperTest {
+    @Test fun itemIdIsStoredInCanonicalLowercase() {
+        // The local cache and the detail Presenter look items up by the lowercase UUID.
+        val item = mapped("id" to "\"00000000-0000-4000-8000-00000000ABCD\"").successValue()
+        assertEquals("00000000-0000-4000-8000-00000000abcd", item.id)
+    }
+
     @Test fun purposeDisplayFieldsAreKeptVerbatim() {
         val item = mapped("purpose" to """{"id":"P1","name":"출퇴근 헤드폰","colorKey":"CORAL","iconKey":"HEART","source":"USER"}""").successValue()
         assertEquals(ItemPurpose("P1", ValueSource.USER, "출퇴근 헤드폰", "CORAL", "HEART"), item.purpose)

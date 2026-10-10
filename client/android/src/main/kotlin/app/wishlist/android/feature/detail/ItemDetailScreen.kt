@@ -62,6 +62,7 @@ import app.wishlist.shared.domain.DisplayFormat
 import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.presentation.ItemDetailState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import java.util.TimeZone
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -101,7 +102,12 @@ internal fun ItemDetailScreen(itemId: String) {
     val state by owner.state.collectAsState()
     val route = remember(itemId) { ItemDetailRoute(itemId) }
 
-    LaunchedEffect(owner) { owner.loadOnce(itemId) }
+    // A route restored after process death composes before the DEBUG bootstrap restored the session:
+    // loading then would fail (RUNTIME_NOT_READY) or be reset by that restore and close the screen.
+    LaunchedEffect(owner) {
+        runtime.ready.first { it }
+        owner.loadOnce(itemId)
+    }
     // Initial before the first load answer is the load not having started yet; only a later one means the session moved on.
     val seenWork = remember(owner) { mutableStateOf(false) }
     LaunchedEffect(state) {

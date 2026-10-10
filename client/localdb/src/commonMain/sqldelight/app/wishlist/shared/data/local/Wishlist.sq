@@ -1,4 +1,4 @@
--- Local schema v2 (C3-D7; v1 -> v2 in 1.sqm). No tokens are stored. Money and item Instants are
+-- Local schema v3 (C3-D7; v1 -> v2 in 1.sqm, v2 -> v3 in 2.sqm). No tokens are stored. Money and item Instants are
 -- exact text; submission times are integer epoch microseconds so ordering is numeric.
 CREATE TABLE local_submission (
     client_submission_id TEXT NOT NULL PRIMARY KEY,
