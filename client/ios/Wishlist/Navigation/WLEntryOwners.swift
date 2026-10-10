@@ -16,13 +16,20 @@ import SwiftUI
 final class WLEntryOwners {
     private let makeItem: () -> ItemDetailPresenter
     private let makeLocal: () -> LocalSubmissionDetailPresenter
+    private let makeWeb: @MainActor (URL) -> WebViewModel
     private var items: [Int: ItemDetailPresenterOwner] = [:]
     private var locals: [Int: LocalSubmissionPresenterOwner] = [:]
+    private var webs: [Int: WebViewModel] = [:]
     private var retired: Set<Int> = []
 
-    init(makeItem: @escaping () -> ItemDetailPresenter, makeLocal: @escaping () -> LocalSubmissionDetailPresenter) {
+    init(
+        makeItem: @escaping () -> ItemDetailPresenter,
+        makeLocal: @escaping () -> LocalSubmissionDetailPresenter,
+        makeWeb: @escaping @MainActor (URL) -> WebViewModel = { @MainActor in WebViewModel(url: $0) }
+    ) {
         self.makeItem = makeItem
         self.makeLocal = makeLocal
+        self.makeWeb = makeWeb
     }
 
     convenience init(runtime: SharedRuntime) {
@@ -51,12 +58,25 @@ final class WLEntryOwners {
         return owner
     }
 
+    /// The FWebView entry's web view owner (`AppDestination.web`), built with the route URL on first request.
+    func web(_ entryId: Int, url: URL) -> WebViewModel {
+        if let owner = webs[entryId] { return owner }
+        let owner = makeWeb(url)
+        if retired.contains(entryId) {
+            owner.close()
+            return owner
+        }
+        webs[entryId] = owner
+        return owner
+    }
+
     /// close() and forget. Idempotent; ids without an owner are only retired.
     func close(_ ids: [Int]) {
         for id in ids {
             retired.insert(id)
             items.removeValue(forKey: id)?.close()
             locals.removeValue(forKey: id)?.close()
+            webs.removeValue(forKey: id)?.close()
         }
     }
 }

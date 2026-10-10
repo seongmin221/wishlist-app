@@ -3,7 +3,7 @@ import SwiftUI
 private let dialogBody = WLTextStyle.body.resized(15, lineHeight: 15 * 1.6)
 private let dialogTarget = WLTextStyle.bodyBold.resized(15)
 
-/// 확인창 카드: 제목 + 글머리표 영향 + 취소(왼쪽)·확인(오른쪽, 더 넓음). 모서리 xl 36, 시트색 불투명.
+/// 확인창 카드: (머리 타일) + 제목 + 글머리표 영향 + 취소(왼쪽)·확인(오른쪽, 더 넓음). 모서리 xl 36, 시트색 불투명.
 struct WLConfirmDialogCard: View {
     let spec: WLDialogSpec
     let onCancel: () -> Void
@@ -13,6 +13,7 @@ struct WLConfirmDialogCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: WishlistTokens.Space.s12) {
+            spec.icon
             WLText(spec.title, wlSheetTitleStyle, color: c.text)
                 .accessibilityAddTraits(.isHeader)
             if let target = spec.target {

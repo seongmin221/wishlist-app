@@ -147,7 +147,7 @@ private struct OriginalBar: View {
 
 /// 짧은 안내 줄: 위쪽 바 아래, 카드색 pill 13/400, 나타남·사라짐 opacity 200(구현 기본값). VoiceOver에는 알림으로 읽힌다.
 /// 3초 뒤 스스로 사라진다(같은 `serial`은 다시 보이지 않는다).
-private struct DetailNoticeLine: View {
+struct DetailNoticeLine: View {
     let notice: BriefNotice?
 
     @Environment(\.wlColors) private var c
