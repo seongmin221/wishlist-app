@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -349,7 +350,9 @@ internal fun WebViewScreen(route: WebViewRoute) {
                 title = { PageTitle(page) },
             )
             ProgressLine(page)
-            Box(Modifier.fillMaxWidth().weight(1f)) {
+            // clipToBounds: a WebView with no painted content yet (loading, Chromium error page) otherwise fills
+            // the whole window with its background and hides the top bar (seen on the API 36 emulator).
+            Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
                 key(holder.generation) {
                     val bound = remember { BoundParent() }
                     AndroidView(
