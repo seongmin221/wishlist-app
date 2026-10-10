@@ -63,6 +63,28 @@ proxy는 이제 연결마다 다시 해석하지 않고, 한 render 안에서 �
 
 반영 후 `./gradlew test`: 439 tests, 실패·오류 0, skip 2(opt-in). `RUN_BROWSER_TESTS=1` `PlaywrightRealBrowserTest` 통과.
 
+### 2차 리뷰 (`/code-review`)
+
+같은 PR을 `/code-review` 스킬로 다시 리뷰했다. 10건 중 7건을 반영했다.
+
+| 지적 | 처리 | 검증 |
+| --- | --- | --- |
+| PENDING 복구 예외 경로의 defer가 실패하면 남은 batch 전체 중단 | defer 실패를 기록만 하고 다음 후보 진행 | defer SQL 실패 주입 테스트 |
+| proxy가 검증된 첫 주소만 시도 | 검증된 주소를 순서대로 시도 | 첫 주소 연결 실패 테스트 |
+| client 쪽 30초 read timeout이 느린 응답 도중 upstream을 반쯤 닫음 | 양방향 idle 기준 timeout | read-EOF에 끊는 upstream 테스트(수정 전 RED 확인) |
+| https 페이지가 http canonical 채택 | scheme 하향 거부 | canonical 테스트 |
+| route 검사와 proxy가 origin을 두 번 해석 | route가 proxy 검증 캐시 공유(`EgressProxy.allows`) | origin당 lookup 1회 테스트 |
+| outbox insert가 5곳에 복제 | `insertAnalysisOutbox` helper. task name은 dedupe key라 그대로 둠 | 기존 회귀 |
+| 도달 불가 IPv6 literal 괄호 처리, 가격 offers 중복 조건 | 제거 | 기존 회귀 |
+
+반영하지 않은 지적:
+
+- browser lane의 `DnsLookupFailed`가 PARTIAL로 끝나는 것. spec §5가 browser 대상 DNS 실패를 PARTIAL로 확정했다. resolver 포화도 같은 예외라 PARTIAL이 되지만, 1차 리뷰에서 용량을 늘리고 중복 조회를 없애 가능성을 줄였다.
+- Retryable ACK 뒤 retry outbox가 다음 maintenance 실행에만 발행되는 것. durable outbox가 진행을 맡는 B5 결정이며, 실제 간격은 1차 리뷰에서 문서화했다.
+- maintenance 실행(최대 50초 이상)이 종료 drain을 Cloud Run 유예 시간보다 오래 붙잡는 것. 강제 종료돼도 transaction rollback과 task 이름 dedupe로 crash와 같은 경로로 복구된다. B11 배포 설정에서 종료 유예와 함께 다시 본다.
+
+반영 후 `./gradlew test`: 443 tests, 실패·오류 0, skip 2(opt-in). `RUN_BROWSER_TESTS=1` `PlaywrightRealBrowserTest` 통과.
+
 ## 검증
 
 명령은 [로컬 테스트 환경](../../../architecture/server/local-test-environment.md#전체-테스트-실행)의 Podman/JDK 설정으로 실행했다.

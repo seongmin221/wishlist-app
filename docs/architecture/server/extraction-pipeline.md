@@ -34,7 +34,7 @@
 - JSON `null`은 값이 없는 것으로 본다. 이름·brand·판매처·통화는 JSON 문자열만, 가격은 문자열이나 숫자를 받는다. 이름 없는 Product 노드보다 이름 있는 노드를 대표로 쓴다.
 - 이름이 다른 Product가 둘 이상이면 brand·가격은 null이다. brand·merchant가 200자를 넘으면 null이다.
 - merchant는 `offers.seller.name` → `og:site_name`, 둘 다 없으면 null이다.
-- canonical은 `link[rel=canonical]` → `og:url`이 최종 URL과 같은 등록 도메인(OkHttp `topPrivateDomain`)이고 엄격한 URI 문법·http(s)·userinfo 없음·기본 port일 때만 채택한다. 그 밖에는 최종 URL을 쓴다. 정규화는 scheme/host 소문자·fragment 제거·tracking query(`utm_*`, `fbclid`, `gclid`, `msclkid`, `igshid`, `mc_cid`, `mc_eid`) 제거이며 다른 query는 보존한다.
+- canonical은 `link[rel=canonical]` → `og:url`이 최종 URL과 같은 등록 도메인(OkHttp `topPrivateDomain`)이고 엄격한 URI 문법·http(s)·userinfo 없음·기본 port일 때만 채택한다. https 최종 URL에서 http canonical로 낮추는 것은 채택하지 않는다. 그 밖에는 최종 URL을 쓴다. 정규화는 scheme/host 소문자·fragment 제거·tracking query(`utm_*`, `fbclid`, `gclid`, `msclkid`, `igshid`, `mc_cid`, `mc_eid`) 제거이며 다른 query는 보존한다.
 
 ## URL 안전성
 
@@ -52,7 +52,7 @@
 
 일반 Worker는 `browserAttempted=false`일 때에만 같은 transaction에서 `BROWSER_PENDING`, `browserAttempted=true`, browser outbox event를 기록한다. browser Worker는 `BROWSER_PENDING → BROWSER_RUNNING`을 claim하고 성공 metadata를 해당 `WishlistItem`에 기록한다. 사이트 차단·navigation timeout·정보 부족은 `PARTIAL`로 끝난다. Playwright 시작·browser launch·context 생성 실패는 Worker 인프라 장애라 Retryable이며, `PARTIAL`로 바꾸는 Playwright 예외는 대상 페이지 navigation·내용 읽기 구간만이다. Worker 자체 중단으로 120초 이상 `BROWSER_RUNNING`이 남으면 reconciler가 browser outbox를 다시 만든다. browser 대상 페이지의 모든 요청은 URL 안전성 검사를 거치며, 실제 배포에는 browser service의 사설 주소 egress 차단도 적용해야 한다.
 
-B5의 browser Worker는 Chromium을 프로세스 내 loopback `EgressProxy`로만 연결한다(`--proxy-server`, `--proxy-bypass-list=<-loopback>`, QUIC·비proxy WebRTC UDP 끔, service worker·다운로드 차단). proxy는 CONNECT·절대 URI 요청의 host를 `UrlSafetyPolicy`로 검증한 주소에만 연결하고 다시 해석하지 않으므로 DNS rebinding으로 사설 주소에 닿을 수 없다. 80/443 외 port, IPv6 literal 대상, 검증 실패는 403이다. proxy는 render마다 새로 만들고 render가 끝나면 닫는다. 한 render 안에서 검증한 host는 그 주소로 고정해 재사용한다. 이후 rebinding 응답은 쓰지 않는다. 절대 URI(평문 HTTP) 응답은 `Connection: close`로 바꿔, Chromium이 같은 proxy 연결로 다른 origin을 요청해 처음 host의 주소로 전달되는 일을 막는다. route 검사도 render 안에서 scheme·userinfo·host·port 단위로 결과를 재사용한다. IPv6 차단 대역은 loopback·link-local 외에 fc00::/7(ULA)·2002::/16·2001::/32(Teredo)·64:ff9b::/96·64:ff9b:1::/48·::ffff:0:0:0/96(SIIT)·IPv4 호환 주소를 포함한다. IPv4-mapped(::ffff:0:0/96) 주소는 내장 IPv4로 다시 검사한다. native DNS는 mapped AAAA 응답을 `Inet6Address`로 남기는데, JDK의 loopback·사설 판정은 이 주소를 놓치기 때문이다. fallback 첫 실행도 generation 합산 3회 예산을 쓴다.
+B5의 browser Worker는 Chromium을 프로세스 내 loopback `EgressProxy`로만 연결한다(`--proxy-server`, `--proxy-bypass-list=<-loopback>`, QUIC·비proxy WebRTC UDP 끔, service worker·다운로드 차단). proxy는 CONNECT·절대 URI 요청의 host를 `UrlSafetyPolicy`로 검증한 주소에만 연결하고 다시 해석하지 않으므로 DNS rebinding으로 사설 주소에 닿을 수 없다. 80/443 외 port, IPv6 literal 대상, 검증 실패는 403이다. proxy는 render마다 새로 만들고 render가 끝나면 닫는다. 한 render 안에서 검증한 host는 그 주소로 고정해 재사용한다. 이후 rebinding 응답은 쓰지 않는다. 검증된 주소 중 하나에 연결하지 못하면 다음 주소를 순서대로 시도한다. 절대 URI(평문 HTTP) 응답은 `Connection: close`로 바꿔, Chromium이 같은 proxy 연결로 다른 origin을 요청해 처음 host의 주소로 전달되는 일을 막는다. route 검사는 그 render의 proxy 검증 결과를 함께 써서 origin마다 한 번만 해석한다. IPv6 차단 대역은 loopback·link-local 외에 fc00::/7(ULA)·2002::/16·2001::/32(Teredo)·64:ff9b::/96·64:ff9b:1::/48·::ffff:0:0:0/96(SIIT)·IPv4 호환 주소를 포함한다. IPv4-mapped(::ffff:0:0/96) 주소는 내장 IPv4로 다시 검사한다. native DNS는 mapped AAAA 응답을 `Inet6Address`로 남기는데, JDK의 loopback·사설 판정은 이 주소를 놓치기 때문이다. fallback 첫 실행도 generation 합산 3회 예산을 쓴다.
 
 ## 실제 URL 8건 로컬 파일럿 (2026-09-24)
 
