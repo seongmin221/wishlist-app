@@ -30,15 +30,22 @@ class PlaywrightRealBrowserTest {
         try {
             val public = InetAddress.getByName("93.184.216.34")
             val policy = UrlSafetyPolicy { host -> if (host == "shop.test") listOf(public) else listOf(InetAddress.getByName(host)) }
-            EgressProxy(policy, { address, _, _ ->
-                check(address == public)
-                Socket().apply { connect(InetSocketAddress(InetAddress.getLoopbackAddress(), server.address.port), 2_000) }
-            }).use { proxy ->
-                val metadata = PlaywrightGateway(policy, proxy).render("http://shop.test/product")
+            val proxies = CopyOnWriteArrayList<EgressProxy>()
+            val gateway = PlaywrightGateway(policy) {
+                EgressProxy(policy, { address, _, _ ->
+                    check(address == public)
+                    Socket().apply { connect(InetSocketAddress(InetAddress.getLoopbackAddress(), server.address.port), 2_000) }
+                }).also { proxies += it }
+            }
+            repeat(2) {
+                val metadata = gateway.render("http://shop.test/product")
                 assertEquals("Rendered cap", metadata?.title)
                 assertEquals("CAYL", metadata?.brand)
-                assertTrue(requests.none { it.contains("private.png") }, requests.toString())
             }
+            assertTrue(requests.none { it.contains("private.png") }, requests.toString())
+            // Each render owns its proxy, so one render ending can never cut another render's connections.
+            assertEquals(2, proxies.map { it.port }.distinct().size)
+            for (proxy in proxies) assertTrue(runCatching { Socket(InetAddress.getLoopbackAddress(), proxy.port).close() }.isFailure)
         } finally { server.stop(0) }
     }
 }

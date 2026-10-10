@@ -13,11 +13,16 @@ import com.microsoft.playwright.Playwright
 import com.microsoft.playwright.PlaywrightException
 import com.microsoft.playwright.options.ServiceWorkerPolicy
 
-class PlaywrightGateway(private val safety: UrlSafetyPolicy, private val proxy: EgressProxy) {
+/** Each render owns a fresh pinning proxy, so one render ending never cuts another render's connections. */
+class PlaywrightGateway(private val safety: UrlSafetyPolicy, private val newProxy: () -> EgressProxy) {
     fun canRequest(url: String): Boolean = runCatching { safety.validate(url) }.isSuccess
 
     fun render(url: String): Metadata? {
         safety.validate(url)
+        newProxy().use { proxy -> return render(url, proxy) }
+    }
+
+    private fun render(url: String, proxy: EgressProxy): Metadata? {
         try {
             Playwright.create().use { playwright ->
                 val launch = BrowserType.LaunchOptions().setHeadless(true).setArgs(launchArguments(proxy.port))
@@ -40,8 +45,6 @@ class PlaywrightGateway(private val safety: UrlSafetyPolicy, private val proxy: 
             }
         } catch (_: PlaywrightException) {
             throw BrowserNavigationTimeout()
-        } finally {
-            proxy.closeActiveConnections()
         }
     }
 

@@ -11,8 +11,8 @@ class PlaywrightGatewayTest {
     private val policy = UrlSafetyPolicy { listOf(InetAddress.getByName("93.184.215.14")) }
 
     @Test
-    fun `browser request guard blocks private subresources`() = EgressProxy(policy).use { proxy ->
-        val gateway = PlaywrightGateway(policy, proxy)
+    fun `browser request guard blocks private subresources`() {
+        val gateway = PlaywrightGateway(policy) { EgressProxy(policy) }
         assertTrue(gateway.canRequest("https://shop.example/image.png"))
         assertFalse(gateway.canRequest("http://127.0.0.1/metadata"))
         assertFalse(gateway.canRequest("file:///etc/passwd"))

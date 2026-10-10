@@ -77,7 +77,7 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
                 val processor = GeneralExtractionProcessor(source, extractor::extract, classifier::classify)
                 generalWorkerRoute(GeneralWorkerService(source, execution, processor::process)::runGeneral)
             } else {
-                val gateway = PlaywrightGateway(safety, resources.own(EgressProxy(safety)))
+                val gateway = PlaywrightGateway(safety) { EgressProxy(safety) }
                 val renderer = BrowserRenderProcessor(source, gateway::render)
                 browserWorkerRoute(BrowserWorkerService(source, renderer::render, classifier::classify, execution)::runBrowser)
             }
