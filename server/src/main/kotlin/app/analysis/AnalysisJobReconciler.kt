@@ -22,7 +22,8 @@ class AnalysisJobReconciler(
                 select id,wishlist_item_id,generation,stage,execution_token,lease_until,claimed_item_version
                 from analysis_jobs where stage in ('GENERAL_RUNNING','BROWSER_RUNNING')
                 and (lease_until<=clock_timestamp() or (execution_token is null and lease_until is null and claimed_item_version is null))
-                order by wishlist_item_id,id limit ?
+                and (recovery_check_at is null or recovery_check_at<=clock_timestamp())
+                order by recovery_check_at nulls first,lease_until,id limit ?
             """.trimIndent()).use { statement ->
                 statement.setInt(1, batchSize)
                 statement.executeQuery().use { rows ->
@@ -37,12 +38,14 @@ class AnalysisJobReconciler(
             }
         }
         return candidates.count { candidate ->
-            try { dataSource.connection.use { connection ->
+            var deferred = false
+            val recovered = try { dataSource.connection.use { connection ->
                 connection.autoCommit = false
                 try {
                     val changed = recoverLocked(connection, candidate)
                     connection.commit()
-                    changed
+                    deferred = changed == null
+                    changed == true
                 } catch (cause: Throwable) {
                     connection.rollback()
                     throw cause
@@ -50,15 +53,23 @@ class AnalysisJobReconciler(
             } } catch (cause: Exception) {
                 if (cause is CancellationException || cause is InterruptedException) throw cause
                 onFailure(candidate.id, cause)
+                deferred = true
                 false
             }
+            // Locked or failed candidates move behind later ones for a minute; a raced one is simply re-read next scan.
+            if (deferred) try { dataSource.deferRecoveryCheck(candidate.id, 60) } catch (cause: Exception) {
+                if (cause is CancellationException || cause is InterruptedException) throw cause
+                onFailure(candidate.id, cause)
+            }
+            recovered
         }
     }
 
-    private fun recoverLocked(connection: Connection, candidate: Candidate): Boolean {
-        if(!connection.lockAnalysisOwner(candidate.itemId,skipLocked=true)) return false
-        val item = connection.lockAnalysisItem(candidate.itemId, skipLocked = true) ?: return false
-        val job = connection.lockAnalysisJob(candidate.id, skipLocked = true) ?: return false
+    /** true: recovered, false: nothing to do after revalidation, null: a row was locked by someone else. */
+    private fun recoverLocked(connection: Connection, candidate: Candidate): Boolean? {
+        if(!connection.lockAnalysisOwner(candidate.itemId,skipLocked=true)) return null
+        val item = connection.lockAnalysisItem(candidate.itemId, skipLocked = true) ?: return null
+        val job = connection.lockAnalysisJob(candidate.id, skipLocked = true) ?: return null
         if (job.itemId != candidate.itemId || job.generation != candidate.generation || job.stage != candidate.stage ||
             job.executionToken != candidate.token || job.leaseUntil != candidate.lease || job.claimedItemVersion != candidate.version) return false
         val now = connection.analysisDatabaseTime()
