@@ -81,11 +81,12 @@ class EgressProxyTest {
             assertEquals("HTTP/1.1 403 Forbidden", connect(proxy, "shop.test:443").second, address)
         }
         proxy { listOf(public) }.use { proxy ->
-            for (target in listOf("shop.test:8443", "[::1]:443", "localhost.:443", "127.0.0.1:443", "shop.test")) {
+            for (target in listOf("shop.test:8443", "[::1]:443", "[fd00::1]:443", "[2606:4700::1111]:443", "localhost.:443", "127.0.0.1:443", "shop.test")) {
                 assertEquals("HTTP/1.1 403 Forbidden", connect(proxy, target).second, target)
             }
             assertEquals("HTTP/1.1 403 Forbidden", open(proxy, "GET /path HTTP/1.1\r\nHost: shop.test\r\n\r\n").second)
             assertEquals("HTTP/1.1 403 Forbidden", open(proxy, "DELETE https://shop.test/ HTTP/1.1\r\n\r\n").second)
+            assertEquals("HTTP/1.1 403 Forbidden", open(proxy, "GET http://[2606:4700::1111]/ HTTP/1.1\r\n\r\n").second)
             assertEquals("HTTP/1.1 200 Connection Established", connect(proxy, "SHOP.TEST:443").second)
         }
         assertEquals(listOf(public to 443), connected.toList())

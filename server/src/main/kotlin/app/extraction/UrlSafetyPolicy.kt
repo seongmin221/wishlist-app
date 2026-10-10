@@ -39,6 +39,20 @@ class UrlSafetyPolicy(
             if (a == 0 || a >= 224 || a == 100 && b in 64..127 || a == 169 && b == 254 ||
                 a == 192 && b == 0 && c == 0 || a == 198 && b in 18..19) return true
         }
+        if (bytes.size == 16) {
+            val first = bytes[0].toInt() and 255
+            val second = bytes[1].toInt() and 255
+            // fc00::/7 unique local (cloud VPC internal IPv6), 2002::/16 6to4 and 64:ff9b::/96 NAT64 can embed or
+            // reach internal addresses; ::/96 IPv4-compatible addresses embed an IPv4 target directly.
+            if (first and 0xfe == 0xfc) return true
+            if (first == 0x20 && second == 0x02) return true
+            if (bytes.copyOfRange(0, 12).contentEquals(NAT64_PREFIX)) return true
+            if (bytes.copyOfRange(0, 12).all { it.toInt() == 0 }) return true
+        }
         return false
+    }
+
+    private companion object {
+        val NAT64_PREFIX = byteArrayOf(0, 0x64, 0xff.toByte(), 0x9b.toByte(), 0, 0, 0, 0, 0, 0, 0, 0)
     }
 }

@@ -73,7 +73,8 @@ class EgressProxy(
         val tunnel = method == "CONNECT"
         val destination = (if (tunnel) authority(target) else absoluteHttp(target)) ?: return deny(client)
         val (host, port, path) = destination
-        if (port != 80 && port != 443) return deny(client)
+        // Pages have no reason to address an IPv6 literal; refusing them outright avoids range-list gaps.
+        if (port != 80 && port != 443 || ':' in host) return deny(client)
         val literal = if (':' in host) "[$host]" else host
         val addresses = try { safety.validate("${if (port == 443) "https" else "http"}://$literal/") } catch (cause: Exception) {
             if (cause is CancellationException) throw cause

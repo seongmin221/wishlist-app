@@ -50,6 +50,15 @@ class UrlSafetyPolicyTest {
     }
 
     @Test
+    fun `internal and translated ipv6 ranges are blocked while public ipv6 passes`() {
+        for (address in listOf("fd00::1", "fc00::1", "fd20:1234::5", "64:ff9b::7f00:1", "2002:7f00:1::1", "::7f00:1", "fe80::1", "::1")) {
+            assertFailsWith<UnsafeUrlException>(address) { UrlSafetyPolicy { listOf(InetAddress.getByName(address)) }.validate("https://shop.example/item") }
+        }
+        assertEquals(1, UrlSafetyPolicy { listOf(InetAddress.getByName("2606:4700::1111")) }.validate("https://shop.example/item").size)
+        assertFailsWith<UnsafeUrlException> { UrlSafetyPolicy { listOf(InetAddress.getByName("93.184.215.14")) }.validate("https://[fd12:3456::5]/") }
+    }
+
+    @Test
     fun `json ld product name wins over open graph and title`() {
         val policy = UrlSafetyPolicy { listOf(InetAddress.getByName("93.184.215.14")) }
         val extractor = HttpMetadataExtractor(policy) { _, _ ->
