@@ -99,7 +99,7 @@
 
 **홈 줄 target.** `HomeRow`에 `target = Local(submissionId) | Item(itemId)`를 더해 key 문자열을 파싱하지 않는다.
 
-**플랫폼 owner.** `ItemDetailPresenterOwner`는 지금 계약 그대로 화면에 연결한다. `LocalSubmissionDetailPresenterOwner`를 같은 패턴으로 만든다(Android `ViewModel`, iOS `@MainActor @Observable`, `close`/`deinit`).
+**플랫폼 owner.** `ItemDetailPresenterOwner`는 지금 계약 그대로 화면에 연결한다. `LocalSubmissionPresenterOwner`를 같은 패턴으로 만든다(Android `ViewModel`, iOS `@MainActor @Observable`, `close`/`deinit`).
 
 ## 3. 화면과 내비게이션
 

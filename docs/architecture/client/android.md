@@ -82,7 +82,7 @@
 
 ## 상품 상세·분석 중·로컬 대기 화면 (C4)
 
-> 2026-10-10 C4 Task 10. 화면 규칙은 [C4 설계](../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md#3-화면과-내비게이션) §3, 검증 기록은 [C4 Android 화면 확인](../../history/architecture/client/c4-android-detail-verification-2026-10-10.md).
+> 2026-10-10 C4 Task 10. 화면 규칙은 [C4 설계](../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md#3-화면과-내비게이션) §3, 검증 기록은 [C4 Android 화면 확인](../../history/architecture/client/c4-detail-verification-2026-10-10.md).
 
 - **화면 위치:** `feature/detail/{ItemDetailScreen,LocalSubmissionScreen,DetailScaffold,DetailText,LocalSubmissionPresenterOwner}`. `AppRoute`가 `ItemDetailRoute(itemId)` → `ItemDetailScreen`, `LocalSubmissionRoute(submissionId)` → `LocalSubmissionScreen`을 debug·release 공통으로 그린다.
 - **owner 사용:** 두 화면 모두 `remember(LocalWLEntryViewModelStoreOwner.current) { ViewModelProvider(owner, XOwner.factory(runtime))[…] }`로 칸의 ViewModelStore에 owner를 만든다(`viewModel()` 아님). runtime은 `WishlistApplication.runtime`. 처음 한 번만 `loadOnce(id)`(owner 필드라 구성 변경 뒤 다시 부르지 않고, 프로세스 복원 뒤 새 owner에서는 다시 부른다). pop·`replaceTop`·계정 떠남이 store를 지우면 `onCleared`에서 Presenter를 닫는다.

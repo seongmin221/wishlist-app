@@ -1,6 +1,6 @@
-# C4 Android 상세·분석 중·로컬 대기 화면 확인 (2026-10-10)
+# C4 상세·분석 중·로컬 대기 화면 확인 (2026-10-10)
 
-> C4 Task 10. 에뮬레이터 `emulator-5554`(API 36, 앱 문구 한국어), DEBUG Fake. 캡처는 [c4-shots](c4-shots/)(1200px로 줄임). 비교 기준은 보드 `FProductDetail{L,D}`·`FProductProcessing{L,D}`와 [C4 설계](../../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md) §3 D8·D9·D12.
+> C4 Task 10(Android 절)·Task 11(iOS 절). 에뮬레이터 `emulator-5554`(API 36, 앱 문구 한국어), DEBUG Fake. 캡처는 [c4-shots](c4-shots/)(1200px로 줄임). 비교 기준은 보드 `FProductDetail{L,D}`·`FProductProcessing{L,D}`와 [C4 설계](../../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md) §3 D8·D9·D12.
 
 ## 확인한 흐름
 

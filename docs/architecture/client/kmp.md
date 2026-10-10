@@ -162,7 +162,7 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
   - `item_cache`: C2와 같다. PK `(account_id, item_id)`, `version`, 상품·카테고리·목적·분석 상태 컬럼 평탄화, 가격은 `DecimalAmount.canonical` text, Instant는 ISO text, `allowed_actions`는 정렬된 쉼표 text. 조건부 쓰기는 `version <= ?` 삭제뿐이다.
   - **v1→v2 migration(`1.sqm`):** v1 `local_submission`은 `created_at` ISO text와 `server_item_id`를 가졌다. migration은 ISO text를 SQLite `strftime`으로 바꾸므로 **ms 정밀도까지만 보존**한다(v1 데이터는 개발 기기에만 있어 허용, C2 v1이 ms 미만을 쓰지 않았다는 근거는 없다). v1 `SUBMITTING`·`ACCEPTED`는 `PENDING`으로 바꿔 같은 key 재전송으로 복구하고 `server_item_id`는 버린다. `SchemaMigrationTest`가 같은 초 안의 순서와 오류 컬럼 보존을 검증한다(Review Focus 5).
 - **계정 규칙:** 캐시 key는 (accountId, itemId)다. 같은 계정 재로그인은 캐시 행을 유지하되 이전 snapshot의 쓰기는 `SESSION_CHANGED`로 거절한다. `pending()`은 현재 계정 귀속분+미귀속분(로그아웃 상태는 미귀속만), `saveSubmission`은 binding이 null이거나 현재 계정일 때만 허용하고 나머지는 `VALIDATION/ACCOUNT_BINDING_MISMATCH`다. 같은 key를 다시 저장하면 기존 행을 그대로 두며 binding을 바꾸지 않는다(C3 Task 1부터 미귀속→계정 귀속은 `prepareFlush`에서만 일어난다). 예외로, 이미 귀속된 행에 다른 binding으로 다시 저장하면 같은 URL이어도 `ACCOUNT_BINDING_MISMATCH`다. 현재 계정에 귀속된 행에 binding null로 다시 저장하는 경우도 여기에 해당한다. `accept`는 pending이 snapshot 계정에 귀속된 경우에만 받는다(미귀속·타 계정은 같은 code).
-- **transaction 계약:** 계정에 의존하는 연산은 session gate(`withCurrent`) → DB transaction 순서이며(계정과 무관한 `importSubmission`·`readAppState`·`writeAppState`는 gate 없이 DB만 쓴다) gate 안에는 짧은 DB commit만 둔다(네트워크·delay 없음). `accept`는 한 transaction에서 캐시 upsert(또는 DELETED replay면 tombstone version 이하 캐시 삭제)와 pending 삭제를 수행하고, 중간 오류는 둘 다 rollback한다. 낮은·같은 version의 upsert는 건너뛰고 더 높은 version만 교체한다. `removeCachedItem`은 `throughVersion` 이하만 지우고 `clearCurrentCache`는 현재 계정 캐시만 지우며 pending은 보존한다. DB/driver 예외는 `UNAVAILABLE/LOCAL_STORE_FAILURE`로 바꾸고 취소는 항상 전파한다. rollback 오류 주입은 `SqlLocalStore`의 internal 생성자 hook(테스트 전용)이다.
+- **transaction 계약:** 계정에 의존하는 연산은 session gate(`withCurrent`) → DB transaction 순서이며(계정과 무관한 `importSubmission`·`readAppState`·`writeAppState`는 gate 없이 DB만 쓴다) gate 안에는 짧은 DB commit만 둔다(네트워크·delay 없음). `accept`는 한 transaction에서 캐시 upsert(또는 DELETED replay면 tombstone version 이하 캐시 삭제)와 pending 삭제를 수행하고, 중간 오류는 둘 다 rollback한다. `accept`의 upsert는 낮은·같은 version을 건너뛰고 더 높은 version만 교체한다. GET 결과(`upsertFromGet`)는 같은 version도 덮어쓴다(C4, 표시 metadata 갱신). `removeCachedItem`은 `throughVersion` 이하만 지우고 `clearCurrentCache`는 현재 계정 캐시만 지우며 pending은 보존한다. DB/driver 예외는 `UNAVAILABLE/LOCAL_STORE_FAILURE`로 바꾸고 취소는 항상 전파한다. rollback 오류 주입은 `SqlLocalStore`의 internal 생성자 hook(테스트 전용)이다.
 - **C3 저장 계약 추가(Task 1):** `saveSubmission`·`importSubmission`은 key 가드를 공유한다. 새 key는 `INSERT OR IGNORE`, 같은 key·같은 URL은 기존 행 유지(no-op Success, 상태·binding 그대로), 같은 key·다른 URL은 `CONFLICT/SUBMISSION_KEY_REUSED`다. `saveSubmission`은 현재 계정 기준 binding 규칙(null 또는 현재 계정, 기존 binding과 다르면 `ACCOUNT_BINDING_MISMATCH`)을 유지한다. 그래서 현재 계정에 이미 귀속된 행에 같은 key·같은 URL을 binding null로 다시 저장하면 no-op이 아니라 `ACCOUNT_BINDING_MISMATCH`다. 그리고 `importSubmission`(iOS inbox)은 공유 시점 binding을 그대로 받으며 session gate를 거치지 않는다. `prepareFlush(snapshot)`는 한 transaction에서 그 계정(과 미귀속)의 `SUBMITTING`→`PENDING`, 미귀속→그 계정 binding, 그 계정 전체 대기 목록 반환을 한다. `markSubmission`은 snapshot 계정에 묶인 행만 바꾼다(미귀속·다른 계정은 `ACCOUNT_BINDING_MISMATCH`, 없으면 `NOT_FOUND/SUBMISSION_NOT_FOUND`). `accept`는 `Uuid.parse`로 `item.clientSubmissionId`와 key를 대소문자 무관 비교해 다르면(또는 UUID가 아니면) `VALIDATION/SUBMISSION_ITEM_MISMATCH`로 아무것도 쓰지 않는다. `deleteSubmission(snapshot, id)`(C4 Task 3)는 계정 없이 도는 `gated(snapshot)`에서 한 transaction으로 행을 읽고 판정한다. 로그인이면 그 계정 또는 미귀속 행, 비로그인이면 미귀속 행만 지운다. `PENDING`·`FAILED`만 지우고 `SUBMITTING`은 `CONFLICT/SUBMISSION_IN_FLIGHT`, 없거나 다른 binding이면 `NOT_FOUND/SUBMISSION_NOT_FOUND`이며 key는 대소문자 무관이다. `SubmissionCoordinator.deleteLocal`이 이를 부르고 성공하면 바로 view를 게시한다. `processingItems`는 그 계정 캐시의 `ACTIVE`+`PROCESSING`만, `readAppState`·`writeAppState`(null=삭제)는 계정과 무관한 기기 상태다.
 - **decorator 계약:** `CachedGetItemRepository(delegate, localStore, session)`는 snapshot→cache read(version 관찰)→snapshot 확인→delegate→cache write→동일 snapshot 확인→반환 순서다. 성공은 upsert, `NOT_FOUND`는 관찰한 version 이하만 제거(캐시가 없었으면 no-op)해 늦은 404가 새 version을 지우지 않는다. 일반 오류는 캐시를 유지한다. 반환은 항상 delegate 응답이라 같은 version 캐시를 건너뛰어도 최신 표시명을 받는다. 캐시 read/write 실패는 ClientError로 반환하고, 계정/세대가 바뀌면 결과와 commit을 거절한다. 로그아웃 상태에서는 캐시 없이 delegate 결과를 그대로 반환한다. Presenter는 `GetItemRepository`만 소비한다.
 - **driver·검증 범위:** Android는 `AndroidSqliteDriver`(앱 sandbox, `DriverFactory(context)`), iOS는 `NativeSqliteDriver`다. 동작 suite는 같은 commonTest를 JDBC SQLite(androidHostTest, 임시 파일)와 Native SQLite(iosSimulatorArm64Test, 임시 파일)에서 `expect` 테스트 driver factory로 실행하며 close/reopen을 검증한다. Android Context driver는 C2에서 컴파일만 확인했고, C3 Task 5 에뮬레이터 smoke(API 36)에서 공유 → `am force-stop` → 재실행 뒤 대기 줄이 남는 것으로 실제 `wishlist.db` 동작을 확인했다. v1→v2 migration을 Android 기기 driver로 실행해 보지는 않았다(JDBC·Native에서만 검증).
@@ -294,12 +294,12 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 | DEBUG seed가 실패하면 runtime이 조용히 ready가 되지 않는다 | C3 | 해결(`fff233a`, handler 범위 `108a07f`): ready 게시 + `bootstrapFailure` |
 | `changeAccount`가 공개 `MutableAuthSession`을 통해 Swift에서 보인다 | C3 | 해결(`c791412`): `MutableAuthSession` internal, 앱은 `auth()`만 쓴다 |
 | Swift 테스트가 호스트 앱의 실제 `wishlist.db`를 공유한다 | 테스트 격리 후속 | 일부(`5846212`): XCTest host에서 앱 신호(inbox·refresh·네트워크)는 끈다. host 앱은 여전히 runtime을 만들고 debug 복원·seed를 같은 DB에 실행하며 여러 테스트 runtime도 그 파일을 연다. 테스트 전용 DB 경로가 필요하다 |
-| Fake는 UUID를 소문자로 정규화하지만 cache·LocalStore는 호출자의 원본 ID를 쓴다(대문자 ID는 stale cache row를 남기고, Presenter는 refresh 때 표시 중인 item을 버린다) | C4 | |
-| 계정이 바뀐 뒤 `retry()`가 이전 계정의 마지막 ID를 다시 요청한다(서버가 owner 범위라 누출은 없음) | C4 정책 결정 | |
-| repository의 의도치 않은 `CancellationException`이 `loading=true`를 남긴다. `close()` 뒤 state는 마지막 값을 유지한다 | C4 | |
-| 해독할 수 없는 cache row 하나가 그 item의 네트워크 GET을 막는다(계획대로의 동작) | C4에서 cache miss 처리 검토 | |
+| Fake는 UUID를 소문자로 정규화하지만 cache·LocalStore는 호출자의 원본 ID를 쓴다(대문자 ID는 stale cache row를 남기고, Presenter는 refresh 때 표시 중인 item을 버린다) | C4 | 해결(`da68a51` cache·LocalStore 정규화, `84c60bb` Presenter id 정규화) |
+| 계정이 바뀐 뒤 `retry()`가 이전 계정의 마지막 ID를 다시 요청한다(서버가 owner 범위라 누출은 없음) | C4 정책 결정 | 결정 D3(`84c60bb`): session 변경 때 마지막 ID를 버려 `retry()`·`refresh()`가 아무것도 하지 않는다 |
+| repository의 의도치 않은 `CancellationException`이 `loading=true`를 남긴다. `close()` 뒤 state는 마지막 값을 유지한다 | C4 | 해결(`84c60bb`): 새는 취소는 `DETAIL_STEP_FAILURE` 오류로 게시. close 뒤 state가 마지막 값에 멈추는 것은 의도 |
+| 해독할 수 없는 cache row 하나가 그 item의 네트워크 GET을 막는다(계획대로의 동작) | C4에서 cache miss 처리 검토 | 해결(`da68a51`): 해독 불가 행은 같은 transaction에서 지우고 없는 것으로 읽어 네트워크 GET으로 채운다(`processingItems`도 같은 규칙) |
 | `ScriptedItemServer`가 UUID가 아닌 id에 404를 돌려주지만 서버·Fake는 400이다 | fixture를 다시 만질 때(C4) | 해결(2026-10-09 연동 보완): 정규 36자 UUID 검사·400 오류, 생성 입력·시각 계약과 공통 시나리오 보강 |
-| Swift enum 이름 `.theRelease`가 어색하고, `RemoteConfig`는 https·path prefix를 검사하지 않는다 | 다듬기(C4/C12) | |
+| Swift enum 이름 `.theRelease`가 어색하고, `RemoteConfig`는 https·path prefix를 검사하지 않는다 | 다듬기(C4/C12) | C12로 이월(D18) |
 
 ### C3에서 생긴 항목
 
@@ -311,8 +311,17 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 | signIn이 seed 중 취소되면 저장 계정·session은 새 계정인데 `account`는 null로 남는다(취소에서만). 계정 전환 때 두 계정 사이에 잠깐 로그아웃 상태가 게시된다(화면 깜빡임 가능, 화면은 `Loading`으로 가림) | 인증 연결(Firebase facade로 교체할 때) |
 | 첫 실행 플래그 읽기 실패는 "안 봄", 쓰기 실패는 버린다. signIn의 seed 실패는 기록 없이 무시한다(logger 없음) | 인증 연결 |
 | NETWORK·TIMEOUT·RATE_LIMITED, 그리고 한 flush의 두 번째 서버 쪽 오류에서 flush를 멈춰 실패 행이 다음 신호·타이머까지 나머지를 늦춘다(Ruling 10·3차 리뷰, 의도. 서버 쪽 오류 행 하나만으로는 멈추지 않는다). 행마다 view를 다시 계산하던 비용은 PR #12 리뷰의 게시 합치기와 200ms 게시 간격으로 제한했다 | C7(목록 규모가 커질 때) |
-| 테스트 보강: 닫힌 store 호출 테스트가 close 뒤 DB 미접촉을 단언하지 않는다(`homePresenter()`/`accountPresenter()` runtime 연결 테스트는 PR #12 리뷰에서 추가) | 다음 Presenter 변경 때(C4) |
+| 테스트 보강: 닫힌 store 호출 테스트가 close 뒤 DB 미접촉을 단언하지 않는다(`homePresenter()`/`accountPresenter()` runtime 연결 테스트는 PR #12 리뷰에서 추가) | 다음 Presenter 변경 때(C4) → 해결(`932281e`): `RuntimeCloseLeaseTest`가 close 뒤 graph store 호출의 DB 미접촉을 단언 |
 | 계층: `data.fake.FakeAuthFacade`가 `di.BOOTSTRAP_FAILURE`를, `data.local.SqlLocalStore`가 `di.RUNTIME_NOT_READY`를 가져온다. release `Shared.h`에 DEBUG 전용 `DebugControls`가 남는다(같은 Kotlin binary) | 다듬기(C12) |
 | DEBUG Fake 전용: `failNext`/`delayNext`가 `SESSION_CHANGED` 거절 전에 소비되고, DEBUG 분석 진행이 대기 중인 `failNext(CAT_01)`를 소비할 수 있다 | debug 도구를 다시 만질 때 |
 
 참고: `ItemDetailPresenter`의 `CoroutineDispatcher` 생성자는 Android 단위 테스트가 쓰므로 Kotlin에서는 공개로 두며(`@HiddenFromObjC`는 생성자에 적용할 수 없다), Swift는 `SharedRuntime.itemDetailPresenter()`만 쓴다. C3의 `AccountPresenter`·`HomePresenter` 생성자는 `internal`이다(Android 소유자 테스트는 그래서 reflection을 쓴다). `data.fake` 계층과 `RuntimeDispatchers`는 `internal`이라 RELEASE `Shared.h`에 나오지 않는다.
+
+### C4에서 생긴 항목
+
+| 한계 | 담당 단계 |
+|--|--|
+| 같은 version의 표시 metadata(목적 이름·색·아이콘)는 그 항목의 GET에서만 갱신된다. `accept`(전송 응답)나 목록 경로는 같은 version의 cache 행을 덮지 않으므로 목록·목적 화면은 갱신 시점이 다를 수 있다 | C5/C6(목록·목적 화면이 표시 metadata를 읽을 때) |
+| 같은 항목에 겹친 GET이 있으면 version이 같은 채 먼저 시작한 응답이 나중에 써서 표시 이름이 되돌아갈 수 있다(마지막 쓰기 승리) | C5/C6 |
+| `LocalSubmissionDetailPresenter`는 계정을 떠난 뒤 다음 load 전까지 아무것도 판정하지 않는다(sticky skip, Ruling 5). 셸이 늦게 닫으면 그 사이 화면은 미결정 상태다 | 다듬기 |
+| 웹뷰 실기기 확인(D16 외부 앱 확인창 빈도, `window.opener` 손실)은 PR B 문서에서 다룬다 | PR B·인증 연결 |

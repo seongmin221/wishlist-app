@@ -35,7 +35,7 @@ FakeStore가 단독으로 생성 idempotency·최신 snapshot 재전송·삭제 
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ITEM-01 | B1 완료 | C2 기반 → C3 사용(공유 전송) | FAKE / UNAVAILABLE | 구현 · 공통 계약 17개 통과 · C3 snapshot create | 구현 · `RemoteItemRepository` | 공통 계약 17개 + Remote 집중 테스트 통과 | 실HTTP·DB repository 검증 / 앱·Firebase 미실행 |
 | ITEM-02 | B4 완료 | C5/C6 → C7 | UNAVAILABLE / UNAVAILABLE | 시드 조회 구현 · wire projection 미구현 | 미구현 · C5/C6 → C7 | 미실행 | 미실행 |
-| ITEM-03 | B1 완료 | C2 기반 → C3 refresh 사용 → C4 | FAKE / UNAVAILABLE | 구현 · 공통 계약 17개 통과 | 구현 · `RemoteItemRepository` | 공통 계약 17개 + Remote 집중 테스트 통과 | 실HTTP·DB repository 검증 / 앱·Firebase 미실행 |
+| ITEM-03 | B1 완료 | C2 기반 → C3 refresh 사용 → C4 상품 상세 조회(PR A, 캐시 decorator 경유) | FAKE / UNAVAILABLE | 구현 · 공통 계약 17개 통과 | 구현 · `RemoteItemRepository` | 공통 계약 17개 + Remote 집중 테스트 통과 | 실HTTP·DB repository 검증 / 앱·Firebase 미실행 |
 | ITEM-04 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
 | ITEM-05 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
 | ITEM-06 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
