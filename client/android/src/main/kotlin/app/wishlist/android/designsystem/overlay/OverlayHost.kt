@@ -31,7 +31,8 @@ import app.wishlist.android.designsystem.WishlistTokens
 
 /**
  * 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. `target`은 제목 아래 대상 줄(썸네일 + 이름)이다.
- * `icon`은 제목 위 머리 타일(보드 FWebViewExternal의 48 상태색 타일)이다.
+ * `icon`은 제목 위 머리 타일(보드 FWebViewExternal의 48 상태색 타일)이다. `onDismissed`는 취소·확인·뒤로 어느 쪽이든
+ * 창이 다 닫힌 뒤 한 번 불린다.
  */
 data class WLDialogSpec(
     val title: String,
@@ -41,6 +42,7 @@ data class WLDialogSpec(
     val confirmKind: WLButtonKind,
     val target: WLDialogTarget? = null,
     val icon: (@Composable () -> Unit)? = null,
+    val onDismissed: () -> Unit = {},
     val onConfirm: () -> Unit,
 )
 
@@ -150,7 +152,9 @@ class OverlayHostState {
     }
 
     internal fun onClosed(id: Long) {
+        val closed = entries.filter { it.id == id }
         entries.removeAll { it.id == id }
+        closed.forEach { (it as? DialogEntry)?.spec?.onDismissed?.invoke() }
         if (entries.none { it.phase == OverlayPhase.Closing }) {
             if (dismissingAll) {
                 val top = entries.lastOrNull()

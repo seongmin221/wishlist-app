@@ -158,4 +158,19 @@ class OverlayHostStateTest {
         s.settleOpen(); s.dismiss(); assertTrue(s.isShowing)
         s.settleClose(); assertFalse(s.isShowing)
     }
+
+    @Test fun dialogReportsItsCloseOnceWhetherCancelledOrConfirmed() {
+        var closed = 0
+        var confirmed = 0
+        val tracked = WLDialogSpec("t", emptyList(), "취소", "확인", WLButtonKind.Primary, onDismissed = { closed++ }) { confirmed++ }
+        val s = OverlayHostState()
+        s.showDialog(tracked); s.settleOpen()
+        s.dismiss(); s.settleClose()
+        assertEquals(1, closed)
+        assertEquals(0, confirmed)
+        s.showDialog(tracked); s.settleOpen()
+        s.confirm(s.entries.single().id); s.settleClose()
+        assertEquals(2, closed)
+        assertEquals(1, confirmed)
+    }
 }

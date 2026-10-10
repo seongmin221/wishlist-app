@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.MutableContextWrapper
 import android.graphics.Bitmap
 import android.view.ViewGroup
+import android.view.ViewParent
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -109,6 +110,9 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
 
     val externalRequests = Channel<ExternalRequest>(Channel.BUFFERED)
 
+    /** FWebViewExternal flood guard; kept here so it survives configuration changes with the page. */
+    val promptGate = ExternalPromptGate()
+
     /** For `AndroidView.factory`: the kept WebView, re-parented and re-based on [activity]. */
     fun attach(activity: Context): WebView {
         val view = webView ?: create().also { webView = it }
@@ -121,8 +125,13 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
         return view
     }
 
-    /** For `AndroidView.onRelease`: the view stays alive in this holder, holding only the application context. */
-    fun detach(view: WebView) {
+    /**
+     * For `AndroidView.onRelease`: the view stays alive in this holder, holding only the application context.
+     * [boundParent] is the parent this AndroidView gave the view (recorded in `update`). If the view already
+     * moved to another AndroidView (a later [attach] won the race), it is left there with its Activity base.
+     */
+    fun detach(view: WebView, boundParent: ViewParent?) {
+        if (view.parent !== boundParent) return
         (view.parent as? ViewGroup)?.removeView(view)
         if (view === webView) context.baseContext = app
     }
@@ -187,7 +196,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
                 WebDecision.LOAD_INSIDE -> false
                 WebDecision.BLOCK -> true
                 WebDecision.OPEN_EXTERNAL, WebDecision.CONFIRM_EXTERNAL -> {
-                    when (val target = WebExternalApps.targetOf(url)) {
+                    when (val target = WebExternalApps.targetOf(url, request.isForMainFrame, request.hasGesture())) {
                         is ExternalTarget.Launch ->
                             externalRequests.trySend(ExternalRequest(target, confirm = decision == WebDecision.CONFIRM_EXTERNAL))
                         is ExternalTarget.LoadInside -> view.post { if (view === webView) view.loadUrl(target.url) }
@@ -198,7 +207,9 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
             }
         }
 
+        // Main frame only (WebView never reports iframe loads here).
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+            url?.let(promptGate::onMainFrameNavigation)
             page = page.copy(url = url ?: page.url, title = null, loading = true, failed = false)
         }
 
@@ -287,11 +298,28 @@ internal fun WebViewScreen(route: WebViewRoute) {
     val externalDialog by rememberUpdatedState(externalDialogSpec())
     val currentContext by rememberUpdatedState(context)
     LaunchedEffect(holder) {
+        val gate = holder.promptGate
+        // A fresh composition (Activity recreated) has a fresh OverlayHost: a dialog that was up is gone.
+        gate.onScreenRestarted(holder.page.url)
+        // Requests a page queued while no screen was there to show them are dropped, not replayed.
+        while (holder.externalRequests.tryReceive().isSuccess) Unit
         for (request in holder.externalRequests) {
-            if (request.confirm) {
-                overlay.showDialog(externalDialog.copy(onConfirm = { WebExternalApps.launch(currentContext, request.target, holder::load) }))
-            } else {
-                WebExternalApps.launch(currentContext, request.target, holder::load)
+            when (gate.onRequest(request.confirm)) {
+                ExternalPromptGate.Action.LAUNCH -> WebExternalApps.launch(currentContext, request.target, holder::load)
+                ExternalPromptGate.Action.DROP -> Unit
+                ExternalPromptGate.Action.PROMPT -> {
+                    var confirmed = false
+                    val shown = overlay.showDialog(
+                        externalDialog.copy(
+                            onConfirm = {
+                                confirmed = true
+                                WebExternalApps.launch(currentContext, request.target, holder::load)
+                            },
+                            onDismissed = { gate.onPromptClosed(confirmed, holder.page.url) },
+                        ),
+                    )
+                    if (!shown) gate.onPromptNotShown()
+                }
             }
         }
     }
@@ -323,10 +351,12 @@ internal fun WebViewScreen(route: WebViewRoute) {
             ProgressLine(page)
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 key(holder.generation) {
+                    val bound = remember { BoundParent() }
                     AndroidView(
                         factory = { holder.attach(it) },
                         modifier = Modifier.fillMaxSize(),
-                        onRelease = { holder.detach(it) },
+                        update = { bound.parent = it.parent },
+                        onRelease = { holder.detach(it, bound.parent) },
                     )
                 }
                 if (page.failed) {
@@ -345,6 +375,11 @@ internal fun WebViewScreen(route: WebViewRoute) {
         }
         DetailNoticeLine(notice, Modifier.align(Alignment.TopCenter))
     }
+}
+
+/** The parent one `AndroidView` gave the shared WebView, so its release only undoes its own attachment. */
+private class BoundParent {
+    var parent: ViewParent? = null
 }
 
 /** FWebViewExternal: 48 상태(바깥 앱) 타일 · "외부 앱을 열까요?" · 두 줄 · 취소 / 열기(먹색, 결정 2026-10-04). */

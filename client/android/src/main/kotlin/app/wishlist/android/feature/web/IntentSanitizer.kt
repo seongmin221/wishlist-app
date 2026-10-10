@@ -21,6 +21,7 @@ internal interface IntentTarget {
     val fallbackUrl: String?
     fun clearComponent()
     fun clearSelector()
+    fun clearFlags()
     fun addBrowsableCategory()
 }
 
@@ -74,6 +75,9 @@ internal object IntentSanitizer {
         if (scheme in inWebViewOnly) return fallbackOrDrop(target.fallbackUrl)
         target.clearComponent()
         target.clearSelector()
+        // A page must not hand the target app URI grants (FLAG_GRANT_*) or task/launch flags; none are needed
+        // when starting from the Activity.
+        target.clearFlags()
         target.addBrowsableCategory()
         return if (resolvable(target)) SanitizedIntent.External(target) else fallbackOrDrop(target.fallbackUrl)
     }
@@ -86,6 +90,7 @@ internal object IntentSanitizer {
         override val fallbackUrl: String? get() = intent.getStringExtra(FALLBACK_EXTRA)
         override fun clearComponent() { intent.component = null }
         override fun clearSelector() { intent.selector = null }
+        override fun clearFlags() { intent.flags = 0 }
         override fun addBrowsableCategory() { intent.addCategory(Intent.CATEGORY_BROWSABLE) }
     }
 }
@@ -101,7 +106,11 @@ internal class ParsedIntentUri private constructor(
     component: String?,
     hasSelector: Boolean,
     override val fallbackUrl: String?,
+    flags: Int,
 ) : IntentTarget {
+    /** `launchFlags=`, like `Intent.getFlags()`. */
+    var flags: Int = flags
+        private set
     var component: String? = component
         private set
     var hasSelector: Boolean = hasSelector
@@ -111,6 +120,7 @@ internal class ParsedIntentUri private constructor(
 
     override fun clearComponent() { component = null }
     override fun clearSelector() { hasSelector = false }
+    override fun clearFlags() { flags = 0 }
     override fun addBrowsableCategory() { mutableCategories += CATEGORY_BROWSABLE }
 
     companion object {
@@ -131,6 +141,7 @@ internal class ParsedIntentUri private constructor(
             var pkg: String? = null
             var component: String? = null
             var fallback: String? = null
+            var flags = 0
             var inSelector = false
             for (field in fields.subList(0, end)) {
                 if (field == "SEL") { inSelector = true; continue }
@@ -144,14 +155,22 @@ internal class ParsedIntentUri private constructor(
                     "package" -> pkg = value
                     "component" -> component = value
                     "S.$FALLBACK_KEY" -> fallback = value
+                    "launchFlags" -> flags = value?.let(::parseFlags) ?: 0
                 }
             }
             val data = uri.substring(PREFIX.length, hash)
             val dataScheme = scheme ?: data.substringBefore(':', "").takeIf { ':' in data && it.isNotEmpty() && '/' !in it }
-            return ParsedIntentUri(dataScheme, pkg, component, inSelector, fallback)
+            return ParsedIntentUri(dataScheme, pkg, component, inSelector, fallback, flags)
         }
 
         private const val FALLBACK_KEY = "browser_fallback_url"
+
+        /** `Intent.parseUri` reads `launchFlags` with `Integer.decode` (`0x…` hex or decimal). */
+        private fun parseFlags(value: String): Int? = try {
+            Integer.decode(value)
+        } catch (_: NumberFormatException) {
+            null
+        }
 
         private fun decode(value: String): String? = try {
             URLDecoder.decode(value.replace("+", "%2B"), "UTF-8") // Charset overload is API 33+

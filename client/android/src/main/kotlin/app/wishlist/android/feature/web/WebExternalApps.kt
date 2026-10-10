@@ -30,14 +30,15 @@ internal object WebExternalApps {
      * ([launch]), which then falls back to `browser_fallback_url`.
      */
     @Suppress("UseKtx") // Uri.parse: core-ktx is only a transitive dependency of this module.
-    fun targetOf(url: String): ExternalTarget {
+    fun targetOf(url: String, mainFrame: Boolean, userGesture: Boolean): ExternalTarget {
         if (schemeOf(url).equals("intent", ignoreCase = true)) {
+            val fallbackOk = fallbackAllowed(mainFrame, userGesture)
             return when (val r = IntentSanitizer.sanitize(url) { true }) {
                 is SanitizedIntent.External -> ExternalTarget.Launch(
                     r.intent,
-                    r.intent.getStringExtra(FALLBACK_EXTRA)?.takeIf(WebUrl::isWeb),
+                    r.intent.getStringExtra(FALLBACK_EXTRA)?.takeIf { fallbackOk && WebUrl.isWeb(it) },
                 )
-                is SanitizedIntent.Fallback -> ExternalTarget.LoadInside(r.url)
+                is SanitizedIntent.Fallback -> if (fallbackOk) ExternalTarget.LoadInside(r.url) else ExternalTarget.None
                 SanitizedIntent.Drop -> ExternalTarget.None
             }
         }
@@ -47,6 +48,13 @@ internal object WebExternalApps {
         }
         return ExternalTarget.Launch(intent, null)
     }
+
+    /**
+     * Whether an `intent:` navigation may load its `browser_fallback_url` into the web view, which always means
+     * the main frame. From an iframe (an ad, say) only after a user tap: otherwise the iframe could replace the
+     * whole page with any web URL (frame busting). Main-frame navigations keep their fallback.
+     */
+    fun fallbackAllowed(mainFrame: Boolean, userGesture: Boolean): Boolean = mainFrame || userGesture
 
     /** Starts [target]; on no app, loads its fallback through [loadInside]. Other failures do nothing (D16). */
     fun launch(context: Context, target: ExternalTarget.Launch, loadInside: (String) -> Unit) {

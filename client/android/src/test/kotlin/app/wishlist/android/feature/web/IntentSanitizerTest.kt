@@ -147,4 +147,20 @@ class IntentSanitizerTest {
         ).forEach { assertNull(it, ParsedIntentUri.parse(it)) }
         assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize(null, always))
     }
+
+    @Test
+    fun launchFlagsAreClearedIncludingUriGrants() {
+        // 0x43 = FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION | FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        val parsed = ParsedIntentUri.parse("intent://x/#Intent;scheme=pay;launchFlags=0x43;end")!!
+        assertEquals(0x43, parsed.flags)
+        val target = (IntentSanitizer.sanitize(parsed, always) as SanitizedIntent.External).intent
+        assertEquals(0, target.flags)
+    }
+
+    @Test
+    fun flagsAreClearedBeforeResolvabilityIsAsked() {
+        var seen = -1
+        sanitize("intent://x/#Intent;scheme=pay;launchFlags=0x10000000;end") { seen = it.flags; true }
+        assertEquals(0, seen)
+    }
 }

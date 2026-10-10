@@ -63,3 +63,18 @@ class WebPageStateTest {
         assertEquals("", schemeOf("no-colon"))
     }
 }
+
+/** Frame-busting guard: an iframe must not put a fallback URL into the main frame without a tap. */
+class WebFallbackRuleTest {
+    @Test
+    fun mainFrameFallbacksStay() {
+        assertTrue(WebExternalApps.fallbackAllowed(mainFrame = true, userGesture = false))
+        assertTrue(WebExternalApps.fallbackAllowed(mainFrame = true, userGesture = true))
+    }
+
+    @Test
+    fun subFrameFallbackNeedsATap() {
+        assertTrue(WebExternalApps.fallbackAllowed(mainFrame = false, userGesture = true))
+        assertFalse(WebExternalApps.fallbackAllowed(mainFrame = false, userGesture = false))
+    }
+}
