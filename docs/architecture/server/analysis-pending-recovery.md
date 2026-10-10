@@ -40,7 +40,7 @@ B5에서 유효 실행의 Retryable은 retry outbox를 저장한 뒤 HTTP 204로
 [B5 결정](../../history/product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md)과 [B5 spec](../../superpowers/specs/2026-10-09-b5-analysis-runtime-recovery-design.md)을 따른다.
 
 - `maintenance` 역할의 `POST /internal/maintenance/run`이 한 번에 outbox backlog 발행(100건) → 만료 RUNNING 복구 → 오래된 PENDING 복구 → LLM 예산 정리를 실행한다. 단계별로 실패를 격리한다. 발행은 30초까지만 쓰고 복구 단계는 50초 deadline을 공유하며, budget 정리는 항상 실행한다. 실패 단계가 있으면 500과 report를 반환한다.
-- backlog 발행은 이번 실행에서 실패한 event만 제외하고 계속한다. retry outbox의 `not_before`는 Cloud Tasks `scheduleTime`으로 넘겨 ADR-009 backoff(10초부터 2배, 최대 600초)를 유지한다.
+- backlog 발행은 이번 실행에서 실패한 event만 제외하고 계속한다. retry outbox의 `not_before`는 Cloud Tasks `scheduleTime`으로 넘겨 ADR-009 backoff(10초부터 2배, 최대 600초)를 유지한다. 다만 Worker가 ACK와 함께 남긴 retry outbox와 reconciler가 만든 outbox는 다음 maintenance 실행에서 발행되므로, 실제 재시도 간격은 `max(not_before, 다음 Scheduler 실행까지 남은 시간)`이다.
 - PENDING 발견: `updated_at` 5분 경과, `recovery_check_at` 도래, 최신 outbox가 발행됐거나 없음. 미발행 event는 발행 단계의 대상이라 발견 batch(50)를 차지하지 않는다.
 - `TaskGateway.status`(getTask, 5초)로 transaction 밖에서 확인한다. ALIVE는 5분 뒤, 조회 실패는 1분 뒤 다시 본다. MISSING만 owner→item→job 잠금 뒤 stage·`updated_at`·최신 outbox ID를 재검증한다.
 - 결과: 비활성·이전 generation은 job CANCELLED, generation 예산 소진 또는 `recovery_seq` 누적 3회는 `failExhausted`(읽은 metadata 반영 + FAILED_RETRYABLE), 그 외는 `recovery_seq` 증가와 새 outbox(`…-pending-{seq}`) 저장. task_name UNIQUE로 동시 실행도 1건이다.

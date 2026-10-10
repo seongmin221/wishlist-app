@@ -46,6 +46,23 @@
 
 수정하지 않고 남긴 Minor: proxy 기본 connect 실패 시 Socket 미종료, proxy slot 32와 Chromium 한도 일치, PENDING 예외 경로의 defer 재실패 시 단계 실패, reconcile의 deadline 미사용, V17 `wishlist_items` CHECK의 전체 스캔(B11 이전 운영 데이터 없음 전제), reconciler defer가 다른 transaction 뒤 최대 1분 지연을 남길 수 있음, 공유 resolver의 동시 lookup 20건 초과 시 실패.
 
+## PR #17 코드리뷰 반영 (2026-10-10)
+
+PR 단계에서 별도 reviewer subagent가 `origin/develop...HEAD`를 spec과 대조했다. High 1, Medium 2, Low 3이었다. 동시성·잠금 순서 쪽에서는 문제를 찾지 못했다.
+
+| 지적 | 처리 | 검증 |
+| --- | --- | --- |
+| (High) DNS가 돌려준 IPv4-mapped AAAA(`::ffff:169.254.169.254`)가 `Inet6Address`로 남아 차단을 우회 | mapped는 내장 IPv4로 재검사, SIIT·Teredo·64:ff9b:1::/48 차단 | `Inet6Address.getByAddress`로 만든 DNS 응답 테스트 |
+| (Medium) Playwright 시작·launch 실패까지 navigation timeout으로 바뀌어 PARTIAL 확정(spec §5 위반) | navigation·내용 읽기 구간만 PARTIAL, 나머지는 전파해 Retryable | Playwright 생성 실패 주입 테스트 |
+| (Medium) browser 공용 resolver 포화로 정상 host가 403·DNS 실패 | render 안 route·proxy 검증 결과 재사용, browser resolver 8·128, 시간 초과 조회를 queue에서 제거 | proxy 고정 재사용 테스트, 실제 Chromium 테스트 |
+| (Low) reconcile 단계가 maintenance deadline 무시 | `reconcileExpired(deadlineNanos)` | 마감 후 후보 보류 테스트 |
+| (Low) 평문 HTTP proxy 연결 재사용으로 다른 origin 요청이 첫 host로 전달 | 응답 hop-by-hop 헤더 제거 후 `Connection: close` | keep-alive upstream 테스트 |
+| (Low) V17 CHECK 즉시 검증의 잠금 | 변경 없음. B11 이전 운영 데이터 없음 전제를 migration 주석에 이미 기록 | — |
+
+proxy는 이제 연결마다 다시 해석하지 않고, 한 render 안에서 처음 검증한 주소로 고정한다. 기존 "연결마다 재검증해 rebinding 응답을 거부" 테스트는 "rebinding 응답을 아예 쓰지 않음"으로 바꿨다. 검증된 주소에만 연결한다는 보안 성질은 같다. 실제 backoff가 다음 maintenance 실행에 묶인다는 점은 [PENDING 복구 문서](../../../architecture/server/analysis-pending-recovery.md)에 적었다.
+
+반영 후 `./gradlew test`: 439 tests, 실패·오류 0, skip 2(opt-in). `RUN_BROWSER_TESTS=1` `PlaywrightRealBrowserTest` 통과.
+
 ## 검증
 
 명령은 [로컬 테스트 환경](../../../architecture/server/local-test-environment.md#전체-테스트-실행)의 Podman/JDK 설정으로 실행했다.
