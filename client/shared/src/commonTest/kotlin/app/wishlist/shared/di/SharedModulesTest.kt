@@ -385,6 +385,31 @@ class SharedModulesTest {
         runtime.close()
     }
 
+    @Test fun debug_detail_refresh_advances_the_fake_analysis_before_its_get() = runTest {
+        var now = runtimeTime
+        val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler), clock = Clock { now })
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
+        val submissions = runtime.submissions()
+        assertEquals(ShareCardKind.SAVED, submissions.receiveShared("https://shop.example/p/2", online = true))
+        advanceUntilIdle()
+        val processing = submissions.view.value!!.processing.single()
+
+        val presenter = runtime.itemDetailPresenter()
+        presenter.load(processing.id)
+        advanceUntilIdle()
+        assertEquals(AnalysisStatus.PROCESSING, presenter.state.value.item?.analysis?.status) // younger than 5s
+
+        // D7 in DEBUG: the detail's own pull to refresh finishes a due fake analysis, no coordinator refresh needed.
+        now += 5.seconds
+        presenter.refresh()
+        advanceUntilIdle()
+        assertEquals(AnalysisStatus.READY, presenter.state.value.item?.analysis?.status)
+        presenter.close()
+        runtime.close()
+    }
+
     // --- Local link detail Presenter from the runtime ---------------------------------------------
 
     @Test fun runtime_local_detail_presenter_uses_the_runtime_view_session_and_store() = runTest {
