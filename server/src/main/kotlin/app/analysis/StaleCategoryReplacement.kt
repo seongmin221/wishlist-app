@@ -4,9 +4,8 @@ import java.sql.Connection
 import java.util.UUID
 
 internal fun Connection.replaceStaleCategoryJob(claim: AnalysisClaim, job: LockedAnalysisJob) {
-    if (!job.hasRetryBudget(AnalysisLane.GENERAL, analysisDatabaseTime())) {
-        transitionAnalysisJob(claim.jobId, "FAILED")
-        failRetryableItem(claim.itemId)
+    if (!job.hasRetryBudget(analysisDatabaseTime())) {
+        failExhausted(claim.jobId, claim.itemId)
         return
     }
     transitionAnalysisJob(claim.jobId, "CANCELLED")

@@ -40,6 +40,11 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             return WorkerDisposition.ACKNOWLEDGE
         }
         if (outcome == ProcessingOutcome.NeedsBrowser && claim.lane == AnalysisLane.GENERAL && !job.browserAttempted) {
+            // The fallback is one more execution of the same generation budget.
+            if (!job.hasRetryBudget(c.analysisDatabaseTime())) {
+                c.failExhausted(claim.jobId, claim.itemId)
+                return WorkerDisposition.ACKNOWLEDGE
+            }
             c.transitionAnalysisJob(claim.jobId, "BROWSER_PENDING", fallback = true)
             c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,'BROWSER_ANALYSIS',?)").use { s ->
                 s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
@@ -48,16 +53,21 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             return WorkerDisposition.ACKNOWLEDGE
         }
         if (outcome == ProcessingOutcome.Retryable) {
-            if (job.hasRetryBudget(claim.lane, c.analysisDatabaseTime())) {
-                c.transitionAnalysisJob(claim.jobId, "${claim.lane.name}_PENDING")
-                c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,?,?)").use { s ->
-                    s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
-                    s.setString(3, if (claim.lane == AnalysisLane.GENERAL) "GENERAL_ANALYSIS" else "BROWSER_ANALYSIS")
-                    s.setString(4, "${claim.lane.name.lowercase()}-${claim.jobId}-${claim.generation}-retry-${claim.executionToken}")
-                    check(s.executeUpdate() == 1)
-                }
-                return WorkerDisposition.RETRY
+            if (!job.hasRetryBudget(c.analysisDatabaseTime())) {
+                c.failExhausted(claim.jobId, claim.itemId)
+                return WorkerDisposition.ACKNOWLEDGE
             }
+            c.transitionAnalysisJob(claim.jobId, "${claim.lane.name}_PENDING")
+            c.prepareStatement("""insert into outbox_events(id,analysis_job_id,event_type,task_name,not_before)
+                values (?,?,?,?,clock_timestamp()+make_interval(secs => ?))""").use { s ->
+                s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
+                s.setString(3, if (claim.lane == AnalysisLane.GENERAL) "GENERAL_ANALYSIS" else "BROWSER_ANALYSIS")
+                s.setString(4, "${claim.lane.name.lowercase()}-${claim.jobId}-${claim.generation}-retry-${claim.executionToken}")
+                s.setDouble(5, retryBackoffSeconds(job.attempts + job.browserAttempts).toDouble())
+                check(s.executeUpdate() == 1)
+            }
+            // The durable retry outbox now owns progress; ending this task avoids a second delivery spending budget.
+            return WorkerDisposition.ACKNOWLEDGE
         }
 
         val pending = readPending(c, claim.jobId)

@@ -77,9 +77,8 @@ class AnalysisJobReconciler(
         }
         val lane = if (browser) AnalysisLane.BROWSER else AnalysisLane.GENERAL
         val attempts = job.attemptsFor(lane)
-        if (!job.hasRetryBudget(lane, now)) {
-            connection.transitionAnalysisJob(candidate.id, "FAILED")
-            connection.failRetryableItem(candidate.itemId)
+        if (!job.hasRetryBudget(now)) {
+            connection.failExhausted(candidate.id, candidate.itemId)
         } else {
             connection.transitionAnalysisJob(candidate.id, if (browser) "BROWSER_PENDING" else "GENERAL_PENDING")
             connection.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,?,?)").use { statement ->

@@ -95,13 +95,14 @@ class AnalysisJobReconcilerTest {
         }
     }
 
-    @Test fun `expired limits fail once using lane attempts and database deadline`() = withAnalysisDatabase { source ->
+    @Test fun `expired limits fail once using combined generation attempts and database deadline`() = withAnalysisDatabase { source ->
         for (lane in AnalysisLane.entries) for (limit in listOf("attempts", "deadline")) {
             val claim = newAnalysisClaim(source, lane)
             expire(source, claim)
+            // The other lane's counter and first attempt count toward the same generation budget.
             val column = if (limit == "attempts") {
-                if (lane == AnalysisLane.GENERAL) "attempt_count=3" else "browser_attempt_count=3"
-            } else if (lane == AnalysisLane.GENERAL) "first_attempt_at=clock_timestamp()-interval '30 minutes'" else "first_browser_attempt_at=clock_timestamp()-interval '30 minutes'"
+                if (lane == AnalysisLane.GENERAL) "browser_attempt_count=2" else "attempt_count=2"
+            } else if (lane == AnalysisLane.GENERAL) "first_browser_attempt_at=clock_timestamp()-interval '30 minutes'" else "first_attempt_at=clock_timestamp()-interval '30 minutes'"
             analysisSql(source, "update analysis_jobs set $column where id='${claim.jobId}'")
             val before = finishSnapshot(source, FinishJob(claim.itemId, claim.jobId))
             assertEquals(1, AnalysisJobReconciler(source).reconcileExpired())
