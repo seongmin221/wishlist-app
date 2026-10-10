@@ -92,4 +92,6 @@
 - **전환 중 stack 변경:** `pop`·`replaceTop`은 전환 중 false이므로 화면은 `WLNavigator.whenSettled(route) { … }`로 전환이 끝날 때까지 기다렸다가 다시 시도하고, 그 route가 더 이상 맨 위가 아니면 그만둔다(밀려 들어오는 중에 온 `MovedTo`·`Initial`).
 - **표시 함수(`DetailText`, 순수):** `noticeText`·`savedText`(`SavedLabel` → `detail_saved_*`, 여러 인자는 `ResText.args`)·`errorText`(NETWORK·TIMEOUT → 불러오지 못했어요, NOT_FOUND → 삭제됨, 그 밖 → 서버)·`priceCheckedText`(`time_*`를 안에 둔 `ResText`)·`purposeColor(colorKey)`(wire `CORAL`을 소문자로 바꿔 `PurposeKeys.colorKeys`에 있으면 그 토큰, 아니면 null → `textSecondary` 중립 점). 시각은 기기 시간대(`TimeZone.getOffset`)와 1분마다 움직이는 now로 계산한다. JVM 테스트 `DetailTextTest`·`ItemDetailCloseTest`·`LocalSubmissionPresenterOwnerTest`.
 - **홈 진입점:** `HomeLinkRow` 전체가 `clickable`(접근성 동작 이름 `home_row_open_detail`)이고 `HomeRow.target`으로 `Item` → `ItemDetailRoute`, `Local` → `LocalSubmissionRoute`를 push한다(로그인 전·후 모두). 로그인 전 줄의 "원본"은 `home_row_open_original` 이름으로 시스템 브라우저를 연다(PR B에서 웹뷰).
-- **DEBUG 한계:** Fake 분석 완료는 coordinator refresh(홈 당김·foreground) 때만 진행한다. 상세의 당겨서 새로고침은 GET만 하므로, DEBUG에서는 foreground·홈 새로고침으로 완료된 뒤 상세를 당기면 상세로 바뀐다(실서버에서는 서버가 분석을 진행한다).
+- **DEBUG 분석 진행:** Fake ITEM-03이면 runtime의 상세 GET이 먼저 `DebugAnalysisDriver.advance()`를 부른다(coordinator refresh와 같은 5초 규칙). 상세 진입·당겨서 새로고침만으로 분석 중 → 상세 전환이 보인다(D7). RELEASE·REMOTE는 그대로다([KMP 구조](kmp.md)).
+- **사진:** 완료 상세는 1:1 칸(모서리 20) 안 여백 56에 사진을 원래 비율로(`ContentScale.Fit`) 넣고, 로딩·실패·주소 없음은 칸 전체 자리표시다. 다른 호출(기본값)은 Crop.
+- **짧은 안내 재표시 방지:** "이미 알린 오류"(상세: 오류 인스턴스, 로컬: 삭제 실패 플래그)를 owner(`takeRefreshNotice`·`takeDeleteFailureNotice`)에 둬 회전 뒤 같은 상태를 다시 읽어도 안내가 다시 뜨지 않는다.

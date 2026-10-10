@@ -77,7 +77,7 @@ internal fun LocalSubmissionScreen(submissionId: String) {
     val failedText = stringResource(R.string.local_delete_failed)
     // Each failed delete shows the line again (the flag is cleared by the next view).
     val failures = remember(owner) { mutableIntStateOf(0) }
-    LaunchedEffect(state.deleteFailed) { if (state.deleteFailed) failures.intValue++ }
+    LaunchedEffect(state) { if (owner.takeDeleteFailureNotice(state)) failures.intValue++ }
     val notice = rememberBriefNotice(failures.intValue.takeIf { it > 0 }, failedText)
     val close = { nav.pop(); Unit }
     val row = state.row

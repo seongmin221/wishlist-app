@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -117,7 +118,7 @@ internal fun ItemDetailScreen(itemId: String) {
     val error = state.error
     // Each refresh that fails while an item is shown brings the short line back.
     val failures = remember(owner) { mutableIntStateOf(0) }
-    LaunchedEffect(state) { if (state.item != null && state.error != null && !state.loading) failures.intValue++ }
+    LaunchedEffect(state) { if (owner.takeRefreshNotice(state)) failures.intValue++ }
     val notice = rememberBriefNotice(failures.intValue.takeIf { it > 0 }, error?.let { stringResource(DetailText.errorText(it)) }.orEmpty())
     val close = { nav.pop(); Unit }
     val kind = item?.let { DetailKinds.of(it) }
@@ -167,7 +168,8 @@ private fun PhotoFrame(content: @Composable () -> Unit) {
 private fun ProductContent(item: WishlistItem, noticeRes: Int?) {
     val c = LocalWLColors.current
     val now = rememberMinuteClock()
-    PhotoFrame { ProductPhoto(item.product.imageUrl, Modifier.fillMaxSize()) }
+    // 2026-10-04: 1:1 칸(모서리 20) 안 여백 56에 사진을 원래 비율로(보드 FProductDetail). 자리표시는 칸 전체.
+    PhotoFrame { ProductPhoto(item.product.imageUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, imagePadding = 56.dp) }
     Column(
         Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp),
         verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s20),
@@ -305,12 +307,14 @@ internal fun WaitingFrame(icon: WLLineIcon, tile: Pair<Color, Color>, caption: S
             .height(222.dp)
             .clip(RoundedCornerShape(WishlistTokens.Radius.l))
             .background(c.card)
-            .semantics(mergeDescendants = true) { contentDescription = caption },
+            .then(if (caption.isEmpty()) Modifier else Modifier.semantics(mergeDescendants = true) { contentDescription = caption }),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
     ) {
         WLIconTile(size = 56.dp, radius = WishlistTokens.Radius.m, color = tile.first) { WLIcon(icon, size = 28.dp, color = tile.second) }
-        WLText(caption, WLType.body, Modifier.padding(horizontal = WishlistTokens.Space.s16), color = c.textSecondary, textAlign = TextAlign.Center)
+        if (caption.isNotEmpty()) {
+            WLText(caption, WLType.body, Modifier.padding(horizontal = WishlistTokens.Space.s16), color = c.textSecondary, textAlign = TextAlign.Center)
+        }
     }
 }
 

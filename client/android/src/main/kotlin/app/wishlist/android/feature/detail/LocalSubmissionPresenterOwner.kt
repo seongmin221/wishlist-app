@@ -33,6 +33,23 @@ class LocalSubmissionPresenterOwner(private val presenter: LocalSubmissionDetail
     /** Recomputes the relative saved time; the screen calls it every minute while shown. */
     fun tick() = presenter.tick()
 
+    // Main thread only (the screen's effects); survives configuration changes with the owner.
+    private var deleteFailureShown = false
+
+    /**
+     * Whether [state] carries a delete failure the screen has not announced yet. The flag is cleared by
+     * the next view, which re-arms it; a configuration change re-reads the same state and gets false.
+     */
+    fun takeDeleteFailureNotice(state: LocalDetailState): Boolean {
+        if (!state.deleteFailed) {
+            deleteFailureShown = false
+            return false
+        }
+        if (deleteFailureShown) return false
+        deleteFailureShown = true
+        return true
+    }
+
     override fun onCleared() {
         presenter.close()
     }

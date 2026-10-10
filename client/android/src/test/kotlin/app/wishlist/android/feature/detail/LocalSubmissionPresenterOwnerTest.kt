@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -100,6 +101,15 @@ class LocalSubmissionPresenterOwnerTest {
         assertEquals(shown, owner.state.value) // no Gone outcome, no reset: it no longer follows the view
         assertEquals(emptyList<String>(), deletes)
         assertEquals(0, lookups)
+    }
+
+    @Test fun a_delete_failure_is_announced_once_until_the_flag_clears() = runTest {
+        val owner = LocalSubmissionPresenterOwner(presenter())
+        val failed = LocalDetailState.Initial.copy(deleteFailed = true)
+        assertTrue(owner.takeDeleteFailureNotice(failed))
+        assertFalse(owner.takeDeleteFailureNotice(failed)) // same state read again (configuration change)
+        assertFalse(owner.takeDeleteFailureNotice(LocalDetailState.Initial)) // the next view clears it
+        assertTrue(owner.takeDeleteFailureNotice(failed)) // a new failure
     }
 
     @Test fun the_same_store_returns_the_same_owner_until_cleared() = runTest {
