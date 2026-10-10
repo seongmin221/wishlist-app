@@ -17,8 +17,8 @@ import WebKit
 ///   a gesture they go through `ExternalPromptGate` and FWebViewExternal (`presentPrompt`). Every external request,
 ///   from the main frame or an iframe, is cancelled in WebKit, so it never loads into any frame.
 /// - `createWebViewWith` loads the request in this web view and returns nil (`target=_blank`, `window.open`). The
-///   load is asked about again as a main-frame navigation. A blank new window (`window.open()`) is not loaded: it
-///   would wipe the page.
+///   load is asked about again as a main-frame navigation. Only a `WebPageURL` (http/https with a host) is loaded;
+///   a blank new window (`window.open()`) or any other scheme is dropped (it would wipe the page).
 /// - Bars: KVO of `url`, `title`, `isLoading`, `estimatedProgress`, `canGoBack`, `canGoForward` into `page`.
 ///   Main-frame `didFailProvisionalNavigation`/`didFail` (not a cancel) or a web content crash set `failed`.
 @MainActor
@@ -243,9 +243,9 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        guard !isClosed, let url = navigationAction.request.url, !url.absoluteString.isEmpty,
-              !WebNavigationPolicy.isAboutBlank(url.absoluteString)
-        else { return nil }
+        // Only an http/https URL with a host (`WebPageURL`): a blank window, `data:`, `javascript:` or an
+        // external scheme is dropped rather than loaded over the page.
+        guard !isClosed, let url = navigationAction.request.url, WebPageURL(url) != nil else { return nil }
         webView.load(navigationAction.request)
         return nil
     }

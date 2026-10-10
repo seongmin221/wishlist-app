@@ -84,6 +84,22 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertTrue(view.loaded.isEmpty)
     }
 
+    func testNewWindowLoadsOnlyWebPageURLs() {
+        let m = model()
+        defer { m.close() }
+        let view = RecordingWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let dropped = ["data:text/html,x", "javascript:alert(1)", "tel:0101234", "file:///etc/hosts", "https:///nohost", "about:srcdoc"]
+        for text in dropped {
+            guard let url = URL(string: text) else { continue }
+            let made = m.webView(view, createWebViewWith: WKWebViewConfiguration(), for: FakeAction(url), windowFeatures: WKWindowFeatures())
+            XCTAssertNil(made, text)
+        }
+        XCTAssertTrue(view.loaded.isEmpty)
+        let page = URL(string: "HTTP://m.shop.example.com/2")!
+        _ = m.webView(view, createWebViewWith: WKWebViewConfiguration(), for: FakeAction(page), windowFeatures: WKWindowFeatures())
+        XCTAssertEqual(view.loaded.map(\.url), [page])
+    }
+
     func testWebAndAboutBlankLoadInsideOthersAreCancelled() {
         let m = model()
         defer { m.close() }
@@ -121,7 +137,7 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertEqual(opened, [app])
     }
 
-    func testCancelSilencesUntilTheMainFrameStartsAnotherPage() {
+    func testCancelSilencesUntilTheMainFrameStartsAPageOnAnotherHost() {
         var opened: [URL] = []
         let prompts = Prompts()
         let m = model({ opened.append($0) }, prompts: prompts)
@@ -133,7 +149,12 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertEqual(prompts.shown.count, 1)
         _ = m.decide(url: tel, mainFrame: true, userGesture: true) // a tap still opens
         XCTAssertEqual(opened, [tel])
-        m.mainFrameStarted(url: URL(string: "https://shop.example.com/next"))
+        // Ruling 13: keyed on the host, so `?n=2` loops and www./case variants on the same host stay silent.
+        m.mainFrameStarted(url: URL(string: "https://shop.example.com/p/1?n=2"))
+        m.mainFrameStarted(url: URL(string: "https://WWW.Shop.Example.com/next"))
+        _ = m.decide(url: tel, mainFrame: true, userGesture: false)
+        XCTAssertEqual(prompts.shown.count, 1)
+        m.mainFrameStarted(url: URL(string: "https://other.example.com/"))
         _ = m.decide(url: tel, mainFrame: true, userGesture: false)
         XCTAssertEqual(prompts.shown.count, 2)
     }
