@@ -1,5 +1,6 @@
 import Observation
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 import WebKit
 
 /// Lifetime owner of one FWebView route's `WKWebView` (spec §4 수명; Android `WebViewHolder`). Kept per back-stack
@@ -9,7 +10,9 @@ import WebKit
 ///
 /// It is the web view's navigation and UI delegate:
 /// - `decidePolicyFor` → `decide(url:mainFrame:userGesture:)`: `WebNavigationPolicy` with
-///   `targetFrame?.isMainFrame ?? true` (nil = a new-window request) and `.linkActivated` as the user gesture.
+///   `targetFrame?.isMainFrame ?? true` (nil = a new-window request) and `WebUserGesture` as the user gesture
+///   (`.linkActivated` and a real touch on the web view within the last second: a script's `a.click()` is also
+///   `.linkActivated`).
 ///   External apps open with `UIApplication.open` (never `canOpenURL`; a false result does nothing, D16); without
 ///   a gesture they go through `ExternalPromptGate` and FWebViewExternal (`presentPrompt`). Every external request,
 ///   from the main frame or an iframe, is cancelled in WebKit, so it never loads into any frame.
@@ -43,6 +46,8 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     @ObservationIgnored private var started = false
     /// The main-frame URL that failed (retry loads it; the web view may still show the previous page).
     @ObservationIgnored private var failedURL: URL?
+    /// `ProcessInfo.systemUptime` of the last real touch on the web view (`WebTouchStampRecognizer`).
+    @ObservationIgnored private(set) var lastTouch: TimeInterval?
 
     init(url: URL, openExternal: @escaping (URL) -> Void = WebViewModel.openWithSystem) {
         initialURL = url
@@ -56,11 +61,12 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         observe()
     }
 
-    /// WebKit defaults otherwise: JavaScript on, `javaScriptCanOpenWindowsAutomatically` false (a page cannot open
-    /// a window, and so cannot replace this page through `createWebViewWith`, without a user gesture).
+    /// JavaScript on (WebKit default). `javaScriptCanOpenWindowsAutomatically` is set to false on purpose: a page
+    /// cannot open a window, and so cannot replace this page through `createWebViewWith`, without a user gesture.
     static func makeConfiguration() -> WKWebViewConfiguration {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = WishlistWebStore.dataStore
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration.allowsInlineMediaPlayback = true
         return configuration
     }
@@ -92,6 +98,11 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         if webView.url == nil { webView.load(URLRequest(url: initialURL)) } else { webView.reload() }
     }
 
+    /// A finger touched the web view (recorded by the screen's non-cancelling recognizer).
+    func noteTouch(at uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        lastTouch = uptime
+    }
+
     func stop() {
         webView.stopLoading()
         page.loading = false
@@ -117,6 +128,7 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         observations.forEach { $0.invalidate() }
         observations = []
         webView.stopLoading()
+        webView.pauseAllMediaPlayback(completionHandler: nil)
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
     }
@@ -190,7 +202,11 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         decisionHandler(decide(
             url: navigationAction.request.url,
             mainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
-            userGesture: navigationAction.navigationType == .linkActivated
+            userGesture: WebUserGesture.isUserGesture(
+                navigationType: navigationAction.navigationType,
+                lastTouch: lastTouch,
+                now: ProcessInfo.processInfo.systemUptime
+            )
         ))
     }
 
@@ -259,5 +275,42 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         next.canGoBack = webView.canGoBack
         next.canGoForward = webView.canGoForward
         if next != page { page = next }
+    }
+}
+
+/// D16 "사용자 탭" on iOS (controller Ruling 12): a link activation is a tap only when a real touch on the web view
+/// came within `window` seconds. `.linkActivated` alone is not enough: a script's `a.click()` (or a synthetic click
+/// event) on a `tel:`/app link is reported as `.linkActivated` too.
+enum WebUserGesture {
+    static let window: TimeInterval = 1.0
+
+    static func isUserGesture(navigationType: WKNavigationType, lastTouch: TimeInterval?, now: TimeInterval) -> Bool {
+        guard navigationType == .linkActivated, let lastTouch else { return false }
+        let age = now - lastTouch
+        return age >= 0 && age <= window
+    }
+}
+
+/// Records each real touch on the web view and never takes part otherwise: it fails at once, does not cancel or
+/// delay touches, and recognizes alongside every other recognizer (scrolling, links, the back swipes keep working).
+final class WebTouchStampRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
+    private let onTouch: () -> Void
+
+    init(onTouch: @escaping () -> Void) {
+        self.onTouch = onTouch
+        super.init(target: nil, action: nil)
+        cancelsTouchesInView = false
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
+        delegate = self
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        if touches.contains(where: { $0.type == .direct || $0.type == .indirectPointer || $0.type == .pencil }) { onTouch() }
+        state = .failed
+    }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
     }
 }
