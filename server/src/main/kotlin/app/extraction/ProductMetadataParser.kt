@@ -23,7 +23,8 @@ object ProductMetadataParser {
     fun parse(document: Document, truncated: Boolean): ParsedProduct {
         val products = document.select("script[type=application/ld+json]")
             .flatMap { script -> runCatching { collectProducts(Json.parseToJsonElement(script.data())) }.getOrDefault(emptyList()) }
-        val product = products.firstOrNull()
+        // A nameless Product node (an empty template or partial markup) must not hide the named one.
+        val product = products.firstOrNull { text(it["name"]) != null } ?: products.firstOrNull()
         val ambiguous = products.mapNotNull { text(it["name"]) }.distinct().size > 1
         val title = text(product?.get("name")) ?: meta(document, "og:title")
             ?: if (truncated) null else document.title().trim().takeIf { it.isNotEmpty() }
@@ -66,7 +67,7 @@ object ProductMetadataParser {
     /** A price exists only when every offer is a plain Offer with the same valid amount and currency. */
     private fun singlePrice(offers: List<JsonObject>): Pair<BigDecimal, String>? {
         if (offers.isEmpty() || offers.any { "aggregateoffer" in types(it) }) return null
-        val prices = offers.map { validPrice(text(it["price"]), text(it["priceCurrency"])) ?: return null }
+        val prices = offers.map { validPrice(amount(it["price"]), text(it["priceCurrency"])) ?: return null }
         return prices.distinctBy { it.first.stripTrailingZeros() to it.second }.singleOrNull()
     }
 
@@ -83,7 +84,13 @@ object ProductMetadataParser {
         else -> null
     }
 
-    private fun text(element: JsonElement?): String? = (element as? JsonPrimitive)?.content?.trim()?.takeIf { it.isNotEmpty() }
+    /** JSON strings only: JsonNull is a JsonPrimitive whose content is the text "null". */
+    private fun text(element: JsonElement?): String? =
+        (element as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() }
+
+    /** Prices may be JSON numbers or strings; null and booleans are not amounts. */
+    private fun amount(element: JsonElement?): String? =
+        (element as? JsonPrimitive)?.takeUnless { it is kotlinx.serialization.json.JsonNull }?.content?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun meta(document: Document, property: String): String? =
         document.selectFirst("meta[property=$property]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }

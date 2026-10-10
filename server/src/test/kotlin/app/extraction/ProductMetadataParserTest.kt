@@ -1,5 +1,6 @@
 package app.extraction
 
+import app.testutil.MetadataFixtures
 import app.testutil.MetadataFixtures.jsonLd
 import app.testutil.MetadataFixtures.meta
 import app.testutil.MetadataFixtures.page
@@ -69,6 +70,19 @@ class ProductMetadataParserTest {
         assertEquals("CAYL Store", parsed.merchant)
         val ogOnly = parse(jsonLd("{ broken") + meta("og:title", "Fallback") + meta("og:site_name", "Shop"))
         assertEquals("Fallback", ogOnly.title); assertEquals("Shop", ogOnly.merchant)
+    }
+
+    @Test fun `json null values are treated as missing rather than the text null`() {
+        val head = MetadataFixtures.jsonLd("""{"@type":"Product","name":null,"brand":null,
+            "offers":{"@type":"Offer","price":"1000","priceCurrency":"KRW","seller":null}}""") + meta("og:title", "OG title") + meta("og:site_name", "Site")
+        val parsed = parse(head)
+        assertEquals("OG title", parsed.title)
+        assertNull(parsed.brand)
+        assertEquals("Site", parsed.merchant)
+        assertNull(parse(product(brand = """{"@type":"Brand","name":null}""")).brand)
+        val partlyNamed = parse(MetadataFixtures.jsonLd("""{"@type":"Product","name":null}""") + product("Cap", """{"@type":"Offer","price":"1","priceCurrency":"KRW"}""", "\"CAYL\""))
+        assertEquals("CAYL", partlyNamed.brand)
+        assertNull(parse(product(brand = "123")).brand)
     }
 
     @Test fun `merchant prefers seller then site name then null`() {
