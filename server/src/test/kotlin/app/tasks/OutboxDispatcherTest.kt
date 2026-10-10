@@ -121,6 +121,39 @@ class OutboxDispatcherTest {
         }
     }
 
+    @Test fun `first failed event does not block later events in the same run`() = app.testutil.withAnalysisDatabase { source ->
+        repeat(3) { n ->
+            CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item-$n")
+            app.testutil.analysisSql(source, "update outbox_events set created_at=clock_timestamp()-interval '${10 - n} minutes' where published_at is null and created_at > clock_timestamp()-interval '1 minute'")
+        }
+        val oldest = app.testutil.analysisScalar(source, "select task_name from outbox_events order by created_at limit 1")!!
+        val queue = app.testutil.InMemoryTaskQueue().apply { failCreates += oldest }
+        assertEquals(DispatchReport(published = 2, failed = 1), OutboxDispatcher(source, queue).dispatchPending(10, Long.MAX_VALUE))
+        assertEquals("1", app.testutil.analysisScalar(source, "select count(*) from outbox_events where published_at is null and lease_until is null and task_name='$oldest'"))
+        assertEquals(2, queue.created.size)
+    }
+
+    @Test fun `an expired run deadline attempts nothing`() = app.testutil.withAnalysisDatabase { source ->
+        CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/item")
+        val queue = app.testutil.InMemoryTaskQueue()
+        assertEquals(DispatchReport(0, 0), OutboxDispatcher(source, queue).dispatchPending(10, System.nanoTime() - 1))
+        assertEquals(0, queue.created.size)
+    }
+
+    @Test fun `future not before becomes the task schedule time and a past one is sent immediately`() = app.testutil.withAnalysisDatabase { source ->
+        CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/a")
+        CreateWishlistItemService(source).create(UUID.randomUUID(), UUID.randomUUID(), "https://example.com/b")
+        val ids = app.testutil.analysisScalar(source, "select string_agg(id::text, ',' order by created_at) from outbox_events")!!.split(",")
+        app.testutil.analysisSql(source, "update outbox_events set not_before=clock_timestamp()+interval '20 seconds' where id='${ids[0]}'")
+        app.testutil.analysisSql(source, "update outbox_events set not_before=clock_timestamp()-interval '20 seconds' where id='${ids[1]}'")
+        val queue = app.testutil.InMemoryTaskQueue()
+        assertEquals(2, OutboxDispatcher(source, queue).dispatchPending(10, Long.MAX_VALUE).published)
+        val scheduled = queue.created.map { it.scheduleAt }
+        assertNotNull(scheduled[0])
+        kotlin.test.assertTrue(java.time.Duration.between(java.time.Instant.now(), scheduled[0]).seconds in 10..21, scheduled.toString())
+        assertNull(scheduled[1])
+    }
+
     private fun publishedAt(database: PostgreSQLContainer<*>): Any? = database.createConnection("").use { connection ->
         connection.createStatement().executeQuery("select published_at from outbox_events").use { rows ->
             rows.next()
