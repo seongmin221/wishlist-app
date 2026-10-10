@@ -16,6 +16,8 @@
 11. **iframe의 `data:`·`blob:` 문서는 막는다.** 설계 §4가 `data:`·`blob:`을 "하위 리소스(iframe 아님)에만" 허용한다고 적었으므로 brief보다 설계를 따랐다. iframe의 `about:blank`·`about:srcdoc`은 안에서 연다. 대가: `data:`·`blob:` 문서를 iframe에 띄우는 일부 쇼핑몰 화면은 그 부분이 비어 보일 수 있다.
 12. **iOS "사용자 탭"은 `.linkActivated` + 최근 1초 안의 실제 터치다.** 시뮬레이터에서 스크립트 `a.click()`이 `.linkActivated`로 와서 확인창 없이 `tel:`을 실행했다(D16 우회). 웹뷰 컨테이너에 다른 동작을 막지 않는 터치 기록 인식기를 두고, 터치 없는 `.linkActivated`는 확인창으로 보낸다. Android `hasGesture()`(Chromium user activation)와 같은 뜻이다. 대가: 1초보다 오래 누른 뒤 뗀 탭도 확인창이 뜬다(안전한 쪽).
 
+13. **확인창 취소 뒤 침묵은 main frame host 기준이다.** URL 기준이면 페이지가 `?n=2`처럼 쿼리만 바꿔 다시 열어 침묵을 풀고 확인창을 반복할 수 있다. 위쪽 바와 같은 host(소문자·`www.` 뺌, `DisplayFormat.host`)가 바뀔 때만 푼다. 대가: 같은 쇼핑몰 안에서 다른 상품 페이지로 옮겨도 탭 없는 외부 요청은 계속 버려진다(탭은 늘 연다).
+
 규칙은 [디자인 결정](../../../design/decisions.md)과 [QA-CLI-015](../../../learning/client/q-and-a/QA-CLI-015-webview-security.md)에 정리했다.
 
 ## 계획과 달라진 점
@@ -24,9 +26,17 @@
 - 진입점은 순수 helper를 새로 만들지 않고 이미 테스트된 `WebViewRoute.of`(Android `WebViewRouteCodecTest`)·`WebPageURL(string:)`(iOS `WebViewRouteTests`)을 그대로 쓴다. 그래서 Task 16에 새 단위 테스트는 없다.
 - Task 16 기기 확인 중 Android 웹뷰가 로딩·실패 중에 위쪽 바를 덮는 문제를 찾아 고쳤다(`clipToBounds`). Task 14 리뷰 수정 뒤 에뮬레이터를 다시 돌리지 않아 놓친 부분이다.
 
+## 최종 리뷰 반영
+
+- Android: 웹뷰가 닫힌 뒤에도 앱 전체 overlay에 남은 FWebViewExternal의 열기가 닫힌 페이지로 외부 앱을 열던 문제 — `ExternalPromptGate.close()`(holder `onCleared`)와 `mayLaunchConfirmed()`로 막고, 화면이 사라질 때 자기 확인창이 맨 위면 `OverlayHostState.dismissDialog(spec)`로 닫는다.
+- 두 플랫폼: 취소 침묵을 host 기준으로(Ruling 13).
+- Android: 실패 중 제목 줄 숨김(도메인만, D13), `onPageStarted`는 웹 URL만 바에 반영(`WebPageState.started`), `parseUri` 예외는 `RuntimeException` 전체를 fallback/Drop으로.
+- iOS: `createWebViewWith`는 `WebPageURL`(http/https + host)만 연다.
+- 실제 `intent:` adapter를 에뮬레이터에서 확인했다([화면 확인 기록](c4-detail-verification-2026-10-10.md) PR B 절).
+
 ## 남긴 점(task 리뷰에서 미룬 minor)
 
-- Android: intent data scheme 확인이 문법 검사 없는 거부 목록, catch 범위(`RuntimeException`까지 넓힐지), Android adapter의 기기 테스트 없음(androidTest 없음, 실제 `intent:` 링크는 실기기 확인), Compose wiring 단위 테스트 없음, URL 기준 침묵은 `?n=` 같은 쿼리만 다른 페이지 로드로 풀릴 수 있음, 실패 덮개 위 제목 줄에 Chromium 오류 페이지 제목("웹페이지를 사용할 수 없음")이 보임.
+- Android: intent data scheme 확인이 문법 검사 없는 거부 목록, adapter의 androidTest 없음(에뮬레이터 수동 확인만), Compose wiring 단위 테스트 없음, 열리는 중이거나 줄 서 있던 확인창은 화면이 사라져도 닫지 못함(열기는 `mayLaunchConfirmed`로 막힘).
 - iOS: 1초보다 긴 누름 뒤 탭은 확인창, WebKit 기록 스와이프는 실제 손가락 확인 필요, 빈 `window.open()`은 열지 않음(실기기 결제 팝업 확인), WebKit 제한 포트는 빈 화면, 유니버설 링크 https 탭은 확인창 없이 앱으로 넘어감(Android와의 차이), `about:blank`로 갈 때 자물쇠·host 유지.
 - 공통: "링크를 복사했어요" pill(카드색)의 흰 페이지 위 대비, 실기기 확인 항목 두 가지(아래).
 
@@ -37,12 +47,12 @@
 
 ## 검증(2026-10-10, 로컬)
 
-| 항목 | PR A 끝(`92a140b`) | Task 16 |
-| --- | --- | --- |
-| shared Android host / iOS simulator | 496 / 493 | 496 / 493 (실패·skip 0) |
-| Android unit debug / release | 127 / 127 | 169 / 169 |
-| iOS XCTest | 163 | 198 |
-| assembleDebug·assembleRelease·lintDebug(0 errors, 경고 26 기존)·`linkReleaseFrameworkIosArm64`·iOS Release simulator build | 통과 | 통과 |
-| `gen_tokens.py --check`·`test_gen_tokens.py` | 통과 | 통과·8개 |
+| 항목 | PR A 끝(`92a140b`) | Task 16 | 최종 리뷰 반영 |
+| --- | --- | --- | --- |
+| shared Android host / iOS simulator | 496 / 493 | 496 / 493 (실패·skip 0) | 변경 없음(shared 미수정) |
+| Android unit debug / release | 127 / 127 | 169 / 169 | 173 / 173 |
+| iOS XCTest | 163 | 198 | 199 |
+| assembleDebug·assembleRelease·lintDebug(0 errors, 경고 26 기존)·`linkReleaseFrameworkIosArm64`·iOS Release simulator build | 통과 | 통과 | assemble·lint(0 errors, 경고 26) 통과 |
+| `gen_tokens.py --check`·`test_gen_tokens.py` | 통과 | 통과·8개 | — |
 
 화면 확인은 [C4 화면 확인 기록](c4-detail-verification-2026-10-10.md)의 PR B 절에 있다. 플랫폼 CI job은 꺼져 있어 로컬 결과가 근거다.

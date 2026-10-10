@@ -84,5 +84,16 @@
 - **로그아웃 시 웹뷰 닫힘·로그인 시 유지:** 웹뷰는 탭 바를 숨기고 홈 스택 위를 덮어, 웹뷰가 열린 채 로그아웃하거나 로그인할 UI 경로가 없다(상세와 같은 이유). 규칙은 `WebViewRoute`·`AppDestination.web`의 `accountScoped = true`(`WebViewRouteCodecTest`·`WebViewRouteTests`)와 `AppRouteCodecTest.signingInKeepsAccountScopedRoutes`·`WLNavigatorTests.testSigningInKeepsAccountScopedRoutes`·`testLeavingAnAccountDropsAccountScopedRoutesInEveryTab`로 확인했다.
 - **D16 결제 확인창 빈도:** 미확인 · 실기기.
 - **새 창의 `window.opener` 손실(PG 팝업):** 미확인 · 실기기.
-- Android 실제 `intent:` 링크, iOS WKWebView 기록 스와이프(합성 터치로는 안 됨), "외부 브라우저로 열기"(앱을 떠남)는 누르지 않았다.
-- Android 실패 덮개 위 제목 줄에 Chromium 오류 페이지 제목("웹페이지를 사용할 수 없음")이 보인다. 동작에는 문제 없고 문구 정리는 남겼다.
+- iOS WKWebView 기록 스와이프(합성 터치로는 안 됨), "외부 브라우저로 열기"(앱을 떠남)는 누르지 않았다. (Android 실제 `intent:` 링크는 아래 최종 리뷰 절에서 확인했다.)
+- ~~Android 실패 덮개 위 제목 줄에 Chromium 오류 페이지 제목("웹페이지를 사용할 수 없음")이 보인다.~~ 최종 리뷰에서 고쳤다(`WebPageState.titleLine`이 실패 중 null, 도메인만).
+
+### 실제 `intent:` 링크(PR B 최종 리뷰, 2026-10-10)
+
+> `emulator-5554`(API 36), 최종 리뷰 수정을 넣은 debug 빌드. 조작 전 `mCurrentFocus` = `app.wishlist.android/.MainActivity` 확인, 다른 앱은 건드리지 않았다. 시험 페이지는 scratchpad `python3 -m http.server 8782`의 `intent.html`(링크 세 개)·`fallback.html`, `adb reverse tcp:8782`, 공유(`ACTION_SEND` → `ShareReceiverActivity`)로 만든 로컬 대기 상세의 "원본 보기"로 열었다. Task 16과 같이 커밋하지 않은 `src/debug/AndroidManifest.xml`(`usesCleartextTraffic`)을 두었다가 지우고, reverse·서버를 끄고 깨끗한 debug 빌드를 다시 설치했다. 세 링크 모두 사용자 탭(확인창 없이 바로 실행 경로)이라 실제 `Intent.parseUri` → `AndroidIntentTarget` → `startSafely`를 탄다.
+
+| 링크(탭) | 결과 |
+| --- | --- |
+| (a) `intent://x#Intent;scheme=wltest;component=app.wishlist.android/.MainActivity;end` | **component가 지워져 시작되지 않음.** logcat `ActivityTaskManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.BROWSABLE] dat=wltest://x/... xflg=0x4} … result code=-91`(해석 불가, `cmp=` 없음). `dumpsys activity activities` 앞뒤 모두 `Hist #0: ActivityRecord{254715469 … MainActivity t232}` 하나뿐, 포커스 그대로, 페이지 유지 |
+| (b) `intent://x#Intent;scheme=wltest;package=com.example.none;S.browser_fallback_url=http%3A%2F%2F10.0.2.2%3A8782%2Ffallback.html;end` | `START … pkg=com.example.none (has extras) … result code=-91` → `ActivityNotFoundException` → fallback이 웹뷰 안에 열림(서버 로그 `GET /fallback.html`, 위쪽 바 `10.0.2.2` / "대체 페이지", 본문 "FALLBACK OK"). 아래쪽 뒤로 → `intent.html`로 돌아옴 |
+| (c) `intent://x#Intent;scheme=wltest;launchFlags=q;end` | 앱 비정상 종료 없음: 앱 PID 4333 그대로, logcat에 `START`·`AndroidRuntime`·`FATAL` 없음(fallback이 없어 Drop), 페이지 유지 |
+
