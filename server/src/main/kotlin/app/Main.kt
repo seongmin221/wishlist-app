@@ -6,6 +6,10 @@ import app.purpose.PurposeService
 import app.ai.*
 import app.analysis.GeneralWorkerService
 import app.analysis.WorkerExecution
+import app.browser.BrowserRenderProcessor
+import app.browser.BrowserWorkerService
+import app.browser.EgressProxy
+import app.browser.PlaywrightGateway
 import app.budget.LlmBudgetService
 import app.extraction.*
 import app.http.*
@@ -52,18 +56,22 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
     }
     val source = resources.own(DatabaseFactory.pooledDataSource(env.getValue("DATABASE_URL"),
         env.getValue("DATABASE_USER"), env.getValue("DATABASE_PASSWORD"), runtime.databasePool))
-    if (runtime.role == RuntimeRole.GENERAL_WORKER) {
-        val model = env.getValue("OPENAI_MODEL_SNAPSHOT")
-        val gateway = OpenAiResponsesGateway(OpenAiConfig(model, env.getValue("OPENAI_API_KEY"), allowLocalAlias = env["APP_ENV"] != "production"))
-        val classifier = AiClassificationService(source, LlmBudgetService(source, modelSnapshot = model, allowLocalAlias = env["APP_ENV"] != "production"),
-            CategoryCandidateProvider(), gateway::classify)
-        val transport = resources.own(SafeHttpTransport())
-        val extractor = HttpMetadataExtractor(UrlSafetyPolicy(resources.own(BoundedResolver())), transport::fetch)
-        val processor = GeneralExtractionProcessor(source, extractor::extract, classifier::classify)
+    if (runtime.role == RuntimeRole.GENERAL_WORKER || runtime.role == RuntimeRole.BROWSER_WORKER) {
+        val classifier = workerClassifier(env, source)
+        val safety = UrlSafetyPolicy(resources.own(BoundedResolver()))
         val execution = resources.own(WorkerExecution())
         routing {
             get("/health") { call.respondText("ok") }
-            workerRoutes(GeneralWorkerService(source, execution, processor::process))
+            if (runtime.role == RuntimeRole.GENERAL_WORKER) {
+                val transport = resources.own(SafeHttpTransport())
+                val extractor = HttpMetadataExtractor(safety, transport::fetch)
+                val processor = GeneralExtractionProcessor(source, extractor::extract, classifier::classify)
+                generalWorkerRoute(GeneralWorkerService(source, execution, processor::process)::runGeneral)
+            } else {
+                val gateway = PlaywrightGateway(safety, resources.own(EgressProxy(safety)))
+                val renderer = BrowserRenderProcessor(source, gateway::render)
+                browserWorkerRoute(BrowserWorkerService(source, renderer::render, classifier::classify, execution)::runBrowser)
+            }
         }
         return
     }
@@ -93,4 +101,13 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         categoryRoutes(CategoryService(source)) { resolver.resolve(it) }
         purposeRoutes(PurposeService(source)) { resolver.resolve(it) }
     }
+}
+
+/** Both worker lanes share the OpenAI gateway, budget and owner candidate supply. */
+private fun workerClassifier(env: Map<String, String>, source: javax.sql.DataSource): AiClassificationService {
+    val model = env.getValue("OPENAI_MODEL_SNAPSHOT")
+    val local = env["APP_ENV"] != "production"
+    val gateway = OpenAiResponsesGateway(OpenAiConfig(model, env.getValue("OPENAI_API_KEY"), allowLocalAlias = local))
+    return AiClassificationService(source, LlmBudgetService(source, modelSnapshot = model, allowLocalAlias = local),
+        CategoryCandidateProvider(), gateway::classify)
 }

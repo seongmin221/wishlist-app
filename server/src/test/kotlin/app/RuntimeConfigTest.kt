@@ -28,6 +28,17 @@ class RuntimeConfigTest {
         }
     }
 
+    @Test fun `browser worker needs the same settings as the general worker and a small pool`() {
+        val db = mapOf("DATABASE_URL" to "jdbc:postgresql://example/db", "DATABASE_USER" to "user", "DATABASE_PASSWORD" to "password")
+        val browser = db + mapOf("APP_ENV" to "production", "APP_ROLE" to "browser-worker")
+        assertFailsWith<IllegalArgumentException> { RuntimeConfig.fromEnvironment(browser) }
+        val config = RuntimeConfig.fromEnvironment(browser + mapOf("OPENAI_API_KEY" to "secret", "OPENAI_MODEL_SNAPSHOT" to "gpt-5.6-luna-2026-09-01"))
+        assertEquals(RuntimeRole.BROWSER_WORKER, config.role)
+        assertEquals(2, config.databasePool.maximumPoolSize)
+        assertFailsWith<IllegalArgumentException> { RuntimeConfig.fromEnvironment(browser + mapOf("OPENAI_API_KEY" to "secret", "OPENAI_MODEL_SNAPSHOT" to "gpt-5.6-luna")) }
+        assertFailsWith<IllegalArgumentException> { RuntimeConfig.fromEnvironment(db + ("APP_ROLE" to "scheduler")) }
+    }
+
     @Test fun `worker requires database and OpenAI settings`() {
         val worker = mapOf(
                 "APP_ENV" to "production", "APP_ROLE" to "general-worker",
