@@ -33,7 +33,8 @@ class BoundedResolver(
         val addresses = try {
             future.get(wait.toNanos(), TimeUnit.NANOSECONDS)
         } catch (_: TimeoutException) {
-            future.cancel(true); throw DnsLookupFailed()
+            // A still-queued lookup would hold a queue slot until a worker thread drains it.
+            future.cancel(true); executor.remove(future as Runnable); throw DnsLookupFailed()
         } catch (_: ExecutionException) {
             throw DnsLookupFailed()
         }

@@ -36,6 +36,14 @@ class AnalysisJobReconcilerTest {
         assertEquals(0, reconciler.reconcileExpired())
     }
 
+    @Test fun `passed deadline leaves candidates due for the next run`() = withAnalysisDatabase { source ->
+        repeat(2) { expire(source, newAnalysisClaim(source)) }
+        val reconciler = AnalysisJobReconciler(source)
+        assertEquals(0, reconciler.reconcileExpired(System.nanoTime() - 1))
+        assertEquals("2", analysisScalar(source, "select count(*) from analysis_jobs where stage='GENERAL_RUNNING'"))
+        assertEquals(2, reconciler.reconcileExpired())
+    }
+
     @Test fun `locked first batch does not starve later candidates`() = withAnalysisDatabase { source ->
         val claims = List(3) { newAnalysisClaim(source) }
         claims.forEachIndexed { n, claim ->

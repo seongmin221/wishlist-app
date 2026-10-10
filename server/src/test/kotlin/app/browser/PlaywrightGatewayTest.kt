@@ -4,6 +4,7 @@ import app.extraction.UrlSafetyPolicy
 import java.net.InetAddress
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -26,5 +27,11 @@ class PlaywrightGatewayTest {
             "--disable-quic",
             "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
         ), PlaywrightGateway.launchArguments(4567))
+    }
+
+    @Test
+    fun `playwright start-up failure stays an infrastructure failure instead of a navigation timeout`() {
+        val gateway = PlaywrightGateway(policy, { throw com.microsoft.playwright.PlaywrightException("driver missing") }) { EgressProxy(policy) }
+        assertFailsWith<com.microsoft.playwright.PlaywrightException> { gateway.render("https://shop.example/item") }
     }
 }

@@ -15,7 +15,7 @@ class AnalysisJobReconciler(
     },
 ) {
     init { require(batchSize in 1..1000) }
-    fun reconcileExpired(): Int {
+    fun reconcileExpired(deadlineNanos: Long = Long.MAX_VALUE): Int {
         // Discovery has no row locks. Each candidate is rechecked under item -> job locks.
         val candidates = dataSource.connection.use { connection ->
             connection.prepareStatement("""
@@ -37,7 +37,10 @@ class AnalysisJobReconciler(
                 }
             }
         }
-        return candidates.count { candidate ->
+        var recoveredCount = 0
+        for (candidate in candidates) {
+            // Remaining candidates stay due and are picked up by the next maintenance run.
+            if (System.nanoTime() - deadlineNanos >= 0) break
             var deferred = false
             val recovered = try { dataSource.connection.use { connection ->
                 connection.autoCommit = false
@@ -61,8 +64,9 @@ class AnalysisJobReconciler(
                 if (cause is CancellationException || cause is InterruptedException) throw cause
                 onFailure(candidate.id, cause)
             }
-            recovered
+            if (recovered) recoveredCount++
         }
+        return recoveredCount
     }
 
     /** true: recovered, false: nothing to do after revalidation, null: a row was locked by someone else. */

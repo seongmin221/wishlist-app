@@ -67,7 +67,10 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         env.getValue("DATABASE_USER"), env.getValue("DATABASE_PASSWORD"), runtime.databasePool))
     if (runtime.role == RuntimeRole.GENERAL_WORKER || runtime.role == RuntimeRole.BROWSER_WORKER) {
         val classifier = workerClassifier(env, source)
-        val safety = UrlSafetyPolicy(resources.own(BoundedResolver()))
+        // A browser page resolves many subresource hosts at once (route checks and proxy pinning, two renders),
+        // so its resolver gets more room before saturation turns into a rejected request.
+        val resolver = if (runtime.role == RuntimeRole.BROWSER_WORKER) BoundedResolver(threads = 8, queueCapacity = 128) else BoundedResolver()
+        val safety = UrlSafetyPolicy(resources.own(resolver))
         val execution = resources.own(WorkerExecution())
         routing {
             get("/health") { call.respondText("ok") }
@@ -96,7 +99,7 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
             log.warn("LLM_BUDGET_ALERT id={} window={} start={} threshold={}", alert.id, alert.windowType, alert.windowStart, alert.thresholdPercent)
         }
         val service = MaintenanceService({ limit, deadline -> dispatcher.dispatchPending(limit, deadline) },
-            { reconciler.reconcileExpired() }, pending::recover, budget::runOnce)
+            reconciler::reconcileExpired, pending::recover, budget::runOnce)
         routing {
             get("/health") { call.respondText("ok") }
             maintenanceRoutes {

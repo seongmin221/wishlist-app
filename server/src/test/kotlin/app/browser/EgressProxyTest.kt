@@ -67,13 +67,36 @@ class EgressProxyTest {
         }
     }
 
-    @Test fun `each connection is validated again so a rebinding answer is refused`() {
+    @Test fun `a host validated once in a render stays pinned so a later rebinding answer is never used`() {
         val answers = ArrayDeque(listOf(listOf(public), listOf(InetAddress.getByName("127.0.0.1"))))
         proxy { answers.removeFirst() }.use { proxy ->
             assertEquals("HTTP/1.1 200 Connection Established", connect(proxy, "shop.test:443").second)
-            assertEquals("HTTP/1.1 403 Forbidden", connect(proxy, "shop.test:443").second)
-            assertEquals(listOf(public to 443), connected.toList())
+            assertEquals("HTTP/1.1 200 Connection Established", connect(proxy, "shop.test:443").second)
+            assertEquals(listOf(public to 443, public to 443), connected.toList())
+            assertEquals(1, answers.size)
         }
+    }
+
+    @Test fun `absolute form http responses forbid reusing the proxy connection for another origin`() {
+        val upstream = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        thread(isDaemon = true) {
+            runCatching {
+                val socket = upstream.accept()
+                opened += socket
+                socket.getOutputStream().apply {
+                    write("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nKeep-Alive: timeout=60\r\nContent-Length: 2\r\n\r\nok".toByteArray()); flush()
+                }
+            }
+        }
+        EgressProxy(UrlSafetyPolicy { listOf(public) }, { _, _, _ ->
+            Socket().apply { connect(InetSocketAddress(InetAddress.getLoopbackAddress(), upstream.localPort), 2_000) }
+        }).use { proxy ->
+            val (socket, status) = open(proxy, "GET http://shop.test/ HTTP/1.1\r\nHost: shop.test\r\n\r\n")
+            assertEquals("HTTP/1.1 200 OK", status)
+            val headers = generateSequence { readLine(socket.getInputStream()).takeIf { it.isNotEmpty() } }.toList()
+            assertEquals(listOf("Content-Length: 2", "Connection: close"), headers)
+        }
+        upstream.close()
     }
 
     @Test fun `private answers and unsupported targets are refused before any connection`() {

@@ -59,6 +59,19 @@ class UrlSafetyPolicyTest {
     }
 
     @Test
+    fun `dns ipv6 answers embedding ipv4 targets are checked like native resolution returns them`() {
+        // Native DNS keeps mapped AAAA answers as Inet6Address; getByName would convert them to Inet4Address.
+        fun dnsAnswer(literal: String) = java.net.Inet6Address.getByAddress("shop.example", InetAddress.getByName("[$literal]").let { parsed ->
+            if (parsed.address.size == 16) parsed.address else ByteArray(10) + byteArrayOf(-1, -1) + parsed.address
+        }, -1)
+        for (address in listOf("::ffff:127.0.0.1", "::ffff:169.254.169.254", "::ffff:10.0.0.1", "::ffff:0:7f00:1",
+            "2001:0:4136:e378::1", "64:ff9b:1::a00:1")) {
+            assertFailsWith<UnsafeUrlException>(address) { UrlSafetyPolicy { listOf(dnsAnswer(address)) }.validate("https://shop.example/item") }
+        }
+        assertEquals(1, UrlSafetyPolicy { listOf(dnsAnswer("::ffff:93.184.215.14")) }.validate("https://shop.example/item").size)
+    }
+
+    @Test
     fun `json ld product name wins over open graph and title`() {
         val policy = UrlSafetyPolicy { listOf(InetAddress.getByName("93.184.215.14")) }
         val extractor = HttpMetadataExtractor(policy) { _, _ ->

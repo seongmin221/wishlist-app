@@ -32,6 +32,8 @@ class EgressProxy(
     private val server = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
     private val slots = Semaphore(maxConnections)
     private val active = ConcurrentHashMap.newKeySet<Socket>()
+    /** One proxy serves one render, so a host validated once is reused instead of resolving it per connection. */
+    private val validated = ConcurrentHashMap<String, List<InetAddress>>()
     private val threads = Executors.newCachedThreadPool(ThreadFactory { task -> Thread(task, "egress-proxy").apply { isDaemon = true } })
 
     val port: Int = server.localPort
@@ -76,7 +78,8 @@ class EgressProxy(
         // Pages have no reason to address an IPv6 literal; refusing them outright avoids range-list gaps.
         if (port != 80 && port != 443 || ':' in host) return deny(client)
         val literal = if (':' in host) "[$host]" else host
-        val addresses = try { safety.validate("${if (port == 443) "https" else "http"}://$literal/") } catch (cause: Exception) {
+        val origin = "${if (port == 443) "https" else "http"}://$literal/"
+        val addresses = validated[origin] ?: try { safety.validate(origin).also { validated[origin] = it } } catch (cause: Exception) {
             if (cause is CancellationException) throw cause
             return deny(client)
         }
@@ -96,7 +99,14 @@ class EgressProxy(
                     val request = (listOf("$method $path $version") + headers + "Connection: close").joinToString("\r\n") + "\r\n\r\n"
                     upstream.getOutputStream().apply { write(request.toByteArray()); flush() }
                 }
-                val back = threads.submit { pump(upstream.getInputStream(), client.getOutputStream()); client.closeQuietly() }
+                val back = threads.submit {
+                    // Absolute-form HTTP is pinned to this one host, so the response forbids reusing the proxy
+                    // connection; otherwise a later request for another origin would reach this host's address.
+                    if (tunnel || forwardResponseHead(upstream.getInputStream(), client.getOutputStream())) {
+                        pump(upstream.getInputStream(), client.getOutputStream())
+                    }
+                    client.closeQuietly()
+                }
                 pump(input, upstream.getOutputStream())
                 upstream.shutdownOutputQuietly()
                 back.get()
@@ -135,6 +145,16 @@ class EgressProxy(
         return null
     }
 
+    private fun forwardResponseHead(from: InputStream, to: OutputStream): Boolean {
+        val head = readHead(from) ?: return false
+        val lines = head.split("\r\n")
+        val headers = lines.drop(1).filter { it.isNotEmpty() }.filterNot { line ->
+            HOP_BY_HOP.any { line.startsWith("$it:", true) }
+        }
+        val rewritten = (listOf(lines.first()) + headers + "Connection: close").joinToString("\r\n") + "\r\n\r\n"
+        return runCatching { to.write(rewritten.toByteArray(Charsets.ISO_8859_1)) }.isSuccess
+    }
+
     private fun pump(from: InputStream, to: OutputStream) {
         try { from.copyTo(to) } catch (_: Exception) { }
         runCatching { to.flush() }
@@ -150,6 +170,7 @@ class EgressProxy(
 
     private companion object {
         const val MAX_HEAD_BYTES = 8 * 1024
+        val HOP_BY_HOP = listOf("Connection", "Proxy-Connection", "Keep-Alive")
         val FORBIDDEN = "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray()
     }
 }
