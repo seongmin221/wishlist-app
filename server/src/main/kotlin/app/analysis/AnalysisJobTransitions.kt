@@ -41,6 +41,19 @@ internal fun Connection.failExhausted(jobId: UUID, itemId: UUID) {
         merged.recordCheckedAt, classified = false)
 }
 
+/** One outbox row per analysis task; the task name is the Cloud Tasks dedupe key, a delay becomes its scheduleTime. */
+internal fun Connection.insertAnalysisOutbox(jobId: UUID, lane: AnalysisLane, taskName: String, delaySeconds: Long? = null) {
+    prepareStatement("""insert into outbox_events(id,analysis_job_id,event_type,task_name,not_before)
+        values (?,?,?,?,case when ?::double precision is null then null else clock_timestamp()+make_interval(secs => ?::double precision) end)""").use { s ->
+        s.setObject(1, UUID.randomUUID()); s.setObject(2, jobId)
+        s.setString(3, if (lane == AnalysisLane.GENERAL) "GENERAL_ANALYSIS" else "BROWSER_ANALYSIS")
+        s.setString(4, taskName)
+        val delay = delaySeconds?.toDouble()
+        s.setObject(5, delay, java.sql.Types.DOUBLE); s.setObject(6, delay, java.sql.Types.DOUBLE)
+        check(s.executeUpdate() == 1)
+    }
+}
+
 internal fun Connection.transitionAnalysisJob(jobId: UUID, stage: String, fallback: Boolean = false) {
     prepareStatement("""update analysis_jobs set stage=?,execution_token=null,lease_until=null,claimed_item_version=null,
         browser_attempted=browser_attempted or ?,recovery_check_at=null,updated_at=clock_timestamp() where id=?""").use { statement ->

@@ -12,8 +12,6 @@ import com.microsoft.playwright.BrowserType
 import com.microsoft.playwright.Playwright
 import com.microsoft.playwright.PlaywrightException
 import com.microsoft.playwright.options.ServiceWorkerPolicy
-import java.net.URI
-import java.util.concurrent.ConcurrentHashMap
 
 /** Each render owns a fresh pinning proxy, so one render ending never cuts another render's connections. */
 class PlaywrightGateway(
@@ -23,12 +21,6 @@ class PlaywrightGateway(
 ) {
     fun canRequest(url: String): Boolean = runCatching { safety.validate(url) }.isSuccess
 
-    /** validate depends only on scheme, credentials, host and port, so one answer covers every URL of that origin. */
-    private fun canRequestCached(url: String, allowed: ConcurrentHashMap<String, Boolean>): Boolean {
-        val uri = runCatching { URI(url) }.getOrElse { return false }
-        val origin = "${uri.scheme}|${uri.rawUserInfo}|${uri.host}|${uri.port}"
-        return allowed[origin] ?: canRequest(url).also { allowed[origin] = it }
-    }
 
     fun render(url: String): Metadata? {
         safety.validate(url)
@@ -43,10 +35,10 @@ class PlaywrightGateway(
                 .setTimeout(WorkerExecution.remaining(Duration.ofSeconds(30)).toMillis().toDouble())
             playwright.chromium().launch(launch).use { browser ->
                 browser.newContext(Browser.NewContextOptions().setServiceWorkers(ServiceWorkerPolicy.BLOCK).setAcceptDownloads(false)).use { context ->
-                    // Fast rejection only; the proxy is what pins every connection to a validated address.
-                    val allowed = ConcurrentHashMap<String, Boolean>()
+                    // Fast rejection only, sharing the proxy's per-render answers; the proxy is what pins every
+                    // connection to a validated address.
                     context.route("**/*") { route ->
-                        if (canRequestCached(route.request().url(), allowed)) route.resume() else route.abort()
+                        if (proxy.allows(route.request().url())) route.resume() else route.abort()
                     }
                     val page = context.newPage()
                     val (finalUrl, html) = try {

@@ -46,10 +46,7 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
                 return WorkerDisposition.ACKNOWLEDGE
             }
             c.transitionAnalysisJob(claim.jobId, "BROWSER_PENDING", fallback = true)
-            c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,'BROWSER_ANALYSIS',?)").use { s ->
-                s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
-                s.setString(3, "browser-${claim.jobId}-${claim.generation}"); check(s.executeUpdate() == 1)
-            }
+            c.insertAnalysisOutbox(claim.jobId, AnalysisLane.BROWSER, "browser-${claim.jobId}-${claim.generation}")
             return WorkerDisposition.ACKNOWLEDGE
         }
         if (outcome == ProcessingOutcome.Retryable) {
@@ -58,14 +55,9 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
                 return WorkerDisposition.ACKNOWLEDGE
             }
             c.transitionAnalysisJob(claim.jobId, "${claim.lane.name}_PENDING")
-            c.prepareStatement("""insert into outbox_events(id,analysis_job_id,event_type,task_name,not_before)
-                values (?,?,?,?,clock_timestamp()+make_interval(secs => ?))""").use { s ->
-                s.setObject(1, UUID.randomUUID()); s.setObject(2, claim.jobId)
-                s.setString(3, if (claim.lane == AnalysisLane.GENERAL) "GENERAL_ANALYSIS" else "BROWSER_ANALYSIS")
-                s.setString(4, "${claim.lane.name.lowercase()}-${claim.jobId}-${claim.generation}-retry-${claim.executionToken}")
-                s.setDouble(5, retryBackoffSeconds(job.attempts + job.browserAttempts).toDouble())
-                check(s.executeUpdate() == 1)
-            }
+            c.insertAnalysisOutbox(claim.jobId, claim.lane,
+                "${claim.lane.name.lowercase()}-${claim.jobId}-${claim.generation}-retry-${claim.executionToken}",
+                delaySeconds = retryBackoffSeconds(job.attempts + job.browserAttempts))
             // The durable retry outbox now owns progress; ending this task avoids a second delivery spending budget.
             return WorkerDisposition.ACKNOWLEDGE
         }

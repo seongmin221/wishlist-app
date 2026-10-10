@@ -21,6 +21,8 @@ object UrlCanonicalizer {
 
     private fun trusted(candidate: HttpUrl, final: HttpUrl): Boolean {
         val domain = candidate.topPrivateDomain() ?: return false   // null for IP literals and public suffixes
+        // An https page never adopts an http canonical; the reverse upgrade is fine.
+        if (final.isHttps && !candidate.isHttps) return false
         return candidate.username.isEmpty() && candidate.password.isEmpty() &&
             candidate.port == HttpUrl.defaultPort(candidate.scheme) && domain == final.topPrivateDomain()
     }

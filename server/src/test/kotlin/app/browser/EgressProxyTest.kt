@@ -77,6 +77,61 @@ class EgressProxyTest {
         }
     }
 
+    @Test fun `an unreachable first record falls back to the next validated address`() {
+        val second = InetAddress.getByName("93.184.216.35")
+        EgressProxy(UrlSafetyPolicy { listOf(public, second) }, { address, port, _ ->
+            connected += address to port
+            if (address == public) throw java.net.ConnectException("unreachable")
+            Socket().apply { connect(InetSocketAddress(InetAddress.getLoopbackAddress(), echo.localPort), 2_000) }
+        }).use { proxy ->
+            assertEquals("HTTP/1.1 200 Connection Established", connect(proxy, "shop.test:443").second)
+            assertEquals(listOf(public to 443, second to 443), connected.toList())
+        }
+    }
+
+    @Test fun `a client waiting on a slow response is not cut off by its own read timeout`() {
+        val upstream = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        thread(isDaemon = true) {
+            runCatching {
+                val socket = upstream.accept()
+                opened += socket
+                val input = socket.getInputStream()
+                while (input.read() != '\n'.code) { }
+                // The response trickles in while the client sends nothing more. Like servers that abort on read-EOF,
+                // this one drops the response if the proxy half-closes the request side early.
+                repeat(4) {
+                    Thread.sleep(150)
+                    socket.soTimeout = 1
+                    val halfClosed = try { input.read() < 0 } catch (_: java.net.SocketTimeoutException) { false }
+                    if (halfClosed) { socket.close(); return@runCatching }
+                    socket.getOutputStream().apply { write("part\n".toByteArray()); flush() }
+                }
+            }
+        }
+        EgressProxy(UrlSafetyPolicy { listOf(public) }, { _, _, _ ->
+            Socket().apply { connect(InetSocketAddress(InetAddress.getLoopbackAddress(), upstream.localPort), 2_000) }
+        }, timeout = java.time.Duration.ofMillis(300)).use { proxy ->
+            val (socket, _) = connect(proxy, "shop.test:443")
+            readLine(socket.getInputStream())
+            socket.getOutputStream().apply { write("request\n".toByteArray()); flush() }
+            assertEquals(List(4) { "part" }, List(4) { readLine(socket.getInputStream()) })
+        }
+        upstream.close()
+    }
+
+    @Test fun `route checks share the proxy validation so each origin is resolved once`() {
+        val lookups = AtomicInteger()
+        proxy { lookups.incrementAndGet(); listOf(public) }.use { proxy ->
+            assertTrue(proxy.allows("https://shop.test/a.png"))
+            assertTrue(proxy.allows("https://shop.test:443/b.js?x=1"))
+            assertEquals("HTTP/1.1 200 Connection Established", connect(proxy, "shop.test:443").second)
+            for (url in listOf("file:///etc/passwd", "https://user@shop.test/", "https://shop.test:8443/", "https://[::1]/", "data:text/plain,x")) {
+                kotlin.test.assertFalse(proxy.allows(url), url)
+            }
+            assertEquals(1, lookups.get())
+        }
+    }
+
     @Test fun `absolute form http responses forbid reusing the proxy connection for another origin`() {
         val upstream = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
         thread(isDaemon = true) {

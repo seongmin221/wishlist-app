@@ -8,12 +8,14 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.net.URI
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Semaphore
 import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -62,6 +64,29 @@ class EgressProxy(
         threads.shutdownNow()
     }
 
+    /**
+     * The render's route check uses the same validation as the proxy, so each origin is resolved once per render.
+     * Only http(s) on 80/443 without credentials can pass; everything else is refused without a lookup.
+     */
+    fun allows(url: String): Boolean {
+        val uri = runCatching { URI(url) }.getOrElse { return false }
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https" || uri.rawUserInfo != null) return false
+        val host = uri.host?.removePrefix("[")?.removeSuffix("]")?.lowercase()?.trimEnd('.')?.takeIf { it.isNotEmpty() } ?: return false
+        val port = if (uri.port == -1) (if (scheme == "https") 443 else 80) else uri.port
+        return validatedAddresses(host, port) != null
+    }
+
+    /** Pages have no reason to address an IPv6 literal; refusing them outright avoids range-list gaps. */
+    private fun validatedAddresses(host: String, port: Int): List<InetAddress>? {
+        if (port != 80 && port != 443 || ':' in host) return null
+        val origin = "${if (port == 443) "https" else "http"}://$host/"
+        return validated[origin] ?: try { safety.validate(origin).also { validated[origin] = it } } catch (cause: Exception) {
+            if (cause is CancellationException) throw cause
+            null
+        }
+    }
+
     private fun track(socket: Socket) { active.add(socket); if (server.isClosed) socket.closeQuietly() }
 
     private fun handle(client: Socket) {
@@ -75,18 +100,14 @@ class EgressProxy(
         val tunnel = method == "CONNECT"
         val destination = (if (tunnel) authority(target) else absoluteHttp(target)) ?: return deny(client)
         val (host, port, path) = destination
-        // Pages have no reason to address an IPv6 literal; refusing them outright avoids range-list gaps.
-        if (port != 80 && port != 443 || ':' in host) return deny(client)
-        val literal = if (':' in host) "[$host]" else host
-        val origin = "${if (port == 443) "https" else "http"}://$literal/"
-        val addresses = validated[origin] ?: try { safety.validate(origin).also { validated[origin] = it } } catch (cause: Exception) {
-            if (cause is CancellationException) throw cause
-            return deny(client)
-        }
-        val upstream = try { connect(addresses.first(), port, timeout) } catch (cause: Exception) {
-            if (cause is CancellationException) throw cause
-            return deny(client)
-        }
+        val addresses = validatedAddresses(host, port) ?: return deny(client)
+        // Like a browser, fall back to the next validated record when one address is unreachable.
+        val upstream = addresses.firstNotNullOfOrNull { address ->
+            try { connect(address, port, timeout) } catch (cause: Exception) {
+                if (cause is CancellationException) throw cause
+                null
+            }
+        } ?: return deny(client)
         upstream.use {
             track(upstream)
             upstream.soTimeout = timeout.toMillis().toInt()
@@ -99,15 +120,17 @@ class EgressProxy(
                     val request = (listOf("$method $path $version") + headers + "Connection: close").joinToString("\r\n") + "\r\n\r\n"
                     upstream.getOutputStream().apply { write(request.toByteArray()); flush() }
                 }
+                // The timeout is for the whole connection being idle: a client waiting on a slow response is not.
+                val lastActivity = AtomicLong(System.nanoTime())
                 val back = threads.submit {
                     // Absolute-form HTTP is pinned to this one host, so the response forbids reusing the proxy
                     // connection; otherwise a later request for another origin would reach this host's address.
                     if (tunnel || forwardResponseHead(upstream.getInputStream(), client.getOutputStream())) {
-                        pump(upstream.getInputStream(), client.getOutputStream())
+                        pump(upstream.getInputStream(), client.getOutputStream(), lastActivity)
                     }
                     client.closeQuietly()
                 }
-                pump(input, upstream.getOutputStream())
+                pump(input, upstream.getOutputStream(), lastActivity)
                 upstream.shutdownOutputQuietly()
                 back.get()
             } finally { active.remove(upstream) }
@@ -155,8 +178,19 @@ class EgressProxy(
         return runCatching { to.write(rewritten.toByteArray(Charsets.ISO_8859_1)) }.isSuccess
     }
 
-    private fun pump(from: InputStream, to: OutputStream) {
-        try { from.copyTo(to) } catch (_: Exception) { }
+    /** Copies until EOF; a read timeout ends the copy only when neither direction has moved for the timeout. */
+    private fun pump(from: InputStream, to: OutputStream, lastActivity: AtomicLong) {
+        val buffer = ByteArray(16 * 1024)
+        try {
+            while (true) {
+                val read = try { from.read(buffer) } catch (_: SocketTimeoutException) {
+                    if (System.nanoTime() - lastActivity.get() < timeout.toNanos()) continue else break
+                }
+                if (read < 0) break
+                to.write(buffer, 0, read); to.flush()
+                lastActivity.set(System.nanoTime())
+            }
+        } catch (_: Exception) { }
         runCatching { to.flush() }
     }
 

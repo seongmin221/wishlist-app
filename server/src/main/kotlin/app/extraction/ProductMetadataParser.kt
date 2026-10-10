@@ -32,8 +32,7 @@ object ProductMetadataParser {
             ?: document.selectFirst("meta[name=description]")?.attr("content")?.takeIf { it.isNotBlank() }
         val image = document.selectFirst("meta[property=og:image]")?.attr("abs:content")?.takeIf { it.isNotBlank() }
         val offers = product?.get("offers")?.let(::offerObjects).orEmpty()
-        val structuredPrice = if (product != null && product["offers"] != null) singlePrice(offers) else null
-        val price = if (ambiguous) null else if (product?.get("offers") != null) structuredPrice
+        val price = if (ambiguous) null else if (product?.get("offers") != null) singlePrice(offers)
             else validPrice(meta(document, "product:price:amount"), meta(document, "product:price:currency"))
         val brand = if (ambiguous) null else label(brandName(product?.get("brand")) ?: meta(document, "product:brand"))
         val seller = offers.firstNotNullOfOrNull { offer -> brandName(offer["seller"]) }

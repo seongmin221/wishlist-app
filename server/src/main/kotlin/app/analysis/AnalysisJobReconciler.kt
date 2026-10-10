@@ -96,12 +96,8 @@ class AnalysisJobReconciler(
             connection.failExhausted(candidate.id, candidate.itemId)
         } else {
             connection.transitionAnalysisJob(candidate.id, if (browser) "BROWSER_PENDING" else "GENERAL_PENDING")
-            connection.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,?,?)").use { statement ->
-                statement.setObject(1, UUID.randomUUID()); statement.setObject(2, candidate.id)
-                statement.setString(3, if (browser) "BROWSER_ANALYSIS" else "GENERAL_ANALYSIS")
-                statement.setString(4, "${if (browser) "browser" else "analysis"}-${candidate.id}-${job.generation}-recovery-$attempts-${job.executionToken ?: UUID.randomUUID()}")
-                check(statement.executeUpdate() == 1)
-            }
+            connection.insertAnalysisOutbox(candidate.id, lane,
+                "${if (browser) "browser" else "analysis"}-${candidate.id}-${job.generation}-recovery-$attempts-${job.executionToken ?: UUID.randomUUID()}")
         }
         return true
     }

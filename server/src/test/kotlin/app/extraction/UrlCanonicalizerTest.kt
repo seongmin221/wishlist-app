@@ -18,13 +18,14 @@ class UrlCanonicalizerTest {
         assertEquals("https://www.example.com/p/1", UrlCanonicalizer.choose("https://www.example.com/p/1#top", "https://m.example.com/p/1?utm_source=x"))
         assertEquals("https://m.example.com/p/1", UrlCanonicalizer.choose("/p/1?utm_source=x", "https://m.example.com/other"))
         assertEquals("https://shop.example.co.uk/p", UrlCanonicalizer.choose("https://shop.example.co.uk/p", "https://www.example.co.uk/q"))
+        assertEquals("https://www.example.com/p/1", UrlCanonicalizer.choose("https://www.example.com/p/1", "http://www.example.com/p/1"))
     }
 
     @Test fun `unsafe or foreign declared canonical falls back to the normalized final URL`() {
         val final = "https://m.example.com/p/1?utm_source=x&color=red"
         val expected = "https://m.example.com/p/1?color=red"
         for (declared in listOf(null, "", "not a url", "https://other.com/p/1", "http://user@example.com/p", "https://93.184.216.34/p",
-            "https://[2001:db8::1]/p", "https://www.example.com:8443/p", "ftp://example.com/p", "https://other.co.uk/p", "javascript:alert(1)")) {
+            "https://[2001:db8::1]/p", "https://www.example.com:8443/p", "ftp://example.com/p", "https://other.co.uk/p", "javascript:alert(1)", "http://m.example.com/p/1")) {
             assertEquals(expected, UrlCanonicalizer.choose(declared, final), declared.toString())
         }
         assertEquals("https://www.example.co.uk/q", UrlCanonicalizer.choose("https://other.co.uk/q", "https://www.example.co.uk/q"))

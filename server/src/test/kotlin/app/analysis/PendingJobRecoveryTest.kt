@@ -63,6 +63,28 @@ class PendingJobRecoveryTest {
         assertEquals("1", outboxes(source, unknown))
     }
 
+    @Test fun `a failing deferral does not abort the rest of the batch`() = withAnalysisDatabase { source ->
+        repeat(2) { publishedPending(source) }
+        // The same outage that fails the lookup also fails every deferral write.
+        val failingDeferral = object : DataSource by source {
+            override fun getConnection(): java.sql.Connection {
+                val c = source.connection
+                return object : java.sql.Connection by c {
+                    override fun prepareStatement(sql: String): java.sql.PreparedStatement =
+                        if (sql.contains("for update skip locked") && sql.startsWith("select id from analysis_jobs")) throw java.sql.SQLException("pool exhausted")
+                        else c.prepareStatement(sql)
+                }
+            }
+        }
+        val lookups = java.util.concurrent.atomic.AtomicInteger()
+        val queue = object : TaskGateway {
+            override fun create(task: AnalysisTask) = error("must not publish")
+            override fun status(task: AnalysisTask): TaskStatus { lookups.incrementAndGet(); error("lookup unavailable") }
+        }
+        assertEquals(PendingRecoveryReport(0, 0, 0, 0, 0, 0), PendingJobRecovery(failingDeferral, queue).recover())
+        assertEquals(2, lookups.get())
+    }
+
     @Test fun `missing task is rescheduled under a new name without spending attempts`() = withAnalysisDatabase { source ->
         for (lane in AnalysisLane.entries) {
             val lost = publishedPending(source, lane)

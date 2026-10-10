@@ -26,10 +26,5 @@ internal fun Connection.replaceStaleCategoryJob(claim: AnalysisClaim, job: Locke
         statement.setObject(3, claim.jobId)
         check(statement.executeUpdate() == 1)
     }
-    prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,'GENERAL_ANALYSIS',?)").use { statement ->
-        statement.setObject(1, UUID.randomUUID())
-        statement.setObject(2, id)
-        statement.setString(3, "category-refresh-$id-$next")
-        check(statement.executeUpdate() == 1)
-    }
+    insertAnalysisOutbox(id, AnalysisLane.GENERAL, "category-refresh-$id-$next")
 }

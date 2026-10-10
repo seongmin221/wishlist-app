@@ -39,7 +39,11 @@ class PendingJobRecovery(
             val outcome = try { inspect(candidate) } catch (cause: Exception) {
                 if (cause is CancellationException || cause is InterruptedException) throw cause
                 logger.error("Pending recovery failed jobId={} exceptionType={}", candidate.id, cause.javaClass.name)
-                dataSource.deferRecoveryCheck(candidate.id, lookupRetrySeconds)
+                // A failing deferral (same DB outage) must not abort the rest of the batch.
+                try { dataSource.deferRecoveryCheck(candidate.id, lookupRetrySeconds) } catch (deferral: Exception) {
+                    if (deferral is CancellationException || deferral is InterruptedException) throw deferral
+                    logger.error("Pending recovery deferral failed jobId={} exceptionType={}", candidate.id, deferral.javaClass.name)
+                }
                 Outcome.UNCHANGED
             }
             outcomes.merge(outcome, 1, Int::plus)
@@ -108,12 +112,8 @@ class PendingJobRecovery(
             updated_at=clock_timestamp() where id=? returning recovery_seq""").use { s ->
             s.setObject(1, candidate.id); s.executeQuery().use { r -> check(r.next()); r.getInt(1) }
         }
-        c.prepareStatement("insert into outbox_events(id,analysis_job_id,event_type,task_name) values (?,?,?,?)").use { s ->
-            s.setObject(1, UUID.randomUUID()); s.setObject(2, candidate.id)
-            s.setString(3, if (browser) "BROWSER_ANALYSIS" else "GENERAL_ANALYSIS")
-            s.setString(4, "${if (browser) "browser" else "analysis"}-${candidate.id}-${candidate.generation}-pending-$seq")
-            check(s.executeUpdate() == 1)
-        }
+        c.insertAnalysisOutbox(candidate.id, if (browser) AnalysisLane.BROWSER else AnalysisLane.GENERAL,
+            "${if (browser) "browser" else "analysis"}-${candidate.id}-${candidate.generation}-pending-$seq")
         return Outcome.RESCHEDULED
     }
 
