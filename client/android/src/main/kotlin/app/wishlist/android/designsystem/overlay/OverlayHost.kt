@@ -29,18 +29,27 @@ import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLButtonKind
 import app.wishlist.android.designsystem.WishlistTokens
 
-/** 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. */
+/** 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. `target`은 제목 아래 대상 줄(썸네일 + 이름)이다. */
 data class WLDialogSpec(
     val title: String,
     val bullets: List<String>,
     val cancelText: String,
     val confirmText: String,
     val confirmKind: WLButtonKind,
+    val target: WLDialogTarget? = null,
     val onConfirm: () -> Unit,
 )
 
-/** 메뉴 항목. 누르면 메뉴가 닫히기 시작하고 `onClick`이 불린다. */
-data class WLMenuItem(val text: String, val icon: (@Composable () -> Unit)? = null, val onClick: () -> Unit)
+/** 확인창 대상 줄(보드 삭제 확인): 묶음 면 위 썸네일 44 + 15/700 이름. */
+data class WLDialogTarget(val text: String, val thumbnail: @Composable () -> Unit)
+
+/** 메뉴 항목. 누르면 메뉴가 닫히기 시작하고 `onClick`이 불린다. `enabled`가 false면 흐리게(0.4) 그리고 누를 수 없다. */
+data class WLMenuItem(
+    val text: String,
+    val icon: (@Composable () -> Unit)? = null,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit,
+)
 
 enum class OverlayPhase { Opening, Open, Closing }
 

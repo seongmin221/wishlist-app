@@ -11,9 +11,10 @@ import app.wishlist.shared.presentation.RowStatus
 
 /**
  * A string resource with its format argument (if any); resolved only in composition. [count] set:
- * [res] is a plurals resource chosen by that count (and formatted with it).
+ * [res] is a plurals resource chosen by that count (and formatted with it). [args] set: several
+ * format arguments in order (instead of [arg]). An argument that is itself a [ResText] is resolved first.
  */
-data class ResText(val res: Int, val arg: Any? = null, val count: Int? = null)
+data class ResText(val res: Int, val arg: Any? = null, val count: Int? = null, val args: List<Any> = emptyList())
 
 /** Maps the Presenter's row values to the 문구 표 keys. Wording is the platform's; the Presenter only classifies. */
 object HomeRowText {
@@ -41,13 +42,24 @@ object HomeRowText {
 
     /** Logged-in header caption "할 일 N개" (N = the 분류 중 rows, the only to-do card in C3). */
     fun todoCount(count: Int): ResText = ResText(R.plurals.home_todo_count, count, count = count)
+
+    /** TalkBack name of a tappable row (opens the item or local link detail). */
+    @StringRes
+    val openDetail: Int = R.string.home_row_open_detail
+
+    /** TalkBack name of the signed-out row's "원본" button (PR A: the system browser). */
+    @StringRes
+    val openOriginal: Int = R.string.home_row_open_original
 }
 
 @Composable
-internal fun ResText.resolve(): String = when {
-    count != null -> pluralStringResource(res, count, arg ?: count)
-    arg == null -> stringResource(res)
-    else -> stringResource(res, arg)
+internal fun ResText.resolve(): String {
+    val resolved = (if (args.isNotEmpty()) args else listOfNotNull(arg)).map { if (it is ResText) it.resolve() else it }
+    return when {
+        count != null -> pluralStringResource(res, count, resolved.firstOrNull() ?: count)
+        resolved.isEmpty() -> stringResource(res)
+        else -> stringResource(res, *resolved.toTypedArray())
+    }
 }
 
 @Composable

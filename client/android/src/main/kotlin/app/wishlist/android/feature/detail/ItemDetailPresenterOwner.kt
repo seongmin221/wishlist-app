@@ -22,6 +22,18 @@ class ItemDetailPresenterOwner(private val presenter: ItemDetailPresenter) : Vie
 
     fun retry() = presenter.retry()
 
+    /** Pull to refresh and the screen's later resumes; keeps the shown item. */
+    fun refresh() = presenter.refresh()
+
+    private var started = false
+
+    /** The screen's first composition loads; a recomposition after a configuration change does not. */
+    fun loadOnce(id: String) {
+        if (started) return
+        started = true
+        load(id)
+    }
+
     override fun onCleared() {
         presenter.close()
     }

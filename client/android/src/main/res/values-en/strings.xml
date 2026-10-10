@@ -81,4 +81,34 @@
     <string name="share_failed_title">Couldn\'t save</string>
     <string name="share_failed_line">Please share again</string>
     <string name="settings_back">Back</string>
+    <!-- C4 상품 상세·로컬 대기 -->
+    <string name="detail_back">Back</string>
+    <string name="detail_more">More</string>
+    <string name="detail_open_original">View original</string>
+    <string name="detail_price_checked">Price checked %1$s. Check the current price on the original page.</string>
+    <string name="detail_category">Category</string>
+    <string name="detail_category_empty">Choose one</string>
+    <string name="detail_purpose">Purpose</string>
+    <string name="detail_purpose_none">No purpose</string>
+    <string name="detail_name_empty">Name · Add one</string>
+    <string name="detail_saved_just_now">Saved just now</string>
+    <string name="detail_saved_today">Saved today</string>
+    <string name="detail_saved_date">Saved %1$d/%2$d</string>
+    <string name="detail_saved_date_year">Saved %2$d/%3$d/%1$d</string>
+    <string name="detail_processing_note">You can\'t edit while we fetch the details. They appear when you reopen the app or refresh.</string>
+    <string name="detail_incomplete_info">We couldn\'t get all the product details</string>
+    <string name="detail_incomplete_category">We couldn\'t choose a category</string>
+    <string name="detail_incomplete_reassign">The category was deleted. Choose a new one</string>
+    <string name="detail_error_network">Couldn\'t load</string>
+    <string name="detail_error_server">Please try again in a moment</string>
+    <string name="detail_retry">Try again</string>
+    <string name="detail_not_found">This item was deleted</string>
+    <string name="detail_close">Close</string>
+    <string name="local_delete">Delete</string>
+    <string name="local_delete_title">Delete this link?</string>
+    <string name="local_delete_target">%1$s · Only on this device</string>
+    <string name="local_delete_line_unsent">This link hasn\'t been sent yet</string>
+    <string name="local_delete_failed">Couldn\'t delete</string>
+    <string name="home_row_open_detail">View details</string>
+    <string name="home_row_open_original">Open original</string>
 </resources>

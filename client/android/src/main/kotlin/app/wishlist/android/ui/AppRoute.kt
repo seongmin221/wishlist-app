@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Modifier
 import app.wishlist.android.designsystem.*
+import app.wishlist.android.feature.detail.ItemDetailScreen
+import app.wishlist.android.feature.detail.LocalSubmissionScreen
 import app.wishlist.android.feature.home.HomeScreen
 import app.wishlist.android.feature.login.LoginMode
 import app.wishlist.android.feature.login.LoginScreen
@@ -18,8 +20,8 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
         WLRoute.TabRoot(WLTab.Home) -> HomeScreen()
         SettingsRoute -> SettingsScreen()
         LoginRoute -> LoginScreen(LoginMode.Pushed)
-        // 화면은 Task 10. 아직 push하는 곳은 없지만 저장된 스택 복원이 죽지 않도록 빈 화면을 둔다.
-        is ItemDetailRoute, is LocalSubmissionRoute -> Box(Modifier.fillMaxSize().background(LocalWLColors.current.background))
+        is ItemDetailRoute -> ItemDetailScreen(route.itemId)
+        is LocalSubmissionRoute -> LocalSubmissionScreen(route.submissionId)
         else -> if (!VariantRoutes.Content(route, sourceKey)) {
             when (route) {
                 is WLRoute.TabRoot -> PlainTabRoot(route.tab)

@@ -79,4 +79,34 @@
     <string name="share_failed_title">저장하지 못했어요</string>
     <string name="share_failed_line">다시 공유해 주세요</string>
     <string name="settings_back">뒤로</string>
+    <!-- C4 상품 상세·로컬 대기 -->
+    <string name="detail_back">뒤로</string>
+    <string name="detail_more">더보기</string>
+    <string name="detail_open_original">원본 보기</string>
+    <string name="detail_price_checked">%1$s 확인한 가격이에요. 지금 가격은 원본에서 확인해 주세요.</string>
+    <string name="detail_category">카테고리</string>
+    <string name="detail_category_empty">골라 주세요</string>
+    <string name="detail_purpose">목적</string>
+    <string name="detail_purpose_none">목적 미지정</string>
+    <string name="detail_name_empty">제품명 · 입력해 주세요</string>
+    <string name="detail_saved_just_now">방금 저장</string>
+    <string name="detail_saved_today">오늘 저장</string>
+    <string name="detail_saved_date">%1$d월 %2$d일 저장</string>
+    <string name="detail_saved_date_year">%1$d년 %2$d월 %3$d일 저장</string>
+    <string name="detail_processing_note">정보를 가져오는 동안은 편집할 수 없어요. 끝나면 앱을 다시 열거나 새로고침할 때 반영돼요.</string>
+    <string name="detail_incomplete_info">상품 정보를 다 가져오지 못했어요</string>
+    <string name="detail_incomplete_category">카테고리를 정하지 못했어요</string>
+    <string name="detail_incomplete_reassign">카테고리가 삭제되어 다시 골라야 해요</string>
+    <string name="detail_error_network">불러오지 못했어요</string>
+    <string name="detail_error_server">잠시 후 다시 시도해 주세요</string>
+    <string name="detail_retry">다시 시도</string>
+    <string name="detail_not_found">삭제된 상품이에요</string>
+    <string name="detail_close">닫기</string>
+    <string name="local_delete">삭제</string>
+    <string name="local_delete_title">링크를 삭제할까요?</string>
+    <string name="local_delete_target">%1$s · 이 기기에만 있어요</string>
+    <string name="local_delete_line_unsent">아직 보내지 않은 링크예요</string>
+    <string name="local_delete_failed">지우지 못했어요</string>
+    <string name="home_row_open_detail">상세 보기</string>
+    <string name="home_row_open_original">원본 열기</string>
 </resources>
