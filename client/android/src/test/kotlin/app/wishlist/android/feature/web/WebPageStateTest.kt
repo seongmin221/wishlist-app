@@ -57,6 +57,14 @@ class WebPageStateTest {
     }
 
     @Test
+    fun aNewLoadStartsTheProgressLineOver() {
+        val finished = page(title = "상품 페이지").copy(progress = 100, loading = false)
+        val next = finished.started("https://m.musinsa.com/p/2")
+        assertEquals(0, next.progress)
+        assertTrue(next.progressVisible)
+    }
+
+    @Test
     fun progressLineHidesAtHundred() {
         assertTrue(page(loading = true, progress = 40).progressVisible)
         assertFalse(page(loading = true, progress = 100).progressVisible)

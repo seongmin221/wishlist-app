@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import app.wishlist.android.R
+import app.wishlist.android.designsystem.DISABLED_ALPHA
 import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLButton
 import app.wishlist.android.designsystem.WLButtonKind
@@ -135,9 +136,6 @@ internal fun DetailScaffold(
         if (originalUrl != null) OriginalBar(originalUrl, Modifier.align(Alignment.BottomCenter))
     }
 }
-
-/** 웹 주소가 아닌 원본 링크: 버튼은 남기되 누를 수 없게 흐리게 그린다. */
-internal const val DISABLED_ALPHA = 0.4f
 
 /** 하단 고정 "원본 보기": 위 12·좌우 20, 높이 56 pill 반전색, 16/700 + 바깥 링크 18(간격 8). */
 @Composable

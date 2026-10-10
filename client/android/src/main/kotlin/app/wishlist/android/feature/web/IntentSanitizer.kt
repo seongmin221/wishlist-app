@@ -4,6 +4,9 @@ import android.content.Intent
 import java.net.URISyntaxException
 import java.net.URLDecoder
 
+/** The `intent:` extra naming the web page to load when no app handles it; parser, sanitizer and launcher share it. */
+internal const val BROWSER_FALLBACK_URL = "browser_fallback_url"
+
 /** Result of handling an `intent:` navigation (spec §4 Android `intent://`). */
 sealed interface SanitizedIntent<out T> {
     /** Launch [intent]: component and selector cleared, `CATEGORY_BROWSABLE` added. */
@@ -31,7 +34,6 @@ internal interface IntentTarget {
  * `http`/`https` data or that nothing resolves falls back to `browser_fallback_url` (web URLs only) or is dropped.
  */
 internal object IntentSanitizer {
-    private const val FALLBACK_EXTRA = "browser_fallback_url"
     private val inWebViewOnly = setOf("http", "https", "file", "content", "javascript")
 
     /** Android adapter: `Intent.parseUri(URI_INTENT_SCHEME)` through the guarded pure path below. */
@@ -88,7 +90,7 @@ internal object IntentSanitizer {
 
     private class AndroidIntentTarget(val intent: Intent) : IntentTarget {
         override val dataScheme: String? get() = intent.data?.scheme
-        override val fallbackUrl: String? get() = intent.getStringExtra(FALLBACK_EXTRA)
+        override val fallbackUrl: String? get() = intent.getStringExtra(BROWSER_FALLBACK_URL)
         override fun clearComponent() { intent.component = null }
         override fun clearSelector() { intent.selector = null }
         override fun clearFlags() { intent.flags = 0 }
@@ -155,7 +157,7 @@ internal class ParsedIntentUri private constructor(
                     "scheme" -> scheme = value
                     "package" -> pkg = value
                     "component" -> component = value
-                    "S.$FALLBACK_KEY" -> fallback = value
+                    "S.$BROWSER_FALLBACK_URL" -> fallback = value
                     "launchFlags" -> flags = value?.let(::parseFlags) ?: 0
                 }
             }
@@ -163,8 +165,6 @@ internal class ParsedIntentUri private constructor(
             val dataScheme = scheme ?: data.substringBefore(':', "").takeIf { ':' in data && it.isNotEmpty() && '/' !in it }
             return ParsedIntentUri(dataScheme, pkg, component, inSelector, fallback, flags)
         }
-
-        private const val FALLBACK_KEY = "browser_fallback_url"
 
         /** `Intent.parseUri` reads `launchFlags` with `Integer.decode` (`0x…` hex or decimal). */
         private fun parseFlags(value: String): Int? = try {

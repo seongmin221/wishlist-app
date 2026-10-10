@@ -18,7 +18,6 @@ internal sealed interface ExternalTarget {
 }
 
 internal object WebExternalApps {
-    private const val FALLBACK_EXTRA = "browser_fallback_url"
 
     /**
      * `intent:` goes through [IntentSanitizer] (component and selector cleared, BROWSABLE added). Every other
@@ -36,7 +35,7 @@ internal object WebExternalApps {
             return when (val r = IntentSanitizer.sanitize(url) { true }) {
                 is SanitizedIntent.External -> ExternalTarget.Launch(
                     r.intent,
-                    r.intent.getStringExtra(FALLBACK_EXTRA)?.takeIf { fallbackOk && WebUrl.isWeb(it) },
+                    r.intent.getStringExtra(BROWSER_FALLBACK_URL)?.takeIf { fallbackOk && WebUrl.isWeb(it) },
                 )
                 is SanitizedIntent.Fallback -> if (fallbackOk) ExternalTarget.LoadInside(r.url) else ExternalTarget.None
                 SanitizedIntent.Drop -> ExternalTarget.None

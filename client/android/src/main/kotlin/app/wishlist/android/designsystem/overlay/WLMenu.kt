@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.wishlist.android.designsystem.DISABLED_ALPHA
 import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLText
 import app.wishlist.android.designsystem.WLType
@@ -64,7 +65,7 @@ fun WLMenuCard(items: List<WLMenuItem>, onItemClick: (WLMenuItem) -> Unit, modif
                 Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 52.dp)
-                    .alpha(if (item.enabled) 1f else 0.4f)
+                    .alpha(if (item.enabled) 1f else DISABLED_ALPHA)
                     .clickable(enabled = item.enabled, role = Role.Button) { onItemClick(item) }
                     .padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,

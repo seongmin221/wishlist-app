@@ -178,7 +178,8 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
 
     private fun syncHistory(view: WebView) {
         page = page.copy(
-            url = view.url?.takeIf { it.isNotEmpty() } ?: page.url,
+            // Like started(): only a web URL replaces the shown one (about:blank keeps the last page).
+            url = view.url?.takeIf(WebUrl::isWeb) ?: page.url,
             canGoBack = view.canGoBack(),
             canGoForward = view.canGoForward(),
         )
@@ -235,7 +236,8 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
                 (view.parent as? ViewGroup)?.removeView(view)
                 view.destroy()
                 webView = null
-                page = page.copy(loading = false, failed = true)
+                // The new view has no history: back must close, not call goBack() on an empty view.
+                page = page.copy(loading = false, failed = true, canGoBack = false, canGoForward = false)
                 generation++
             }
             return true
@@ -326,6 +328,11 @@ internal fun WebViewScreen(route: WebViewRoute) {
                         onDismissed = {
                             shownPrompt.spec = null // the gate allows one FWebViewExternal at a time
                             gate.onPromptClosed(confirmed, holder.page.url)
+                        },
+                        // Discarded while waiting for a closing overlay: never asked, so nothing is silenced.
+                        onDropped = {
+                            shownPrompt.spec = null
+                            gate.onPromptNotShown()
                         },
                     )
                     val shown = overlay.showDialog(spec)
