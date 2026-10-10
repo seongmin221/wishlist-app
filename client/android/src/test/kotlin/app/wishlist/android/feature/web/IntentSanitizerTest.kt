@@ -97,6 +97,47 @@ class IntentSanitizerTest {
     }
 
     @Test
+    fun localOrScriptDataNeverGoesExternal() {
+        var asked = false
+        val probe: (ParsedIntentUri) -> Boolean = { asked = true; true }
+        assertEquals(
+            SanitizedIntent.Fallback("https://m.shop.com"),
+            sanitize("intent:///etc/hosts#Intent;scheme=file;S.browser_fallback_url=https%3A%2F%2Fm.shop.com;end", probe),
+        )
+        assertEquals(SanitizedIntent.Drop, sanitize("intent://com.app.provider/x#Intent;scheme=content;end", probe))
+        assertEquals(SanitizedIntent.Drop, sanitize("intent:javascript:alert(1)#Intent;end", probe))
+        assertEquals(SanitizedIntent.Drop, sanitize("intent://x#Intent;scheme=JavaScript;end", probe))
+        assertFalse(asked)
+    }
+
+    @Test
+    fun parserExceptionsEndInFallbackOrDropInsteadOfCrashing() {
+        // Intent.parseUri throws NumberFormatException for `launchFlags=q`, `i.x=zz`, bad l./f./d. extras.
+        val withFallback = "intent://x#Intent;scheme=shop;launchFlags=q;S.browser_fallback_url=https%3A%2F%2Fm.shop.com;end"
+        val numberFormat: (String) -> ParsedIntentUri = { throw NumberFormatException("q") }
+        val illegal: (String) -> ParsedIntentUri = { throw IllegalArgumentException("bad") }
+        val syntax: (String) -> ParsedIntentUri = { throw java.net.URISyntaxException(it, "bad") }
+        for (parse in listOf(numberFormat, illegal, syntax)) {
+            assertEquals(SanitizedIntent.Fallback("https://m.shop.com"), IntentSanitizer.sanitize(withFallback, parse, always))
+            assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize("intent://x#Intent;i.x=zz;end", parse, always))
+        }
+    }
+
+    @Test
+    fun guardedPathHardensWhatTheParserReturns() {
+        val result = IntentSanitizer.sanitize(
+            "intent://scan/#Intent;scheme=zxing;component=com.evil/.Steal;SEL;component=a/.B;end",
+            { ParsedIntentUri.parse(it)!! },
+            always,
+        )
+        val target = (result as SanitizedIntent.External).intent
+        assertNull(target.component)
+        assertFalse(target.hasSelector)
+        assertTrue(ParsedIntentUri.CATEGORY_BROWSABLE in target.categories)
+        assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize("intent://scan/", { ParsedIntentUri.parse(it)!! }, always))
+    }
+
+    @Test
     fun malformedIntentUrisAreDropped() {
         listOf(
             "intent://scan/#Intent;scheme=zxing", // no end

@@ -31,28 +31,47 @@ internal interface IntentTarget {
  */
 internal object IntentSanitizer {
     private const val FALLBACK_EXTRA = "browser_fallback_url"
+    private val inWebViewOnly = setOf("http", "https", "file", "content", "javascript")
 
-    /** Android adapter: `Intent.parseUri(URI_INTENT_SCHEME)` then the pure [sanitize] core. Not JVM-testable. */
-    fun sanitize(uri: String, resolvable: (Intent) -> Boolean): SanitizedIntent<Intent> {
-        // Only the well-formed `#Intent;…;end` form; the legacy format and plain URIs never reach parseUri.
-        val parsed = ParsedIntentUri.parse(uri) ?: return SanitizedIntent.Drop
-        val intent = try {
-            Intent.parseUri(uri, Intent.URI_INTENT_SCHEME)
-        } catch (_: URISyntaxException) {
-            return fallbackOrDrop(parsed.fallbackUrl)
-        }
-        return when (val result = sanitize(AndroidIntentTarget(intent), { resolvable(it.intent) })) {
+    /** Android adapter: `Intent.parseUri(URI_INTENT_SCHEME)` through the guarded pure path below. */
+    fun sanitize(uri: String, resolvable: (Intent) -> Boolean): SanitizedIntent<Intent> =
+        when (
+            val result = sanitize(uri, { AndroidIntentTarget(Intent.parseUri(it, Intent.URI_INTENT_SCHEME)) }) {
+                resolvable(it.intent)
+            }
+        ) {
             is SanitizedIntent.External -> SanitizedIntent.External(result.intent.intent)
             is SanitizedIntent.Fallback -> result
             SanitizedIntent.Drop -> SanitizedIntent.Drop
         }
+
+    /**
+     * Gate + guarded [parse] + [sanitize] core. Only the well-formed `#Intent;…;end` form reaches [parse]
+     * (the legacy format and plain URIs are dropped).
+     *
+     * Regression note (Task 13 review): `Intent.parseUri` throws not only `URISyntaxException` but also
+     * `NumberFormatException` (an `IllegalArgumentException`) for `launchFlags=q`, `i.x=zz` and malformed
+     * `l.`/`f.`/`d.` extras. A page can send these without a gesture from `shouldOverrideUrlLoading`, so both
+     * are caught here and end in the fallback or Drop instead of crashing the app.
+     */
+    fun <T : IntentTarget> sanitize(uri: String, parse: (String) -> T, resolvable: (T) -> Boolean): SanitizedIntent<T> {
+        val parsed = ParsedIntentUri.parse(uri) ?: return SanitizedIntent.Drop
+        val target = try {
+            parse(uri)
+        } catch (_: URISyntaxException) {
+            return fallbackOrDrop(parsed.fallbackUrl)
+        } catch (_: IllegalArgumentException) {
+            return fallbackOrDrop(parsed.fallbackUrl)
+        }
+        return sanitize(target, resolvable)
     }
 
     /** Pure core: hardens [target] in place before asking [resolvable]. */
     fun <T : IntentTarget> sanitize(target: T?, resolvable: (T) -> Boolean): SanitizedIntent<T> {
         if (target == null) return SanitizedIntent.Drop
         val scheme = target.dataScheme?.lowercase()
-        if (scheme == "http" || scheme == "https") return fallbackOrDrop(target.fallbackUrl)
+        // Web data stays in the web view; local/script data (file:, content:, javascript:) never goes external.
+        if (scheme in inWebViewOnly) return fallbackOrDrop(target.fallbackUrl)
         target.clearComponent()
         target.clearSelector()
         target.addBrowsableCategory()
