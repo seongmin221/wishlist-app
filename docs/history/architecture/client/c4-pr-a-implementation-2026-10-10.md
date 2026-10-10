@@ -56,3 +56,9 @@
 | `gen_tokens.py --check`·`test_gen_tokens.py` | 통과 | 통과·8개 |
 
 화면 확인은 [C4 화면 확인 기록](c4-detail-verification-2026-10-10.md), 메모리 baseline은 [성능 기록](../../../architecture/client/c3-performance-checks.md#c4-측정-결과-2026-10-10)에 있다. 플랫폼 CI job은 꺼져 있어 로컬 결과가 근거다.
+
+## PR #15 2차 리뷰 반영(2026-10-10)
+
+- **Android 복원 시 상세가 닫히거나 오류에 멈춤:** `ItemDetailRoute`는 프로세스 종료 뒤 복원되는데, 화면이 DEBUG bootstrap(세션 복원·seed → ready)보다 먼저 `loadOnce`를 불렀다. ready 전이면 `RUNTIME_NOT_READY` 오류가 나고, 뒤이은 세션 복원((null,0) → (A,1))이 Presenter를 `Initial`로 되돌려 `shouldClose`가 화면을 pop했다. 이제 화면이 `runtime.ready`를 기다린 뒤 load한다. Presenter 정책(세션 변경 = 계정 떠남)은 바꾸지 않았다. iOS는 내비게이션 스택을 복원하지 않아 해당하지 않는다.
+- **로컬 대기 화면의 메뉴·삭제 확인창 잔류(Android·iOS):** 확인창이 열린 동안 전송이 시작되거나(`canDelete`가 true → false) outcome(`MovedTo` 등)이 오면, 이 화면이 연 overlay를 모두 닫은 뒤 스택을 바꾼다. 열리는 중이면 `dismissAll`이 거절하므로 한 프레임씩 기다렸다가 다시 시도한다.
+- `Wishlist.sq` 머리 주석을 schema v3로 고쳤다.
