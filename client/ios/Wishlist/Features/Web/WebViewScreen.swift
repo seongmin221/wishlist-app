@@ -70,7 +70,7 @@ private struct WebViewContent: View {
                     }
                     WebProgressLine(page: page)
                     ZStack {
-                        WebViewHost(webView: model.webView)
+                        WebViewHost(webView: model.webView, onTouch: { [model] in model.noteTouch() })
                         if page.failed {
                             c.background
                             DetailStatusBlock(
@@ -275,12 +275,15 @@ private struct WebBarButton: View {
 
 /// The owner's `WKWebView` in a container: a recreated representable re-parents it, and dismantling only takes it
 /// out of its own container (another container may already hold it).
+/// A `WebTouchStampRecognizer` on the container sees every touch that lands in the web view (D16 user tap).
 private struct WebViewHost: UIViewRepresentable {
     let webView: WKWebView
+    let onTouch: () -> Void
 
     func makeUIView(context: Context) -> UIView {
         let container = UIView()
         container.clipsToBounds = true
+        container.addGestureRecognizer(WebTouchStampRecognizer(onTouch: onTouch))
         attach(to: container)
         return container
     }

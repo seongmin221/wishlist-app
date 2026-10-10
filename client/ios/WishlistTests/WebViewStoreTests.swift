@@ -20,13 +20,17 @@ final class WebViewStoreTests: XCTestCase {
 
     private final class FakeAction: WKNavigationAction {
         private let fakeRequest: URLRequest
+        private let fakeType: WKNavigationType
 
-        init(_ url: URL) {
+        init(_ url: URL, type: WKNavigationType = .other) {
             fakeRequest = URLRequest(url: url)
+            fakeType = type
             super.init()
         }
 
         override var request: URLRequest { fakeRequest }
+        override var navigationType: WKNavigationType { fakeType }
+        override var targetFrame: WKFrameInfo? { nil } // a main-frame (new-window) request
     }
 
     /// What the screen's FWebViewExternal did with each prompt.
@@ -193,5 +197,52 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertFalse(motion.canBeginDrag)
         motion.setEdgeBackBlocked(entry.id, false)
         XCTAssertTrue(motion.canBeginDrag)
+    }
+
+    // MARK: D16 user tap (Ruling 12)
+
+    func testUserGestureNeedsALinkActivationAndARecentRealTouch() {
+        XCTAssertFalse(WebUserGesture.isUserGesture(navigationType: .linkActivated, lastTouch: nil, now: 100))
+        XCTAssertTrue(WebUserGesture.isUserGesture(navigationType: .linkActivated, lastTouch: 99.5, now: 100))
+        XCTAssertTrue(WebUserGesture.isUserGesture(navigationType: .linkActivated, lastTouch: 99.0, now: 100))
+        XCTAssertFalse(WebUserGesture.isUserGesture(navigationType: .linkActivated, lastTouch: 98.5, now: 100))
+        XCTAssertFalse(WebUserGesture.isUserGesture(navigationType: .other, lastTouch: 99.9, now: 100))
+        XCTAssertFalse(WebUserGesture.isUserGesture(navigationType: .formSubmitted, lastTouch: 99.9, now: 100))
+        XCTAssertFalse(WebUserGesture.isUserGesture(navigationType: .linkActivated, lastTouch: 101, now: 100))
+    }
+
+    func testScriptedLinkClickAsksAndATouchedOneOpens() {
+        var opened: [URL] = []
+        let prompts = Prompts()
+        let m = model({ opened.append($0) }, prompts: prompts)
+        defer { m.close() }
+        let tel = URL(string: "tel:0109998888")!
+        var policies: [WKNavigationActionPolicy] = []
+        // `a.click()` from a timer: .linkActivated with no touch.
+        m.webView(m.webView, decidePolicyFor: FakeAction(tel, type: .linkActivated)) { policies.append($0) }
+        XCTAssertEqual(prompts.shown, [tel])
+        XCTAssertTrue(opened.isEmpty)
+        prompts.pending?.closed(true)
+        m.noteTouch()
+        m.webView(m.webView, decidePolicyFor: FakeAction(tel, type: .linkActivated)) { policies.append($0) }
+        XCTAssertEqual(opened, [tel])
+        XCTAssertEqual(policies, [.cancel, .cancel])
+    }
+
+    func testPagesCannotOpenWindowsWithoutAGesture() {
+        let m = model()
+        defer { m.close() }
+        XCTAssertFalse(WebViewModel.makeConfiguration().preferences.javaScriptCanOpenWindowsAutomatically)
+        XCTAssertFalse(m.webView.configuration.preferences.javaScriptCanOpenWindowsAutomatically)
+    }
+
+    func testTouchRecognizerNeverCancelsOrBlocksOthers() {
+        var touches = 0
+        let r = WebTouchStampRecognizer { touches += 1 }
+        XCTAssertFalse(r.cancelsTouchesInView)
+        XCTAssertFalse(r.delaysTouchesBegan)
+        XCTAssertFalse(r.delaysTouchesEnded)
+        XCTAssertTrue(r.gestureRecognizer(r, shouldRecognizeSimultaneouslyWith: UIPanGestureRecognizer()))
+        XCTAssertEqual(touches, 0)
     }
 }
