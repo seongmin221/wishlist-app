@@ -95,7 +95,8 @@ private struct AppRoute: View {
             switch destination {
             case .settings: SettingsScreen()
             case .login: LoginScreen(mode: .pushed)
-            case .item, .local: DetailPlaceholder() // Task 11 screens
+            case .item(let itemId): ItemDetailScreen(itemId: itemId)
+            case .local(let submissionId): LocalSubmissionScreen(submissionId: submissionId)
             }
         }
         #if DEBUG
@@ -103,15 +104,6 @@ private struct AppRoute: View {
             DemoDetailScreen(destination: destination)
         }
         #endif
-    }
-}
-
-/// C4 상세 화면 자리(Task 11에서 실제 화면으로 바뀐다). 배경만 그린다.
-private struct DetailPlaceholder: View {
-    @Environment(\.wlColors) private var c
-
-    var body: some View {
-        c.background.ignoresSafeArea()
     }
 }
 

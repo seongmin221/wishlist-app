@@ -4,7 +4,7 @@ private let menuWidth: CGFloat = 200
 private let menuGap: CGFloat = 8
 private let menuBody = WLTextStyle.body.resized(15)
 
-/// ⋯ 메뉴 카드: 시트색, 모서리 20, 폭 200, 항목 높이 52, 1pt 선색 테두리, 그림자·블러 없음.
+/// ⋯ 메뉴 카드: 시트색, 모서리 20, 폭 200, 항목 높이 52, 1pt 선색 테두리, 그림자·블러 없음. 끈 항목은 0.4로 흐리고 누를 수 없다.
 struct WLMenuCard: View {
     let items: [WLMenuItem]
     let onItemClick: (WLMenuItem) -> Void
@@ -26,6 +26,8 @@ struct WLMenuCard: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .disabled(!item.enabled)
+                .opacity(item.enabled ? 1 : 0.4)
             }
         }
         .padding(.vertical, 6)

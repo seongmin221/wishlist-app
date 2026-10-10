@@ -17,7 +17,7 @@ final class WLEntryOwners {
     private let makeItem: () -> ItemDetailPresenter
     private let makeLocal: () -> LocalSubmissionDetailPresenter
     private var items: [Int: ItemDetailPresenterOwner] = [:]
-    private var locals: [Int: LocalSubmissionDetailPresenterOwner] = [:]
+    private var locals: [Int: LocalSubmissionPresenterOwner] = [:]
     private var retired: Set<Int> = []
 
     init(makeItem: @escaping () -> ItemDetailPresenter, makeLocal: @escaping () -> LocalSubmissionDetailPresenter) {
@@ -40,9 +40,9 @@ final class WLEntryOwners {
         return owner
     }
 
-    func localDetail(_ entryId: Int) -> LocalSubmissionDetailPresenterOwner {
+    func localDetail(_ entryId: Int) -> LocalSubmissionPresenterOwner {
         if let owner = locals[entryId] { return owner }
-        let owner = LocalSubmissionDetailPresenterOwner(presenter: makeLocal())
+        let owner = LocalSubmissionPresenterOwner(presenter: makeLocal())
         if retired.contains(entryId) {
             owner.close()
             return owner

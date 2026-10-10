@@ -338,4 +338,33 @@ final class WLNavigatorTests: XCTestCase {
         XCTAssertEqual(nav.dropAccountScoped().count, 1)
         XCTAssertEqual(nav.activeTransition?.kind, .tab(from: .home))
     }
+
+    /// A `MovedTo` that arrives while the local screen still slides in: the change waits for the transition, then applies.
+    @MainActor
+    func testWhenSettledRetriesAfterTheTransition() async throws {
+        let nav = WLNavigator()
+        XCTAssertTrue(nav.push(AppDestination.local("l1").route, sourceKey: "home/row/l1"))
+        let localId = try XCTUnwrap(nav.entries(.home).last?.id)
+        let item = AppDestination.item("i1").route
+        let settled = Task { @MainActor in await nav.whenSettled(entryID: localId) { nav.replaceTop(item) } }
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(nav.stack(.home).last, AppDestination.local("l1").route) // refused mid-push: still waiting
+        nav.finishTransition()
+        await settled.value
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home), item])
+    }
+
+    /// The entry is no longer the top (the user left, or another screen came over it): nothing happens.
+    @MainActor
+    func testWhenSettledGivesUpWhenTheEntryIsNotTheTop() async throws {
+        let nav = WLNavigator()
+        XCTAssertTrue(nav.push(AppDestination.item("i1").route, sourceKey: "a"))
+        nav.finishTransition()
+        let itemId = try XCTUnwrap(nav.entries(.home).last?.id)
+        XCTAssertTrue(nav.push(AppDestination.settings.route, sourceKey: "b"))
+        let settled = Task { @MainActor in await nav.whenSettled(entryID: itemId) { nav.pop() } }
+        nav.finishTransition()
+        await settled.value
+        XCTAssertEqual(nav.stack(.home), [.tabRoot(.home), AppDestination.item("i1").route, AppDestination.settings.route])
+    }
 }

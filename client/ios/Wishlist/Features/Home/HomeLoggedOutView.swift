@@ -2,7 +2,8 @@ import Shared
 import SwiftUI
 
 /// FHomeLoggedOut: 로그인 카드 + 할 일 "분석 대기"(이 기기에만 있는 링크, 오래된 순, 줄마다 "원본"). 대기가 없으면 할 일
-/// 섹션을 숨긴다. 줄 key는 불투명 값이라 목록 정체성으로만 쓴다.
+/// 섹션을 숨긴다. 줄을 누르면 로컬 대기 화면(C4), 오른쪽 "원본"은 시스템 브라우저다(PR A). 줄 key는 불투명 값이라 목록
+/// 정체성으로만 쓴다.
 struct HomeLoggedOutView: View {
     let pending: [HomeRow]
 

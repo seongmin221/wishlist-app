@@ -171,6 +171,8 @@ struct HomeTodoCard<Rows: View>: View {
 
 /// 펼친 카드 안의 링크 한 줄: 묶음 면(`sheetField`, 모서리 20, 패딩 10) 위 아이콘 타일(카드색)·host·상태 줄.
 /// `original`이 있으면 오른쪽에 "원본"(로그인 전 분석 대기만, Ruling 15: 로그인 뒤 분류 중 줄은 오른쪽 동작이 없다).
+/// 줄을 누르면 상세로 간다(C4, `HomeRow.target`): 서버 상품은 `.item`, 이 기기의 링크는 `.local`(가로 밀기).
+/// VoiceOver는 줄을 host·상태로 읽고 동작 이름 "상세 보기"를 힌트로, "원본"은 "원본 열기"로 읽는다.
 struct HomeLinkRow: View {
     let row: HomeRow
     let icon: WLLineIcon
@@ -178,26 +180,42 @@ struct HomeLinkRow: View {
     var showsOriginal = false
 
     @Environment(\.wlColors) private var c
+    @Environment(\.wlNavigator) private var nav
 
     var body: some View {
         HStack(spacing: WishlistTokens.Space.s12) {
-            WLIconTile(size: tileSize, color: c.card) { WLIcon(icon) }
-            VStack(alignment: .leading, spacing: 2) {
-                WLText(row.host, .bodyStrong, maxLines: 1)
-                    .truncationMode(.tail)
-                WLText(HomeRowText.meta(row), .label, color: c.textSecondary, maxLines: 1)
-                    .truncationMode(.tail)
+            Button(action: open) {
+                HStack(spacing: WishlistTokens.Space.s12) {
+                    WLIconTile(size: tileSize, color: c.card) { WLIcon(icon) }
+                    VStack(alignment: .leading, spacing: 2) {
+                        WLText(row.host, .bodyStrong, maxLines: 1)
+                            .truncationMode(.tail)
+                        WLText(HomeRowText.meta(row), .label, color: c.textSecondary, maxLines: 1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
+            .accessibilityHint(String(localized: String.LocalizationValue(HomeRowText.openDetailKey)))
             if showsOriginal { OriginalLink(url: row.sourceUrl) }
         }
         .padding(10)
         .background(c.sheetField, in: RoundedRectangle(cornerRadius: WishlistTokens.Radius.m, style: .continuous))
     }
+
+    private func open() {
+        let source = "home/row/\(row.key)"
+        switch onEnum(of: row.target) {
+        case .item(let target): nav.push(AppDestination.item(target.itemId).route, sourceKey: source)
+        case .local(let target): nav.push(AppDestination.local(target.submissionId).route, sourceKey: source)
+        }
+    }
 }
 
-/// "원본": C3-D5 a — 시스템 브라우저로 연다(C4에서 웹뷰).
+/// "원본": C3-D5 a — 시스템 브라우저로 연다(C4 PR A까지, PR B에서 웹뷰). VoiceOver 이름은 "원본 열기".
 private struct OriginalLink: View {
     let url: String
 
@@ -216,5 +234,6 @@ private struct OriginalLink: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: String.LocalizationValue(HomeRowText.openOriginalKey)))
     }
 }

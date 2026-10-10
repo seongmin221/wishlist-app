@@ -35,6 +35,15 @@ final class HomeRowTextTests: XCTestCase {
         }
     }
 
+    /// VoiceOver names the row's two actions apart (Android `home_row_open_detail` / `home_row_open_original`).
+    func testRowsNameTheirTwoActionsApart() throws {
+        XCTAssertEqual(HomeRowText.openDetailKey, "home.row.open.detail")
+        XCTAssertEqual(HomeRowText.openOriginalKey, "home.row.open.original")
+        let ko = try XCTUnwrap(HomeRowText.bundle(for: "ko"))
+        XCTAssertEqual(ko.localizedString(forKey: HomeRowText.openDetailKey, value: nil, table: nil), "상세 보기")
+        XCTAssertEqual(ko.localizedString(forKey: HomeRowText.openOriginalKey, value: nil, table: nil), "원본 열기")
+    }
+
     /// Resolution in a fixed language (the catalog's ko and en tables), independent of the simulator locale.
     func testMetaAndHeaderTextResolveInBothLanguages() throws {
         let ko = try XCTUnwrap(HomeRowText.bundle(for: "ko"))
