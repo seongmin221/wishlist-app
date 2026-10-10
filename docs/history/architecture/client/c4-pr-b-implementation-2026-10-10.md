@@ -56,3 +56,19 @@
 | `gen_tokens.py --check`·`test_gen_tokens.py` | 통과 | 통과·8개 | — |
 
 화면 확인은 [C4 화면 확인 기록](c4-detail-verification-2026-10-10.md)의 PR B 절에 있다. 플랫폼 CI job은 꺼져 있어 로컬 결과가 근거다.
+
+## PR #16 `/code-review` 반영(2026-10-10)
+
+PR A(#15)의 2·3차 리뷰 수정을 병합한 뒤 리뷰했다. 9건 중 8건을 고쳤다.
+
+- **대기 확인창 유실 → 외부 앱 확인이 영구히 막힘(두 플랫폼):** `showDialog`가 대기열 한 칸(`pending`)에 넣은 확인창이 뒤 `show*`나 `dismissAll`로 버려지면 `onDismissed`가 불리지 않았다. 그래서 `ExternalPromptGate.prompting`이 true로 남았다. 이제 버려질 때 `WLDialogSpec.onDropped`가 불리고, 웹뷰는 `onPromptNotShown`으로 되돌린다(취소로 보지 않아 페이지가 막히지 않는다). `dismissDialog`는 대기 중인 같은 확인창도 버린다.
+- **iOS 웹뷰가 닫혀도 확인창이 남음:** `dismissDialog(spec)`을 iOS에도 두었다. `WebViewModel.close()`가 `dismissPrompt`로 자기 확인창을 닫는다.
+- **iOS 가장자리 뒤로 막기가 다시 나타날 때 풀림:** `onAppear`에서 `canGoBack`으로 다시 막는다.
+- **Android 렌더러가 죽은 뒤 뒤로가 먹지 않음:** 새 view에는 기록이 없으므로 `canGoBack`·`canGoForward`를 false로 둔다.
+- **Android `syncHistory`가 `about:blank`로 주소를 덮음:** `started()`처럼 웹 URL만 받는다.
+- **Android 새 로드에서 진행 선이 안 보임:** `started()`가 progress를 0으로 되돌린다.
+- **정리:** `browser_fallback_url` 상수를 하나(`BROWSER_FALLBACK_URL`)로 합쳤다. 흐림 0.4를 designsystem의 `DISABLED_ALPHA`(iOS `wlDisabledOpacity`)로 옮겨 버튼·메뉴·설정·홈·상세가 같이 쓴다.
+
+고치지 않은 것: Android main frame `onReceivedError`의 중단 필터. WebView는 `ERR_ABORTED`를 `onReceivedError`로 보내지 않는다. 오류 코드로 거르면 실제 실패(`ERROR_UNKNOWN`)까지 숨길 수 있다.
+
+검증: Android unit debug·`assembleDebug`·`lintDebug`, iOS XCTest 201개가 통과했다(실패 0, overlay 대기 버림·진행 선 재시작 테스트 추가).
