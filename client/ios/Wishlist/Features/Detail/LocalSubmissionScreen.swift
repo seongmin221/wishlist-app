@@ -43,6 +43,7 @@ private struct LocalSubmissionContent: View {
     let owner: LocalSubmissionPresenterOwner
 
     @Environment(\.wlNavigator) private var nav
+    @Environment(\.overlayHostState) private var overlay
     @Environment(\.colorScheme) private var scheme
     @Environment(\.wlColors) private var c
     @State private var notice: BriefNotice?
@@ -82,7 +83,13 @@ private struct LocalSubmissionContent: View {
                 owner.tick()
             }
         }
+        // The menu or delete dialog this screen opened must not outlive what it acts on: sending started
+        // (canDelete went false) or the screen is ending (e.g. moved under an open dialog).
+        .onChange(of: owner.canDelete) { had, can in
+            if had, !can { Task { await closeOverlays() } }
+        }
         .task(id: exit) {
+            if exit != .stay { await closeOverlays() }
             switch exit {
             case .stay: break
             case .moved(let itemId): await nav.whenSettled(entryID: entryID) { nav.replaceTop(AppDestination.item(itemId).route) }
@@ -92,6 +99,14 @@ private struct LocalSubmissionContent: View {
         // Each failed delete shows the line again (counted on the owner; the flag is cleared by the next view).
         .onChange(of: owner.deleteFailureNotices) { _, serial in
             notice = BriefNotice(serial: serial, text: DetailLine("local.delete.failed").resolve())
+        }
+    }
+
+    /// Closes every overlay, waiting a frame at a time while one is still opening (dismissAll refuses then).
+    private func closeOverlays() async {
+        guard let overlay else { return }
+        while !overlay.entries.isEmpty, !overlay.dismissAll(), !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 16_000_000)
         }
     }
 

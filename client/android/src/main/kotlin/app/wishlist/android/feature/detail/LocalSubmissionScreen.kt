@@ -7,7 +7,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -25,6 +27,7 @@ import app.wishlist.android.designsystem.WLLineIcon
 import app.wishlist.android.designsystem.WLText
 import app.wishlist.android.designsystem.WishlistTokens
 import app.wishlist.android.designsystem.overlay.LocalOverlayHostState
+import app.wishlist.android.designsystem.overlay.OverlayHostState
 import app.wishlist.android.designsystem.overlay.WLDialogSpec
 import app.wishlist.android.designsystem.overlay.WLDialogTarget
 import app.wishlist.android.designsystem.overlay.WLMenuItem
@@ -66,6 +69,15 @@ internal fun LocalSubmissionScreen(submissionId: String) {
         }
     }
     val outcome = state.outcome
+    // The menu or delete dialog this screen opened must not outlive what it acts on: sending started
+    // (canDelete went false) or the screen is ending (e.g. MovedTo under an open dialog).
+    val canDeleteNow = state.canDelete
+    val hadDelete = remember(owner) { mutableStateOf(false) }
+    LaunchedEffect(canDeleteNow, outcome) {
+        val lost = hadDelete.value && !canDeleteNow
+        hadDelete.value = canDeleteNow
+        if (lost || outcome != null) overlay.closeAllWhenAble()
+    }
     LaunchedEffect(outcome) {
         when (outcome) {
             is LocalDetailOutcome.MovedTo -> nav.whenSettled(route) { replaceTop(ItemDetailRoute(outcome.itemId)) }
@@ -159,4 +171,9 @@ private fun DeleteThumbnail() {
     Box(Modifier.size(44.dp)) {
         WLIconTile(size = 44.dp, radius = WishlistTokens.Radius.xs, color = c.sheet) { WLIcon(WLLineIcon.Clock, color = c.textSecondary) }
     }
+}
+
+/** Closes every overlay, waiting a frame at a time while one is still opening (dismissAll refuses then). */
+private suspend fun OverlayHostState.closeAllWhenAble() {
+    while (isShowing && !dismissAll()) withFrameNanos { }
 }
