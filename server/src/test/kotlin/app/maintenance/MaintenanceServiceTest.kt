@@ -38,18 +38,33 @@ class MaintenanceServiceTest {
         assertEquals(listOf("reconcile" to "java.lang.IllegalStateException", "budget" to "java.lang.IllegalStateException"), logs)
     }
 
-    @Test fun `each step receives the shared run deadline and a spent budget skips the remaining steps`() {
+    @Test fun `outbox publication gets its own share so a slow queue cannot starve recovery and budget`() {
         var now = 0L
         val deadlines = mutableListOf<Long>()
+        var budgetRuns = 0
         val report = MaintenanceService(
-            dispatch = { _, deadline -> deadlines += deadline; now += 30_000_000_000; DispatchReport(1, 0) },
-            reconcile = { deadline -> deadlines += deadline; now += 30_000_000_000; 1 },
-            recoverPending = { error("must not run after the deadline") },
-            budget = { error("must not run after the deadline") },
-            totalMillis = 50_000, nanoTime = { now },
+            dispatch = { _, deadline -> deadlines += deadline; now += 60_000_000_000; DispatchReport(1, 9) },
+            reconcile = { error("must not run after the run deadline") },
+            recoverPending = { error("must not run after the run deadline") },
+            budget = { budgetRuns++; BudgetMaintenanceReport(1, 0) },
+            totalMillis = 50_000, dispatchMillis = 30_000, nanoTime = { now },
         ).runOnce()
-        assertEquals(listOf(50_000_000_000L, 50_000_000_000L), deadlines)
-        assertEquals(listOf("timeout:pending", "timeout:budget"), report.failedSteps)
-        assertTrue(report.publishedEvents == 1 && report.recoveredRunning == 1)
+        assertEquals(listOf(30_000_000_000L), deadlines)
+        assertEquals(listOf("timeout:reconcile", "timeout:pending"), report.failedSteps)
+        assertEquals(1, budgetRuns)
+        assertEquals(BudgetMaintenanceReport(1, 0), report.budget)
+    }
+
+    @Test fun `recovery steps share the run deadline`() {
+        var now = 0L
+        val deadlines = mutableListOf<Long>()
+        MaintenanceService(
+            dispatch = { _, deadline -> deadlines += deadline; DispatchReport(0, 0) },
+            reconcile = { deadline -> deadlines += deadline; now += 10_000_000_000; 0 },
+            recoverPending = { deadline -> deadlines += deadline; pending },
+            budget = { BudgetMaintenanceReport(0, 0) },
+            totalMillis = 50_000, dispatchMillis = 30_000, nanoTime = { now },
+        ).runOnce()
+        assertEquals(listOf(30_000_000_000L, 50_000_000_000L, 50_000_000_000L), deadlines)
     }
 }
