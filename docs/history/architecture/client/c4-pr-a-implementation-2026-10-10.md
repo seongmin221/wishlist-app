@@ -42,7 +42,7 @@
 ## 남긴 점(task 리뷰에서 미룬 minor)
 
 - 테스트·fixture: v1 migration 행 데이터 보존 미검증, v2 DDL 손복사 drift, 대문자 `client_submission_id`·decode 실패의 `cachedItemBySubmission` 테스트 없음, snapshot-match guard·close 중 lookup·generic 삭제 실패 미검증, 윤일·미래 시각·정확히 60초 경계, Compose 제스처 wiring(Robolectric 없음), 실제 사진 캡처(Fake imageUrl 없음).
-- 구조·동작: `selectSubmissionByKey` `LIMIT 1` 정렬 없음, iOS 다운샘플이 `scaledToFill` 대비 긴 변 기준이라 흐릴 수 있음, 크기 0일 때 1px 캐시, 진행 중 요청 dedupe 없음, 메모리 hit 때 자리표시 깜빡임, Android `java.net.URI`가 iOS `URL`보다 엄격, iOS `refreshAndWait` 최대 2초 지연 가능, 숨은 상세가 foreground에서 새로고침, 로컬 메뉴 탭에서 `!deleting` 재확인 없음, 복원 후 `seenWork`·`resumes` 미저장, 떠나는 화면이 모션 끝까지 구 계정 상태로 보임, retired id마다 Presenter를 만드는 경로(placeholder 권장).
+- 구조·동작: `selectSubmissionByKey` `LIMIT 1` 정렬 없음, iOS 다운샘플이 `scaledToFill` 대비 긴 변 기준이라 흐릴 수 있음, 크기 0일 때 1px 캐시, 진행 중 요청 dedupe 없음, 메모리 hit 때 자리표시 깜빡임, Android `java.net.URI`가 iOS `URL`보다 엄격, 숨은 상세가 foreground에서 새로고침, 로컬 메뉴 탭에서 `!deleting` 재확인 없음, 복원 후 `seenWork`·`resumes` 미저장, 떠나는 화면이 모션 끝까지 구 계정 상태로 보임.
 - 한계 표와 인계는 [kmp.md](../../../architecture/client/kmp.md#c4에서-생긴-항목)에 있다. 플랫폼 화면 한계는 [android.md](../../../architecture/client/android.md)·[ios.md](../../../architecture/client/ios.md)의 C4 절에 있다.
 
 ## 검증(2026-10-10, 로컬)
@@ -62,3 +62,23 @@
 - **Android 복원 시 상세가 닫히거나 오류에 멈춤:** `ItemDetailRoute`는 프로세스 종료 뒤 복원되는데, 화면이 DEBUG bootstrap(세션 복원·seed → ready)보다 먼저 `loadOnce`를 불렀다. ready 전이면 `RUNTIME_NOT_READY` 오류가 나고, 뒤이은 세션 복원((null,0) → (A,1))이 Presenter를 `Initial`로 되돌려 `shouldClose`가 화면을 pop했다. 이제 화면이 `runtime.ready`를 기다린 뒤 load한다. Presenter 정책(세션 변경 = 계정 떠남)은 바꾸지 않았다. iOS는 내비게이션 스택을 복원하지 않아 해당하지 않는다.
 - **로컬 대기 화면의 메뉴·삭제 확인창 잔류(Android·iOS):** 확인창이 열린 동안 전송이 시작되거나(`canDelete`가 true → false) outcome(`MovedTo` 등)이 오면, 이 화면이 연 overlay를 모두 닫은 뒤 스택을 바꾼다. 열리는 중이면 `dismissAll`이 거절하므로 한 프레임씩 기다렸다가 다시 시도한다.
 - `Wishlist.sq` 머리 주석을 schema v3로 고쳤다.
+
+## PR #15 3차 리뷰 반영(2026-10-10, `/code-review`)
+
+10건 중 6건을 고쳤다.
+
+- **iOS 당겨서 새로고침이 2초 동안 돎:** `refreshAndWait`가 50ms 폴링이라, 같은 항목으로 빨리 끝난 새로고침을 놓쳤다. 공유 `ItemDetailPresenter.refreshNow()`를 추가했고, iOS는 이것을 await한 뒤 마지막 상태를 바로 반영한다.
+- **item id 대소문자:** 조회(`cachedItem`·`removeCachedItem`)는 소문자 UUID로 하는데, 쓰기는 서버 id를 그대로 썼다. 이제 `mapItem`이 id를 canonical 소문자로 바꾼다. 캐시 키와 상세 Presenter의 `shown` 비교가 한 형태가 된다.
+- **이미 떠난 행의 삭제:** NOT_FOUND를 일반 실패("지우지 못했어요")로 보였다. 이제 `SUBMISSION_IN_FLIGHT`처럼 `deleting`만 내리고, 다음 view가 MovedTo·Gone을 정한다.
+- **분류 중 정렬:** 줄은 `savedAt`(`clientCreatedAt ?: createdAt`)을 보여 주는데, 정렬은 `createdAt`으로 했다. 정렬도 `(savedAt, id)`로 바꿨다.
+- **iOS retired id:** 요청마다 Presenter를 만들고 닫았다. 이제 종류별로 이미 닫힌 owner 하나를 돌려준다.
+- `upsertFromGet`·`upsertIfNewer`를 같은 버전 허용 여부만 다른 한 함수로 합쳤다.
+
+고치지 않은 것:
+
+- Activity 재생성 중 계정 변경을 놓친다는 지적은 고치지 않았다. Activity가 없을 때는 계정을 바꾸는 입력이 없고, 로그아웃 상태 복원은 UNAUTHENTICATED 닫기가 맡는다.
+- iOS `whenSettled` 30ms 폴링: 닫기·교체 때만 짧게 돈다.
+- 화면 쪽 시계·UTC 오프셋: 상세 라벨을 Presenter로 옮기는 것은 별도 정리 대상이다.
+- `retry`/`refresh` 동일: 의도를 이름으로 구분하려고 둔다.
+
+검증: shared Android host 501개, shared iOS simulator 498개, Android unit debug, `assembleDebug`·`lintDebug`, iOS XCTest 163개가 모두 통과했다(실패 0).
