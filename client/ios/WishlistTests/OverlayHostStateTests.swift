@@ -200,4 +200,46 @@ final class OverlayHostStateTests: XCTestCase {
         XCTAssertEqual(dismissed, 2)
         XCTAssertEqual(confirmed, 1)
     }
+
+    /// A dialog queued behind a closing overlay that never opens reports `onDropped`, not `onDismissed`:
+    /// replaced by a later show, cleared by dismissAll, or taken back with dismissDialog while waiting.
+    func testQueuedDialogThatNeverOpensReportsDroppedNotDismissed() {
+        let discards: [(OverlayHostState, WLDialogSpec) -> Void] = [
+            { s, _ in s.showSheet {} },
+            { s, _ in s.dismissAll() },
+            { s, d in XCTAssertTrue(s.dismissDialog(d)) },
+        ]
+        for discard in discards {
+            var dropped = 0
+            var dismissed = 0
+            let waiting = WLDialogSpec(title: "t", bullets: [], cancelText: "취소", confirmText: "확인", confirmKind: .primary,
+                                       onDismissed: { dismissed += 1 }, onDropped: { dropped += 1 }, onConfirm: {})
+            let s = OverlayHostState()
+            s.showSheet {}
+            settleOpen(s)
+            s.dismiss()
+            XCTAssertTrue(s.showDialog(waiting)) // queued behind the closing sheet
+            discard(s, waiting)
+            XCTAssertEqual(dropped, 1)
+            settleClose(s); settleOpen(s); settleClose(s)
+            XCTAssertFalse(s.entries.contains(where: isDialog))
+            XCTAssertEqual(dismissed, 0)
+            XCTAssertEqual(dropped, 1)
+        }
+    }
+
+    func testDismissDialogClosesOnlyThatDialogOnTop() {
+        var dismissed = 0
+        let mine = WLDialogSpec(title: "t", bullets: [], cancelText: "취소", confirmText: "확인", confirmKind: .primary,
+                                onDismissed: { dismissed += 1 }, onConfirm: {})
+        let s = OverlayHostState()
+        s.showDialog(mine)
+        XCTAssertFalse(s.dismissDialog(mine)) // still opening
+        settleOpen(s)
+        XCTAssertFalse(s.dismissDialog(spec)) // another spec
+        XCTAssertTrue(s.dismissDialog(mine))
+        settleClose(s)
+        XCTAssertTrue(s.entries.isEmpty)
+        XCTAssertEqual(dismissed, 1)
+    }
 }
