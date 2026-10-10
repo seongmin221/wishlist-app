@@ -131,7 +131,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
      * moved to another AndroidView (a later [attach] won the race), it is left there with its Activity base.
      */
     fun detach(view: WebView, boundParent: ViewParent?) {
-        if (view.parent !== boundParent) return
+        if (view.parent != null && view.parent !== boundParent) return
         (view.parent as? ViewGroup)?.removeView(view)
         if (view === webView) context.baseContext = app
     }
