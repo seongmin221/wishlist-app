@@ -97,6 +97,7 @@ private struct AppRoute: View {
             case .login: LoginScreen(mode: .pushed)
             case .item(let itemId): ItemDetailScreen(itemId: itemId)
             case .local(let submissionId): LocalSubmissionScreen(submissionId: submissionId)
+            case .web(let page): WebViewPlaceholder(url: page.url) // Task 15 replaces this with FWebView
             }
         }
         #if DEBUG
@@ -122,6 +123,18 @@ private struct DemoTabRoot: View {
 #endif
 
 /// release 빌드의 카테고리·목적 탭 첫 화면(아직 기능 화면이 없다).
+/// PR B 진행 중 임시 화면: 아직 웹뷰 화면이 없다(Task 15). 어디서도 push하지 않는다.
+private struct WebViewPlaceholder: View {
+    let url: URL
+
+    var body: some View {
+        WLText(url.absoluteString, .body)
+            .padding(.horizontal, WishlistTokens.Space.screenMargin)
+            .padding(.vertical, WishlistTokens.Space.s24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
 private struct PlainTabRoot: View {
     let tab: WLTab
 
