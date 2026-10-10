@@ -110,4 +110,20 @@
     <string name="local_delete_failed">지우지 못했어요</string>
     <string name="home_row_open_detail">상세 보기</string>
     <string name="home_row_open_original">원본 열기</string>
+    <!-- 원본 링크 웹뷰(C4 FWebView·FWebViewShare·FWebViewExternal) -->
+    <string name="webview_close">닫기</string>
+    <string name="webview_back">뒤로</string>
+    <string name="webview_forward">앞으로</string>
+    <string name="webview_reload">새로고침</string>
+    <string name="webview_stop">중지</string>
+    <string name="webview_share">공유</string>
+    <string name="webview_open_browser">외부 브라우저로 열기</string>
+    <string name="webview_copy_link">링크 복사</string>
+    <string name="webview_share_other">다른 앱으로 공유</string>
+    <string name="webview_link_copied">링크를 복사했어요</string>
+    <string name="webview_load_failed">페이지를 열 수 없어요</string>
+    <string name="webview_external_title">외부 앱을 열까요?</string>
+    <string name="webview_external_line_app">다른 앱이 열려요</string>
+    <string name="webview_external_line_tap">직접 누르지 않았다면 취소해 주세요</string>
+    <string name="webview_external_open">열기</string>
 </resources>

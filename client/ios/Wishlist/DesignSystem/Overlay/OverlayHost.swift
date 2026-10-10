@@ -10,16 +10,29 @@ struct WLDialogSpec {
     let confirmText: String
     let confirmKind: WLButtonKind
     var target: WLDialogTarget?
+    /// 제목 위 머리 타일(보드 FWebViewExternal의 48 상태색 타일).
+    var icon: AnyView?
+    /// 취소·확인·뒤로 어느 쪽이든 창이 다 닫힌 뒤 한 번 불린다(Android와 같다).
+    let onDismissed: () -> Void
+    /// 앞 overlay가 닫히길 기다리던 창이 열리지 못하고 버려졌을 때 대신 한 번 불린다(뒤 `show*`가 자리를 덮음, `dismissAll`,
+    /// `dismissDialog`). 그때 `onDismissed`는 불리지 않는다(Android와 같다).
+    let onDropped: () -> Void
     let onConfirm: () -> Void
+    /// Identifies this dialog for `dismissDialog` (Android compares the spec instance).
+    let token = UUID()
 
     init(title: String, bullets: [String], cancelText: String, confirmText: String, confirmKind: WLButtonKind,
-         target: WLDialogTarget? = nil, onConfirm: @escaping () -> Void) {
+         target: WLDialogTarget? = nil, icon: AnyView? = nil, onDismissed: @escaping () -> Void = {},
+         onDropped: @escaping () -> Void = {}, onConfirm: @escaping () -> Void) {
         self.title = title
         self.bullets = bullets
         self.cancelText = cancelText
         self.confirmText = confirmText
         self.confirmKind = confirmKind
         self.target = target
+        self.icon = icon
+        self.onDismissed = onDismissed
+        self.onDropped = onDropped
         self.onConfirm = onConfirm
     }
 }
@@ -96,7 +109,8 @@ final class OverlayEntry: Identifiable {
 final class OverlayHostState {
     private(set) var entries: [OverlayEntry] = []
     @ObservationIgnored private var nextId = 0
-    @ObservationIgnored private var pending: (() -> Void)?
+    /// The one overlay waiting for the closing one; a dialog's `onDropped` runs when it is discarded.
+    @ObservationIgnored private var pending: (add: () -> Void, dialog: WLDialogSpec?)?
     @ObservationIgnored private var dismissingAll = false
 
     var isAnimating: Bool { entries.contains { $0.phase != .open } }
@@ -107,7 +121,7 @@ final class OverlayHostState {
     }
 
     @discardableResult
-    func showDialog(_ spec: WLDialogSpec) -> Bool { push { .dialog(spec) } }
+    func showDialog(_ spec: WLDialogSpec) -> Bool { push(dialog: spec) { .dialog(spec) } }
 
     /// `anchor`는 눌린 버튼의 화면(전역) 기준 사각형(`View.wlAnchor`).
     @discardableResult
@@ -117,6 +131,18 @@ final class OverlayHostState {
     @discardableResult
     func dismiss() -> Bool {
         guard let top = entries.last else { return false }
+        return requestDismiss(top.id)
+    }
+
+    /// `spec`으로 연 확인창이 가장 위에 열려 있으면 닫는다(`onDismissed`가 불린다). 아직 열리길 기다리는 중이면 버린다
+    /// (`onDropped`). 그 확인창을 띄운 화면이 사라질 때 쓴다(Android `dismissDialog`). 열리는 중이거나 다른 overlay가 위에 있으면 false.
+    @discardableResult
+    func dismissDialog(_ spec: WLDialogSpec) -> Bool {
+        if pending?.dialog?.token == spec.token {
+            dropPending()
+            return true
+        }
+        guard let top = entries.last, case .dialog(let shown) = top.kind, shown.token == spec.token else { return false }
         return requestDismiss(top.id)
     }
 
@@ -134,7 +160,7 @@ final class OverlayHostState {
     func dismissAll() -> Bool {
         guard let top = entries.last, !entries.contains(where: { $0.phase == .opening }) else { return false }
         dismissingAll = true
-        pending = nil
+        dropPending()
         if top.phase == .open { top.phase = .closing }
         return true
     }
@@ -153,7 +179,9 @@ final class OverlayHostState {
     }
 
     func onClosed(_ id: Int) {
+        let closed = entries.filter { $0.id == id }
         entries.removeAll { $0.id == id }
+        for entry in closed { if case .dialog(let spec) = entry.kind { spec.onDismissed() } }
         if !entries.contains(where: { $0.phase == .closing }) {
             if dismissingAll {
                 if let top = entries.last {
@@ -164,22 +192,29 @@ final class OverlayHostState {
             }
             let next = pending
             pending = nil
-            next?()
+            next?.add()
         }
     }
 
-    private func push(_ make: @escaping () -> OverlayKind) -> Bool {
+    private func push(dialog: WLDialogSpec? = nil, _ make: @escaping () -> OverlayKind) -> Bool {
         if entries.contains(where: { $0.phase == .opening }) { return false }
         let add = { [unowned self] in
             entries.append(OverlayEntry(id: nextId, kind: make()))
             nextId += 1
         }
         if entries.contains(where: { $0.phase == .closing }) {
-            pending = add
+            dropPending()
+            pending = (add, dialog)
         } else {
             add()
         }
         return true
+    }
+
+    private func dropPending() {
+        guard let dropped = pending else { return }
+        pending = nil
+        dropped.dialog?.onDropped()
     }
 }
 

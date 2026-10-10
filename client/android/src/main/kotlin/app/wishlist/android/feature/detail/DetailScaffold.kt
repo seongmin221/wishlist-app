@@ -1,9 +1,5 @@
 package app.wishlist.android.feature.detail
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -38,8 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -53,6 +49,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import app.wishlist.android.R
+import app.wishlist.android.designsystem.DISABLED_ALPHA
 import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLButton
 import app.wishlist.android.designsystem.WLButtonKind
@@ -66,6 +63,8 @@ import app.wishlist.android.designsystem.WLTopBarMetrics
 import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
 import app.wishlist.android.designsystem.wlSafeTop
+import app.wishlist.android.feature.web.WebViewRoute
+import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLNavigator
 import app.wishlist.android.navigation.WLRoute
 import kotlinx.coroutines.delay
@@ -101,7 +100,7 @@ internal class DetailRefresh(val refreshing: Boolean, val onRefresh: () -> Unit)
 
 /**
  * 상세 공통 틀: 스크롤 본문 위에 뒤로·(선택)⋯가 떠 있는 위쪽 바 56(안전 영역 + 6, 좌우 20), 하단 고정 "원본 보기"
- * (PR A: 시스템 브라우저 `ACTION_VIEW`). 탭 바는 route가 숨긴다. `originalUrl`이 없으면(첫 로딩·오류) 하단 바를 그리지 않는다.
+ * (PR B: 앱 안 웹뷰 [WebViewRoute], `http`/`https`가 아니면 누를 수 없다). 탭 바는 route가 숨긴다. `originalUrl`이 없으면(첫 로딩·오류) 하단 바를 그리지 않는다.
  * `notice`는 위쪽 바 아래의 짧은 안내 줄이다(C1에 토스트 부품이 없다).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,7 +141,8 @@ internal fun DetailScaffold(
 @Composable
 private fun OriginalBar(url: String, modifier: Modifier) {
     val c = LocalWLColors.current
-    val context = LocalContext.current
+    val nav = LocalWLNavigator.current
+    val route = remember(url) { WebViewRoute.of(url) }
     Box(
         modifier
             .fillMaxWidth()
@@ -155,7 +155,8 @@ private fun OriginalBar(url: String, modifier: Modifier) {
                 .heightIn(min = 56.dp)
                 .clip(RoundedCornerShape(WishlistTokens.Radius.pill))
                 .background(c.text)
-                .clickable(role = Role.Button) { openOriginal(context, url) },
+                .alpha(if (route != null) 1f else DISABLED_ALPHA)
+                .clickable(enabled = route != null, role = Role.Button) { route?.let { nav.push(it, "detail/original") } },
             horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -165,9 +166,9 @@ private fun OriginalBar(url: String, modifier: Modifier) {
     }
 }
 
-/** 짧은 안내 줄: 위쪽 바 아래, 카드색 pill 13/400. 나타남·사라짐 opacity 200(구현 기본값). */
+/** 짧은 안내 줄: 위쪽 바 아래, 카드색 pill 13/400. 나타남·사라짐 opacity 200(구현 기본값). 웹뷰 "링크를 복사했어요"도 쓴다. */
 @Composable
-private fun DetailNoticeLine(text: String?, modifier: Modifier) {
+internal fun DetailNoticeLine(text: String?, modifier: Modifier) {
     val c = LocalWLColors.current
     var last by remember { mutableStateOf(text) }
     if (text != null) last = text
@@ -216,16 +217,6 @@ internal fun DetailStatusBlock(message: String, buttonText: String, onClick: () 
         WLIconTile(size = 56.dp, radius = WishlistTokens.Radius.m, color = c.card) { WLIcon(WLLineIcon.Warning, color = c.textSecondary) }
         WLText(message, WLType.title.copy(fontSize = 18.sp), color = c.text, textAlign = TextAlign.Center)
         WLButton(buttonText, WLButtonKind.Secondary, onClick = onClick)
-    }
-}
-
-// Uri.parse: core-ktx is only a transitive dependency of this module.
-@Suppress("UseKtx")
-internal fun openOriginal(context: Context, url: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    } catch (e: ActivityNotFoundException) {
-        // No browser installed: nothing to open.
     }
 }
 

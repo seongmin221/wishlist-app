@@ -22,6 +22,21 @@ class OverlayHostStateTest {
         assertFalse(s.isAnimating)
     }
 
+    @Test fun dismissDialogClosesOnlyThatDialogOnTop() {
+        val s = OverlayHostState()
+        var dismissed = 0
+        val mine = spec.copy(onDismissed = { dismissed++ })
+        s.showDialog(mine)
+        assertFalse(s.dismissDialog(mine)) // still opening
+        s.settleOpen()
+        assertFalse(s.dismissDialog(spec)) // another spec
+        assertTrue(s.dismissDialog(mine))
+        s.settleClose()
+        assertTrue(s.entries.isEmpty())
+        assertEquals(1, dismissed)
+        assertFalse(s.dismissDialog(mine))
+    }
+
     @Test fun dismissDuringOpenIsIgnored() {
         val s = OverlayHostState()
         s.showSheet {}
@@ -157,5 +172,43 @@ class OverlayHostStateTest {
         s.showSheet {}; assertTrue(s.isShowing)
         s.settleOpen(); s.dismiss(); assertTrue(s.isShowing)
         s.settleClose(); assertFalse(s.isShowing)
+    }
+
+    @Test fun dialogReportsItsCloseOnceWhetherCancelledOrConfirmed() {
+        var closed = 0
+        var confirmed = 0
+        val tracked = WLDialogSpec("t", emptyList(), "취소", "확인", WLButtonKind.Primary, onDismissed = { closed++ }) { confirmed++ }
+        val s = OverlayHostState()
+        s.showDialog(tracked); s.settleOpen()
+        s.dismiss(); s.settleClose()
+        assertEquals(1, closed)
+        assertEquals(0, confirmed)
+        s.showDialog(tracked); s.settleOpen()
+        s.confirm(s.entries.single().id); s.settleClose()
+        assertEquals(2, closed)
+        assertEquals(1, confirmed)
+    }
+
+    @Test fun queuedDialogThatNeverOpensReportsDroppedNotDismissed() {
+        // Replaced by a later show, cleared by dismissAll, or taken back with dismissDialog while waiting.
+        for (discard in listOf<(OverlayHostState, WLDialogSpec) -> Unit>(
+            { s, _ -> s.showSheet {} },
+            { s, _ -> s.dismissAll() },
+            { s, d -> assertTrue(s.dismissDialog(d)) },
+        )) {
+            var dropped = 0
+            var dismissed = 0
+            val waiting = spec.copy(onDismissed = { dismissed++ }, onDropped = { dropped++ })
+            val s = OverlayHostState()
+            s.showSheet {}; s.settleOpen()
+            s.dismiss()
+            assertTrue(s.showDialog(waiting)) // queued behind the closing sheet
+            discard(s, waiting)
+            assertEquals(1, dropped)
+            s.settleClose(); s.settleOpen(); s.settleClose()
+            assertTrue(s.entries.none { it is DialogEntry && it.spec === waiting })
+            assertEquals(0, dismissed)
+            assertEquals(1, dropped)
+        }
     }
 }

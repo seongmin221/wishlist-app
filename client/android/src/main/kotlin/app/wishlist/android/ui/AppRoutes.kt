@@ -1,5 +1,6 @@
 package app.wishlist.android.ui
 
+import app.wishlist.android.feature.web.WebViewRoute
 import app.wishlist.android.navigation.WLPushStyle
 import app.wishlist.android.navigation.WLRoute
 import app.wishlist.android.navigation.WLRouteCodec
@@ -30,13 +31,14 @@ internal data class LocalSubmissionRoute(val submissionId: String) : WLRoute {
     override val accountScoped = true
 }
 
-/** C3·C4 production routes. Tokens never collide with the debug `demo` namespace. */
+/** C3·C4 production routes (`web/<base64url(url)>` re-validates on decode). Tokens never collide with the debug `demo` namespace. */
 internal object ProductionRouteCodec : WLRouteCodec {
     override fun encode(route: WLRoute): List<String>? = when (route) {
         SettingsRoute -> listOf("settings")
         LoginRoute -> listOf("login")
         is ItemDetailRoute -> listOf("item", route.itemId)
         is LocalSubmissionRoute -> listOf("local", route.submissionId)
+        is WebViewRoute -> listOf("web", WebViewRoute.encodeToken(route.url))
         else -> null
     }
 
@@ -45,6 +47,7 @@ internal object ProductionRouteCodec : WLRouteCodec {
         tokens == listOf("login") -> LoginRoute
         tokens.size == 2 && tokens[0] == "item" -> ItemDetailRoute(tokens[1])
         tokens.size == 2 && tokens[0] == "local" -> LocalSubmissionRoute(tokens[1])
+        tokens.size == 2 && tokens[0] == "web" -> WebViewRoute.decodeToken(tokens[1])
         else -> null
     }
 }

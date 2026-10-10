@@ -55,6 +55,8 @@ final class WLNavMotion {
     @ObservationIgnored private var drag: (entry: WLBackStackEntry, transition: WLNavTransition)?
     @ObservationIgnored private var pendingPopRemaining: Double?
     @ObservationIgnored private var arrivalSerial = 0
+    /// Entries whose own content takes the left-edge swipe (FWebView with page history: WKWebView goes back).
+    @ObservationIgnored private var edgeBackBlocked: Set<Int> = []
 
     init(navigator: WLNavigator) {
         self.navigator = navigator
@@ -273,8 +275,17 @@ final class WLNavMotion {
 
     // MARK: 끌어서 뒤로 (진행값 0~1)
 
-    /// 가장자리 끌기를 받아도 되는지(전환 중·탭 첫 화면이면 아니다).
-    var canBeginDrag: Bool { !navigator.isTransitioning && navigator.canPop }
+    /// 가장자리 끌기를 받아도 되는지(전환 중·탭 첫 화면이면 아니다, 맨 위 칸이 끌기를 직접 쓰면 아니다).
+    var canBeginDrag: Bool {
+        guard !navigator.isTransitioning, navigator.canPop else { return false }
+        guard let top = navigator.entries(navigator.currentTab).last else { return false }
+        return !edgeBackBlocked.contains(top.id)
+    }
+
+    /// 칸이 왼쪽 가장자리 끌기를 직접 쓰는지(웹뷰: 기록이 있으면 `allowsBackForwardNavigationGestures`가 뒤로 간다).
+    func setEdgeBackBlocked(_ entryID: Int, _ blocked: Bool) {
+        if blocked { edgeBackBlocked.insert(entryID) } else { edgeBackBlocked.remove(entryID) }
+    }
 
     func beginDrag() -> Bool {
         guard let entry = navigator.entries(navigator.currentTab).last, navigator.beginBackGesture(),

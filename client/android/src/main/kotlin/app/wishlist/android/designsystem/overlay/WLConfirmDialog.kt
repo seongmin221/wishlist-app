@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
 private val DialogBody = WLType.body.copy(fontSize = 15.sp, lineHeight = 1.6f.em)
 private val DialogTarget = WLType.bodyStrong.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold)
 
-/** 확인창 카드: 제목 + 글머리표 영향 + 취소(왼쪽)·확인(오른쪽, 더 넓음). 모서리 xl 36, 시트색 불투명. */
+/** 확인창 카드: (머리 타일) + 제목 + 글머리표 영향 + 취소(왼쪽)·확인(오른쪽, 더 넓음). 모서리 xl 36, 시트색 불투명. */
 @Composable
 fun WLConfirmDialogCard(spec: WLDialogSpec, onCancel: () -> Unit, onConfirm: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalWLColors.current
@@ -51,6 +51,7 @@ fun WLConfirmDialogCard(spec: WLDialogSpec, onCancel: () -> Unit, onConfirm: () 
         verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12),
     ) {
         WLOnSheet {
+            spec.icon?.invoke()
             WLText(spec.title, WLSheetTitleStyle, color = c.text)
             spec.target?.let { target ->
                 Row(

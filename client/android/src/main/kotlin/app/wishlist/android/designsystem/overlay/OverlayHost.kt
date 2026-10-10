@@ -29,7 +29,12 @@ import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLButtonKind
 import app.wishlist.android.designsystem.WishlistTokens
 
-/** 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. `target`은 제목 아래 대상 줄(썸네일 + 이름)이다. */
+/**
+ * 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. `target`은 제목 아래 대상 줄(썸네일 + 이름)이다.
+ * `icon`은 제목 위 머리 타일(보드 FWebViewExternal의 48 상태색 타일)이다. `onDismissed`는 취소·확인·뒤로 어느 쪽이든
+ * 창이 다 닫힌 뒤 한 번 불린다. `onDropped`는 앞 overlay가 닫히길 기다리던 창이 열리지 못하고 버려졌을 때 대신 한 번 불린다
+ * (뒤 `show*`가 자리를 덮음, `dismissAll`, `dismissDialog`). 그때 `onDismissed`는 불리지 않는다.
+ */
 data class WLDialogSpec(
     val title: String,
     val bullets: List<String>,
@@ -37,6 +42,9 @@ data class WLDialogSpec(
     val confirmText: String,
     val confirmKind: WLButtonKind,
     val target: WLDialogTarget? = null,
+    val icon: (@Composable () -> Unit)? = null,
+    val onDismissed: () -> Unit = {},
+    val onDropped: () -> Unit = {},
     val onConfirm: () -> Unit,
 )
 
@@ -90,7 +98,10 @@ internal class MenuEntry(id: Long, val anchor: Rect, val items: List<WLMenuItem>
 class OverlayHostState {
     internal val entries = mutableStateListOf<OverlayEntry>()
     private var nextId = 0L
-    private var pending: (() -> Unit)? = null
+    // The one overlay waiting for the closing one; a dialog's onDropped runs when it is discarded.
+    private var pending: Pending? = null
+
+    private class Pending(val add: () -> Unit, val dialog: WLDialogSpec?)
     private var dismissingAll = false
 
     val isAnimating: Boolean get() = entries.any { it.phase != OverlayPhase.Open }
@@ -101,7 +112,7 @@ class OverlayHostState {
     fun showSheet(draggable: Boolean = true, title: String? = null, content: @Composable () -> Unit): Boolean =
         push { SheetEntry(it, draggable, title, content) }
 
-    fun showDialog(spec: WLDialogSpec): Boolean = push { DialogEntry(it, spec) }
+    fun showDialog(spec: WLDialogSpec): Boolean = push(spec) { DialogEntry(it, spec) }
 
     /** `anchor`는 눌린 버튼의 창 기준 사각형(`Modifier.wlAnchor`). */
     fun showMenu(anchor: Rect, items: List<WLMenuItem>): Boolean = push { MenuEntry(it, anchor, items) }
@@ -109,6 +120,21 @@ class OverlayHostState {
     /** 가장 위 overlay를 닫는다. 시스템 뒤로·막 누르기가 쓴다. 닫기를 시작했으면 true. */
     fun dismiss(): Boolean {
         val top = entries.lastOrNull() ?: return false
+        return requestDismiss(top.id)
+    }
+
+    /**
+     * [spec]로 연 확인창이 가장 위에 열려 있으면 닫는다(`onDismissed`가 불린다). 아직 열리길 기다리는 중이면 버린다
+     * (`onDropped`). 그 확인창을 띄운 화면이 사라질 때 쓴다.
+     * 열리는 중이거나 다른 overlay가 위에 있으면 false(호출한 쪽이 `onConfirm`을 따로 막는다).
+     */
+    fun dismissDialog(spec: WLDialogSpec): Boolean {
+        if (pending?.dialog === spec) {
+            dropPending()
+            return true
+        }
+        val top = entries.lastOrNull() as? DialogEntry ?: return false
+        if (top.spec !== spec) return false
         return requestDismiss(top.id)
     }
 
@@ -127,7 +153,7 @@ class OverlayHostState {
     fun dismissAll(): Boolean {
         if (entries.isEmpty() || entries.any { it.phase == OverlayPhase.Opening }) return false
         dismissingAll = true
-        pending = null
+        dropPending()
         val top = entries.last()
         if (top.phase == OverlayPhase.Open) top.phase = OverlayPhase.Closing
         return true
@@ -146,7 +172,9 @@ class OverlayHostState {
     }
 
     internal fun onClosed(id: Long) {
+        val closed = entries.filter { it.id == id }
         entries.removeAll { it.id == id }
+        closed.forEach { (it as? DialogEntry)?.spec?.onDismissed?.invoke() }
         if (entries.none { it.phase == OverlayPhase.Closing }) {
             if (dismissingAll) {
                 val top = entries.lastOrNull()
@@ -158,19 +186,26 @@ class OverlayHostState {
             }
             val next = pending
             pending = null
-            next?.invoke()
+            next?.add?.invoke()
         }
     }
 
-    private fun push(make: (Long) -> OverlayEntry): Boolean {
+    private fun push(dialog: WLDialogSpec? = null, make: (Long) -> OverlayEntry): Boolean {
         if (entries.any { it.phase == OverlayPhase.Opening }) return false
         val add = { entries.add(make(nextId++)); Unit }
         if (entries.any { it.phase == OverlayPhase.Closing }) {
-            pending = add
+            dropPending()
+            pending = Pending(add, dialog)
         } else {
             add()
         }
         return true
+    }
+
+    private fun dropPending() {
+        val dropped = pending ?: return
+        pending = null
+        dropped.dialog?.onDropped?.invoke()
     }
 }
 

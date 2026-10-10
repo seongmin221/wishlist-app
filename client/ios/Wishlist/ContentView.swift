@@ -97,6 +97,7 @@ private struct AppRoute: View {
             case .login: LoginScreen(mode: .pushed)
             case .item(let itemId): ItemDetailScreen(itemId: itemId)
             case .local(let submissionId): LocalSubmissionScreen(submissionId: submissionId)
+            case .web(let page): WebViewScreen(page: page)
             }
         }
         #if DEBUG

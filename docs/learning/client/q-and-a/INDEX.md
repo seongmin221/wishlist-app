@@ -18,3 +18,4 @@
 | QA-CLI-012 | iOS는 공유만으로 분석이 시작되지 않는가, C안의 개발자 팀 설정은 복잡한가? | [QA-CLI-012](QA-CLI-012-ios-share-starts-analysis.md) |
 | QA-CLI-013 | lifecycle-viewmodel-compose 없이 화면마다 Presenter owner 수명을 주는 방법은? | [QA-CLI-013](QA-CLI-013-android-per-entry-viewmodel-store.md) |
 | QA-CLI-014 | 로컬 대기 화면은 계정을 떠난 뒤 왜 아무것도 판정하지 않는가? | [QA-CLI-014](QA-CLI-014-local-presenter-sticky-skip.md) |
+| QA-CLI-015 | 원본 링크 웹뷰는 웹 페이지가 앱을 마음대로 움직이지 못하게 무엇을 막는가? | [QA-CLI-015](QA-CLI-015-webview-security.md) |
