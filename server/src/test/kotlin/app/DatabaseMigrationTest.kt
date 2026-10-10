@@ -29,7 +29,7 @@ class DatabaseMigrationTest {
                 }
                 val before = listOf("wishlist_items", "analysis_jobs", "outbox_events").associateWith { snapshot(connection, it, emptyList()) }
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
-                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, if (table == "wishlist_items") listOf("client_created_at", "custom_category_id", "legacy_purpose_id") else if (table == "analysis_jobs") listOf("pending_purpose_judged") else emptyList())) }
+                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, (if (table == "wishlist_items") listOf("client_created_at", "custom_category_id", "legacy_purpose_id") else if (table == "analysis_jobs") listOf("pending_purpose_judged") else emptyList()) + V17_COLUMNS.getValue(table))) }
                 connection.createStatement().use { s -> s.executeQuery("select client_created_at from wishlist_items").use { r ->
                     assertTrue(r.next()); assertNull(r.getObject(1))
                 } }
@@ -51,7 +51,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"), versions)
                     }
                 }
             }
@@ -100,7 +100,8 @@ class DatabaseMigrationTest {
                 val itemFields = "review_status,manual_completion_at,category_id,category_source,category_missing_reason,purpose_id,purpose_source,name_source,image_source,user_override_fields,current_generation,client_created_at,custom_category_id,legacy_purpose_id".split(",")
                 val jobFields = listOf("execution_token", "lease_until", "claimed_item_version", "pending_purpose_judged")
                 val queries = mapOf(
-                    "wishlist_items" to itemFields, "analysis_jobs" to jobFields, "outbox_events" to emptyList(),
+                    "wishlist_items" to itemFields + V17_COLUMNS.getValue("wishlist_items"), "analysis_jobs" to jobFields + V17_COLUMNS.getValue("analysis_jobs"),
+                    "outbox_events" to V17_COLUMNS.getValue("outbox_events"),
                     "llm_budget_windows" to emptyList(), "llm_budget_reservations" to emptyList(), "llm_budget_alerts" to emptyList(),
                 )
                 val before = queries.mapValues { (table, fields) -> snapshot(connection, table, fields) }
@@ -231,6 +232,74 @@ class DatabaseMigrationTest {
             val claim = app.testutil.newAnalysisClaim(source)
             assertTrue(app.budget.LlmBudgetService(source).reserveBeforeCall(claim, UUID.randomUUID()) is app.budget.ReserveResult.Reserved)
         }
+    }
+
+    @Test fun `V17 upgrade keeps V16 rows and adds nullable metadata and recovery defaults`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("16").load().migrate()
+            database.createConnection("").use { connection ->
+                val itemId = UUID.randomUUID()
+                val jobId = UUID.randomUUID()
+                connection.createStatement().use { s ->
+                    s.executeUpdate("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,
+                        product_name,version,created_at,updated_at) values ('$itemId','${UUID.randomUUID()}','${UUID.randomUUID()}',
+                        'https://example.com/item','PROCESSING','ACTIVE','기존 상품',3,'2026-10-09T01:00:00Z','2026-10-09T02:00:00Z')""")
+                    s.executeUpdate("insert into analysis_jobs(id,wishlist_item_id,generation,stage,attempt_count) values ('$jobId','$itemId',1,'GENERAL_PENDING',1)")
+                    s.executeUpdate("insert into outbox_events(id,analysis_job_id,event_type,task_name) values ('${UUID.randomUUID()}','$jobId','GENERAL_ANALYSIS','v17-upgrade-task')")
+                }
+                val before = listOf("wishlist_items", "analysis_jobs", "outbox_events").associateWith { snapshot(connection, it, emptyList()) }
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, V17_COLUMNS.getValue(table))) }
+                connection.createStatement().use { s ->
+                    s.executeQuery("""select product_brand,product_price,product_currency,merchant_name,metadata_checked_at from wishlist_items""").use { r ->
+                        assertTrue(r.next()); for (i in 1..5) assertNull(r.getObject(i))
+                    }
+                    s.executeQuery("""select pending_brand,pending_price,pending_currency,pending_merchant,recovery_check_at,recovery_seq from analysis_jobs""").use { r ->
+                        assertTrue(r.next()); for (i in 1..5) assertNull(r.getObject(i)); assertEquals(0, r.getInt(6))
+                    }
+                    s.executeQuery("select not_before from outbox_events").use { r -> assertTrue(r.next()); assertNull(r.getObject(1)) }
+                    s.executeQuery("""select count(*) from pg_indexes where indexname in
+                        ('analysis_jobs_pending_recovery_idx','analysis_jobs_running_recovery_idx','outbox_events_job_created_idx')""").use { r ->
+                        assertTrue(r.next()); assertEquals(3, r.getInt(1))
+                    }
+                }
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
+    @Test fun `V17 constraints reject half price pairs and invalid currency`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+            val claim = app.testutil.newAnalysisClaim(source)
+            val item = claim.itemId
+            val job = claim.jobId
+            source.connection.use { c ->
+                for (sql in listOf(
+                    "update wishlist_items set product_price=1000 where id='$item'",
+                    "update wishlist_items set product_currency='KRW' where id='$item'",
+                    "update wishlist_items set product_price=-1,product_currency='KRW' where id='$item'",
+                    "update wishlist_items set product_price=1,product_currency='krw' where id='$item'",
+                    "update analysis_jobs set pending_price=1 where id='$job'",
+                    "update analysis_jobs set recovery_seq=-1 where id='$job'",
+                )) assertFailsWith<SQLException>(sql) { c.createStatement().use { it.executeUpdate(sql) } }
+                c.createStatement().use { s ->
+                    assertEquals(1, s.executeUpdate("update wishlist_items set product_price=12900.5,product_currency='KRW' where id='$item'"))
+                    assertEquals(1, s.executeUpdate("update analysis_jobs set pending_price=1,pending_currency='USD' where id='$job'"))
+                }
+            }
+        }
+    }
+
+    private companion object {
+        val V17_COLUMNS = mapOf(
+            "wishlist_items" to listOf("product_brand", "product_price", "product_currency", "merchant_name", "metadata_checked_at"),
+            "analysis_jobs" to listOf("pending_brand", "pending_price", "pending_currency", "pending_merchant", "recovery_seq", "recovery_check_at"),
+            "outbox_events" to listOf("not_before"),
+        )
     }
 
     private fun snapshot(connection: Connection, table: String, ignored: List<String>): List<String> {

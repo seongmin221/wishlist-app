@@ -17,6 +17,10 @@ class WishlistReadIndexTest {
         db.start()
         DatabaseFactory.migrationConfiguration(db.jdbcUrl, db.username, db.password).target("14").load().migrate()
         val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)
+        // The shared projection reads V17 metadata columns. Add them only for the V14 baseline and drop them before
+        // migrating; nullable unindexed columns do not change the measured plans.
+        val v17Columns = listOf("product_brand text", "product_price numeric(19,4)", "product_currency char(3)", "merchant_name text", "metadata_checked_at timestamptz")
+        source.connection.use { c -> c.createStatement().use { s -> v17Columns.forEach { s.execute("alter table wishlist_items add column $it") } } }
         val owner = UUID.fromString("00000000-0000-0000-0000-000000000001")
         var custom: UUID? = null
         var purpose: UUID? = null
@@ -82,6 +86,7 @@ class WishlistReadIndexTest {
         captured["cat-public-count"] = categoryQueries[1]
         capture("purpose-summary") { c -> PurposeRepository().page(c,owner,null,3) }
         val before = measure(source,captured,"V14")
+        source.connection.use { c -> c.createStatement().use { s -> v17Columns.forEach { s.execute("alter table wishlist_items drop column ${it.substringBefore(' ')}") } } }
         DatabaseFactory.migrate(db.jdbcUrl,db.username,db.password)
         val after = measure(source,captured,"V16 (original V15 retained)")
         println("EXPLAIN comparison: same fixture, same bound queries; rows=20000, per-owner=10000, groups=100/100/100, NONE=9700")

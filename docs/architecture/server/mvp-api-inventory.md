@@ -39,7 +39,7 @@
 
 동작 수는 `HTTP method + path` 기준이다. query, 시트·확인 상태와 같은 요청의 재사용을 중복 집계하지 않는다. preview·별도 후보 페이지 등 조회 분리는 이 문서의 권장 구성으로, 필요한 데이터를 다른 응답에 합쳐 제공하면 endpoint 수는 줄일 수 있다. **37은 기능을 지원하기 위한 현재 구성안의 수이며 제품 기능의 수나 최소 API 수를 뜻하지 않는다.**
 
-B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생성/replay의 실제 mapper에 연결했다. clientCreatedAt 보관과 신규 outbox event 지정 발행도 B1에 포함한다. [B1 계약](wishlist-item-read-api.md)을 따르며 WORK-02와 OPS-01 runtime은 B5에 남는다.
+B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생성/replay의 실제 mapper에 연결했다. clientCreatedAt 보관과 신규 outbox event 지정 발행도 B1에 포함한다. [B1 계약](wishlist-item-read-api.md)을 따르며 WORK-02와 OPS-01 runtime은 B5에서 연결했다.
 
 신규 목록의 ‘필수 데이터’는 구현 명세 작성에 필요한 최소 입출력 범위다. 필드 타입·null/누락·status code·각 오류 응답의 완전한 schema는 후속 계약에서 작성한다. 구현 상태는 설계 문서가 아니라 코드의 route와 runtime 조립을 기준으로 판단했다.
 
@@ -49,8 +49,8 @@ B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, 선택 clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **구현(B1)**: 공유 시각 보관·실제 공통 mapper·신규 event 지정 발행. nullable 표시 metadata 및 후속 참조 확장은 B2/B3/B5/B6 |
-| ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId 또는 purposeUnassigned=true, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 공용 카드 wrapper·totalCount·앞뒤 cursor·requested/resolved anchor ID·anchorResolved | **구현(B4)**: 단일 scope·page/anchor·공통 상세 mapper, 저장하지 않는 metadata는 B5까지 nullable |
+| ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, 선택 clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **구현(B1)**: 공유 시각 보관·실제 공통 mapper·신규 event 지정 발행. 표시 metadata는 B5에서 저장 연결, 후속 참조 확장은 B6 |
+| ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId 또는 purposeUnassigned=true, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 공용 카드 wrapper·totalCount·앞뒤 cursor·requested/resolved anchor ID·anchorResolved | **구현(B4)**: 단일 scope·page/anchor·공통 상세 mapper, metadata는 B5부터 저장값(없으면 null) |
 | ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 목적 deletionImpact는 ITEM-05와 함께 B7 확장 |
 | ITEM-04 | `PATCH /v1/wishlist-items/{id}` | 일반 편집 한 번에 저장, 브랜드 수정·category 재지정·purpose 선택/해제 · S3/S4 | expectedVersion, 변경된 이름/brand/mediaId/categoryId/purposeId. 생략=유지, optional null=해제 | 갱신된 item·출처·review·version. 사용자 값만 수정, price/currency/sourceUrl 변경 제외 | 없음 |
 | ITEM-05 | `DELETE /v1/wishlist-items/{id}` | 일반·분석 중 삭제, 목적에서 항목 제거 · S2/S4 | item ID. 기존 계약상 expectedVersion 없음 | 204, 늦은 Worker 반영 차단. owner의 이미 삭제한 item 반복 삭제도 204 | 없음 |
@@ -143,9 +143,9 @@ ARC-01 previewToken은 전체 후보 상태를 나타내며 해당 page의 item 
 | ID | Method·path | 호출자·역할 | 입력/결과 | 구현 |
 | --- | --- | --- | --- | --- |
 | SYS-01 | `GET /health` | 실행 상태 확인 | 현재 `ok`. DB readiness 검사는 별도 요구 시 검토 | 구현 |
-| WORK-01 | `POST /internal/worker/general` | Cloud Tasks → private 일반 Worker | jobId/generation, 완료·stale ACK 204 또는 인프라 retry 503 | route·general-worker runtime 연결. owner/최신 generation fence 보완 필요 |
-| WORK-02 | `POST /internal/worker/browser` | Cloud Tasks → private browser Worker | jobId/generation, 제한된 rendering·최종 분류/보완 상태 | 조건부 route/service 있음. browser runtime 미연결 |
-| OPS-01 | `POST /internal/maintenance` | Scheduler → private maintenance 서비스 | outbox 발행·멈춘 job 복구·예산 정산/경고·미사용 media 정리를 제한 batch로 실행 | 신규 구성 제안. 관련 서비스와 budget 단발 CLI는 있음 |
+| WORK-01 | `POST /internal/worker/general` | Cloud Tasks → private 일반 Worker | jobId/generation. 완료·stale·retry outbox 저장 ACK 204, durable 기록이 없는 retry(claim 전 마감·executor 포화·90초 timeout)만 503 | **구현(B5)**: brand·가격·판매처·canonical 추출, generation 합산 예산, DNS 실패 Retryable·BLOCKED_ADDRESS |
+| WORK-02 | `POST /internal/worker/browser` | Cloud Tasks → private browser Worker | jobId/generation, 제한된 rendering·최종 분류/보완 상태, 응답 규칙은 WORK-01과 같음 | **구현(B5)**: browser-worker 역할, pinning egress proxy 경유 Chromium. 배포 egress firewall은 B11 |
+| OPS-01 | `POST /internal/maintenance/run` | Scheduler → private maintenance 서비스 | outbox backlog 발행·만료 RUNNING·오래된 PENDING 복구·예산 정산/경고를 공통 deadline(50초) 안에서 단계별 격리. 단계 실패 시 500 + report | **구현(B5)**: maintenance 역할. 미사용 media 정리는 B6, Scheduler OIDC 실호출은 B11 |
 
 private 경로를 공개 API 서비스에 같이 등록하지 않는다. Firebase 사용자 token과 service OIDC를 혼용하지 않는다. parser·분류·캐시 조회·AI 품질 평가·DB migration은 공개 endpoint가 아니라 서버 내부 함수/작업/CLI다. 현재 사용자 UI에는 별도의 public AI 호출·outbox 제어 API가 필요하지 않다.
 

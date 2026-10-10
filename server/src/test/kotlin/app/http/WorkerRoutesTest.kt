@@ -35,7 +35,7 @@ class WorkerRoutesTest {
         }
     }
 
-    @Test fun `only current faults return retry while stale faults and finished work are acknowledged`() = withAnalysisDatabase { source ->
+    @Test fun `durable current faults stale faults and finished work are all acknowledged`() = withAnalysisDatabase { source ->
         var mode = "fault"
         val process: (AnalysisClaim) -> ProcessingOutcome = { claim ->
             when (mode) {
@@ -58,7 +58,8 @@ class WorkerRoutesTest {
                     contentType(ContentType.Application.Json)
                     setBody("""{"jobId":"${job.jobId}","generation":1}""")
                 }
-                assertEquals(if (case == "fault") HttpStatusCode.ServiceUnavailable else HttpStatusCode.NoContent, response.status, "$lane $case")
+                assertEquals(HttpStatusCode.NoContent, response.status, "$lane $case")
+                if (case == "fault") assertEquals("${lane.name}_PENDING", analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
             }
         }
     }

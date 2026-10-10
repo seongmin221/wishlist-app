@@ -57,9 +57,12 @@ class CategoryAiIntegrationTest {
         repeat(3) { round ->
             val pending=AnalysisPendingResultRepository(source)
             pending.candidateSnapshotWithConnection(claim,CategoryCandidateProvider()::snapshot)
+            pending.saveMetadata(claim,app.extraction.Metadata("Desk lamp $round",null,null,"https://example.com/p/1"))
             pending.saveAssignment(claim,ClassificationResult.Assigned("C026",null))
             service.patch(owner,category.id,round+1,CategoryChanges(name="Desk-$round"))
             AnalysisResultRepository(source).finish(claim,ProcessingOutcome.Complete)
+            // A replacement with budget leaves the item untouched; only the exhausted round applies what it read.
+            if(round<2) assertEquals(null,analysisScalar(source,"select product_name from wishlist_items where id='${claim.itemId}'"))
             if(round<2) {
                 val job=UUID.fromString(analysisScalar(source,"select id from analysis_jobs where wishlist_item_id='${claim.itemId}' and generation=${round+2}"))
                 claim=(AnalysisClaimRepository(source).claim(job,round+2,AnalysisLane.GENERAL) as ClaimResult.Claimed).claim
@@ -68,6 +71,8 @@ class CategoryAiIntegrationTest {
         assertEquals("FAILED_RETRYABLE",analysisScalar(source,"select analysis_status from wishlist_items where id='${claim.itemId}'"))
         assertEquals("FAILED",analysisScalar(source,"select stage from analysis_jobs where id='${claim.jobId}'"))
         assertEquals("3",analysisScalar(source,"select count(*) from analysis_jobs where wishlist_item_id='${claim.itemId}'"))
+        assertEquals("Desk lamp 2",analysisScalar(source,"select product_name from wishlist_items where id='${claim.itemId}'"))
+        assertEquals("true",analysisScalar(source,"select (metadata_checked_at is not null)::text from wishlist_items where id='${claim.itemId}'"))
     }
 
     @Test fun `custom assignment and live rename keep confirmed and deferred connections and item version`() = withAnalysisDatabase { source ->

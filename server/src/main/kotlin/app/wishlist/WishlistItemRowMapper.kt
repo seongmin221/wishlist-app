@@ -10,7 +10,8 @@ object WishlistItemRowMapper {
        i.lifecycle_status, i.product_name, coalesce(i.category_id,i.custom_category_id::text) category_id, i.category_missing_reason,
        i.manual_completion_at, i.category_source, i.purpose_id::text purpose_id, i.purpose_source,
        i.name_source, i.image_source, i.user_override_fields, i.client_submission_id, i.source_url,
-       i.product_image_url, i.analysis_failure_code, i.client_created_at, i.created_at, i.updated_at,
+       i.product_image_url, i.product_brand, i.product_price, i.product_currency, i.merchant_name, i.metadata_checked_at,
+       i.analysis_failure_code, i.client_created_at, i.created_at, i.updated_at,
        coalesce(pc.name, cc.name) category_name, coalesce(pc.parent_id, cc.parent_id) category_parent,
        case when i.custom_category_id is not null then 'CUSTOM' when i.category_id is not null then 'PUBLIC' end category_kind,
        p.name purpose_name, p.color_key purpose_color_key, p.icon_key purpose_icon_key"""
@@ -58,6 +59,9 @@ left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id"""
             categoryName=row.getString("category_name"),categoryParentId=row.getString("category_parent"),categoryKind=row.getString("category_kind"),
             purposeName = row.getString("purpose_name"), purposeColorKey = row.getString("purpose_color_key"),
             purposeIconKey = row.getString("purpose_icon_key"),
+            brand = row.getString("product_brand"), price = row.getBigDecimal("product_price"),
+            currency = row.getString("product_currency"), merchant = row.getString("merchant_name"),
+            metadataCheckedAt = row.getTimestamp("metadata_checked_at")?.toInstant(),
         )
     }
 }

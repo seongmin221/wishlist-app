@@ -26,11 +26,11 @@ class BudgetMaintenanceServiceTest {
             val notified = mutableSetOf<UUID>()
             val maintenance = BudgetMaintenanceService(source) { alert -> notified.add(alert.id) }
 
-            assertEquals(MaintenanceReport(2,2),maintenance.runOnce())
+            assertEquals(BudgetMaintenanceReport(2,2),maintenance.runOnce())
             assertEquals(596L,budget.windowTotals("DAILY").settled)
             assertEquals(0L,budget.windowTotals("DAILY").reserved)
             assertEquals(2,notified.size)
-            assertEquals(MaintenanceReport(0,0),maintenance.runOnce())
+            assertEquals(BudgetMaintenanceReport(0,0),maintenance.runOnce())
         }
     }
 

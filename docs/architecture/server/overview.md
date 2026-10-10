@@ -6,7 +6,7 @@
 
 B0 Task 1~9의 상태·DTO/error·V8/V9·owner 조회 기반, Worker claim/guard/중간·최종 결과/lease 복구, IO·역할 pool·client 종료 기반을 구현했다. 상세 검증과 감사·B1 인계는 [B0 구현 완료 기록](../../history/architecture/server/b0-foundation-implementation.md), 저장 정책은 [상품 상태 저장 기반](wishlist-state-persistence.md), runtime은 [IO와 자원 수명](runtime-resources.md)을 따른다. 완료 기록의 최종 회귀·리뷰가 통과 조건이다.
 
-현재 runtime 역할은 local health·API·일반 Worker다. 상품 생성/replay와 일반 Worker HTTP를 유지했으며 제품 조회·변경 API를 새로 공개하지 않았다. browser service/route와 reconciler는 local 통합 테스트로 검증한 기반이며 browser/maintenance runtime, 전체 generation retry 예산, Scheduler 연결은 B5다. 실제 client 생성/replay JSON mapper와 ITEM-03 상세 GET은 B1에서 구현한다.
+현재 runtime 역할은 local health·API·일반 Worker·browser Worker·maintenance다(B5). 각 역할은 자기 route만 노출하고 API는 `/internal/**`을 노출하지 않는다. 재시도 예산은 generation 전체 합산 3회·30분이며, maintenance가 outbox backlog·만료 RUNNING·오래된 PENDING·LLM 예산을 정리한다. 클라우드 IAM·Scheduler 실호출은 B11이다. 실제 client 생성/replay JSON mapper와 ITEM-03 상세 GET은 B1에서 구현한다.
 
 운영 적용에서는 구 Worker drain/중지 → V8/V9 별도 migration → 실행 보호 코드 배포 → queue 재개 순서를 지킨다. migration만으로 구 Worker의 token 없는 SQL을 차단할 수 없으므로 혼재 운영을 하지 않는다. 이번 B0에서 production 작업은 수행하지 않았다.
 

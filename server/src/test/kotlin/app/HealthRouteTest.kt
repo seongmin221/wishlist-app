@@ -34,6 +34,39 @@ class HealthRouteTest {
         }
     }
 
+    @Test fun `each worker role exposes only its own internal route`() {
+        app.testutil.PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            val body = """{"jobId":"00000000-0000-0000-0000-000000000001","generation":1}"""
+            for ((role, own, other) in listOf(Triple("general-worker", "general", "browser"), Triple("browser-worker", "browser", "general"))) {
+                testApplication {
+                    application { module(mapOf("APP_ENV" to "local", "APP_ROLE" to role, "DATABASE_URL" to database.jdbcUrl,
+                        "DATABASE_USER" to database.username, "DATABASE_PASSWORD" to database.password,
+                        "OPENAI_API_KEY" to "fixture-only", "OPENAI_MODEL_SNAPSHOT" to "gpt-5.6-luna"), RuntimeResources()) }
+                    assertEquals(HttpStatusCode.NoContent, client.post("/internal/worker/$own") { setBody(body) }.status, role)
+                    assertEquals(HttpStatusCode.NotFound, client.post("/internal/worker/$other") { setBody(body) }.status, role)
+                }
+            }
+        }
+    }
+
+    @Test fun `maintenance role exposes only its run route`() {
+        app.testutil.PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            val queue = app.testutil.InMemoryTaskQueue()
+            testApplication {
+                application { module(mapOf("APP_ENV" to "local", "APP_ROLE" to "maintenance", "DATABASE_URL" to database.jdbcUrl,
+                    "DATABASE_USER" to database.username, "DATABASE_PASSWORD" to database.password), RuntimeResources(), queue) }
+                assertEquals(HttpStatusCode.OK, client.post("/internal/maintenance/run").status)
+                assertEquals(HttpStatusCode.NotFound, client.post("/internal/worker/general") {
+                    setBody("""{"jobId":"00000000-0000-0000-0000-000000000001","generation":1}""")
+                }.status)
+            }
+        }
+    }
+
     @Test fun `failed startup closes resources without waiting for normal shutdown`() {
         val resources = RuntimeResources()
         var closes = 0

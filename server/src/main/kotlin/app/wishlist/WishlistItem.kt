@@ -18,6 +18,11 @@ data class WishlistItem(
     val purposeName: String? = null,
     val purposeColorKey: String? = null,
     val purposeIconKey: String? = null,
+    val brand: String? = null,
+    val price: java.math.BigDecimal? = null,
+    val currency: String? = null,
+    val merchant: String? = null,
+    val metadataCheckedAt: Instant? = null,
 ) {
     val id: UUID get() = storedState.id
     val version: Int get() = storedState.version

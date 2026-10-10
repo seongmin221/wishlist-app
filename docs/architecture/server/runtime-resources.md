@@ -1,6 +1,6 @@
 # Runtime IO와 자원 수명
 
-> 구현 범위: B0 Task 8 · 운영 instance별 총 DB 연결 검증은 B11
+> 구현 범위: B0 Task 8 · B5 browser/maintenance 역할 · 운영 instance별 총 DB 연결 검증은 B11
 
 ## 요청 실행 경계
 
@@ -62,3 +62,17 @@ JVM interrupt가 모든 JDBC/SDK 호출을 즉시 멈추는 것은 아니다. �
 ## B2 category 후보 공급
 
 Worker의 custom 후보는 잠금 transaction의 동일 connection으로 읽는다. candidate snapshot 저장 후 connection을 반환한 다음 gateway를 호출한다. max pool 1에서도 category 편집과 외부 AI 호출이 서로 DB connection을 기다리지 않는 회귀를 유지한다. 입력 토큰 preflight 단계(B3부터 목적 포함 최대 여덟 단계)는 기존 Worker 처리 시간과 2,500/80 비용 상한을 공유한다. custom·목적 축약 후에도 초과하면 그 호출만 공용 taxonomy로 분류한다. B5 Scheduler/browser runtime 조립은 추가하지 않았다.
+
+## B5 역할과 자원
+
+| 역할 | route | 소유 자원(닫는 순서는 등록 역순) | pool 기본 |
+| --- | --- | --- | ---: |
+| general-worker | `/internal/worker/general` | pool·BoundedResolver·WorkerExecution·SafeHttpTransport | 2 |
+| browser-worker | `/internal/worker/browser` | pool·BoundedResolver·WorkerExecution (EgressProxy는 render마다 생성·종료) | 2 |
+| maintenance | `/internal/maintenance/run` | pool·Cloud Tasks client | 2 |
+
+API 역할은 `apiRoutes`의 공개 route만 등록한다. browser-worker는 general-worker와 같은 OpenAI 설정을 요구한다. maintenance는 DB 설정을 요구하고 production에서는 Tasks 설정도 필수다. local에서 Tasks 설정이 없으면 발행·조회가 항상 실패하는 gateway를 써서 상태를 바꾸지 않는다. maintenance 실행은 `runIfOpen` 안에서만 하며 종료 중에는 503이다.
+
+`BoundedResolver`는 InetAddress 해석을 크기와 queue가 제한된 daemon pool에서 실행하고 남은 처리 시간만 기다린다. `getAllByName`은 interrupt로 멈추지 않으므로 포화되면 기다리지 않고 거부한다. 시간 초과한 조회가 아직 queue에 있으면 queue에서 빼 slot을 비운다. browser-worker는 한 페이지가 subresource host를 한꺼번에 검사하므로 resolver를 8 threads·queue 128로 키운다(general-worker는 4·16). `EgressProxy`는 render마다 새로 만들고 render가 끝나면 닫는다. 공유 proxy의 정리가 timeout 직후 겹친 다른 render의 연결을 끊는 일을 막기 위해서다. 연결마다 slot을 쓰고 30초 idle timeout을 둔다. 양방향 모두 30초 동안 데이터가 없을 때만 끊으므로, 요청을 보낸 뒤 느린 응답을 기다리는 쪽이 먼저 반쯤 닫히지 않는다. proxy 연결은 Worker thread 밖이라 처리 deadline을 직접 쓰지 않으며, navigation timeout과 render 종료가 실제 상한이다.
+
+maintenance는 outbox 발행·RUNNING 복구·PENDING 복구·budget을 순서대로 실행한다. 발행은 전체 50초 중 30초만 쓰고, 두 복구 단계는 50초 deadline을 공유해 후보마다 남은 시간을 확인하며 넘으면 `timeout:<step>`으로 보고한다. DB만 쓰는 budget 정리는 queue 장애 중에도 만료 예약이 쌓이지 않도록 마감과 무관하게 항상 실행한다.
