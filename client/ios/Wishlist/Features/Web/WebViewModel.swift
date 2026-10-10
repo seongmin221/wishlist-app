@@ -30,6 +30,8 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         let url: URL
         let open: () -> Void
         let closed: (_ confirmed: Bool) -> Void
+        /// The dialog was discarded before it opened (overlay `onDropped`): nothing was asked, nothing is silenced.
+        let notShown: () -> Void
     }
 
     let initialURL: URL
@@ -39,6 +41,9 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     @ObservationIgnored let webView: WKWebView
     /// The screen's FWebViewExternal; returns false when the dialog could not be shown. Nil = not shown.
     @ObservationIgnored var presentPrompt: ((ExternalPrompt) -> Bool)?
+    /// Closes the FWebViewExternal the screen has up (set while one is shown or waiting): `close()` calls it so the
+    /// app-wide overlay does not keep it over the next screen (Android `ShownPrompt`).
+    @ObservationIgnored var dismissPrompt: (() -> Void)?
 
     @ObservationIgnored private let gate = ExternalPromptGate()
     @ObservationIgnored private let openExternal: (URL) -> Void
@@ -124,6 +129,8 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     func close() {
         guard !isClosed else { return }
         isClosed = true
+        dismissPrompt?()
+        dismissPrompt = nil
         presentPrompt = nil
         observations.forEach { $0.invalidate() }
         observations = []
@@ -189,7 +196,8 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
                 closed: { [weak self] confirmed in
                     guard let self else { return }
                     self.gate.onPromptClosed(confirmed: confirmed, currentURL: self.page.url)
-                }
+                },
+                notShown: { [weak self] in self?.gate.onPromptNotShown() }
             )
             if presentPrompt?(prompt) != true { gate.onPromptNotShown() }
         }

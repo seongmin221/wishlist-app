@@ -100,6 +100,8 @@ private struct WebViewContent: View {
         .onAppear {
             installPrompt()
             model.start()
+            // onChange(initial:) runs only once; a view that disappeared and came back blocks again here.
+            motion.setEdgeBackBlocked(entryID, model.page.canGoBack)
         }
         .onChange(of: page.canGoBack, initial: true) { _, canGoBack in
             motion.setEdgeBackBlocked(entryID, canGoBack)
@@ -141,22 +143,33 @@ private struct WebViewContent: View {
     /// FWebViewExternal: 48 바깥 앱 상태색 타일 · "외부 앱을 열까요?" · 두 줄 · 취소 / 열기(먹색, 결정 2026-10-04).
     private func installPrompt() {
         let overlay = overlay
-        model.presentPrompt = { prompt in
+        // Weak: the model holds these closures.
+        model.presentPrompt = { [weak model] prompt in
             guard let overlay else { return false }
             var confirmed = false
-            return overlay.showDialog(WLDialogSpec(
+            let spec = WLDialogSpec(
                 title: String(localized: "webview.external.title"),
                 bullets: [String(localized: "webview.external.line.app"), String(localized: "webview.external.line.tap")],
                 cancelText: String(localized: "dialog.cancel"),
                 confirmText: String(localized: "webview.external.open"),
                 confirmKind: .primary,
                 icon: AnyView(ExternalAppTile()),
-                onDismissed: { prompt.closed(confirmed) },
+                onDismissed: {
+                    model?.dismissPrompt = nil
+                    prompt.closed(confirmed)
+                },
+                onDropped: {
+                    model?.dismissPrompt = nil
+                    prompt.notShown()
+                },
                 onConfirm: {
                     confirmed = true
                     prompt.open()
                 }
-            ))
+            )
+            guard overlay.showDialog(spec) else { return false }
+            model?.dismissPrompt = { [weak overlay] in overlay?.dismissDialog(spec) }
+            return true
         }
     }
 }

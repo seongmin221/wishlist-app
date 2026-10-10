@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// 누를 수 없는 버튼·메뉴 항목·링크를 흐리게 그리는 불투명도(Android `DISABLED_ALPHA`).
+let wlDisabledOpacity = 0.4
+
 enum WLButtonKind { case primary, secondary, danger }
 
 /// 높이 52 이상 pill. 큰 글자 크기에서는 늘어난다. primary=반전색, secondary=카드색(시트·확인창 위는 sheetField),
@@ -51,7 +54,7 @@ struct WLButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.4)
+        .opacity(enabled ? 1 : wlDisabledOpacity)
     }
 }
 

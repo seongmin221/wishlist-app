@@ -237,7 +237,7 @@ private struct OriginalLink: View {
         }
         .buttonStyle(.plain)
         .disabled(page == nil)
-        .opacity(page == nil ? 0.4 : 1)
+        .opacity(page == nil ? wlDisabledOpacity : 1)
         .accessibilityLabel(String(localized: String.LocalizationValue(HomeRowText.openOriginalKey)))
     }
 }

@@ -138,7 +138,7 @@ private struct OriginalBar: View {
         }
         .buttonStyle(.plain)
         .disabled(page == nil)
-        .opacity(page == nil ? 0.4 : 1)
+        .opacity(page == nil ? wlDisabledOpacity : 1)
         .padding(.horizontal, WishlistTokens.Space.screenMargin)
         .padding(.top, DetailLayout.barTop)
         .padding(.bottom, DetailLayout.barBottom)
