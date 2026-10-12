@@ -1,9 +1,5 @@
 package app.wishlist.android.feature.home
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -66,7 +62,11 @@ import app.wishlist.android.navigation.WLScrollToTopEffect
 import app.wishlist.android.navigation.WLTab
 import app.wishlist.android.navigation.WLTabBarHeight
 import app.wishlist.android.navigation.wlTabBarBottomPadding
+import app.wishlist.android.feature.detail.openOriginal
+import app.wishlist.android.ui.ItemDetailRoute
+import app.wishlist.android.ui.LocalSubmissionRoute
 import app.wishlist.android.ui.SettingsRoute
+import app.wishlist.shared.presentation.HomeRowTarget
 import app.wishlist.shared.presentation.HomeRow
 import app.wishlist.shared.presentation.HomeState
 import kotlinx.coroutines.delay
@@ -225,15 +225,23 @@ internal fun HomeTodoCard(
 /**
  * 펼친 카드 안의 링크 한 줄: 묶음 면(`sheetField`) 위 아이콘 타일·host·상태 줄. `showsOriginal`이면 오른쪽에 "원본"
  * (로그인 전 분석 대기만, Ruling 15: 로그인 뒤 분류 중 줄은 오른쪽 동작이 없다 — 보드의 삭제는 C4/C8).
+ * 줄을 누르면 상세로 간다(C4): 서버 상품은 `ItemDetailRoute`, 이 기기의 링크는 `LocalSubmissionRoute`(가로 밀기).
  */
 @Composable
 internal fun HomeLinkRow(row: HomeRow, icon: WLLineIcon, tileSize: Dp, showsOriginal: Boolean = false) {
     val c = LocalWLColors.current
+    val nav = LocalWLNavigator.current
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(WishlistTokens.Radius.m))
             .background(c.sheetField)
+            .clickable(role = Role.Button, onClickLabel = stringResource(HomeRowText.openDetail)) {
+                when (val target = row.target) {
+                    is HomeRowTarget.Item -> nav.push(ItemDetailRoute(target.itemId), "home/row/${row.key}")
+                    is HomeRowTarget.Local -> nav.push(LocalSubmissionRoute(target.submissionId), "home/row/${row.key}")
+                }
+            }
             .padding(10.dp),
         horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12),
         verticalAlignment = Alignment.CenterVertically,
@@ -255,7 +263,7 @@ private fun OriginalLink(url: String) {
         Modifier
             .heightIn(min = WishlistTokens.Space.minTouch)
             .clip(RoundedCornerShape(WishlistTokens.Radius.xs))
-            .clickable(role = Role.Button) { openOriginal(context, url) }
+            .clickable(role = Role.Button, onClickLabel = stringResource(HomeRowText.openOriginal)) { openOriginal(context, url) }
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4),
         verticalAlignment = Alignment.CenterVertically,
@@ -265,15 +273,6 @@ private fun OriginalLink(url: String) {
     }
 }
 
-// Uri.parse: core-ktx is only a transitive dependency of this module.
-@Suppress("UseKtx")
-private fun openOriginal(context: Context, url: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    } catch (e: ActivityNotFoundException) {
-        // No browser installed: nothing to open (the row stays).
-    }
-}
 
 /** 카드 펼침 상태는 화면 상태다(Presenter에 두지 않는다). */
 @Composable

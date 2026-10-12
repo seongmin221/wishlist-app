@@ -27,6 +27,9 @@ data class WishlistItem(
     val updatedAtIso: String get() = updatedAt.toString()
     val manualCompletionAtIso: String? get() = manualCompletionAt?.toString()
     val clientCreatedAtIso: String? get() = clientCreatedAt?.toString()
+
+    /** When the user saved it: the shared time ([clientCreatedAt]), else the server creation time. */
+    val savedAt: Instant get() = clientCreatedAt ?: createdAt
 }
 
 data class ProductSnapshot(
@@ -54,6 +57,13 @@ data class ItemCategory(
     init { require(id == null || missingReason == null) { "Assigned category cannot have a missing reason" } }
 }
 
-data class ItemPurpose(val id: String? = null, val source: ValueSource = ValueSource.UNASSIGNED)
+/** [name], [colorKey] and [iconKey] are server wire values kept verbatim (e.g. `CORAL`, not lowercased). */
+data class ItemPurpose(
+    val id: String? = null,
+    val source: ValueSource = ValueSource.UNASSIGNED,
+    val name: String? = null,
+    val colorKey: String? = null,
+    val iconKey: String? = null,
+)
 
 data class ItemAnalysis(val status: AnalysisStatus, val failureCode: String? = null)

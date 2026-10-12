@@ -1,4 +1,4 @@
--- Local schema v2 (C3-D7; v1 -> v2 in 1.sqm). No tokens are stored. Money and item Instants are
+-- Local schema v3 (C3-D7; v1 -> v2 in 1.sqm, v2 -> v3 in 2.sqm). No tokens are stored. Money and item Instants are
 -- exact text; submission times are integer epoch microseconds so ordering is numeric.
 CREATE TABLE local_submission (
     client_submission_id TEXT NOT NULL PRIMARY KEY,
@@ -49,6 +49,9 @@ CREATE TABLE item_cache (
     manual_completion_at TEXT,
     allowed_actions TEXT NOT NULL,
     client_created_at TEXT,
+    purpose_name TEXT,
+    purpose_color_key TEXT,
+    purpose_icon_key TEXT,
     PRIMARY KEY (account_id, item_id)
 );
 
@@ -57,6 +60,9 @@ INSERT OR IGNORE INTO local_submission VALUES ?;
 
 selectSubmission:
 SELECT * FROM local_submission WHERE client_submission_id = ?;
+
+selectSubmissionByKey:
+SELECT * FROM local_submission WHERE lower(client_submission_id) = ? LIMIT 1;
 
 selectVisibleSubmissions:
 SELECT * FROM local_submission WHERE account_binding IS NULL OR account_binding = :accountId
@@ -86,6 +92,12 @@ INSERT OR REPLACE INTO item_cache VALUES ?;
 
 selectItem:
 SELECT * FROM item_cache WHERE account_id = ? AND item_id = ?;
+
+selectItemBySubmission:
+SELECT * FROM item_cache WHERE account_id = ? AND lower(client_submission_id) = ? LIMIT 1;
+
+deleteItem:
+DELETE FROM item_cache WHERE account_id = ? AND item_id = ?;
 
 deleteItemThrough:
 DELETE FROM item_cache WHERE account_id = ? AND item_id = ? AND version <= ?;

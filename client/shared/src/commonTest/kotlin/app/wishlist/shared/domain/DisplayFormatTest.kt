@@ -67,4 +67,39 @@ class DisplayFormatTest {
         // With now's offset for both, from would read 00:30 on the 29th and give Hours(1).
         assertEquals(RelativeTime.Yesterday, DisplayFormat.relative(from, now, offset))
     }
+
+    @Test fun savedUnderAMinuteIsJustNow() {
+        assertEquals(SavedLabel.JustNow, DisplayFormat.saved(noonKst, noonKst + 30.seconds, kst))
+    }
+
+    @Test fun savedEarlierTheSameDayIsToday() {
+        assertEquals(SavedLabel.Today, DisplayFormat.saved(noonKst, noonKst + 3.hours, kst))
+    }
+
+    @Test fun savedYesterdayIsADateWithoutYear() {
+        assertEquals(SavedLabel.OnDate(null, 10, 6), DisplayFormat.saved(noonKst - 1.days, noonKst, kst))
+    }
+
+    @Test fun savedLastYearCarriesTheYear() {
+        assertEquals(SavedLabel.OnDate(2025, 10, 7), DisplayFormat.saved(noonKst - 365.days, noonKst, kst))
+    }
+
+    @Test fun savedLeapDayAndYearBoundary() {
+        // 2024-02-29 12:00 UTC viewed a month later in the same year.
+        val leap = Instant.parse("2024-02-29T12:00:00Z")
+        assertEquals(SavedLabel.OnDate(null, 2, 29), DisplayFormat.saved(leap, leap + 30.days, utc))
+        // 2025-12-31 23:00 UTC seen two days later in 2026.
+        val newYearsEve = Instant.parse("2025-12-31T23:00:00Z")
+        assertEquals(SavedLabel.OnDate(2025, 12, 31), DisplayFormat.saved(newYearsEve, newYearsEve + 2.days, utc))
+        // Same instant seen in KST is already 1/1 of 2026.
+        assertEquals(SavedLabel.OnDate(null, 1, 1), DisplayFormat.saved(newYearsEve, newYearsEve + 2.days, kst))
+    }
+
+    @Test fun savedWithNegativeOffset() {
+        val minusEight: (Instant) -> Int = { -8 * 3600 }
+        // 2026-10-07 03:00 UTC is 10-06 19:00 at -08:00; 25 hours later is local 10-07 20:00.
+        val at = Instant.parse("2026-10-07T03:00:00Z")
+        assertEquals(SavedLabel.OnDate(null, 10, 6), DisplayFormat.saved(at, at + 25.hours, minusEight))
+        assertEquals(SavedLabel.Today, DisplayFormat.saved(at, at + 2.hours, minusEight))
+    }
 }

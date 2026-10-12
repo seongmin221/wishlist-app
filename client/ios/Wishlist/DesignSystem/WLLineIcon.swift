@@ -5,7 +5,7 @@ import SwiftUI
 /// stroke-width on the 24 grid. Round caps and joins only for back (design fix §6) and the warning
 /// (its dot); the rest use the SVG defaults (butt, miter). Also compiled into the share extension.
 enum WLLineIcon {
-    case back, chevronRight, settings, person, clock, sorting, external, heart, check, checkBold, clockBold, warning
+    case back, chevronRight, settings, person, clock, sorting, external, heart, check, checkBold, clockBold, warning, more, trash
 
     var stroke: CGFloat {
         switch self {
@@ -84,6 +84,15 @@ enum WLLineIcon {
             path.addLines([p(12, 4), p(21, 20), p(3, 20)])
             path.closeSubpath()
             path.addPath(Self.lines([(p(12, 10), p(12, 14)), (p(12, 17), p(12.01, 17))]))
+        case .more: // circles 5/12/19, 12, r 1.5
+            path.addPath(Self.circle(5, 12, 1.5))
+            path.addPath(Self.circle(12, 12, 1.5))
+            path.addPath(Self.circle(19, 12, 1.5))
+        case .trash: // M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13
+            path.addPath(Self.lines([(p(5, 7), p(19, 7))]))
+            // addLines starts its own subpath at its first point.
+            path.addLines([p(10, 7), p(10, 5), p(14, 5), p(14, 7)])
+            path.addLines([p(7, 7), p(8, 20), p(16, 20), p(17, 7)])
         }
         return path
     }

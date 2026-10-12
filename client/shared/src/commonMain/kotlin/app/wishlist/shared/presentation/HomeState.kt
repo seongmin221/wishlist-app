@@ -9,12 +9,19 @@ import app.wishlist.shared.domain.RelativeTime
  */
 enum class RowStatus { LOCAL_ONLY, SENDING, WAITING_NETWORK, RETRYING, NEEDS_SIGN_IN, FAILED, PROCESSING }
 
+/** Where tapping a row goes: a link still on this device, or a server item. */
+sealed interface HomeRowTarget {
+    data class Local(val submissionId: String) : HomeRowTarget
+    data class Item(val itemId: String) : HomeRowTarget
+}
+
 /**
  * One saved link on the home list. [key] is stable per row and unique within a state, for list
  * diffing; [savedAt] is relative to the moment the state was computed.
  */
 data class HomeRow(
     val key: String,
+    val target: HomeRowTarget,
     val host: String,
     val sourceUrl: String,
     val savedAt: RelativeTime,

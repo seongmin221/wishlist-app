@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -63,7 +64,8 @@ fun WLMenuCard(items: List<WLMenuItem>, onItemClick: (WLMenuItem) -> Unit, modif
                 Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 52.dp)
-                    .clickable(role = Role.Button) { onItemClick(item) }
+                    .alpha(if (item.enabled) 1f else 0.4f)
+                    .clickable(enabled = item.enabled, role = Role.Button) { onItemClick(item) }
                     .padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

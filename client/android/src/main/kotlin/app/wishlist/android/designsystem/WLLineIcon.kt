@@ -35,7 +35,9 @@ enum class WLLineIcon(private vararg val d: String, val stroke: Float = 1.8f, va
     CheckBold("M5 12l5 5L20 7", stroke = 2f),
     ClockBold(circle(12f, 12f, 9f), "M12 7v5l3 2", stroke = 2f),
     CloudOff("M7 18h10a4 4 0 0 0 1.6-.3M20.5 13.5A4 4 0 0 0 17.5 10 6 6 0 0 0 9 5.6M5.7 9.7A4.5 4.5 0 0 0 7 18M3 3l18 18", stroke = 2f),
-    Warning("M12 4l9 16H3z", "M12 10v4M12 17h.01", stroke = 2f, round = true);
+    Warning("M12 4l9 16H3z", "M12 10v4M12 17h.01", stroke = 2f, round = true),
+    More(circle(5f, 12f, 1.5f), circle(12f, 12f, 1.5f), circle(19f, 12f, 1.5f)),
+    Trash("M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13");
 
     // 처음 그릴 때 만든다(JVM 단위 테스트에서 enum 값만 다룰 때 android Path를 만들지 않는다).
     internal val path by lazy { PathParser().parsePathString(d.joinToString("")).toPath() }

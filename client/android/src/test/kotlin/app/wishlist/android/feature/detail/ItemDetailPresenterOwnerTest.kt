@@ -32,6 +32,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,6 +90,35 @@ class ItemDetailPresenterOwnerTest {
         advanceUntilIdle()
         assertEquals(2, repository.answers.size)
         store.clear()
+    }
+
+    @Test fun load_once_loads_a_single_time_and_refresh_repeats_the_last_id() = runTest {
+        session.changeAccount("account-a")
+        val store = ViewModelStore()
+        val (owner, _) = owner(store)
+        owner.loadOnce(itemId)
+        advanceUntilIdle()
+        repository.answers.single().complete(ClientResult.Success(item))
+        advanceUntilIdle()
+        owner.loadOnce(itemId) // a recomposition after a configuration change
+        advanceUntilIdle()
+        assertEquals(1, repository.answers.size)
+
+        owner.refresh()
+        advanceUntilIdle()
+        assertEquals(2, repository.answers.size)
+        assertEquals(ItemDetailState(item = item, loading = true, error = null), owner.state.value) // keeps the item
+        store.clear()
+    }
+
+    @Test fun a_failed_refresh_is_announced_once_per_error() {
+        val owner = ItemDetailPresenterOwner(ItemDetailPresenter(repository, session, StandardTestDispatcher()))
+        val failure = ItemDetailState(item = item, loading = false, error = ClientError(ErrorKind.NETWORK))
+        assertTrue(owner.takeRefreshNotice(failure))
+        assertFalse(owner.takeRefreshNotice(failure)) // same state read again (configuration change)
+        assertFalse(owner.takeRefreshNotice(failure.copy(loading = true)))
+        assertFalse(owner.takeRefreshNotice(failure.copy(item = null))) // no item: the error screen shows it
+        assertTrue(owner.takeRefreshNotice(failure.copy(error = ClientError(ErrorKind.NETWORK)))) // the next failure
     }
 
     @Test fun clearing_the_view_model_store_closes_the_presenter() = runTest {

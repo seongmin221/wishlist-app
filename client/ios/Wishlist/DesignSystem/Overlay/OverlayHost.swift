@@ -2,25 +2,45 @@ import Observation
 import SwiftUI
 import UIKit
 
-/// 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다.
+/// 확인창 내용. 확인(`onConfirm`)은 창이 닫히기 시작한 뒤에 한 번만 불린다. `target`은 제목 아래 대상 줄(썸네일 + 이름)이다.
 struct WLDialogSpec {
     let title: String
     let bullets: [String]
     let cancelText: String
     let confirmText: String
     let confirmKind: WLButtonKind
+    var target: WLDialogTarget?
     let onConfirm: () -> Void
+
+    init(title: String, bullets: [String], cancelText: String, confirmText: String, confirmKind: WLButtonKind,
+         target: WLDialogTarget? = nil, onConfirm: @escaping () -> Void) {
+        self.title = title
+        self.bullets = bullets
+        self.cancelText = cancelText
+        self.confirmText = confirmText
+        self.confirmKind = confirmKind
+        self.target = target
+        self.onConfirm = onConfirm
+    }
 }
 
-/// 메뉴 항목. 누르면 메뉴가 닫히기 시작하고 `onClick`이 불린다.
+/// 확인창 대상 줄(보드 삭제 확인): 묶음 면 위 썸네일 44 + 15/700 이름.
+struct WLDialogTarget {
+    let text: String
+    let thumbnail: AnyView
+}
+
+/// 메뉴 항목. 누르면 메뉴가 닫히기 시작하고 `onClick`이 불린다. `enabled`가 false면 흐리게(0.4) 그리고 누를 수 없다.
 struct WLMenuItem {
     let text: String
     var icon: AnyView?
+    var enabled: Bool
     let onClick: () -> Void
 
-    init(text: String, icon: AnyView? = nil, onClick: @escaping () -> Void) {
+    init(text: String, icon: AnyView? = nil, enabled: Bool = true, onClick: @escaping () -> Void) {
         self.text = text
         self.icon = icon
+        self.enabled = enabled
         self.onClick = onClick
     }
 }

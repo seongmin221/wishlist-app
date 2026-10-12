@@ -160,6 +160,22 @@ class FakeItemRepositoryTest {
         val boardOrder = seeds.displayMetadata.cards.filter { it.cardKey.startsWith("l") }.map { it.itemId }
         assertEquals(boardOrder, f.catalog.items(null, null).successValue().map { it.id })
     }
+    @Test fun item_03_carries_the_purpose_display_fields_in_wire_form() = runTest {
+        val f = FakeFixture(); f.login()
+        val seeds = BoardSeeds.create(Clock { fakeTime }, IdGenerator { Uuid.random().toString() })
+        f.store.seed(seeds).successValue()
+        val commute = seeds.items.first { it.purpose.id == seeds.commuteId }
+        assertEquals(
+            ItemPurpose(seeds.commuteId, ValueSource.USER, "출퇴근 헤드폰", "CORAL", "MUSIC"),
+            f.repository.get(commute.id).successValue().purpose,
+        )
+        // An edit to another purpose also fills its display fields; clearing leaves none.
+        val current = f.repository.get(commute.id).successValue()
+        val moved = f.controls.edit(commute.id, current.version, ItemPatch(purposeId = Patch.Set(seeds.carrierId))).successValue()
+        assertEquals(ItemPurpose(seeds.carrierId, ValueSource.USER, "여행 캐리어", "MUSTARD", "PLANE"), moved.purpose)
+        val cleared = f.controls.edit(commute.id, moved.version, ItemPatch(purposeId = Patch.Set(null))).successValue()
+        assertEquals(ItemPurpose(null, ValueSource.UNASSIGNED), cleared.purpose)
+    }
     @Test fun scheduler_advancement_never_auto_completes_analysis() = runTest {
         val f = FakeFixture(); f.login(); val item = f.create()
         advanceTimeBy(1_000_000)

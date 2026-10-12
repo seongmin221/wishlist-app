@@ -60,6 +60,12 @@ enum HomeRowText {
         HomeText("home.todo.count", Int32(clamping: count)).resolve(bundle)
     }
 
+    /// VoiceOver hint of a tappable row (opens the item or local link detail; Android `onClickLabel`).
+    static let openDetailKey = "home.row.open.detail"
+
+    /// VoiceOver name of the signed-out row's "원본" button (PR A: the system browser).
+    static let openOriginalKey = "home.row.open.original"
+
     /// The catalog's table for one language (tests and previews); the app uses `.main`.
     static func bundle(for language: String, in base: Bundle = .main) -> Bundle? {
         base.path(forResource: language, ofType: "lproj").flatMap(Bundle.init(path:))

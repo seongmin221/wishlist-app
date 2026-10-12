@@ -47,4 +47,9 @@ class HomeRowTextTest {
             assertEquals(status.name, status == RowStatus.LOCAL_ONLY, HomeRowText.metaShowsTime(status))
         }
     }
+
+    @Test fun rows_name_their_two_actions_apart() {
+        assertEquals(R.string.home_row_open_detail, HomeRowText.openDetail)
+        assertEquals(R.string.home_row_open_original, HomeRowText.openOriginal)
+    }
 }

@@ -4,6 +4,7 @@ import app.wishlist.shared.core.*
 import app.wishlist.shared.di.RUNTIME_NOT_READY
 import app.wishlist.shared.model.*
 import app.wishlist.shared.repository.LocalStore
+import app.wishlist.shared.repository.SUBMISSION_IN_FLIGHT
 import kotlinx.coroutines.CancellationException
 import kotlin.concurrent.Volatile
 import kotlin.time.Instant
@@ -178,20 +179,56 @@ internal class SqlLocalStore(
         }
     }
 
+    // Not gatedForAccount: a signed-out user deletes from the local waiting screen too.
+    override suspend fun deleteSubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<Unit> =
+        gated(snapshot) { db ->
+            db.transactionWithResult {
+                val queries = db.wishlistQueries
+                val row = queries.selectSubmission(submissionId).executeAsOneOrNull()
+                    ?: canonicalUuidOrNull(submissionId)?.let { queries.selectSubmissionByKey(it).executeAsOneOrNull() }
+                val binding = row?.account_binding
+                when {
+                    row == null || (binding != null && binding != snapshot.accountId) ->
+                        failure(ErrorKind.NOT_FOUND, SUBMISSION_NOT_FOUND)
+                    row.status == SubmissionStatus.SUBMITTING.name -> failure(ErrorKind.CONFLICT, SUBMISSION_IN_FLIGHT)
+                    else -> {
+                        queries.deleteSubmission(row.client_submission_id)
+                        ClientResult.Success(Unit)
+                    }
+                }
+            }
+        }
+
     override suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>> =
         gatedForAccount(snapshot) { db, account ->
-            ClientResult.Success(db.wishlistQueries.selectProcessingItems(account).executeAsList().map { it.toModel() })
+            db.transactionWithResult {
+                ClientResult.Success(
+                    db.wishlistQueries.selectProcessingItems(account).executeAsList().mapNotNull { db.decodeOrDrop(it) },
+                )
+            }
         }
 
     override suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit> =
         gatedForAccount(snapshot) { db, account ->
-            db.transaction { db.upsertIfNewer(account, item) }
+            db.transaction { db.upsertFromGet(account, item) }
             ClientResult.Success(Unit)
         }
 
     override suspend fun cachedItem(snapshot: SessionSnapshot, id: String): ClientResult<WishlistItem?> =
         gatedForAccount(snapshot) { db, account ->
-            ClientResult.Success(db.wishlistQueries.selectItem(account, id).executeAsOneOrNull()?.toModel())
+            db.transactionWithResult {
+                val row = db.wishlistQueries.selectItem(account, canonicalUuidOrNull(id) ?: id).executeAsOneOrNull()
+                ClientResult.Success(row?.let { db.decodeOrDrop(it) })
+            }
+        }
+
+    override suspend fun cachedItemBySubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<WishlistItem?> =
+        gatedForAccount(snapshot) { db, account ->
+            db.transactionWithResult {
+                val key = canonicalUuidOrNull(submissionId) ?: submissionId
+                val row = db.wishlistQueries.selectItemBySubmission(account, key).executeAsOneOrNull()
+                ClientResult.Success(row?.let { db.decodeOrDrop(it) })
+            }
         }
 
     override suspend fun accept(snapshot: SessionSnapshot, submissionId: String, item: WishlistItem): ClientResult<Unit> =
@@ -219,7 +256,7 @@ internal class SqlLocalStore(
 
     override suspend fun removeCachedItem(snapshot: SessionSnapshot, id: String, throughVersion: Int): ClientResult<Unit> =
         gatedForAccount(snapshot) { db, account ->
-            db.wishlistQueries.deleteItemThrough(account, id, throughVersion.toLong())
+            db.wishlistQueries.deleteItemThrough(account, canonicalUuidOrNull(id) ?: id, throughVersion.toLong())
             ClientResult.Success(Unit)
         }
 
@@ -239,9 +276,23 @@ internal class SqlLocalStore(
         ClientResult.Success(Unit)
     }
 
-    private fun WishlistDatabase.upsertIfNewer(account: String, item: WishlistItem) {
+    /** GET results may carry a same-version edit (purpose/category edits do not bump the item version). */
+    private fun WishlistDatabase.upsertFromGet(account: String, item: WishlistItem) = upsert(account, item, sameVersion = true)
+
+    /** A row this build cannot decode is deleted in the caller's transaction and reads as absent. */
+    private fun WishlistDatabase.decodeOrDrop(row: Item_cache): WishlistItem? =
+        row.decodeOrNull() ?: run {
+            wishlistQueries.deleteItem(row.account_id, row.item_id)
+            null
+        }
+
+    private fun WishlistDatabase.upsertIfNewer(account: String, item: WishlistItem) = upsert(account, item, sameVersion = false)
+
+    /** Writes [item] when no row exists or it is newer; [sameVersion] also accepts an equal version. */
+    private fun WishlistDatabase.upsert(account: String, item: WishlistItem, sameVersion: Boolean) {
         val existing = wishlistQueries.selectItem(account, item.id).executeAsOneOrNull()?.version
-        if (existing == null || item.version > existing) wishlistQueries.insertItem(item.toRow(account))
+        val write = existing == null || if (sameVersion) item.version >= existing else item.version > existing
+        if (write) wishlistQueries.insertItem(item.toRow(account))
     }
 
     internal companion object {
@@ -303,7 +354,11 @@ private fun WishlistItem.toRow(account: String) = Item_cache(
     manual_completion_at = manualCompletionAtIso,
     allowed_actions = allowedActions.map { it.name }.sorted().joinToString(","),
     client_created_at = clientCreatedAtIso,
+    purpose_name = purpose.name, purpose_color_key = purpose.colorKey, purpose_icon_key = purpose.iconKey,
 )
+
+private fun Item_cache.decodeOrNull(): WishlistItem? =
+    try { toModel() } catch (_: IllegalArgumentException) { null } catch (_: IllegalStateException) { null }
 
 private fun Item_cache.toModel() = WishlistItem(
     id = item_id, clientSubmissionId = client_submission_id, version = version.toInt(), sourceUrl = source_url,
@@ -320,7 +375,7 @@ private fun Item_cache.toModel() = WishlistItem(
         missingReason = category_missing_reason?.let(CategoryMissingReason::valueOf),
         name = category_name, parentId = category_parent_id, kind = category_kind,
     ),
-    purpose = ItemPurpose(purpose_id, ValueSource.valueOf(purpose_source)),
+    purpose = ItemPurpose(purpose_id, ValueSource.valueOf(purpose_source), purpose_name, purpose_color_key, purpose_icon_key),
     analysis = ItemAnalysis(AnalysisStatus.valueOf(analysis_status), analysis_failure_code),
     reviewStatus = ReviewStatus.valueOf(review_status),
     lifecycleStatus = LifecycleStatus.valueOf(lifecycle_status),

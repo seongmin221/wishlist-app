@@ -98,6 +98,24 @@ class HomePresenterTest {
     }
 
     @Test
+    fun processingRowUsesTheSharedTimeWhenPresentElseTheServerCreationTime() = runTest {
+        signIn(accountA)
+        view.value = SubmissionView(
+            "A",
+            emptyList(),
+            listOf(
+                processing("shared", T0 + 4.minutes).copy(clientCreatedAt = T0 + 1.minutes),
+                processing("server", T0 + 4.minutes),
+            ),
+        )
+        val p = presenter()
+        advanceUntilIdle()
+        val state = assertIs<HomeState.LoggedIn>(p.state.value)
+        assertEquals(listOf(RelativeTime.Minutes(4), RelativeTime.Minutes(1)), state.processing.map { it.savedAt })
+        p.close()
+    }
+
+    @Test
     fun loggedInMapsLocalAndProcessingStatuses() = runTest {
         signIn(accountA)
         view.value = SubmissionView(
@@ -126,6 +144,13 @@ class HomePresenterTest {
             state.processing.map { it.key },
         )
         assertEquals(state.processing.size, state.processing.map { it.key }.toSet().size)
+        assertEquals(
+            listOf(
+                HomeRowTarget.Local("f"), HomeRowTarget.Local("s"), HomeRowTarget.Local("p"),
+                HomeRowTarget.Item("i3"), HomeRowTarget.Item("i2"), HomeRowTarget.Item("i1"),
+            ),
+            state.processing.map { it.target },
+        )
         assertFalse(state.refreshing)
         p.close()
     }

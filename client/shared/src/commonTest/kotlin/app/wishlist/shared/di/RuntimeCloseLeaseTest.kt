@@ -3,6 +3,9 @@ package app.wishlist.shared.di
 import app.wishlist.shared.core.AuthProvider
 import app.wishlist.shared.data.fake.error
 import app.wishlist.shared.data.fake.successValue
+import app.wishlist.shared.model.LocalSubmission
+import app.wishlist.shared.model.SubmissionStatus
+import app.wishlist.shared.model.itemFixture
 import app.wishlist.shared.repository.LocalStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -102,7 +105,48 @@ class RuntimeCloseLeaseTest {
         assertTrue(probe.drivers.isEmpty())
     }
 
+    @Test fun storeCallsAfterCloseNeverTouchTheDb() = runTest {
+        val probe = RuntimeResourcesProbe()
+        val runtime = createRuntime(releaseBindings(), probe = probe)
+        val raw = runtime.koin.get<LocalStore>()
+        val facade = runtime.localStore()
+        raw.writeAppState("k", "v").successValue()               // opens the driver
+        raw.pending().successValue()
+        val driver = probe.drivers.single()
+        assertTrue(driver.queries > 0 && driver.executes > 0, "the counters must see store traffic")
+        val snapshot = runtime.session.state.value
+        runtime.close()
+        val queries = driver.queries
+        val executes = driver.executes
+
+        val submission = LocalSubmission(SUBMISSION_ID, "https://shop.example/p/1", runtimeTime, null)
+        val item = itemFixture()
+        for (store in listOf(raw, facade, runtime.localStore())) {
+            val results = listOf(
+                store.saveSubmission(submission),
+                store.importSubmission(submission),
+                store.pending(),
+                store.prepareFlush(snapshot),
+                store.markSubmission(snapshot, SUBMISSION_ID, SubmissionStatus.SUBMITTING, null, null),
+                store.processingItems(snapshot),
+                store.upsertItem(snapshot, item),
+                store.cachedItem(snapshot, item.id),
+                store.cachedItemBySubmission(snapshot, SUBMISSION_ID),
+                store.accept(snapshot, SUBMISSION_ID, item),
+                store.removeCachedItem(snapshot, item.id, 1),
+                store.deleteSubmission(snapshot, SUBMISSION_ID),
+                store.clearCurrentCache(),
+                store.readAppState("k"),
+                store.writeAppState("k", "w"),
+            )
+            results.forEach { assertEquals(RUNTIME_NOT_READY, it.error().code) }
+        }
+        assertEquals(queries, driver.queries, "no SELECT after close")
+        assertEquals(executes, driver.executes, "no write after close")
+    }
+
     private companion object {
+        const val SUBMISSION_ID = "00000000-0000-4000-8000-0000000000d1"
         const val SELECT_UNBOUND = "FROM local_submission WHERE account_binding IS NULL ORDER BY"
         const val SELECT_ITEM = "FROM item_cache WHERE account_id = ? AND item_id = ?"
     }
