@@ -36,8 +36,8 @@
 
 ## 남긴 점(task 리뷰에서 미룬 minor)
 
-- Android: intent data scheme 확인이 문법 검사 없는 거부 목록, adapter의 androidTest 없음(에뮬레이터 수동 확인만), Compose wiring 단위 테스트 없음, 열리는 중이거나 줄 서 있던 확인창은 화면이 사라져도 닫지 못함(열기는 `mayLaunchConfirmed`로 막힘).
-- iOS: 1초보다 긴 누름 뒤 탭은 확인창, WebKit 기록 스와이프는 실제 손가락 확인 필요, 빈 `window.open()`은 열지 않음(실기기 결제 팝업 확인), WebKit 제한 포트는 빈 화면, 유니버설 링크 https 탭은 확인창 없이 앱으로 넘어감(Android와의 차이), `about:blank`로 갈 때 자물쇠·host 유지.
+- Android: intent data scheme 확인이 문법 검사 없는 거부 목록, adapter의 androidTest 없음(에뮬레이터 수동 확인만), Compose wiring 단위 테스트 없음, 열리는 중이거나 다른 overlay 아래 있는 확인창은 화면이 사라져도 닫지 못함(열기는 `isClosed`로 막힘, 3차 리뷰에서 유지로 결정).
+- iOS: WebKit 기록 스와이프는 실제 손가락 확인 필요, 빈 `window.open()`은 열지 않음(실기기 결제 팝업 확인), WebKit 제한 포트는 빈 화면, 유니버설 링크 https 탭은 확인창 없이 앱으로 넘어감(Android와의 차이), `about:blank`로 갈 때 자물쇠·host 유지.
 - 공통: "링크를 복사했어요" pill(카드색)의 흰 페이지 위 대비, 실기기 확인 항목 두 가지(아래).
 
 ## 실기기 확인 항목(미확인)
@@ -72,3 +72,21 @@ PR A(#15)의 2·3차 리뷰 수정을 병합한 뒤 리뷰했다. 9건 중 8건�
 고치지 않은 것: Android main frame `onReceivedError`의 중단 필터. WebView는 `ERR_ABORTED`를 `onReceivedError`로 보내지 않는다. 오류 코드로 거르면 실제 실패(`ERROR_UNKNOWN`)까지 숨길 수 있다.
 
 검증: Android unit debug·`assembleDebug`·`lintDebug`, iOS XCTest 201개가 통과했다(실패 0, overlay 대기 버림·진행 선 재시작 테스트 추가).
+
+## PR #16 3차 `/code-review` 반영(2026-10-12)
+
+PR A(#15)가 develop에 merge된 뒤 PR B를 develop 위로 rebase하고 다시 리뷰했다. 9건 중 7건을 고쳤다.
+
+- **Android 첫 WebView가 앱 context로 만들어짐:** `attach()`가 `create()` 뒤에 base를 Activity로 바꿨다. 이제 먼저 바꾼다(테마·창 token을 생성 때 읽는다).
+- **iOS 미디어 링크가 실패로 덮임:** 미디어를 플레이어가 맡을 때 오는 WebKit 204를 102처럼 실패로 보지 않는다. 판정은 `WebLoadError.isPageFailure`로 빼 XCTest로 확인한다.
+- **iOS 실패 중 이전 제목:** `titleLine`이 실패 때 nil이다(Android와 같다).
+- **Android 회전이 취소로 처리됨:** Activity 재생성으로 사라진 확인창은 답하지 않은 것으로 보고 침묵을 걸지 않는다. 결제 페이지의 재시도가 막히지 않는다(D16).
+- **`about:blank`가 침묵을 풂(두 플랫폼):** 웹이 아닌 main frame 이동은 침묵을 풀지 않는다. 다른 host를 거쳐 돌아오는 경우는 실제 페이지 이동이 필요하고 매번 확인창이 뜨므로 Ruling 13대로 둔다.
+- **iOS 스크롤 터치도 탭으로 인정(Ruling 12 보완):** 손가락 하나가 10pt 안에서 떼어졌을 때만 탭으로 기록한다. 스크롤 직후 스크립트 클릭은 확인창이다. 1초 창은 손을 뗀 때부터 세므로 "1초보다 긴 누름 뒤 탭은 확인창" 한계도 사라졌다.
+- **정리:** `mayLaunchConfirmed()`를 지우고 `isClosed`를 쓴다. iOS 가장자리 뒤로 막기는 `onAppear` + `onChange`(initial 없이)로 한 번씩만 부른다.
+
+고치지 않은 것:
+- **닫힌 웹뷰 위에 남는 확인창:** `dismissDialog`가 열리는 중이거나 다른 overlay 아래에 있으면 닫지 못한다. 닫히는 순간 탭 없는 외부 요청이 겹칠 때만 생기고 열기는 막혀 있어 알려진 한계로 둔다.
+- **웹 URL·탐색 정책·gate·페이지 상태의 플랫폼별 중복:** shared `commonMain` 이전은 후속 이슈로 분리했다(IPv6 `http://[::1` 처리 차이 포함).
+
+검증: develop rebase 뒤 shared Android host 501·iOS simulator 498, Android unit debug·release 175, iOS XCTest 201, `gen_tokens.py --check`가 통과했다. 수정 뒤 Android unit debug·release 175·`assembleDebug`·`lintDebug`, iOS XCTest 204개가 통과했다(실패 0). 탭 기록 변경과 Android context 순서는 시뮬레이터·에뮬레이터에서 다시 확인하지 않았다.
