@@ -11,8 +11,8 @@ import WebKit
 /// It is the web view's navigation and UI delegate:
 /// - `decidePolicyFor` → `decide(url:mainFrame:userGesture:)`: `WebNavigationPolicy` with
 ///   `targetFrame?.isMainFrame ?? true` (nil = a new-window request) and `WebUserGesture` as the user gesture
-///   (`.linkActivated` and a real touch on the web view within the last second: a script's `a.click()` is also
-///   `.linkActivated`).
+///   (`.linkActivated` and a real tap on the web view within the last second: a script's `a.click()` is also
+///   `.linkActivated`, and a scroll or drag is not a tap).
 ///   External apps open with `UIApplication.open` (never `canOpenURL`; a false result does nothing, D16); without
 ///   a gesture they go through `ExternalPromptGate` and FWebViewExternal (`presentPrompt`). Every external request,
 ///   from the main frame or an iframe, is cancelled in WebKit, so it never loads into any frame.
@@ -51,7 +51,7 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     @ObservationIgnored private var started = false
     /// The main-frame URL that failed (retry loads it; the web view may still show the previous page).
     @ObservationIgnored private var failedURL: URL?
-    /// `ProcessInfo.systemUptime` of the last real touch on the web view (`WebTouchStampRecognizer`).
+    /// `ProcessInfo.systemUptime` of the last real tap's lift on the web view (`WebTouchStampRecognizer`).
     @ObservationIgnored private(set) var lastTouch: TimeInterval?
 
     init(url: URL, openExternal: @escaping (URL) -> Void = WebViewModel.openWithSystem) {
@@ -103,7 +103,7 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         if webView.url == nil { webView.load(URLRequest(url: initialURL)) } else { webView.reload() }
     }
 
-    /// A finger touched the web view (recorded by the screen's non-cancelling recognizer).
+    /// A finger tapped the web view (recorded by the screen's non-cancelling recognizer).
     func noteTouch(at uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         lastTouch = uptime
     }
@@ -295,8 +295,8 @@ enum WebLoadError {
     }
 }
 
-/// D16 "사용자 탭" on iOS (controller Ruling 12): a link activation is a tap only when a real touch on the web view
-/// came within `window` seconds. `.linkActivated` alone is not enough: a script's `a.click()` (or a synthetic click
+/// D16 "사용자 탭" on iOS (controller Ruling 12): a link activation is a tap only when a real tap on the web view
+/// was lifted within `window` seconds. `.linkActivated` alone is not enough: a script's `a.click()` (or a synthetic click
 /// event) on a `tel:`/app link is reported as `.linkActivated` too.
 enum WebUserGesture {
     static let window: TimeInterval = 1.0
@@ -308,10 +308,16 @@ enum WebUserGesture {
     }
 }
 
-/// Records each real touch on the web view and never takes part otherwise: it fails at once, does not cancel or
-/// delay touches, and recognizes alongside every other recognizer (scrolling, links, the back swipes keep working).
+/// Records each real tap on the web view (a single finger lifted within `slop` points of where it went down) and
+/// never takes part otherwise: it never recognizes, does not cancel or delay touches, and recognizes alongside
+/// every other recognizer (scrolling, links, the back swipes keep working). A scroll, drag or pinch is no tap, so a
+/// script clicking a link right after one still asks (Chromium's user activation leaves scrolls out the same way).
 final class WebTouchStampRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
+    static let slop: CGFloat = 10
+
     private let onTouch: () -> Void
+    private var tracked: UITouch?
+    private var start: CGPoint = .zero
 
     init(onTouch: @escaping () -> Void) {
         self.onTouch = onTouch
@@ -322,9 +328,37 @@ final class WebTouchStampRecognizer: UIGestureRecognizer, UIGestureRecognizerDel
         delegate = self
     }
 
+    static func isTap(from start: CGPoint, to end: CGPoint) -> Bool {
+        hypot(end.x - start.x, end.y - start.y) <= slop
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        if touches.contains(where: { $0.type == .direct || $0.type == .indirectPointer || $0.type == .pencil }) { onTouch() }
+        // A second finger (or a touch that is not a finger, pointer or pencil) makes it no tap.
+        guard tracked == nil, touches.count == 1, let touch = touches.first,
+              touch.type == .direct || touch.type == .indirectPointer || touch.type == .pencil
+        else { state = .failed; return }
+        tracked = touch
+        start = touch.location(in: view)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard let tracked, touches.contains(tracked) else { return }
+        if !Self.isTap(from: start, to: tracked.location(in: view)) { state = .failed }
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard let tracked, touches.contains(tracked) else { return }
+        if Self.isTap(from: start, to: tracked.location(in: view)) { onTouch() }
         state = .failed
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        state = .failed
+    }
+
+    override func reset() {
+        super.reset()
+        tracked = nil
     }
 
     func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {

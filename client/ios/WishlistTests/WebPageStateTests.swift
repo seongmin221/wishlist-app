@@ -27,6 +27,12 @@ final class WebPageStateTests: XCTestCase {
         XCTAssertEqual(page(title: " 상품 페이지 ").titleLine, "상품 페이지")
     }
 
+    func testFailedPageShowsDomainOnly() {
+        var failed = page(title: "상품 페이지")
+        failed.failed = true
+        XCTAssertNil(failed.titleLine) // like Android: the last page's title does not sit above the failure block
+    }
+
     func testProgressLineHidesAtTheEnd() {
         XCTAssertTrue(page(loading: true, progress: 0.4).progressVisible)
         XCTAssertFalse(page(loading: true, progress: 1).progressVisible)

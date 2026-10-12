@@ -100,10 +100,10 @@ private struct WebViewContent: View {
         .onAppear {
             installPrompt()
             model.start()
-            // onChange(initial:) runs only once; a view that disappeared and came back blocks again here.
+            // Also on a reappearance (onDisappear unblocked it); onChange below follows later changes.
             motion.setEdgeBackBlocked(entryID, model.page.canGoBack)
         }
-        .onChange(of: page.canGoBack, initial: true) { _, canGoBack in
+        .onChange(of: page.canGoBack) { _, canGoBack in
             motion.setEdgeBackBlocked(entryID, canGoBack)
         }
         .onDisappear { motion.setEdgeBackBlocked(entryID, false) }
@@ -288,7 +288,7 @@ private struct WebBarButton: View {
 
 /// The owner's `WKWebView` in a container: a recreated representable re-parents it, and dismantling only takes it
 /// out of its own container (another container may already hold it).
-/// A `WebTouchStampRecognizer` on the container sees every touch that lands in the web view (D16 user tap).
+/// A `WebTouchStampRecognizer` on the container sees every tap that lands in the web view (D16 user tap).
 private struct WebViewHost: UIViewRepresentable {
     let webView: WKWebView
     let onTouch: () -> Void

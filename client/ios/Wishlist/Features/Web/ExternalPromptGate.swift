@@ -33,9 +33,11 @@ final class ExternalPromptGate {
         prompting = false
     }
 
-    /// The main frame started a navigation; another page on the cancelled-on host does not lift the silence.
+    /// The main frame started a navigation; another page on the cancelled-on host, or a non-web page
+    /// (`about:blank`, whose "host" is the raw string), does not lift the silence.
     func onMainFrameNavigation(_ url: String) {
-        if silencedOn != nil, Self.host(url) != silencedOn { silencedOn = nil }
+        guard silencedOn != nil, URL(string: url).flatMap(WebPageURL.init) != nil else { return }
+        if Self.host(url) != silencedOn { silencedOn = nil }
     }
 
     /// The top bar's host (`WebPageState.host`, Android `DisplayFormat.host`).

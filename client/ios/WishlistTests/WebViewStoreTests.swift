@@ -243,6 +243,12 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertFalse(WebUserGesture.isUserGesture(navigationType: .linkActivated, lastTouch: 101, now: 100))
     }
 
+    func testOnlyAFingerLiftedNearWhereItWentDownIsATap() {
+        XCTAssertTrue(WebTouchStampRecognizer.isTap(from: .zero, to: .zero))
+        XCTAssertTrue(WebTouchStampRecognizer.isTap(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 106, y: 108)))
+        XCTAssertFalse(WebTouchStampRecognizer.isTap(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 100, y: 111))) // a scroll
+    }
+
     func testScriptedLinkClickAsksAndATouchedOneOpens() {
         var opened: [URL] = []
         let prompts = Prompts()

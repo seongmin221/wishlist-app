@@ -31,6 +31,8 @@ final class ExternalPromptGateTests: XCTestCase {
         g.onMainFrameNavigation(page + "?n=2")
         g.onMainFrameNavigation("https://WWW.Shop.com/next")
         XCTAssertEqual(g.onRequest(confirm: true), .drop)
+        g.onMainFrameNavigation("about:blank") // a non-web page has no host to compare
+        XCTAssertEqual(g.onRequest(confirm: true), .drop)
         g.onMainFrameNavigation("https://other.com/")
         XCTAssertEqual(g.onRequest(confirm: true), .prompt)
     }

@@ -19,8 +19,9 @@ struct WebPageState: Equatable {
     /// Lock icon only for https (D14).
     var secure: Bool { url.lowercased().hasPrefix("https:") }
 
-    /// Second line; nil (domain only, D13) when the page has no title or reports its URL as one.
+    /// Second line; nil (domain only, D13) when the load failed, the page has no title or reports its URL as one.
     var titleLine: String? {
+        if failed { return nil }
         let t = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if t.isEmpty || t == url { return nil }
         if let range = url.range(of: "://"), t == String(url[range.upperBound...]) { return nil }
