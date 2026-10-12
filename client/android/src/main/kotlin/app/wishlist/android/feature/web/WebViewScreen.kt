@@ -117,9 +117,10 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
 
     /** For `AndroidView.factory`: the kept WebView, re-parented and re-based on [activity]. */
     fun attach(activity: Context): WebView {
+        // Re-base before a first create(): WebView reads its theme and window token from the context it is built on.
+        context.baseContext = activity
         val view = webView ?: create().also { webView = it }
         (view.parent as? ViewGroup)?.removeView(view)
-        context.baseContext = activity
         pendingLoad?.let {
             pendingLoad = null
             view.loadUrl(it)
