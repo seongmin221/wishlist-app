@@ -237,12 +237,10 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         page.failed = true
     }
 
-    /// D13: only the main frame's own errors (WebKit reports no iframe errors here). A cancel (a newer navigation,
-    /// stop) and WebKit's "frame load interrupted" (a response the web view does not show) are not failures.
+    /// D13: only the main frame's own errors (WebKit reports no iframe errors here).
     private func mainFrameFailed(_ error: Error) {
         let e = error as NSError
-        if e.domain == NSURLErrorDomain, e.code == NSURLErrorCancelled { return }
-        if e.domain == "WebKitErrorDomain", e.code == 102 { return }
+        guard WebLoadError.isPageFailure(e) else { return }
         failedURL = (e.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
         page.failed = true
     }
@@ -283,6 +281,17 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         next.canGoBack = webView.canGoBack
         next.canGoForward = webView.canGoForward
         if next != page { page = next }
+    }
+}
+
+/// D13 on iOS: which main-frame load errors are page failures. A cancel (a newer navigation, stop), WebKit's
+/// "frame load interrupted" (102, a response the web view does not show) and "plug-in will handle load" (204, a
+/// media file handed to the player, which keeps playing) are not.
+enum WebLoadError {
+    static func isPageFailure(_ error: NSError) -> Bool {
+        if error.domain == NSURLErrorDomain, error.code == NSURLErrorCancelled { return false }
+        if error.domain == "WebKitErrorDomain", error.code == 102 || error.code == 204 { return false }
+        return true
     }
 }
 

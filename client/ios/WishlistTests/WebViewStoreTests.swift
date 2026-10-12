@@ -220,6 +220,17 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertTrue(motion.canBeginDrag)
     }
 
+    // MARK: D13 main-frame failure
+
+    func testOnlyRealLoadErrorsArePageFailures() {
+        XCTAssertFalse(WebLoadError.isPageFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)))
+        XCTAssertFalse(WebLoadError.isPageFailure(NSError(domain: "WebKitErrorDomain", code: 102)))
+        XCTAssertFalse(WebLoadError.isPageFailure(NSError(domain: "WebKitErrorDomain", code: 204))) // media → player
+        XCTAssertTrue(WebLoadError.isPageFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)))
+        XCTAssertTrue(WebLoadError.isPageFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotFindHost)))
+        XCTAssertTrue(WebLoadError.isPageFailure(NSError(domain: "WebKitErrorDomain", code: 101)))
+    }
+
     // MARK: D16 user tap (Ruling 12)
 
     func testUserGestureNeedsALinkActivationAndARecentRealTouch() {
