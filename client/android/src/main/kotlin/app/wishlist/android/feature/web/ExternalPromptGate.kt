@@ -17,7 +17,7 @@ internal class ExternalPromptGate {
     /** The main-frame host the user cancelled on; non-null while non-gesture requests are silenced. */
     private var silencedOn: String? = null
 
-    /** The web view was closed (holder cleared): a dialog still up must not launch for the gone page. */
+    /** The web view was closed (holder cleared): a dialog still up must not launch for the gone page (its 열기 checks this). */
     var isClosed = false
         private set
 
@@ -44,13 +44,13 @@ internal class ExternalPromptGate {
         prompting = false
     }
 
-    /** `onPageStarted` of the main frame; another page on the cancelled-on host does not lift the silence. */
+    /**
+     * `onPageStarted` of the main frame; another page on the cancelled-on host, or a non-web page (`about:blank`,
+     * whose "host" is the raw string), does not lift the silence.
+     */
     fun onMainFrameNavigation(url: String) {
-        if (silencedOn != null && DisplayFormat.host(url) != silencedOn) silencedOn = null
+        if (silencedOn != null && WebUrl.isWeb(url) && DisplayFormat.host(url) != silencedOn) silencedOn = null
     }
-
-    /** 열기 of a dialog that is still up: launch only while the web view exists. */
-    fun mayLaunchConfirmed(): Boolean = !isClosed
 
     /** `WebViewHolder.onCleared`: the page is gone. */
     fun close() {
@@ -58,8 +58,11 @@ internal class ExternalPromptGate {
         prompting = false
     }
 
-    /** The screen was composed anew (Activity recreated): a dialog that was up is gone without an answer. */
-    fun onScreenRestarted(currentUrl: String) {
-        onPromptClosed(confirmed = false, currentUrl = currentUrl)
+    /**
+     * The screen was composed anew (Activity recreated): a dialog that was up is gone without an answer, so like
+     * [onPromptNotShown] nothing is silenced (a payment page's retry asks again, D16).
+     */
+    fun onScreenRestarted() {
+        prompting = false
     }
 }

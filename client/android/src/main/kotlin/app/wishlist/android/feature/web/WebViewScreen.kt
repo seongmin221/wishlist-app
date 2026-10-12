@@ -311,7 +311,7 @@ internal fun WebViewScreen(route: WebViewRoute) {
     LaunchedEffect(holder) {
         val gate = holder.promptGate
         // A fresh composition (Activity recreated) has a fresh OverlayHost: a dialog that was up is gone.
-        gate.onScreenRestarted(holder.page.url)
+        gate.onScreenRestarted()
         // Requests a page queued while no screen was there to show them are dropped, not replayed.
         while (holder.externalRequests.tryReceive().isSuccess) Unit
         for (request in holder.externalRequests) {
@@ -324,7 +324,7 @@ internal fun WebViewScreen(route: WebViewRoute) {
                         onConfirm = {
                             confirmed = true
                             // The app-wide overlay can outlive this web view (popped while the dialog was up).
-                            if (gate.mayLaunchConfirmed()) WebExternalApps.launch(currentContext, request.target, holder::load)
+                            if (!gate.isClosed) WebExternalApps.launch(currentContext, request.target, holder::load)
                         },
                         onDismissed = {
                             shownPrompt.spec = null // the gate allows one FWebViewExternal at a time

@@ -40,6 +40,8 @@ class ExternalPromptGateTest {
         g.onMainFrameNavigation("$page?n=2")
         g.onMainFrameNavigation("https://WWW.Shop.com/next")
         assertEquals(DROP, g.onRequest(confirm = true))
+        g.onMainFrameNavigation("about:blank") // a non-web page has no host to compare
+        assertEquals(DROP, g.onRequest(confirm = true))
         g.onMainFrameNavigation("https://other.com/")
         assertEquals(PROMPT, g.onRequest(confirm = true))
     }
@@ -48,14 +50,13 @@ class ExternalPromptGateTest {
     fun aClosedWebViewNeitherAsksNorLaunches() {
         val g = ExternalPromptGate()
         assertEquals(PROMPT, g.onRequest(confirm = true))
-        assertTrue(g.mayLaunchConfirmed())
+        assertFalse(g.isClosed)
         g.close() // holder cleared while the app-wide dialog is still up
         assertTrue(g.isClosed)
-        assertFalse(g.mayLaunchConfirmed())
         assertEquals(DROP, g.onRequest(confirm = false))
         assertEquals(DROP, g.onRequest(confirm = true))
         g.onPromptClosed(confirmed = true, currentUrl = page) // the late dismissal changes nothing
-        assertFalse(g.mayLaunchConfirmed())
+        assertTrue(g.isClosed)
     }
 
     @Test
@@ -67,19 +68,17 @@ class ExternalPromptGateTest {
     }
 
     @Test
-    fun aPromptLostWithTheScreenCountsAsCancelled() {
+    fun aPromptLostWithTheScreenSilencesNothing() {
         val g = ExternalPromptGate()
         g.onRequest(confirm = true)
-        g.onScreenRestarted(currentUrl = page) // the overlay (and its dialog) did not survive
-        assertEquals(DROP, g.onRequest(confirm = true))
-        g.onMainFrameNavigation("https://other.com/")
-        assertEquals(PROMPT, g.onRequest(confirm = true))
+        g.onScreenRestarted() // the overlay (and its dialog) did not survive; the user never answered
+        assertEquals(PROMPT, g.onRequest(confirm = true)) // a payment page's retry asks again
     }
 
     @Test
     fun restartWithoutAPromptChangesNothing() {
         val g = ExternalPromptGate()
-        g.onScreenRestarted(currentUrl = page)
+        g.onScreenRestarted()
         assertEquals(PROMPT, g.onRequest(confirm = true))
     }
 
