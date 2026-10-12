@@ -101,6 +101,16 @@ class BrowserWorkerServiceTest {
     }
 
     @Test
+    fun `browser dns failure becomes partial without retry`() = withJob { database, jobId ->
+        val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
+        GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
+        val browser = BrowserWorkerService(source, { throw app.extraction.DnsLookupFailed() }, { _, _ -> error("classification must not run") })
+        assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
+        assertEquals("PARTIAL", analysisScalar(source, "select analysis_status from wishlist_items"))
+        assertEquals("1", analysisScalar(source, "select count(*) from outbox_events where event_type='BROWSER_ANALYSIS'"))
+    }
+
+    @Test
     fun `browser result writes metadata to the same item`() = withJob { database, jobId ->
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
@@ -156,7 +166,7 @@ class BrowserWorkerServiceTest {
         val source = DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)
         GeneralWorkerService(source) { ProcessingOutcome.NeedsBrowser }.runGeneral(jobId, 1)
         val browser = BrowserWorkerService(source, { error("browser runtime exited") }, { _, _ -> error("classification must not run") })
-        assertEquals(WorkerDisposition.RETRY, browser.runBrowser(jobId, 1))
+        assertEquals(WorkerDisposition.ACKNOWLEDGE, browser.runBrowser(jobId, 1))
         assertEquals("BROWSER_PENDING", analysisScalar(source, "select stage from analysis_jobs where id='$jobId'"))
         kotlin.test.assertNull(analysisScalar(source, "select execution_token from analysis_jobs where id='$jobId'"))
         assertEquals("2", analysisScalar(source, "select count(*) from outbox_events where event_type='BROWSER_ANALYSIS'"))

@@ -40,7 +40,7 @@ class GeneralWorkerServiceTest {
             val claim = claimJob(source, job.jobId, lane)
             val before = analysisScalar(source, "select count(*) from outbox_events")!!.toInt()
             assertEquals(ClaimResult.Ignored, AnalysisClaimRepository(source).claim(job.jobId, 1, lane))
-            assertEquals(WorkerDisposition.RETRY, AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Retryable))
+            assertEquals(WorkerDisposition.ACKNOWLEDGE, AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Retryable))
             assertEquals(before + 1, analysisScalar(source, "select count(*) from outbox_events")!!.toInt())
             assertEquals("${lane.name}_PENDING", analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
             assertEquals(WorkerDisposition.ACKNOWLEDGE, AnalysisResultRepository(source).finish(claim, ProcessingOutcome.Retryable))
@@ -173,9 +173,9 @@ class GeneralWorkerServiceTest {
     }
 
     @Test
-    fun `third retryable attempt becomes failed retryable`() = withJob { database, jobId, _ ->
+    fun `third retryable attempt in the generation becomes failed retryable`() = withJob { database, jobId, _ ->
         val worker = GeneralWorkerService(DatabaseFactory.dataSource(database.jdbcUrl, database.username, database.password)) { ProcessingOutcome.Retryable }
-        repeat(2) { assertEquals(WorkerDisposition.RETRY, worker.runGeneral(jobId, 1)) }
+        repeat(2) { assertEquals(WorkerDisposition.ACKNOWLEDGE, worker.runGeneral(jobId, 1)) }
         assertEquals(WorkerDisposition.ACKNOWLEDGE, worker.runGeneral(jobId, 1))
         assertEquals(3, attempts(database, jobId))
         database.createConnection("").use { connection ->

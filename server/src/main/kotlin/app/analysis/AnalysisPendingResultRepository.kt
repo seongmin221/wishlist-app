@@ -20,9 +20,13 @@ class AnalysisPendingResultRepository(private val dataSource: DataSource) {
 
     fun saveMetadata(claim: AnalysisClaim, metadata: Metadata): Boolean = guarded(claim) { c ->
         c.prepareStatement("""update analysis_jobs set pending_product_name=?,pending_product_description=?,
-            pending_product_image_url=?,pending_canonical_url=? where id=?""").use { s ->
+            pending_product_image_url=?,pending_canonical_url=?,pending_brand=?,pending_price=?,pending_currency=?,pending_merchant=? where id=?""").use { s ->
             s.setString(1, metadata.title); s.setString(2, metadata.description); s.setString(3, metadata.imageUrl)
-            s.setString(4, metadata.canonicalUrl); s.setObject(5, claim.jobId); check(s.executeUpdate() == 1)
+            s.setString(4, metadata.canonicalUrl); s.setString(5, metadata.brand)
+            // The parser yields both or neither; never store half a price pair.
+            val pair = metadata.price != null && metadata.currency != null
+            s.setBigDecimal(6, metadata.price.takeIf { pair }); s.setString(7, metadata.currency.takeIf { pair })
+            s.setString(8, metadata.merchant); s.setObject(9, claim.jobId); check(s.executeUpdate() == 1)
         }
         true
     } ?: false

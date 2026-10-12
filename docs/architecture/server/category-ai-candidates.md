@@ -54,10 +54,10 @@ AI 요청의 developer 메시지에는 고정 지시문만 넣는다. user 메�
 | 목적 결과 | B3부터 [AI 목적 후보](purpose-ai-candidates.md)의 판단/판단 없음 규칙을 따른다. CONFIRMED/DEFERRED·USER·override 상품의 빈 목적은 채우지 않는다 |
 | generation/token/lease/lifecycle 또는 실행 identity가 바뀜 | 기존 Worker guard를 따라 반영 차단 |
 
-replacement는 일반·browser 시도 횟수와 최초 시각을 승계한다. 일반 실행 최대 3회 또는
-최초 시도 후 30분을 넘기면 재예약하지 않는다. category 편집으로 예산을 초기화하지 않는다.
+replacement는 일반·browser 시도 횟수와 최초 시각을 승계한다. generation 합산 3회 또는
+가장 이른 최초 시도 후 30분을 넘기면 재예약하지 않고, 읽은 metadata를 반영해 FAILED_RETRYABLE로 끝낸다. category 편집으로 예산을 초기화하지 않는다.
 실제 AI 비용 정산은 결과 폐기와 독립적이다. general/browser는 같은 finish repository를
-사용하며 Scheduler와 browser runtime 조립은 B5 계약에 속한다.
+사용하며 Scheduler와 browser runtime 조립은 B5에서 연결했다.
 
 ## 토큰 단계와 공용 fallback
 

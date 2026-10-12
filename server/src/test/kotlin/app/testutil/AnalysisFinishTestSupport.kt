@@ -87,7 +87,8 @@ fun assertNormalFinishMatrix(source: DataSource, lane: AnalysisLane) {
         val process: (AnalysisClaim) -> ProcessingOutcome = { claim -> seedFinishResult(source, claim); outcome }
         val result = if (lane == AnalysisLane.GENERAL) GeneralWorkerService(source, process).runGeneral(job.jobId, 1)
             else BrowserWorkerService(source, { Metadata("render", null, null, "https://example.com/item") }, { claim, _ -> process(claim) }).runBrowser(job.jobId, 1)
-        assertEquals(if (outcome == ProcessingOutcome.Retryable) WorkerDisposition.RETRY else WorkerDisposition.ACKNOWLEDGE, result)
+        // A durable retry outbox ends the task: every normal finish acknowledges.
+        assertEquals(WorkerDisposition.ACKNOWLEDGE, result)
         assertEquals(status, analysisScalar(source, "select analysis_status from wishlist_items where id='${job.itemId}'"))
         assertEquals(stage, analysisScalar(source, "select stage from analysis_jobs where id='${job.jobId}'"))
         val final = outcome != ProcessingOutcome.Retryable && outcome != ProcessingOutcome.NeedsBrowser

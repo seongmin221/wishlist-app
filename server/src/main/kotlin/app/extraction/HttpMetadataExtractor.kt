@@ -1,13 +1,9 @@
 package app.extraction
 
+import java.math.BigDecimal
 import java.net.InetAddress
 import java.net.URI
 import org.jsoup.Jsoup
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 data class HttpFetchResponse(val status: Int, val headers: Map<String, String>, val body: String, val truncated: Boolean = false)
 
@@ -17,7 +13,10 @@ sealed interface ExtractionResult {
     data object Partial : ExtractionResult
 }
 
-data class Metadata(val title: String?, val description: String?, val imageUrl: String?, val canonicalUrl: String)
+data class Metadata(
+    val title: String?, val description: String?, val imageUrl: String?, val canonicalUrl: String,
+    val brand: String? = null, val price: BigDecimal? = null, val currency: String? = null, val merchant: String? = null,
+)
 
 class HttpMetadataExtractor(
     private val safety: UrlSafetyPolicy,
@@ -35,28 +34,12 @@ class HttpMetadataExtractor(
                 safety.validate(current)
             } else {
                 if (response.status != 200) return ExtractionResult.Partial
-                val document = Jsoup.parse(response.body, current)
-                val product = document.select("script[type=application/ld+json]")
-                    .firstNotNullOfOrNull { script -> runCatching { findProduct(Json.parseToJsonElement(script.data())) }.getOrNull() }
-                val structuredTitle = product?.get("name")?.jsonPrimitive?.content?.trim()?.takeIf { it.isNotEmpty() }
-                    ?: document.selectFirst("meta[property=og:title]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
-                val title = structuredTitle ?: if (response.truncated) null else document.title().trim().takeIf { it.isNotEmpty() }
-                val description = document.selectFirst("meta[property=og:description]")?.attr("content")?.takeIf { it.isNotBlank() }
-                    ?: document.selectFirst("meta[name=description]")?.attr("content")?.takeIf { it.isNotBlank() }
-                val image = document.selectFirst("meta[property=og:image]")?.attr("abs:content")?.takeIf { it.isNotBlank() }
-                return if (title == null) ExtractionResult.NeedsBrowser
-                else ExtractionResult.Complete(Metadata(title, description, image, current))
+                val parsed = ProductMetadataParser.parse(Jsoup.parse(response.body, current), response.truncated)
+                val title = parsed.title ?: return ExtractionResult.NeedsBrowser
+                return ExtractionResult.Complete(Metadata(title, parsed.description, parsed.imageUrl,
+                    UrlCanonicalizer.choose(parsed.declaredCanonical, current), parsed.brand, parsed.price, parsed.currency, parsed.merchant))
             }
         }
         return ExtractionResult.Partial
-    }
-
-    private fun findProduct(element: JsonElement): kotlinx.serialization.json.JsonObject? = when (element) {
-        is kotlinx.serialization.json.JsonArray -> element.firstNotNullOfOrNull(::findProduct)
-        is kotlinx.serialization.json.JsonObject -> {
-            val type = element["@type"]?.toString()?.lowercase().orEmpty()
-            if ("product" in type) element else element["@graph"]?.let(::findProduct)
-        }
-        else -> null
     }
 }

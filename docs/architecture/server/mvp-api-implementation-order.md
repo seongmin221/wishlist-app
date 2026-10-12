@@ -166,6 +166,8 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 **주요 테스트:** 기존 `GeneralWorkerServiceTest`, `BrowserWorkerServiceTest`, `WorkerRoutesTest`, `RuntimeConfigTest`, `OutboxDispatcherTest`, `AiClassificationServiceTest`, budget 테스트. maintenance의 통합 실행 테스트를 추가한다.
 
+**구현 상태:** B5 WORK-01·WORK-02·OPS-01을 구현했다. [제품·운영 결정](../../history/product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md), [spec](../../superpowers/specs/2026-10-09-b5-analysis-runtime-recovery-design.md), [계획](../../superpowers/plans/2026-10-09-b5-analysis-runtime-recovery.md), [구현 이력](../../history/architecture/server/b5-analysis-runtime-implementation-2026-10-09.md)에 범위·검증·B11 이관을 기록했다.
+
 ## B6 — 사용자 이미지
 
 **산출물:** 파일을 업로드해 owner의 검증된 READY mediaId를 받는다.
@@ -272,7 +274,7 @@ ARC-07 → ARC-08 → ARC-09. 현재 참조 상태와 복원 정책을 preview/�
 | 목적 입력 제한·색/icon stable key·활동순 | B3 (**해결**) | [B3 제품 결정](../../history/product-planning/mvp/decisions/b3-purpose-api-policy-2026-10-07.md) |
 | 홈 목적 개수·빈 목적 노출·연속 restart | B4 (**해결**) | [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md): 최대 3개·빈 목적 포함, restart는 현재 미완료 대상 재조회이며 CONFIRMED/DEFERRED를 검토 대상으로 되돌리지 않음 |
 | category count·서버 할 일 합계 | B4 (**해결**) | [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md): category count는 목록 표시 집합과 일치, HOME-01은 그룹별 count만 제공하고 별도 합계 필드 없음 |
-| retry 예산·deadline·즉시 발행 제한 | B5 | 일반/browser 합산과 timeout·복구, 기존 운영 계약 유지 |
+| retry 예산·deadline·즉시 발행 제한 | B5 (**해결**) | [B5 결정](../../history/product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md): generation 합산 3회·30분, Retryable ACK·scheduleTime backoff, PENDING 5분 정체·재예약 누적 3회 |
 | 이미지 형식/크기·저장소·외부 이미지 보존 | B6 | upload·completion·정리·archive 장기 보존 방향 |
 | 상품명/brand 제한·생성 후 편집 취소 | B7 | CAT POST 성공 뒤 draft 취소 시 새 자원 수명. PUR는 B3에서 유지로 해결 |
 | 후보 filter·선택 유지·분석 상태·bulk 상한 | B8a | 추가 가능 item 상태, 이동 원자성, 최대 요청 크기 |

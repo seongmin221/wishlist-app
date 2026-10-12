@@ -19,11 +19,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 
+/** Test convenience registering both lanes; runtime roles register only their own lane. */
 fun Route.workerRoutes(worker: GeneralWorkerService, browser: BrowserWorkerService? = null) =
     workerRoutes(worker::runGeneral, browser?.let { it::runBrowser })
 
 fun Route.workerRoutes(runGeneral: (UUID, Int) -> WorkerDisposition, runBrowser: ((UUID, Int) -> WorkerDisposition)? = null) {
-    post("/internal/worker/general") {
+    generalWorkerRoute(runGeneral)
+    if (runBrowser != null) browserWorkerRoute(runBrowser)
+}
+
+fun Route.generalWorkerRoute(run: (UUID, Int) -> WorkerDisposition) = workerRoute("/internal/worker/general", run)
+
+fun Route.browserWorkerRoute(run: (UUID, Int) -> WorkerDisposition) = workerRoute("/internal/worker/browser", run)
+
+private fun Route.workerRoute(path: String, run: (UUID, Int) -> WorkerDisposition) {
+    post(path) {
         val request = try {
             val json = Json.parseToJsonElement(call.receiveText()).jsonObject
             UUID.fromString(json.getValue("jobId").jsonPrimitive.content) to json.getValue("generation").jsonPrimitive.int
@@ -32,21 +42,9 @@ fun Route.workerRoutes(runGeneral: (UUID, Int) -> WorkerDisposition, runBrowser:
             null
         } ?: return@post call.respondText("invalid task", ContentType.Text.Plain, HttpStatusCode.BadRequest)
 
-        when (withContext(Dispatchers.IO) { runGeneral(request.first, request.second) }) {
+        when (withContext(Dispatchers.IO) { run(request.first, request.second) }) {
             WorkerDisposition.ACKNOWLEDGE -> call.respond(HttpStatusCode.NoContent)
-            WorkerDisposition.RETRY -> call.respond(HttpStatusCode.ServiceUnavailable)
-        }
-    }
-    if (runBrowser != null) post("/internal/worker/browser") {
-        val request = try {
-            val json = Json.parseToJsonElement(call.receiveText()).jsonObject
-            UUID.fromString(json.getValue("jobId").jsonPrimitive.content) to json.getValue("generation").jsonPrimitive.int
-        } catch (cause: Exception) {
-            if (cause is CancellationException) throw cause
-            null
-        } ?: return@post call.respondText("invalid task", ContentType.Text.Plain, HttpStatusCode.BadRequest)
-        when (withContext(Dispatchers.IO) { runBrowser(request.first, request.second) }) {
-            WorkerDisposition.ACKNOWLEDGE -> call.respond(HttpStatusCode.NoContent)
+            // Only executions with no durable record ask Cloud Tasks to deliver again.
             WorkerDisposition.RETRY -> call.respond(HttpStatusCode.ServiceUnavailable)
         }
     }

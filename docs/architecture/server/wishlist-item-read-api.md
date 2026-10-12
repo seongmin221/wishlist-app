@@ -8,7 +8,7 @@
 
 인증이 없으면 `401 UNAUTHORIZED`, UUID 형식이 잘못되면 `400 INVALID_WISHLIST_ITEM_ID`다. 존재하지 않음·다른 owner·DELETED는 모두 `404 WISHLIST_ITEM_NOT_FOUND`다. ARCHIVED는 조회할 수 있지만 조치는 없다. 생성 key 재전송에는 기존 삭제 tombstone을 반환한다. GET과 생성·발행 JDBC 작업은 `Dispatchers.IO`에서 실행하고 취소를 전파한다.
 
-공개 projection은 이름·이미지·각 값 출처, category/purpose의 현재 ID·출처·누락 사유, analysis/review/lifecycle, version, 수동 완료 시각, 원본 URL과 저장/변경 시각을 반환한다. DB에 없는 가격·통화·brand·merchant·metadataCheckedAt은 기존 DTO의 nullable 필드로 유지한다. `classified_at`은 AI 분류 시각이므로 metadata 확인 시각으로 대신 사용하지 않는다. 목적명·후보 수를 사용하는 deletionImpact는 상품 삭제 ITEM-05와 함께 B7에서 확장한다.
+공개 projection은 이름·이미지·각 값 출처, category/purpose의 현재 ID·출처·누락 사유, analysis/review/lifecycle, version, 수동 완료 시각, 원본 URL과 저장/변경 시각을 반환한다. 가격·통화·brand·merchant·metadataCheckedAt은 B5부터 저장값을 반환하며 신뢰할 값이 없으면 null이다. 가격은 원래 통화의 decimal(scale 4)이다. `classified_at`은 AI 분류 시각이므로 metadata 확인 시각으로 대신 사용하지 않는다. 목적명·후보 수를 사용하는 deletionImpact는 상품 삭제 ITEM-05와 함께 B7에서 확장한다.
 
 ## 공유 시각과 생성 key
 
@@ -30,7 +30,7 @@ V10은 `client_created_at timestamptz`만 추가하고 기존 행은 null로 유
 
 실패인데 저장 code가 없거나 알려지지 않았으면 FAILED_RETRYABLE은 `ANALYSIS_RETRYABLE_FAILURE`, FAILED_TERMINAL은 `ANALYSIS_FAILED`다. PARTIAL의 알 수 없는 code도 `ANALYSIS_FAILED`로 가리고, code가 없으면 null을 유지한다. 원본 내부 진단을 공개하지 않으며 DB 진단값을 바꾸지는 않는다. B5에서 추출·실행 실패 분류를 더 구체화한다.
 
-`BLOCKED_ADDRESS`/`UNSUPPORTED_CONTENT`/`ACCESS_DENIED`는 기존 공개 계약의 범주를 유지하는 것이며 현재 extraction이 이 code를 저장한다는 의미는 아니다. 구체적인 producer 연결은 B5에서 구현한다.
+`BLOCKED_ADDRESS`는 B5부터 안전하지 않은 주소(사설·loopback·metadata 주소, 허용하지 않는 scheme·port, userinfo, 잘못된 URL)에서 저장한다. `UNSUPPORTED_CONTENT`/`ACCESS_DENIED`는 기존 공개 계약의 범주를 유지하며 아직 producer가 없다.
 
 ## commit 후 지정 발행
 
@@ -38,7 +38,7 @@ V10은 `client_created_at timestamptz`만 추가하고 기존 행은 null로 유
 
 발행 실패는 가능한 경우 lease를 해제하고 item과 미발행 event를 보존한다. gateway 실패는 dispatcher가, lease 해제·claim 실패처럼 생성 서비스까지 올라온 예외는 생성 서비스가 event ID와 예외 타입만 warn 로그로 남긴다. Scheduler가 연결되기 전에는 이 로그가 PROCESSING에 남은 상품을 추적하는 유일한 신호다. 취소도 lease 해제 후 전파한다. key 재전송은 저장된 API 결과를 복구하며 발행을 다시 시도하지 않는다. 미발행 event의 queue 전달 복구는 B5 Scheduler에서 연결한다. 생성 응답은 transaction 안에서 읽고 성공적으로 commit한 snapshot을 반환하며 발행 후 재조회하지 않는다. post-commit 재조회 장애로 201/Location을 잃는 경로를 없앤다. 성공적인 생성·즉시 발행의 pool 대여는 생성 transaction, claim, published update의 세 번이다. Worker가 그 사이 완료하면 이후 GET/재전송에서 최신 결과를 읽는다. runtime 종료 gate와 작은 connection pool을 유지한다.
 
-B0의 production createTask RPC 5초 상한과 batch 발행 메서드를 유지한다. B5의 Scheduler·장기 PENDING 복구·batch의 후보별 시간/실패 격리·generation 전체 retry 예산은 후속 범위다.
+B0의 production createTask RPC 5초 상한을 유지한다. B5 maintenance가 backlog를 후보별 실패 격리·시간 상한으로 발행하고 장기 PENDING을 복구한다([PENDING 복구](analysis-pending-recovery.md)).
 
 Scheduler가 있는 상태의 비동기 발행 전환과 API/Worker body 크기 제한은 운영 정책·설정 범위의 후속 검토 항목이다. 이번 리뷰 보완은 fire-and-forget 작업이나 임의 body 상한을 추가하지 않는다.
 
@@ -75,7 +75,7 @@ categoryId·purposeId·purposeUnassigned 중 **정확히 하나**를 받는다. 
 
 ### 공용 카드와 page/window
 
-카드는 `item`과 `anchorCursor` wrapper다. item은 B1~B3 상세 mapper 표현과 동일하며 purpose 색/아이콘/source, reviewStatus, requiredAction, allowedActions, version을 포함한다. 가격/통화·brand·merchant·metadataCheckedAt은 B5에서 저장을 연결하므로 B4 응답은 null이다. classified_at을 확인 시각으로 대신 쓰지 않는다.
+카드는 `item`과 `anchorCursor` wrapper다. item은 B1~B3 상세 mapper 표현과 동일하며 purpose 색/아이콘/source, reviewStatus, requiredAction, allowedActions, version을 포함한다. 가격/통화·brand·merchant·metadataCheckedAt은 B5에서 저장을 연결했으며 상세와 같은 값이다. classified_at을 확인 시각으로 대신 쓰지 않는다.
 
 다음은 ITEM-02 첫 페이지 예시다. `opaque-anchor`는 설명용 값이며 실 요청에는 응답받은 cursor를 사용한다.
 

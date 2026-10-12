@@ -3,6 +3,7 @@ package app.extraction
 import app.analysis.AnalysisClaim
 import app.analysis.AnalysisPendingResultRepository
 import app.analysis.ProcessingOutcome
+import app.wishlist.AnalysisFailureCode
 import javax.sql.DataSource
 
 class GeneralExtractionProcessor(
@@ -14,8 +15,11 @@ class GeneralExtractionProcessor(
 
     fun process(claim: AnalysisClaim): ProcessingOutcome {
         val sourceUrl = pending.sourceUrl(claim) ?: return ProcessingOutcome.Stale
-        val result = try { extract(sourceUrl) } catch (_: UnsafeUrlException) {
-            return ProcessingOutcome.Terminal
+        val result = try { extract(sourceUrl) } catch (_: DnsLookupFailed) {
+            return ProcessingOutcome.Retryable
+        } catch (_: UnsafeUrlException) {
+            // Every unsafe or unsupported address shares the public BLOCKED_ADDRESS code.
+            return if (pending.saveFailure(claim, AnalysisFailureCode.BLOCKED_ADDRESS)) ProcessingOutcome.Terminal else ProcessingOutcome.Stale
         }
         return when (result) {
             is ExtractionResult.Complete -> {

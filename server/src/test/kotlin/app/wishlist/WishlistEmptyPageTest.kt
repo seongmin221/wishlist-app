@@ -93,7 +93,7 @@ class WishlistEmptyPageTest {
             "getInt" -> (rows[index][args!![0]] as? Number)?.toInt() ?: 0
             "getLong" -> (rows[index][args!![0]] as Number).toLong()
             "getBoolean" -> rows[index][args!![0]] as Boolean
-            "getString","getObject","getTimestamp","getArray" -> rows[index][args!![0]]
+            "getString","getObject","getTimestamp","getArray","getBigDecimal" -> rows[index][args!![0]]
             else -> error(method)
         } }
     }

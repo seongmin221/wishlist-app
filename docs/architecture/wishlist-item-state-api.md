@@ -289,7 +289,7 @@ DELETE /v1/wishlist-items/{id}
 }
 ```
 
-가격 wire 타입은 JSON number 또는 null이다. 공통 DTO는 BigDecimal을 사용하고 부동소수점 변환 없이 소수 값을 직렬화한다. 금액 단위와 통화 validation은 metadata 구현에서 확정한다.
+가격 wire 타입은 JSON number 또는 null이다. 공통 DTO는 BigDecimal을 사용하고 부동소수점 변환 없이 소수 값을 직렬화한다. B5에서 금액은 상품 페이지의 원래 통화 단위 decimal(`numeric(19,4)`, 0 이상)로 저장하고 환산하지 않는다. `currency`는 ISO 4217 대문자 3자이며 `price`와 항상 함께 있거나 함께 null이다. 가격이 범위이거나 offer마다 다르면 null이다. `metadataCheckedAt`은 서버가 페이지를 읽어 metadata를 반영한 시각이고, 그 반영에서 가격 쌍은 새로 읽은 값(null 포함)으로 바뀐다. 근거는 [B5 결정](../history/product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md)이다.
 
 ## 오류 계약
 

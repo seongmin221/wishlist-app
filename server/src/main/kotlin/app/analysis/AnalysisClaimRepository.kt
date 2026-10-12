@@ -37,9 +37,8 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
         val now = connection.analysisDatabaseTime()
         // Connection-pool and item/job lock waits also consume the processing budget.
         if (WorkerExecution.expired()) throw ProcessingDeadlineExceeded()
-        if (!job.hasRetryBudget(lane, now)) {
-            connection.transitionAnalysisJob(jobId, "FAILED")
-            connection.failRetryableItem(itemId)
+        if (!job.hasRetryBudget(now)) {
+            connection.failExhausted(jobId, itemId)
             return ClaimResult.Exhausted
         }
 
@@ -47,10 +46,11 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
         val countColumn = if (lane == AnalysisLane.GENERAL) "attempt_count" else "browser_attempt_count"
         val firstColumn = if (lane == AnalysisLane.GENERAL) "first_attempt_at" else "first_browser_attempt_at"
         val clearMetadata = if (lane == AnalysisLane.GENERAL)
-            "pending_product_name=null,pending_product_description=null,pending_product_image_url=null,pending_canonical_url=null," else ""
+            "pending_product_name=null,pending_product_description=null,pending_product_image_url=null,pending_canonical_url=null," +
+            "pending_brand=null,pending_price=null,pending_currency=null,pending_merchant=null," else ""
         val lease = connection.prepareStatement("""
             update analysis_jobs set stage=?,execution_token=?,lease_until=clock_timestamp()+interval '${AnalysisTiming.LEASE_SECONDS} seconds',
-                claimed_item_version=?, $countColumn=$countColumn+1,$firstColumn=coalesce($firstColumn,clock_timestamp()),
+                claimed_item_version=?, recovery_check_at=null, $countColumn=$countColumn+1,$firstColumn=coalesce($firstColumn,clock_timestamp()),
                 ${clearMetadata}pending_category_id=null,pending_purpose_id=null,pending_purpose_judged=false,pending_failure_code=null,updated_at=clock_timestamp()
             where id=? returning lease_until
         """.trimIndent()).use { statement ->

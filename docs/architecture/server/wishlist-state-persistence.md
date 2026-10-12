@@ -35,7 +35,7 @@ B0 Task 4~7에서 중간·최종 반영과 복구에 현재 상태·출처·실�
 
 `AnalysisClaimRepository.claim(jobId, generation, lane)`는 먼저 job의 item ID를 잠금 없이 찾고, transaction에서 owner→item→job 순서로 `FOR UPDATE`한 뒤 관계와 상태를 다시 검증한다. 현재 generation의 ACTIVE·PROCESSING·수동 미완료 상품과 해당 lane의 PENDING job만 실행 가능하다. BROWSER는 기존 fallback 플래그도 필요하다. owner는 요청에서 받지 않고 잠근 상품 row에서 얻는다. 같은 job/generation/lane의 PENDING이 삭제된 상품에 속하면 owner→item→job 잠금 안에서 CANCELLED로 바꾸고 분석/추가 outbox 없이 ACK한다.
 
-유효한 claim은 새 UUID token, DB 시각 기준 120초 lease, 현재 item version을 저장하고 해당 lane의 attempt만 한 번 증가시킨다. 다른 요청은 이미 RUNNING인 job을 Ignored로 처리하므로 중복 attempt가 없다. lane별 3회 또는 첫 시도로부터 30분을 소진하면 Exhausted를 반환하고 같은 잠금 아래 현재 상품을 FAILED_RETRYABLE로 바꾸며 version을 한 번 증가시킨다. 오래된 generation이나 비활성·수동 완료 상품에는 이 소진 처리를 적용하지 않는다.
+유효한 claim은 새 UUID token, DB 시각 기준 120초 lease, 현재 item version을 저장하고 해당 lane의 attempt만 한 번 증가시킨다. 다른 요청은 이미 RUNNING인 job을 Ignored로 처리하므로 중복 attempt가 없다. B5부터 재시도 예산은 generation 전체다. 두 lane의 attempt 합이 3이거나 가장 이른 첫 시도로부터 30분이 지나면 Exhausted를 반환하고, 같은 잠금 아래 `failExhausted`가 job을 FAILED로, 현재 상품을 FAILED_RETRYABLE로 바꾸며 version을 한 번 증가시킨다. 이때 job에 남은 페이지 metadata를 실패 병합 규칙으로 함께 반영한다. 오래된 generation이나 비활성·수동 완료 상품에는 이 소진 처리를 적용하지 않는다.
 
 claim을 다시 발급할 때 assignment/purpose/failure 임시 결과를 지운다. GENERAL은 임시 metadata도 지우고 BROWSER는 일반 추출 metadata를 유지한다. generation의 candidate snapshot은 두 lane 모두 유지한다.
 
@@ -71,7 +71,7 @@ NAME/IMAGE/CATEGORY/PURPOSE는 USER 출처 또는 userOverrideFields 중 하나�
 
 CONFIRMED/DEFERRED는 유지한다. 사용 가능한 이름·category가 있고 실제 미확정 AI category 또는 nonnull AI purpose 연결이 있으면 PENDING이다. USER category를 유지하고 목적만 AI로 연결해도 검토 대상이다. 연결되지 않은 AI 예측 진단만으로 PENDING을 만들지 않는다.
 
-일반 NeedsBrowser는 BROWSER_PENDING, fallback flag, token 해제, browser outbox 1건을 원자적으로 저장한다. 양쪽 Worker의 infrastructure exception은 Retryable로 처리한다. 현재 실행이 한도 안이면 lane PENDING·token 해제·새 retry outbox를 같은 transaction에 저장하고 RETRY/HTTP 503을 반환한다. task 이름에 실행 token을 넣어 이전 task와 구분한다. 원래 task가 delivery 마감/중복 ACK로 사라져도 발행할 event가 남는다. 한도 소진은 FAILED_RETRYABLE로 최종 반영한다. stale·완료는 ACK/HTTP 204다. CancellationException은 다시 던지고 남은 RUNNING lease의 복구는 Task 7에서 처리한다.
+일반 NeedsBrowser는 BROWSER_PENDING, fallback flag, token 해제, browser outbox 1건을 원자적으로 저장한다. 양쪽 Worker의 infrastructure exception은 Retryable로 처리한다. 현재 실행이 한도 안이면 lane PENDING·token 해제·새 retry outbox(`not_before` = 10초부터 2배, 최대 600초)를 같은 transaction에 저장하고 ACKNOWLEDGE/HTTP 204를 반환한다(B5). durable outbox가 진행을 맡으므로 원래 task를 끝내 예산 이중 소비를 막는다. RETRY/HTTP 503은 claim 전 마감·executor 포화·90초 timeout처럼 durable 기록이 없는 경우만 쓴다. task 이름에 실행 token을 넣어 이전 task와 구분한다. 원래 task가 delivery 마감/중복 ACK로 사라져도 발행할 event가 남는다. 한도 소진은 `failExhausted`로 FAILED_RETRYABLE을 최종 반영한다. 일반 NeedsBrowser도 fallback 전에 예산을 확인하며, 소진이면 browser outbox 없이 FAILED_RETRYABLE로 끝난다. stale·완료는 ACK/HTTP 204다. CancellationException은 다시 던지고 남은 RUNNING lease의 복구는 Task 7에서 처리한다.
 
 
 ## 만료 실행 복구
@@ -82,11 +82,11 @@ ACTIVE·PROCESSING·현재 generation·수동 미완료·claimed version 일치�
 
 한도 내 복구는 lane PENDING, 실행 identity 해제, recovery outbox 1건을 한 transaction으로 저장한다. task_name에는 generation·시도 횟수·옛 token(legacy는 새 UUID)을 넣는다. 복구에서는 attempt나 item version을 올리지 않으며 다음 claim에서 해당 lane attempt가 증가한다. 재claim 이후 옛 token의 중간/최종 쓰기는 모두 무효다.
 
-lane별 3회 또는 첫 시도에서 30분을 소진하면 job FAILED와 identity 해제, 현재 상품 FAILED_RETRYABLE 및 version +1을 함께 저장한다. 다음 스캔은 이미 전이된 job을 처리하지 않는다. 정상 finish가 먼저 commit하면 복구는 건너뛰고, 복구가 먼저 commit하면 옛 finish는 stale ACK다. 이 경로는 AI budget reservation/window를 수정하지 않으며 실제 사용량 정산은 별도 책임으로 유지한다.
+generation 예산(합산 3회·30분)을 소진하면 `failExhausted`로 job FAILED와 identity 해제, 현재 상품 FAILED_RETRYABLE 및 version +1을 함께 저장한다. 다음 스캔은 이미 전이된 job을 처리하지 않는다. 정상 finish가 먼저 commit하면 복구는 건너뛰고, 복구가 먼저 commit하면 옛 finish는 stale ACK다. 이 경로는 AI budget reservation/window를 수정하지 않으며 실제 사용량 정산은 별도 책임으로 유지한다.
 
-claim·finish·reconciler의 lane별 재시도 한도는 AnalysisJobTransitions의 hasRetryBudget을 공유한다. job stage/실행 identity 해제와 잠근 상품의 FAILED_RETRYABLE 갱신도 공용 helper에 둔다. B5의 generation 전체 한도를 추가할 때 이 lane별 규칙과 구분한다.
+claim·finish(NeedsBrowser 분기 포함)·reconciler·PENDING 복구·category stale replacement는 `LockedAnalysisJob.hasRetryBudget(now)` 하나로 generation 예산을 판정한다. lane별 attempt 컬럼은 진단용으로 남는다. job stage/실행 identity 해제(`recovery_check_at` 초기화 포함)와 소진 처리도 `AnalysisJobTransitions`의 공용 helper에 둔다. 수동 편집으로 version이 바뀐 실행의 취소는 metadata를 반영하지 않는 별도 `failRetryableItem` 경로다.
 
-오래된 PENDING·queue retry 소진·미발행 fallback의 실제 발행/복구는 [B5 설계](analysis-pending-recovery.md)에 따라 연결한다.
+오래된 PENDING·queue retry 소진·미발행 fallback의 실제 발행/복구는 B5 maintenance가 담당한다([PENDING 복구](analysis-pending-recovery.md)).
 
 ## B2 category 후보 보호
 

@@ -3,7 +3,8 @@ package app.budget
 import app.DatabaseFactory
 import javax.sql.DataSource
 
-data class MaintenanceReport(val expiredReservations: Int, val deliveredAlerts: Int)
+@kotlinx.serialization.Serializable
+data class BudgetMaintenanceReport(val expiredReservations: Int, val deliveredAlerts: Int)
 
 data class BudgetMaintenanceConfig(val databaseUrl: String, val databaseUser: String, val databasePassword: String) {
     companion object {
@@ -15,7 +16,7 @@ data class BudgetMaintenanceConfig(val databaseUrl: String, val databaseUser: St
 }
 
 class BudgetMaintenanceService(private val dataSource: DataSource, private val notify: (BudgetAlert) -> Unit) {
-    fun runOnce(): MaintenanceReport = MaintenanceReport(
+    fun runOnce(): BudgetMaintenanceReport = BudgetMaintenanceReport(
         expiredReservations = LlmBudgetService(dataSource).reconcileExpired(),
         deliveredAlerts = BudgetAlertDispatcher(dataSource).dispatch(100, notify),
     )

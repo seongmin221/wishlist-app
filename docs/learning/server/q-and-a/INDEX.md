@@ -18,3 +18,5 @@
 | QA-SRV-012 | 큰 HTML 제한과 브라우저 fallback 판단 | [QA-SRV-012](QA-SRV-012-large-html-and-browser-fallback.md) |
 | QA-SRV-013 | 읽기 cursor의 권한 경계와 SQL/policy parity·snapshot | [QA-SRV-013](QA-SRV-013-read-cursor-and-policy-parity.md) |
 | QA-SRV-014 | V15 checksum 보존·V16 실행 소스 검증·별도 배포 job의 제한된 재시도 | [QA-SRV-014](QA-SRV-014-concurrent-read-index-migration.md) |
+| QA-SRV-015 | DNS rebinding과 browser egress pinning proxy | [QA-SRV-015](QA-SRV-015-dns-rebinding-and-egress-proxy.md) |
+| QA-SRV-016 | generation 합산 재시도 예산·Retryable ACK·scheduleTime backoff·재예약 상한 | [QA-SRV-016](QA-SRV-016-generation-retry-budget-and-ack.md) |

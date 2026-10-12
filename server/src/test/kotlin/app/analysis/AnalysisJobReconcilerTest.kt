@@ -36,6 +36,34 @@ class AnalysisJobReconcilerTest {
         assertEquals(0, reconciler.reconcileExpired())
     }
 
+    @Test fun `passed deadline leaves candidates due for the next run`() = withAnalysisDatabase { source ->
+        repeat(2) { expire(source, newAnalysisClaim(source)) }
+        val reconciler = AnalysisJobReconciler(source)
+        assertEquals(0, reconciler.reconcileExpired(System.nanoTime() - 1))
+        assertEquals("2", analysisScalar(source, "select count(*) from analysis_jobs where stage='GENERAL_RUNNING'"))
+        assertEquals(2, reconciler.reconcileExpired())
+    }
+
+    @Test fun `locked first batch does not starve later candidates`() = withAnalysisDatabase { source ->
+        val claims = List(3) { newAnalysisClaim(source) }
+        claims.forEachIndexed { n, claim ->
+            analysisSql(source, "update analysis_jobs set lease_until=clock_timestamp()-interval '${10 - n} minutes' where id='${claim.jobId}'")
+        }
+        source.connection.use { lock ->
+            lock.autoCommit = false
+            lock.createStatement().use { it.executeQuery("select id from wishlist_items where id in ('${claims[0].itemId}','${claims[1].itemId}') for update").close() }
+            val pool = Executors.newSingleThreadExecutor()
+            try {
+                val reconciler = AnalysisJobReconciler(source, batchSize = 2)
+                assertEquals(0, pool.submit<Int> { reconciler.reconcileExpired() }.get(5, TimeUnit.SECONDS))
+                for (claim in claims.take(2)) assertEquals("true", analysisScalar(source,
+                    "select (recovery_check_at > clock_timestamp())::text from analysis_jobs where id='${claim.jobId}'"))
+                assertEquals(1, pool.submit<Int> { reconciler.reconcileExpired() }.get(5, TimeUnit.SECONDS))
+                assertEquals("GENERAL_PENDING", scalar(source, claims[2], "stage"))
+            } finally { lock.rollback(); pool.shutdownNow() }
+        }
+    }
+
     @Test fun `one candidate connection failure does not prevent other recoveries`() = withAnalysisDatabase { source ->
         repeat(2) { expire(source, newAnalysisClaim(source)) }
         val calls = java.util.concurrent.atomic.AtomicInteger()
@@ -48,6 +76,10 @@ class AnalysisJobReconcilerTest {
         val failures = mutableListOf<UUID>()
         assertEquals(1, AnalysisJobReconciler(observed, batchSize = 2, onFailure = { id, _ -> failures.add(id) }).reconcileExpired())
         assertEquals(1, failures.size)
+        // The failed candidate waits one minute before the next check instead of blocking the batch head.
+        assertEquals(0, AnalysisJobReconciler(source).reconcileExpired())
+        assertEquals("1", analysisScalar(source, "select count(*) from analysis_jobs where recovery_check_at > clock_timestamp()"))
+        analysisSql(source, "update analysis_jobs set recovery_check_at=clock_timestamp()-interval '1 second' where recovery_check_at is not null")
         assertEquals(1, AnalysisJobReconciler(source).reconcileExpired())
     }
 
@@ -95,13 +127,14 @@ class AnalysisJobReconcilerTest {
         }
     }
 
-    @Test fun `expired limits fail once using lane attempts and database deadline`() = withAnalysisDatabase { source ->
+    @Test fun `expired limits fail once using combined generation attempts and database deadline`() = withAnalysisDatabase { source ->
         for (lane in AnalysisLane.entries) for (limit in listOf("attempts", "deadline")) {
             val claim = newAnalysisClaim(source, lane)
             expire(source, claim)
+            // The other lane's counter and first attempt count toward the same generation budget.
             val column = if (limit == "attempts") {
-                if (lane == AnalysisLane.GENERAL) "attempt_count=3" else "browser_attempt_count=3"
-            } else if (lane == AnalysisLane.GENERAL) "first_attempt_at=clock_timestamp()-interval '30 minutes'" else "first_browser_attempt_at=clock_timestamp()-interval '30 minutes'"
+                if (lane == AnalysisLane.GENERAL) "browser_attempt_count=2" else "attempt_count=2"
+            } else if (lane == AnalysisLane.GENERAL) "first_browser_attempt_at=clock_timestamp()-interval '30 minutes'" else "first_attempt_at=clock_timestamp()-interval '30 minutes'"
             analysisSql(source, "update analysis_jobs set $column where id='${claim.jobId}'")
             val before = finishSnapshot(source, FinishJob(claim.itemId, claim.jobId))
             assertEquals(1, AnalysisJobReconciler(source).reconcileExpired())
