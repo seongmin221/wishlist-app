@@ -87,6 +87,6 @@ PR A(#15)가 develop에 merge된 뒤 PR B를 develop 위로 rebase하고 다시 
 
 고치지 않은 것:
 - **닫힌 웹뷰 위에 남는 확인창:** `dismissDialog`가 열리는 중이거나 다른 overlay 아래에 있으면 닫지 못한다. 닫히는 순간 탭 없는 외부 요청이 겹칠 때만 생기고 열기는 막혀 있어 알려진 한계로 둔다.
-- **웹 URL·탐색 정책·gate·페이지 상태의 플랫폼별 중복:** shared `commonMain` 이전은 후속 이슈로 분리했다(IPv6 `http://[::1` 처리 차이 포함).
+- **웹 URL·탐색 정책·gate·페이지 상태의 플랫폼별 중복:** shared `commonMain` 이전은 후속 이슈 #18로 분리했다(IPv6 `http://[::1` 처리 차이 포함).
 
 검증: develop rebase 뒤 shared Android host 501·iOS simulator 498, Android unit debug·release 175, iOS XCTest 201, `gen_tokens.py --check`가 통과했다. 수정 뒤 Android unit debug·release 175·`assembleDebug`·`lintDebug`, iOS XCTest 204개가 통과했다(실패 0). 탭 기록 변경과 Android context 순서는 시뮬레이터·에뮬레이터에서 다시 확인하지 않았다.
