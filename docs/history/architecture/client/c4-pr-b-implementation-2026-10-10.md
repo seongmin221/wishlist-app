@@ -90,3 +90,20 @@ PR A(#15)가 develop에 merge된 뒤 PR B를 develop 위로 rebase하고 다시 
 - **웹 URL·탐색 정책·gate·페이지 상태의 플랫폼별 중복:** shared `commonMain` 이전은 후속 이슈 #18로 분리했다(IPv6 `http://[::1` 처리 차이 포함).
 
 검증: develop rebase 뒤 shared Android host 501·iOS simulator 498, Android unit debug·release 175, iOS XCTest 201, `gen_tokens.py --check`가 통과했다. 수정 뒤 Android unit debug·release 175·`assembleDebug`·`lintDebug`, iOS XCTest 204개가 통과했다(실패 0). 기기 확인은 [C4 화면 확인 기록](c4-detail-verification-2026-10-10.md#pr-16-3차-리뷰-수정-기기-확인2026-10-13)에 있다.
+
+## PR #16 4차 리뷰 반영(2026-10-13)
+
+10건 중 7건을 고쳤다.
+
+- **iOS 닫힌 뒤 웹뷰 이동:** `close()`가 delegate를 떼서, 퇴장 모션 중 페이지의 이동·새 창을 WebKit이 정책 확인 없이 허용했다. delegate를 남기고 `isClosed`로 막는다(시작·실패·프로세스 종료 콜백도 무시).
+- **iOS 탭 한 번에 외부 앱 여러 번:** 탭으로 외부 앱을 열면 `lastTouch`를 비운다. 같은 1초 안의 스크립트 클릭은 확인창이다.
+- **Android 렌더러 크래시 뒤 새로고침 무반응:** 새 view에는 URL이 없어 `reload()`가 아무것도 하지 않았다. `reload()`가 URL 없는 view에 `page.url`을 열고, `retry()`는 실패 표시를 지우고 `reload()`를 부른다(중첩 if 정리 포함).
+- **Android `WebViewRoute.copy()`로 검증 우회:** `@ConsistentCopyVisibility`로 `copy()`도 private으로 둔다.
+- **`IntentSanitizer`의 `resolvable`:** 실제 코드는 늘 `true`였다. 인자를 없애고, 웹 URL fallback 고르기를 `External.fallbackUrl`로 옮겨 JVM 테스트에 남겼다. "앱 없음"은 `launch` 한 곳에서 처리한다. `ParsedIntentUri`는 하드닝을 JVM에서 확인하는 순수 parser라 그대로 둔다.
+
+고치지 않은 것:
+- **Android 끊긴 로드의 실패 표시:** 실기기에서 세 경우를 확인했다. 응답 전 새로고침으로 끊긴 이동, 본문을 받는 중 "중지", 느린 이동 중 스크립트의 다른 이동이다. 셋 다 실패 덮개가 뜨지 않았다(WebView는 `ERR_ABORTED`를 `onReceivedError`에 넘기지 않는다). 오류 코드로 거르면 실제 실패를 숨길 수 있어 그대로 둔다.
+- **열리는 중에 뒤로 가면 확인창이 남음:** 3차 리뷰에서 알려진 한계로 두기로 했다(열기는 막혀 있다).
+- **플랫폼별 중복:** #18.
+
+검증: Android unit debug·release 173(`resolvable` 테스트 2개를 지움)·`assembleDebug`·`lintDebug`, iOS XCTest 205개가 통과했다(실패 0). 실기기 확인은 [C4 화면 확인 기록](c4-detail-verification-2026-10-10.md#pr-16-4차-리뷰-기기-확인2026-10-13)에 있다.
