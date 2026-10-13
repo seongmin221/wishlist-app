@@ -101,8 +101,9 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
             // Infrastructure routes these structured records to the alert channel.
             log.warn("LLM_BUDGET_ALERT id={} window={} start={} threshold={}", alert.id, alert.windowType, alert.windowStart, alert.thresholdPercent)
         }
+        val cleanup = MediaCleanup(source, mediaStorage ?: openMediaStorage(checkNotNull(runtime.media), resources))
         val service = MaintenanceService({ limit, deadline -> dispatcher.dispatchPending(limit, deadline) },
-            reconciler::reconcileExpired, pending::recover, budget::runOnce)
+            reconciler::reconcileExpired, pending::recover, budget::runOnce, cleanup::run)
         routing {
             get("/health") { call.respondText("ok") }
             maintenanceRoutes {
@@ -122,14 +123,15 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val client = resources.own(CloudTasksClient.create(CloudTasksGateway.clientSettings()))
         OutboxDispatcher(source, CloudTasksGateway(client, config))
     }
-    val storage = mediaStorage ?: openMediaStorage(env, resources)
+    val mediaConfig = checkNotNull(runtime.media)
+    val storage = mediaStorage ?: openMediaStorage(mediaConfig, resources)
     val signing = resources.own(MediaSigningExecutor())
     val signer = CachingMediaUrlSigner(storage, signing)
     val media = MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), signing), signer)
     routing {
         get("/health") { call.respondText("ok") }
         apiRoutes(source, { eventId -> resources.runIfOpen { dispatcher?.dispatchEvent(eventId) } }, media) { resolver.resolve(it) }
-        if (storage is LocalMediaStorage) localMediaRoutes(storage)
+        mediaObjectRoutes(mediaConfig, storage)
     }
 }
 
@@ -145,12 +147,14 @@ fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, med
     purposeRoutes(PurposeService(source), media.signer, resolve)
 }
 
-/** GCS when MEDIA_BUCKET is set, otherwise the local file store (local only; production requires the bucket). */
-private fun openMediaStorage(env: Map<String, String>, resources: RuntimeResources): MediaStorage {
-    env["MEDIA_BUCKET"]?.takeIf { it.isNotBlank() }?.let { return resources.own(GcsMediaStorage.create(it)) }
-    check(env["APP_ENV"] != "production") { "MEDIA_BUCKET is required in production" }
-    val port = env["PORT"] ?: "8080"
-    return LocalMediaStorage(java.nio.file.Path.of(env["MEDIA_LOCAL_DIR"] ?: "build/local-media"), env["MEDIA_LOCAL_BASE_URL"] ?: "http://localhost:$port")
+private fun openMediaStorage(config: MediaStorageConfig, resources: RuntimeResources): MediaStorage = when (config) {
+    is MediaStorageConfig.Gcs -> resources.own(GcsMediaStorage.create(config.bucket))
+    is MediaStorageConfig.Local -> LocalMediaStorage(java.nio.file.Path.of(config.directory), config.baseUrl)
+}
+
+/** Direct-upload stand-in routes; only a local configuration backed by the local store gets them. */
+fun Route.mediaObjectRoutes(config: MediaStorageConfig, storage: MediaStorage) {
+    if (config.exposesLocalRoutes && storage is LocalMediaStorage) localMediaRoutes(storage)
 }
 
 private fun cloudTasksConfig(env: Map<String, String>): CloudTasksConfig? {

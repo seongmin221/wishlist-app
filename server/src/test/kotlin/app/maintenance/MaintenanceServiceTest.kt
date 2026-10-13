@@ -2,6 +2,7 @@ package app.maintenance
 
 import app.analysis.PendingRecoveryReport
 import app.budget.BudgetMaintenanceReport
+import app.media.MediaCleanupReport
 import app.tasks.DispatchReport
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,9 +19,10 @@ class MaintenanceServiceTest {
             reconcile = { order += "reconcile"; 2 },
             recoverPending = { order += "pending"; pending },
             budget = { order += "budget"; BudgetMaintenanceReport(3, 4) },
+            media = { order += "media"; MediaCleanupReport(8, 9) },
         ).runOnce()
-        assertEquals(listOf("dispatch", "reconcile", "pending", "budget"), order)
-        assertEquals(MaintenanceReport(7, 1, 2, 1, 2, 3, 4, 5, 6, BudgetMaintenanceReport(3, 4), emptyList()), report)
+        assertEquals(listOf("dispatch", "reconcile", "pending", "budget", "media"), order)
+        assertEquals(MaintenanceReport(7, 1, 2, 1, 2, 3, 4, 5, 6, BudgetMaintenanceReport(3, 4), emptyList(), 8, 9), report)
     }
 
     @Test fun `a failing step is isolated logged without its message and later steps still run`() {
@@ -30,12 +32,14 @@ class MaintenanceServiceTest {
             reconcile = { throw IllegalStateException("secret sql text") },
             recoverPending = { pending },
             budget = { throw IllegalStateException("secret") },
+            media = { throw IllegalStateException("secret object key") },
             log = { step, type -> logs += step to type },
         ).runOnce()
-        assertEquals(listOf("reconcile", "budget"), report.failedSteps)
+        assertEquals(listOf("reconcile", "budget", "media"), report.failedSteps)
         assertEquals(1, report.pendingRescheduled)
         assertNull(report.budget)
-        assertEquals(listOf("reconcile" to "java.lang.IllegalStateException", "budget" to "java.lang.IllegalStateException"), logs)
+        assertEquals(listOf("reconcile", "budget", "media").map { it to "java.lang.IllegalStateException" }, logs)
+        assertEquals(0, report.mediaDeleted)
     }
 
     @Test fun `outbox publication gets its own share so a slow queue cannot starve recovery and budget`() {
@@ -47,10 +51,11 @@ class MaintenanceServiceTest {
             reconcile = { error("must not run after the run deadline") },
             recoverPending = { error("must not run after the run deadline") },
             budget = { budgetRuns++; BudgetMaintenanceReport(1, 0) },
+            media = { error("must not run after the run deadline") },
             totalMillis = 50_000, dispatchMillis = 30_000, nanoTime = { now },
         ).runOnce()
         assertEquals(listOf(30_000_000_000L), deadlines)
-        assertEquals(listOf("timeout:reconcile", "timeout:pending"), report.failedSteps)
+        assertEquals(listOf("timeout:reconcile", "timeout:pending", "timeout:media"), report.failedSteps)
         assertEquals(1, budgetRuns)
         assertEquals(BudgetMaintenanceReport(1, 0), report.budget)
     }
@@ -63,8 +68,18 @@ class MaintenanceServiceTest {
             reconcile = { deadline -> deadlines += deadline; now += 10_000_000_000; 0 },
             recoverPending = { deadline -> deadlines += deadline; pending },
             budget = { BudgetMaintenanceReport(0, 0) },
+            media = { deadline -> deadlines += deadline; MediaCleanupReport(0, 0) },
             totalMillis = 50_000, dispatchMillis = 30_000, nanoTime = { now },
         ).runOnce()
-        assertEquals(listOf(30_000_000_000L, 50_000_000_000L, 50_000_000_000L), deadlines)
+        assertEquals(listOf(30_000_000_000L, 50_000_000_000L, 50_000_000_000L, 50_000_000_000L), deadlines)
+    }
+
+    @Test fun `without media wiring the media step is skipped`() {
+        val report = MaintenanceService(
+            dispatch = { _, _ -> DispatchReport(0, 0) }, reconcile = { 0 }, recoverPending = { pending },
+            budget = { BudgetMaintenanceReport(0, 0) },
+        ).runOnce()
+        assertEquals(emptyList(), report.failedSteps)
+        assertEquals(0 to 0, report.mediaDeleted to report.mediaDeleteFailed)
     }
 }
