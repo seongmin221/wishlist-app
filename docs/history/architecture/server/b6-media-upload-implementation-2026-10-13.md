@@ -101,6 +101,23 @@ PR #19 리뷰의 지적 10건을 코드와 대조했고, 모두 사실이었다.
 | insert 뒤 재조회 | `insert … returning` |
 | 파서와 서비스가 `violation()`을 두 번 실행 | 파서는 형식만 보고, 값 규칙과 우선순위는 서비스(`IntentRequest.violation`)에서만 적용한다 |
 
+## PR 3차 리뷰 반영 (2026-10-13)
+
+리뷰 10건은 모두 사실이었다. 이 중 1·2·3번은 앞선 수정의 부작용이었다. 이번에는 해결 방식을 먼저 정했다. 1·2·3번은 사용자에게 선택지를 물어 추천안으로 정했고, 각 변경이 영향을 주는 기존 테스트를 미리 정리한 뒤 진행했다. 바꾼 테스트와 새 테스트로 의도한 RED 10건을 확인한 뒤 구현했다.
+
+| 지적 | 처리 |
+| --- | --- |
+| 응답당 32개 상한 때문에 100건 목록의 2/3가 placeholder(1차 2번의 부작용) | 개수 상한을 없앴다. 응답 하나가 표시 서명을 동시에 4개씩 진행하며 2초 budget 안에서 이어 간다. 50ms 서명 100건이 한 응답에 모두 채워지고 동시 실행은 최대 4개인지 테스트한다. 서명 executor 분리는 그대로 둔다 |
+| media 단계 시간 부족이 500(Scheduler 알림·재시도) | media만 deferrable 단계로 두고 `deferredSteps`에 기록한다. 객체 삭제는 남은 시간에 저장소 호출 5초가 들어갈 때만 시작한다. B5 복구 단계의 timeout은 실패로 유지한다 |
+| 전체를 다운로드한 뒤에야 decode 허가를 시도(2차 1번의 부작용) | 읽기와 decode를 하나의 검증 슬롯(4개)에서 한다. 슬롯은 최대 1초 기다리고, 얻지 못하면 읽기 전에 MEDIA_BUSY다. 메모리 상한은 약 20MiB다 |
+| 값 검증이 idempotency 조회보다 먼저 | key 조회 → fingerprint 비교 → 새 요청만 값 검증 |
+| `createLink`의 UnsupportedOperationException | `MediaStorageException`으로 매핑(503). hard link가 필요하다는 점을 문서에 적었다 |
+| local HMAC key가 process마다 바뀜 | 저장 디렉터리의 `.signing-key`에 한 번 만들고 재사용한다(재시작 뒤에도 URL 유효) |
+| intent가 owner 전체 잠금 | **미반영.** media 전용 advisory lock으로 바꿔도 `media_assets`의 owner FK 검사가 `app_users`에 KEY SHARE를 걸어, owner 잠금(FOR UPDATE)과 여전히 충돌한다. 테스트로 확인했다. 풀려면 `OwnerStructureLock`을 FOR NO KEY UPDATE로 바꿔야 하는데, B2~B5의 모든 owner 경로 동시성이 바뀌므로 이번 범위에서 하지 않는다. 후속 검토 항목이다 |
+| markReady/markFailed 뒤 재조회 | `returning` |
+| 오류 코드가 두 곳 | `MEDIA_ERROR_STATUS` map 하나 |
+| 중복 deadline 확인·떠 있는 KDoc | 정리했다 |
+
 ## 검증
 
 - 전체 회귀(`a773d2c`, 리뷰 반영 전): **494 tests, 492 통과, 2 opt-in skip**(PlaywrightRealBrowser, RealUrlPilot), 28분 37초. 실제 PostgreSQL Testcontainers 사용.
@@ -108,6 +125,7 @@ PR #19 리뷰의 지적 10건을 코드와 대조했고, 모두 사실이었다.
 - 최종 전체 회귀(`e73a82f`): **495 tests, 493 통과, 2 opt-in skip**, 26분 35초.
 - PR 리뷰 반영 뒤 전체 회귀(VM 시계 동기화 후): **502 tests, 500 통과, 2 opt-in skip**, 15분 34초.
 - PR 2차 리뷰 반영 뒤 전체 회귀: **508 tests, 506 통과, 2 opt-in skip**, 41분 11초. Podman VM이 불안정해 오래 걸렸다. 대상 테스트 실행 중 container 시작 실패가 났던 `MediaIntentServiceTest`는 단독으로 다시 돌려 통과했다.
+- PR 3차 리뷰 반영 뒤 전체 회귀: **512 tests, 510 통과, 2 opt-in skip**, 17분 37초.
 - 그보다 앞선 Task 7 시점의 전체 회귀(484개 중 1개 실패)는 같은 build 디렉터리에서 compile을 동시에 실행해 간섭이 있었을 수 있다. 실패 원인(`WishlistReadIndexTest`)은 위 결정대로 고쳤다.
 
 ## B7·B10·B11 인계

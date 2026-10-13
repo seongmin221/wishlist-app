@@ -4,7 +4,9 @@
 >
 > 구현 중 변경: local 생성 전용 게시는 hard link, APP0는 썸네일 없는 JFIF·APP14는 12byte Adobe만 허용, 정리 발견은 상태별 쿼리, 파서는 알 수 없는 필드를 fields에 넣고 큰 정수를 MEDIA_TOO_LARGE로 본다.
 >
-> PR 리뷰 반영(2026-10-13): `released_at` 대신 `unreferenced_since`(READY 때 기록, 연결 중 null, 해제 때 기록)로 연결된 행을 정리 index에서 뺀다. 업로드 서명과 표시 서명의 executor를 나누고 목록 응답 하나가 새로 시작하는 서명을 32개로 제한한다. 저장소 read는 decode gate 밖에서 하고, 업로드 만료는 결과를 반영하는 transaction에서 다시 판정한다. 아래 본문은 승인 당시 설계이며 차이는 [구현 이력](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md)에 있다.
+> PR 리뷰 반영(2026-10-13): `released_at` 대신 `unreferenced_since`(READY 때 기록, 연결 중 null, 해제 때 기록)로 연결된 행을 정리 index에서 뺀다. 업로드 서명과 표시 서명의 executor를 나누고 목록 응답 하나가 새로 시작하는 서명을 32개로 제한한다. 업로드 만료는 결과를 반영하는 transaction에서 다시 판정한다.
+>
+> PR 3차 리뷰 반영(2026-10-13): 목록 서명은 개수 상한 대신 응답당 동시 4개씩 budget 안에서 이어 간다. 객체 읽기와 decode는 하나의 검증 슬롯(4개, 최대 1초 대기)에서 하므로 거절은 다운로드 전에 일어난다. media 단계의 시간 부족은 실패가 아니라 `deferredSteps`다. 같은 key의 다른 body는 값 검증보다 먼저 409다. local 서명 key는 디렉터리에 보관한다. 아래 본문은 승인 당시 설계이며 차이는 [구현 이력](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md)에 있다.
 
 ## 목표와 범위
 

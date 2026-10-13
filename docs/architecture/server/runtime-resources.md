@@ -75,7 +75,7 @@ API 역할은 `apiRoutes`의 공개 route만 등록한다. browser-worker는 gen
 
 `BoundedResolver`는 InetAddress 해석을 크기와 queue가 제한된 daemon pool에서 실행하고 남은 처리 시간만 기다린다. `getAllByName`은 interrupt로 멈추지 않으므로 포화되면 기다리지 않고 거부한다. 시간 초과한 조회가 아직 queue에 있으면 queue에서 빼 slot을 비운다. browser-worker는 한 페이지가 subresource host를 한꺼번에 검사하므로 resolver를 8 threads·queue 128로 키운다(general-worker는 4·16). `EgressProxy`는 render마다 새로 만들고 render가 끝나면 닫는다. 공유 proxy의 정리가 timeout 직후 겹친 다른 render의 연결을 끊는 일을 막기 위해서다. 연결마다 slot을 쓰고 30초 idle timeout을 둔다. 양방향 모두 30초 동안 데이터가 없을 때만 끊으므로, 요청을 보낸 뒤 느린 응답을 기다리는 쪽이 먼저 반쯤 닫히지 않는다. proxy 연결은 Worker thread 밖이라 처리 deadline을 직접 쓰지 않으며, navigation timeout과 render 종료가 실제 상한이다.
 
-maintenance는 outbox 발행·RUNNING 복구·PENDING 복구·budget을 순서대로 실행한다. 발행은 전체 50초 중 30초만 쓰고, 두 복구 단계는 50초 deadline을 공유해 후보마다 남은 시간을 확인하며 넘으면 `timeout:<step>`으로 보고한다. DB만 쓰는 budget 정리는 queue 장애 중에도 만료 예약이 쌓이지 않도록 마감과 무관하게 항상 실행한다.
+maintenance는 outbox 발행·RUNNING 복구·PENDING 복구·budget·media 정리를 순서대로 실행한다. media 단계만 시간이 부족하면 `deferredSteps`로 넘기고 실패로 세지 않는다. 발행은 전체 50초 중 30초만 쓰고, 두 복구 단계는 50초 deadline을 공유해 후보마다 남은 시간을 확인하며 넘으면 `timeout:<step>`으로 보고한다. DB만 쓰는 budget 정리는 queue 장애 중에도 만료 예약이 쌓이지 않도록 마감과 무관하게 항상 실행한다.
 
 ## B6 media 저장소
 
@@ -85,4 +85,4 @@ maintenance는 outbox 발행·RUNNING 복구·PENDING 복구·budget을 순서�
 | maintenance | 정리 delete | GCS `Storage` client(GCS일 때) | api와 같음 |
 | worker 두 역할 | 없음 | 없음 | 없음 |
 
-GCS RPC(stat·read·delete)는 시도 1회·총 5초다. read는 stat으로 확인한 크기만큼의 buffer 하나에 읽고, 1byte를 더 읽어 그보다 크면 거절한다. completion은 객체 읽기(process당 8개, 최대 약 40MiB)와 decode(4개)의 허가를 따로 두며, 가득 차면 503 `MEDIA_BUSY`다. Cloud Run의 서명은 credential이 부르는 IAM signBlob이라 client timeout이 적용되지 않는다. 그래서 서명을 크기가 정해진 executor에서 실행하고 호출자는 최대 2초만 기다린다. 업로드와 표시 executor를 나눠, cold 목록의 표시 서명이 업로드 intent를 503으로 만들지 않게 한다. 목록 응답 하나는 새 서명을 32개까지만 시작한다. 늦게 끝난 표시 URL은 cache에 들어가고, 같은 key의 표시 서명은 동시에 하나만 실행한다. 저장소 호출 중에는 DB connection을 쥐지 않는다. `module()`의 `mediaStorage` 인자는 테스트 주입점이다. API `module()`은 Firebase를 초기화하므로 route 테스트는 `apiRoutes(…, media)`를 직접 등록한다.
+GCS RPC(stat·read·delete)는 시도 1회·총 5초다. read는 stat으로 확인한 크기만큼의 buffer 하나에 읽고, 1byte를 더 읽어 그보다 크면 거절한다. completion은 객체 읽기와 decode를 하나의 검증 슬롯(process당 4개, 최대 약 20MiB)에서 이어서 한다. 슬롯을 1초 안에 얻지 못하면 읽기 전에 503 `MEDIA_BUSY`다. Cloud Run의 서명은 credential이 부르는 IAM signBlob이라 client timeout이 적용되지 않는다. 그래서 서명을 크기가 정해진 executor에서 실행하고 호출자는 최대 2초만 기다린다. 업로드와 표시 executor를 나눠, cold 목록의 표시 서명이 업로드 intent를 503으로 만들지 않게 한다. 목록 응답 하나는 표시 서명을 동시에 4개까지만 진행하며 2초 budget 안에서 이어 간다. 늦게 끝난 표시 URL은 cache에 들어가고, 같은 key의 표시 서명은 동시에 하나만 실행한다. 저장소 호출 중에는 DB connection을 쥐지 않는다. `module()`의 `mediaStorage` 인자는 테스트 주입점이다. API `module()`은 Firebase를 초기화하므로 route 테스트는 `apiRoutes(…, media)`를 직접 등록한다.
