@@ -12,7 +12,7 @@ class MediaRequestParserTest {
             parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":812345,"width":2048,"height":1536}"""))
     }
 
-    @Test fun `rejects shape errors with fields and value errors in priority order`() {
+    @Test fun `rejects shape errors with fields`() {
         val ok = """"contentType":"image/jpeg","byteSize":10,"width":10,"height":10"""
         assertEquals(invalid("INVALID_MEDIA_REQUEST"), parseMediaIntentRequest("[]"))
         assertEquals(invalid("INVALID_MEDIA_REQUEST", "extra"), parseMediaIntentRequest("{$ok,\"extra\":1}"))
@@ -20,14 +20,17 @@ class MediaRequestParserTest {
         assertEquals(invalid("INVALID_MEDIA_REQUEST", "byteSize"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":"10","width":10,"height":10}"""))
         assertEquals(invalid("INVALID_MEDIA_REQUEST", "width"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":10,"width":10.5,"height":10}"""))
         assertEquals(invalid("INVALID_MEDIA_REQUEST", "contentType"), parseMediaIntentRequest("""{"contentType":1,"byteSize":10,"width":10,"height":10}"""))
-        assertEquals(invalid("MEDIA_TOO_LARGE"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":99999999999,"width":10,"height":10}"""))
-        assertEquals(invalid("INVALID_MEDIA_REQUEST", "byteSize"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":1${"0".repeat(19)},"width":10,"height":10}"""))
         assertEquals(invalid("INVALID_MEDIA_REQUEST", "byteSize"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":0,"width":10,"height":10}"""))
-        assertEquals(invalid("INVALID_MEDIA_REQUEST", "height"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":10,"width":10,"height":-1}"""))
-        assertEquals(invalid("UNSUPPORTED_MEDIA_TYPE"), parseMediaIntentRequest("""{"contentType":"image/png","byteSize":10,"width":10,"height":10}"""))
-        assertEquals(invalid("MEDIA_TOO_LARGE"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":5242881,"width":10,"height":10}"""))
-        assertEquals(invalid("MEDIA_DIMENSIONS_EXCEEDED"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":10,"width":2049,"height":10}"""))
-        assertEquals(invalid("UNSUPPORTED_MEDIA_TYPE"), parseMediaIntentRequest("""{"contentType":"image/png","byteSize":5242881,"width":2049,"height":10}"""))
-        assertEquals(invalid("MEDIA_TOO_LARGE"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":5242881,"width":2049,"height":10}"""))
+        assertEquals(invalid("INVALID_MEDIA_REQUEST", "height"), parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":10,"width":10,"height":-${"9".repeat(40)}}"""))
+    }
+
+    @Test fun `value rules are left to the service and oversized integers saturate`() {
+        assertEquals(MediaRequestParseResult.Valid(IntentRequest("image/png", 10, 10, 10)),
+            parseMediaIntentRequest("""{"contentType":"image/png","byteSize":10,"width":10,"height":10}"""))
+        val huge = "9".repeat(40)
+        assertEquals(MediaRequestParseResult.Valid(IntentRequest("image/jpeg", Int.MAX_VALUE, Int.MAX_VALUE, 10)),
+            parseMediaIntentRequest("""{"contentType":"image/jpeg","byteSize":$huge,"width":$huge,"height":10}"""))
+        assertEquals("MEDIA_TOO_LARGE", IntentRequest("image/jpeg", Int.MAX_VALUE, Int.MAX_VALUE, 10).violation())
+        assertEquals("MEDIA_DIMENSIONS_EXCEEDED", IntentRequest("image/jpeg", 10, Int.MAX_VALUE, 10).violation())
     }
 }

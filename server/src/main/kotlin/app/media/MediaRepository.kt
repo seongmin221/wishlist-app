@@ -54,14 +54,14 @@ class MediaRepository {
             insert into media_assets(id,owner_id,idempotency_key,request_fingerprint,object_key,content_type,
                 declared_byte_size,declared_width,declared_height,upload_expires_at)
             values (?,?,?,?,?,?,?,?,?,clock_timestamp() + (? * interval '1 second'))
+            returning $COLUMNS
         """).use { s ->
             s.setObject(1, id); s.setObject(2, owner); s.setObject(3, key); s.setString(4, fingerprint)
             s.setString(5, MediaKeys.objectKey(owner, id)); s.setString(6, request.contentType)
             s.setInt(7, request.byteSize); s.setInt(8, request.width); s.setInt(9, request.height)
             s.setLong(10, MediaLimits.UPLOAD_VALIDITY.seconds)
-            check(s.executeUpdate() == 1)
+            return s.executeQuery().use { r -> check(r.next()); map(r) }
         }
-        return checkNotNull(find(c, owner, id))
     }
 
     /** Applies a verdict only to a row still PENDING; the caller holds the row lock. */

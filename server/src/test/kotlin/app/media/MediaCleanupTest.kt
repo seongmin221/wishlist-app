@@ -174,8 +174,9 @@ class MediaCleanupTest {
         analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours' where id='$candidate'")
         analysisSql(source, "analyze media_assets")
         val plan = source.connection.use { c ->
-            c.prepareStatement("explain (analyze, format json) " + MediaReferences.discovery("m")).use { s ->
-                for (index in 1..5) s.setInt(index, 50)
+            val query = MediaReferences.discovery("m")
+            c.prepareStatement("explain (analyze, format json) " + query.sql).use { s ->
+                for (index in 1..query.limits) s.setInt(index, 50)
                 s.executeQuery().use { r -> check(r.next()); r.getString(1) }
             }
         }
@@ -190,5 +191,10 @@ class MediaCleanupTest {
         assertEquals(1, ready.single()["Actual Rows"]!!.jsonPrimitive.int, plan)
         assertEquals(MediaCleanupReport(1, 0), MediaCleanup(source, InMemoryMediaStorage()).run(farFuture))
         assertEquals("DELETED", status(source, candidate))
+    }
+
+    @Test fun `discovery binds exactly as many limits as it has placeholders`() {
+        val query = MediaReferences.discovery("m")
+        assertEquals(query.sql.count { it == '?' }, query.limits)
     }
 }

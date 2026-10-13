@@ -186,4 +186,32 @@ class MediaCompletionServiceTest {
         media.complete(owner, asset.id)
         assertEquals("t", analysisScalar(source, "select unreferenced_since = ready_at from media_assets where id='${asset.id}'"))
     }
+
+    @Test fun `concurrent object reads are bounded so memory stays bounded`() = withAnalysisDatabase { source ->
+        val storage = InMemoryMediaStorage()
+        val owner = UUID.randomUUID()
+        val setup = service(source, storage)
+        val first = intent(setup, storage, owner); val second = intent(setup, storage, owner)
+        storage.readDelayMillis = { key -> if (key == first.objectKey) 800 else 0 }
+        val media = service(source, storage, MediaImageValidator(maxConcurrent = 4, maxReads = 1))
+        val pool = Executors.newSingleThreadExecutor()
+        try {
+            val slow = pool.submit(Callable { media.complete(owner, first.id) })
+            Thread.sleep(200)
+            val busy = assertFailsWith<MediaException> { media.complete(owner, second.id) }
+            assertEquals("MEDIA_BUSY", busy.code); assertEquals(1, busy.retryAfterSeconds)
+            assertEquals(MediaStatus.READY, slow.get(10, TimeUnit.SECONDS).asset.status)
+        } finally { pool.shutdown() }
+        assertEquals("PENDING", status(source, second.id))
+        assertEquals(MediaStatus.READY, media.complete(owner, second.id).asset.status)
+    }
+
+    @Test fun `objects are read with the stat size as the bound`() = withAnalysisDatabase { source ->
+        val storage = InMemoryMediaStorage()
+        val owner = UUID.randomUUID()
+        val media = service(source, storage)
+        val asset = intent(media, storage, owner)
+        media.complete(owner, asset.id)
+        assertEquals(listOf(image.size), storage.readLimits)
+    }
 }

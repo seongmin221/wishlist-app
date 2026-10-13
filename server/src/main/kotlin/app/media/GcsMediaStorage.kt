@@ -11,6 +11,7 @@ import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageException
 import com.google.cloud.storage.StorageOptions
 import java.nio.ByteBuffer
+import java.nio.channels.ReadableByteChannel
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -48,12 +49,7 @@ class GcsMediaStorage internal constructor(
     }
 
     override fun read(objectKey: String, maxBytes: Int): ByteArray = remote {
-        storage.reader(BlobId.of(bucket, objectKey)).use { channel ->
-            val buffer = ByteBuffer.allocate(maxBytes + 1)
-            while (buffer.hasRemaining() && channel.read(buffer) >= 0) Unit
-            if (!buffer.hasRemaining()) throw MediaObjectTooLarge()
-            buffer.array().copyOf(buffer.position())
-        }
+        storage.reader(BlobId.of(bucket, objectKey)).use { channel -> readBounded(channel, maxBytes) }
     }
 
     override fun delete(objectKey: String) { remote { storage.delete(BlobId.of(bucket, objectKey)) } }
@@ -69,6 +65,17 @@ class GcsMediaStorage internal constructor(
     }
 
     companion object {
+        /** Fills a [maxBytes] buffer and probes one more byte; the usual exact-size read returns the buffer without a copy. */
+        internal fun readBounded(channel: ReadableByteChannel, maxBytes: Int): ByteArray {
+            val buffer = ByteBuffer.allocate(maxBytes)
+            while (buffer.hasRemaining() && channel.read(buffer) >= 0) Unit
+            if (!buffer.hasRemaining()) {
+                val probe = ByteBuffer.allocate(1)
+                while (probe.hasRemaining()) if (channel.read(probe) < 0) return buffer.array()
+                throw MediaObjectTooLarge()
+            }
+            return buffer.array().copyOf(buffer.position())
+        }
         private val retry = RetrySettings.newBuilder().setMaxAttempts(1)
             .setTotalTimeoutDuration(Duration.ofSeconds(5)).build()
         private val transport = HttpTransportOptions.newBuilder().setConnectTimeout(5_000).setReadTimeout(5_000).build()

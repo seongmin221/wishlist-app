@@ -28,8 +28,12 @@ object MediaReferences {
         "$alias.status='DELETING' and $alias.updated_at <= clock_timestamp() - $lease" to "$alias.updated_at",
     )
 
-    /** One limited branch per status so each uses its own partial index; takes the batch size five times. */
-    fun discovery(alias: String) = branches(alias).joinToString("\n        union all ", "select id from (\n        ",
+    /** One limited branch per status so each uses its own partial index. */
+    /** Discovery SQL and how many `limit ?` it binds (one per branch plus the outer limit). */
+    data class DiscoveryQuery(val sql: String, val limits: Int)
+
+    fun discovery(alias: String) = DiscoveryQuery(discoverySql(alias), branches(alias).size + 1)
+    private fun discoverySql(alias: String) = branches(alias).joinToString("\n        union all ", "select id from (\n        ",
         "\n    ) candidates order by updated_at, id limit ?") { (condition, order) ->
         "(select $alias.id, $alias.updated_at from media_assets $alias where $condition order by $order, $alias.id limit ?)"
     }

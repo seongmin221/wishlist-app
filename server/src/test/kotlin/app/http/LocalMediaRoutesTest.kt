@@ -21,7 +21,8 @@ class LocalMediaRoutesTest {
     private fun local(url: String) = URI(url).let { "${it.rawPath}?${it.rawQuery}" }
 
     @Test fun `local storage round trip through signed urls`() = withAnalysisDatabase { source ->
-        val storage = LocalMediaStorage(Files.createTempDirectory("local-media-routes"), "http://localhost:8080")
+        val root = Files.createTempDirectory("local-media-routes")
+        val storage = LocalMediaStorage(root, "http://localhost:8080")
         val owner = UUID.randomUUID()
         val image = MediaFixtures.jpeg(64, 48)
         testApplication {
@@ -59,6 +60,9 @@ class LocalMediaRoutesTest {
             assertEquals(HttpStatusCode.Forbidden, client.get(display.replace("signature=", "signature=x")).status)
             storage.delete("media/$owner/$id.jpg")
             assertEquals(HttpStatusCode.NotFound, client.get(display).status)
+            // A path that cannot be read as a file is a storage failure, not an unhandled 500.
+            Files.createDirectories(root.resolve("media/$owner/$id.jpg"))
+            assertEquals(HttpStatusCode.ServiceUnavailable, client.get(display).status)
         }
     }
 }

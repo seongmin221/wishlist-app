@@ -28,8 +28,9 @@ class MediaCleanup(
     fun run(deadline: Long): MediaCleanupReport {
         if (nanoTime() - deadline >= 0) return MediaCleanupReport(0, 0)
         val candidates = source.inTransaction { c ->
-            c.prepareStatement(MediaReferences.discovery("m")).use { s ->
-                for (index in 1..5) s.setInt(index, batch)
+            val query = MediaReferences.discovery("m")
+            c.prepareStatement(query.sql).use { s ->
+                for (index in 1..query.limits) s.setInt(index, batch)
                 s.executeQuery().use { r -> buildList { while (r.next()) add(r.getObject(1, UUID::class.java)) } }
             }
         }

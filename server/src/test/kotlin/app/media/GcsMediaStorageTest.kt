@@ -50,4 +50,12 @@ class GcsMediaStorageTest {
         assertEquals("3600", q["X-Goog-Expires"])
         assertEquals("host", q["X-Goog-SignedHeaders"])
     }
+
+    @Test fun `bounded read allocates the expected size and rejects anything longer`() {
+        fun channel(bytes: ByteArray) = java.nio.channels.Channels.newChannel(java.io.ByteArrayInputStream(bytes))
+        val bytes = ByteArray(40_000) { it.toByte() }
+        kotlin.test.assertContentEquals(bytes, GcsMediaStorage.readBounded(channel(bytes), bytes.size))
+        kotlin.test.assertContentEquals(bytes.copyOf(10), GcsMediaStorage.readBounded(channel(bytes.copyOf(10)), bytes.size))
+        kotlin.test.assertFailsWith<MediaObjectTooLarge> { GcsMediaStorage.readBounded(channel(bytes), bytes.size - 1) }
+    }
 }

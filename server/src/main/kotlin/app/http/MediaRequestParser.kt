@@ -15,18 +15,25 @@ fun parseMediaIntentRequest(raw: String): MediaRequestParseResult {
     val unknown = body.keys.filterNot { it in INTENT_FIELDS }.toSet()
     if (unknown.isNotEmpty()) return MediaRequestParseResult.Invalid("INVALID_MEDIA_REQUEST", unknown)
     val contentType = body["contentType"].strictString()
-    // Parse as Long so an oversized byteSize reports MEDIA_TOO_LARGE instead of a shape error; values past the
-    // limits never reach Int arithmetic.
-    val numbers = listOf("byteSize", "width", "height").associateWith { body.strictLong(it) }
+    val numbers = listOf("byteSize", "width", "height").associateWith { body.strictCount(it) }
     val shape = buildSet {
         if (contentType == null) add("contentType")
         numbers.forEach { (field, value) -> if (value == null || value <= 0) add(field) }
     }
     if (shape.isNotEmpty()) return MediaRequestParseResult.Invalid("INVALID_MEDIA_REQUEST", shape)
-    fun clamp(value: Long) = minOf(value, Int.MAX_VALUE.toLong()).toInt()
-    val request = IntentRequest(contentType!!, clamp(numbers.getValue("byteSize")!!), clamp(numbers.getValue("width")!!), clamp(numbers.getValue("height")!!))
-    return request.violation()?.let { MediaRequestParseResult.Invalid(it) } ?: MediaRequestParseResult.Valid(request)
+    // Shape only. Value rules (type, size, edge limits and their priority) live in IntentRequest.violation, which the
+    // service applies.
+    return MediaRequestParseResult.Valid(IntentRequest(contentType!!, numbers.getValue("byteSize")!!, numbers.getValue("width")!!, numbers.getValue("height")!!))
 }
 
-private fun JsonObject.strictLong(key: String): Long? = (this[key] as? JsonPrimitive)
-    ?.takeIf { !it.isString && it.content.matches(Regex("-?[0-9]{1,18}")) }?.content?.toLongOrNull()
+/**
+ * A JSON integer of any length. Values past Int saturate so an oversized size or edge reports MEDIA_TOO_LARGE or
+ * MEDIA_DIMENSIONS_EXCEEDED rather than a shape error; negative ones stay non-positive.
+ */
+private fun JsonObject.strictCount(key: String): Int? {
+    val text = (this[key] as? JsonPrimitive)?.takeIf { !it.isString && it.content.matches(Regex("-?[0-9]+")) }?.content ?: return null
+    val negative = text.startsWith("-")
+    val digits = text.removePrefix("-").trimStart('0').ifEmpty { "0" }
+    val magnitude = if (digits.length > 10) Long.MAX_VALUE else digits.toLong()
+    return if (negative) -minOf(magnitude, Int.MAX_VALUE.toLong()).toInt() else minOf(magnitude, Int.MAX_VALUE.toLong()).toInt()
+}

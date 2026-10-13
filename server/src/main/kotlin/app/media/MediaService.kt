@@ -74,10 +74,11 @@ class MediaService(
         } catch (_: MediaStorageException) {
             return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
         } ?: return settledOr(owner, id, "MEDIA_OBJECT_MISSING")
-        // The read stays outside the gate so a slow bucket does not hold decode permits.
+        // Reads and decodes have separate permits: a slow bucket cannot hold decode permits, and concurrent reads cannot
+        // hold unbounded bytes. After precheck the stat size equals the declared size, so it bounds the read buffer.
         val verdict = validator.precheck(stored, asset.declared)?.let(ImageVerdict::Invalid) ?: run {
             val bytes = try {
-                storage.read(asset.objectKey, MediaLimits.MAX_BYTES)
+                validator.readGated { storage.read(asset.objectKey, stored.byteSize.toInt()) }
             } catch (_: MediaObjectTooLarge) {
                 return@run ImageVerdict.Invalid(MediaFailureReason.SIZE_MISMATCH)
             } catch (_: MediaStorageException) {

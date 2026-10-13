@@ -19,8 +19,10 @@ sealed interface ImageVerdict {
  * so a small file cannot claim a huge raster. Decoder warnings count as failures because the JDK reader fills truncated
  * entropy data instead of throwing.
  */
-class MediaImageValidator(maxConcurrent: Int = 4) {
+class MediaImageValidator(maxConcurrent: Int = 4, maxReads: Int = 8) {
     private val permits = Semaphore(maxConcurrent)
+    /** Separate from decode permits: bounds bytes held in memory without letting a slow bucket block decoding. */
+    private val readPermits = Semaphore(maxReads)
 
     init { ImageIO.setUseCache(false) }
 
@@ -44,9 +46,14 @@ class MediaImageValidator(maxConcurrent: Int = 4) {
     }
 
     /** Bounds concurrent decodes; storage calls stay outside. */
-    fun <T> gated(block: () -> T): T {
-        if (!permits.tryAcquire()) throw MediaException("MEDIA_BUSY", retryAfterSeconds = 1)
-        try { return block() } finally { permits.release() }
+    fun <T> gated(block: () -> T): T = permits.held(block)
+
+    /** Bounds concurrent object reads (at most [MediaLimits.MAX_BYTES] each in memory). */
+    fun <T> readGated(block: () -> T): T = readPermits.held(block)
+
+    private fun <T> Semaphore.held(block: () -> T): T {
+        if (!tryAcquire()) throw MediaException("MEDIA_BUSY", retryAfterSeconds = 1)
+        try { return block() } finally { release() }
     }
 
     private fun decodes(bytes: ByteArray, width: Int, height: Int): Boolean {

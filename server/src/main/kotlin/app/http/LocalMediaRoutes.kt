@@ -33,7 +33,12 @@ fun Route.localMediaRoutes(storage: LocalMediaStorage) {
         })
     }
     get("/local/media-objects/{key...}") {
-        when (val read = withContext(Dispatchers.IO) { storage.readSigned(call.objectKey(), call.singleQuery()) }) {
+        val read = try {
+            withContext(Dispatchers.IO) { storage.readSigned(call.objectKey(), call.singleQuery()) }
+        } catch (_: MediaStorageException) {
+            return@get call.respond(HttpStatusCode.ServiceUnavailable)
+        }
+        when (read) {
             LocalRead.Forbidden -> call.respond(HttpStatusCode.Forbidden)
             LocalRead.Missing -> call.respond(HttpStatusCode.NotFound)
             is LocalRead.Found -> call.respondBytes(read.bytes, ContentType.Image.JPEG)

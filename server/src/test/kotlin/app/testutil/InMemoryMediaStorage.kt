@@ -22,6 +22,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
     val readSigns = AtomicInteger()
     val stats = AtomicInteger()
     val reads = AtomicInteger()
+    val readLimits = java.util.concurrent.CopyOnWriteArrayList<Int>()
     val deletes = ConcurrentHashMap.newKeySet<String>()
     val deleteCalls = AtomicInteger()
 
@@ -48,7 +49,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
     }
 
     override fun read(objectKey: String, maxBytes: Int): ByteArray {
-        reads.incrementAndGet()
+        reads.incrementAndGet(); readLimits += maxBytes
         readDelayMillis(objectKey).takeIf { it > 0 }?.let(Thread::sleep)
         if (failRead) throw MediaStorageException()
         val bytes = objects[objectKey]?.first ?: throw MediaStorageException()
