@@ -1,6 +1,8 @@
 # B6 사용자 이미지 업로드 설계
 
-> 2026-10-12 · **spec 승인(2026-10-13)** · 독립 리뷰·사용자 리뷰 반영 · 제품·운영 정책 확정
+> 2026-10-12 · **spec 승인(2026-10-13) · 구현·독립 리뷰 반영 완료** · 제품·운영 정책 확정
+>
+> 구현 중 변경: local 생성 전용 게시는 hard link, APP0는 썸네일 없는 JFIF·APP14는 12byte Adobe만 허용, 정리 발견은 상태별 쿼리, 파서는 알 수 없는 필드를 fields에 넣고 큰 정수를 MEDIA_TOO_LARGE로 본다. 차이는 [구현 이력](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md)에 있다.
 
 ## 목표와 범위
 

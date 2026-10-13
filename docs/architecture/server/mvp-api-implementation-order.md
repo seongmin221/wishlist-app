@@ -176,6 +176,8 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 **통과:** MIME/size/실제 이미지 검증, 다른 owner completion 거절, 완료 재전송 idempotency, 만료/실패 재업로드, 미참조 정리와 참조 보존. OPS-01에 media 정리를 추가한다. 실제 Cloud Storage 권한·접근 만료는 B11에서 확인한다.
 
+**구현 상태:** B6 MEDIA-01·MEDIA-02와 표시 URL·OPS-01 media 정리를 구현했다. [제품·운영 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md), [spec](../../superpowers/specs/2026-10-12-b6-media-upload-design.md), [계획](../../superpowers/plans/2026-10-12-b6-media-upload.md), [계약](media-upload-api.md), [구현 이력](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md)에 범위·검증·B7/B10/B11 인계를 기록했다. 상품 연결(B7)과 실제 bucket 권한(B11)의 완료를 뜻하지 않는다.
+
 ## B7 — 상품 사용자 변경
 
 **산출물:** 일반 편집, 정보 보완, 확정/보류, 삭제, 재분석의 전체 사용자 흐름.

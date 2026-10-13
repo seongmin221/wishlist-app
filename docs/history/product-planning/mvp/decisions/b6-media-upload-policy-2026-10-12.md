@@ -12,7 +12,7 @@ B6 착수 대조에서 남은 미결정 규칙을 사용자에게 묻고 확정�
 4. **미참조 정리·공유.** 만료된 PENDING, FAILED, 그리고 상품·archive 어디서도 참조하지 않는 READY는 참조가 없어진 시점부터 24시간 뒤 OPS-01이 batch로 객체를 지운다. 한 media는 상품 하나만 참조한다(unique). archive snapshot의 참조는 따로 보존한다.
 5. **읽기 URL.** MEDIA-02와 item·archive 응답의 기존 `imageUrl`에 1시간짜리 signed GET URL을 넣는다. 응답에 `imageMediaId`도 함께 넣어, 클라이언트가 바뀌는 URL 대신 mediaId를 이미지 캐시 key로 쓰게 한다.
 6. **외부 이미지 보존.** 분석으로 얻은 외부 이미지는 URL 문자열만 보관하고 archive snapshot에도 URL을 복사한다. 링크가 깨지면 클라이언트가 placeholder를 보여 준다. 출시 뒤 실제로 깨지는 비율을 보고 다시 판단한다.
-7. **EXIF.** C8 클라이언트가 회전을 적용한 뒤 다시 인코딩하면서 EXIF를 뺀다. 서버는 completion 때 APP0(JFIF)·APP2(`ICC_PROFILE`)·APP14(Adobe) 외의 APPn segment와 COM이 JPEG 어디에든 있거나, 처음 만난 EOI 뒤에 byte(MPF 보조 이미지 등)가 있으면 FAILED로 거절한다. 처음 결정은 APP1 Exif였다. 2026-10-12 spec 리뷰에서 XMP와 trailing 데이터에도 위치 정보가 들어갈 수 있다는 지적으로 범위를 넓혔고, 2026-10-13 사용자 리뷰에서 APP13(IPTC)·COM 등도 막도록 허용 목록 방식으로 확정했다.
+7. **EXIF.** C8 클라이언트가 회전을 적용한 뒤 다시 인코딩하면서 EXIF를 뺀다. 서버는 completion 때 APP0(썸네일 없는 JFIF)·APP2(`ICC_PROFILE`)·APP14(Adobe) 외의 APPn segment와 COM이 JPEG 어디에든 있거나, 처음 만난 EOI 뒤에 byte(MPF 보조 이미지 등)가 있으면 FAILED로 거절한다. 처음 결정은 APP1 Exif였다. 2026-10-12 spec 리뷰에서 XMP와 trailing 데이터에도 위치 정보가 들어갈 수 있다는 지적으로 범위를 넓혔고, 2026-10-13 사용자 리뷰에서 APP13(IPTC)·COM 등도 막도록 허용 목록 방식으로 확정했다.
 8. **업로드 한도.** 만료되지 않은 PENDING intent가 owner당 10개면 새 intent를 429로 거절한다. 일일 한도는 두지 않는다.
 
 ## 판단 근거
