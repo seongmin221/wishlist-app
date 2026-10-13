@@ -97,3 +97,18 @@
 | (b) `intent://x#Intent;scheme=wltest;package=com.example.none;S.browser_fallback_url=http%3A%2F%2F10.0.2.2%3A8782%2Ffallback.html;end` | `START … pkg=com.example.none (has extras) … result code=-91` → `ActivityNotFoundException` → fallback이 웹뷰 안에 열림(서버 로그 `GET /fallback.html`, 위쪽 바 `10.0.2.2` / "대체 페이지", 본문 "FALLBACK OK"). 아래쪽 뒤로 → `intent.html`로 돌아옴 |
 | (c) `intent://x#Intent;scheme=wltest;launchFlags=q;end` | 앱 비정상 종료 없음: 앱 PID 4333 그대로, logcat에 `START`·`AndroidRuntime`·`FATAL` 없음(fallback이 없어 Drop), 페이지 유지 |
 
+
+## PR #16 3차 리뷰 수정 기기 확인(2026-10-13)
+
+> iOS 시뮬레이터 iPhone 17 Pro `C069C20E-5E93-47BB-9D26-3E88B5A0278D`(iOS 26.5) · Android 실기기 Galaxy Z Flip6 `SM-F741N`(Android 16, USB, `adb reverse tcp:8781`). DEBUG Fake. 시험 페이지는 `tel:` 링크, `<select>`, 숨은 `itms-apps:` 링크, 스크롤한 손가락을 뗀 50ms 뒤 숨은 링크를 `a.click()`하는 스크립트를 담았다. 임시 변경(커밋 없음, 확인 뒤 되돌리고 깨끗한 빌드를 다시 설치함): iOS는 DEBUG 대기 줄 URL을 시험 페이지로 바꿨고, Android는 `src/debug/AndroidManifest.xml`에 cleartext를 허용했다. iOS는 serve-sim WebSocket으로 287~289ms 동안 빠르게 스크롤했다. 한 번에 명령 하나씩 보내는 CLI는 명령마다 약 0.6초가 걸려, 1초 창을 넘겨서 대조가 되지 않았다.
+
+| 흐름 | 결과 |
+| --- | --- |
+| iOS 실제 탭 `tel:` | 클릭이 됨(서버 로그), 확인창 없음 |
+| iOS 빠른 스크롤 → 손을 떼고 50ms 뒤 스크립트 클릭 | 수정 뒤: FWebViewExternal이 뜬다. 고치기 전 인식기(`9e8dce6`)로 대조: 같은 조작에서 확인창 없이 열렸다(리뷰 지적 재현) |
+| iOS 스크롤 | 링크가 화면 밖으로 이동(인식기가 스크롤을 막지 않음) |
+| iOS 1.5초 길게 누름 | WebKit 링크 미리보기가 뜨고 클릭은 아님(시스템 동작) |
+| Android 웹뷰 처음 열기 → `<select>` | 페이지가 그려지고 선택 팝업이 Activity 다크 테마로 뜬다. 앱 오류·`BadTokenException` 없음. 고치기 전 순서로도 이 기기에서는 차이가 없었다(Android 16 WebView). 수정은 생성 순서를 바로잡는 예방 조치로 둔다 |
+| Android 빠른 스크롤 → 스크립트 클릭 | 확인창(Chromium user activation은 스크롤을 치지 않는다, iOS 수정과 같은 결과) |
+| Android 확인창이 떠 있을 때 가로로 회전 → 세로 | Activity가 재생성되어 확인창이 사라지고 페이지는 유지된다. 다시 스크롤 → 확인창이 다시 뜬다(침묵 없음, 5번 수정) |
+| Android 취소 → 다시 스크롤 | 확인창 없음(같은 host 침묵 유지) |
