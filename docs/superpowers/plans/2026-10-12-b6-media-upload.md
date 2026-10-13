@@ -10,7 +10,7 @@
 
 **Spec:** [B6 설계](../specs/2026-10-12-b6-media-upload-design.md). [제품·운영 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md).
 
-> 상태: ****계획 승인(2026-10-13)** · 구현 전**
+> 상태: **계획 승인(2026-10-13) · 구현 전**
 
 ## Global Constraints
 
@@ -133,7 +133,7 @@ class MediaImageValidator(maxConcurrent: Int = 4) {
 - [ ] RED: `GcsMediaStorageTest`. 테스트 안에서 RSA key로 만든 `ServiceAccountCredentials`와 `StorageOptions.newBuilder().setProjectId("test")`로 offline 서명한다. PUT URL query의 `X-Goog-Algorithm=GOOG4-RSA-SHA256`, `X-Goog-Expires`가 남은 초(≤900), `X-Goog-SignedHeaders=content-type;host;x-goog-content-length-range;x-goog-if-generation-match`, 경로 `media/{owner}/{id}.jpg`. GET URL `X-Goog-Expires=3600`. 반환 `headers`가 세 header와 정확히 같음.
 - [ ] RED: `LocalMediaStorageTest`. 정상 PUT 후 stat·read, 서명 변조·만료·Content-Type·`x-goog-if-generation-match`·`x-goog-content-length-range` 누락이나 값 변경 → 403, 두 번째 PUT 412, 동시 PUT 2개(latch) 중 하나만 성공·파일 byte 온전, 쓰는 중에는 stat이 null, 5MiB+1 → 413, read 서명 검증, delete 없는 객체도 성공, objectKey의 `..` 거부.
 - [ ] RED 실행: `b6_gradle test --tests 'app.media.*Storage*' --tests 'app.media.MediaSigningExecutorTest'`.
-- [ ] 구현: `implementation("com.google.cloud:google-cloud-storage:2.68.0")`. `./gradlew dependencies`로 resolved 버전이 그대로 2.68.0인지 확인해 이력에 남긴다. GCS client는 `StorageOptions.setRetrySettings`(maxAttempts 1, totalTimeout 5초)와 `HttpTransportOptions`(connect·read timeout 5초)로 만든다. read는 `reader()`로 `maxBytes + 1`까지만 읽는다. local 쓰기는 임시 파일 → `Files.move(ATOMIC_MOVE)`, 대상이 있으면 412. `NotFound`는 null/성공, 그 밖의 예외는 `MediaStorageException`.
+- [ ] 구현: `implementation("com.google.cloud:google-cloud-storage:2.68.0")`. `./gradlew dependencies`로 resolved 버전이 그대로 2.68.0인지 확인해 이력에 남긴다. GCS client는 `StorageOptions.setRetrySettings`(maxAttempts 1, totalTimeout 5초)와 `HttpTransportOptions`(connect·read timeout 5초)로 만든다. read는 `reader()`로 `maxBytes + 1`까지만 읽는다. local 쓰기는 임시 파일 → hard link(`Files.createLink`, 대상이 있으면 실패) → 412. rename은 기존 대상을 덮어써 쓰지 않는다. `NotFound`는 null/성공, 그 밖의 예외는 `MediaStorageException`.
 - [ ] GREEN: 같은 명령.
 - [ ] 커밋: `feature(server): B6 GCS·local 저장소 adapter 추가`.
 

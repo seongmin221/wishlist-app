@@ -20,6 +20,7 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.8")
     implementation("com.google.firebase:firebase-admin:9.10.0")
     implementation("com.google.cloud:google-cloud-tasks:2.95.0")
+    implementation("com.google.cloud:google-cloud-storage:2.68.0")
     implementation("org.jsoup:jsoup:1.23.2")
     implementation("com.squareup.okhttp3:okhttp:5.3.0")
     implementation("com.microsoft.playwright:playwright:1.63.0")

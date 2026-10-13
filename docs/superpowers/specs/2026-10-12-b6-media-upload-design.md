@@ -1,6 +1,6 @@
 # B6 사용자 이미지 업로드 설계
 
-> 2026-10-12 · ****spec 승인(2026-10-13)** · 독립 리뷰·사용자 리뷰 반영** · 제품·운영 정책 확정
+> 2026-10-12 · **spec 승인(2026-10-13)** · 독립 리뷰·사용자 리뷰 반영 · 제품·운영 정책 확정
 
 ## 목표와 범위
 
@@ -120,7 +120,7 @@ interface MediaStorage {
 
 - **객체 경로.** `media/{ownerId}/{mediaId}.jpg`. 내부 UUID만 쓰고 사용자 입력은 넣지 않는다.
 - **`GcsMediaStorage`.** `google-cloud-storage`의 `Storage.signUrl`로 V4 서명한다. PUT은 `Content-Type: image/jpeg`, `x-goog-if-generation-match: 0`, `x-goog-content-length-range: 1,5242880`을 extension header로 서명에 포함한다. 클라이언트가 세 header를 정확히 보내지 않으면 서명이 맞지 않아 실패한다. 덮어쓰기 시도는 GCS가 412로 거부한다. 크기 범위 header를 GCS가 signed PUT에서 강제하는지는 B11에서 확인한다. 강제하지 않아도 completion의 크기 검사가 남는다. 서명 credential은 Application Default Credentials를 쓰고, Cloud Run에서는 라이브러리가 IAM signBlob을 호출한다(권한 확인은 B11). stat·read·delete는 RPC마다 총 5초 제한을 두고 재시도하지 않는다. 기존 Cloud Tasks RPC 규칙과 같다.
-- **`LocalMediaStorage`.** `APP_ENV=local`이고 `MEDIA_BUCKET`이 없을 때 쓴다. `MEDIA_LOCAL_DIR`(기본 `build/local-media`) 아래 파일로 보관한다. URL은 `{MEDIA_LOCAL_BASE_URL}/local/media-objects/{objectKey}?expires=…&signature=…`이고 `MEDIA_LOCAL_BASE_URL` 기본값은 `http://localhost:{PORT}`다. Android 에뮬레이터처럼 다른 주소로 접근하는 기기는 이 값을 지정한다. signature는 process 시작 때 만든 HMAC key로 만든다. 같은 세 header를 요구하고 body가 1~5,242,880 byte 범위를 벗어나면 413이다. body는 같은 디렉터리의 임시 파일에 쓴 뒤 `Files.move(ATOMIC_MOVE)`로 옮기고, 대상이 이미 있으면 412다. 그래서 completion이 쓰는 중인 파일을 보지 않고, 동시 PUT 두 개 중 하나만 성공한다. 테스트는 in-memory 구현을 주입한다.
+- **`LocalMediaStorage`.** `APP_ENV=local`이고 `MEDIA_BUCKET`이 없을 때 쓴다. `MEDIA_LOCAL_DIR`(기본 `build/local-media`) 아래 파일로 보관한다. URL은 `{MEDIA_LOCAL_BASE_URL}/local/media-objects/{objectKey}?expires=…&signature=…`이고 `MEDIA_LOCAL_BASE_URL` 기본값은 `http://localhost:{PORT}`다. Android 에뮬레이터처럼 다른 주소로 접근하는 기기는 이 값을 지정한다. signature는 process 시작 때 만든 HMAC key로 만든다. 같은 세 header를 요구하고 body가 1~5,242,880 byte 범위를 벗어나면 413이다. body는 같은 디렉터리의 임시 파일에 쓴 뒤 hard link(`Files.createLink`)로 게시하고, 대상이 이미 있으면 412다. POSIX의 `ATOMIC_MOVE`(rename)는 기존 대상을 덮어쓰므로 생성 전용 조건에 쓰지 않는다(구현 중 변경). 그래서 completion이 쓰는 중인 파일을 보지 않고, 동시 PUT 두 개 중 하나만 성공한다. 테스트는 in-memory 구현을 주입한다.
 - **timeout.** GCS client는 `StorageOptions.setRetrySettings`(maxAttempts 1, totalTimeout 5초)와 `HttpTransportOptions`의 connect·read timeout 5초로 만든다. `read`는 `reader()`로 `maxBytes + 1`까지만 읽는다.
 - **서명 실행.** Cloud Run의 서명은 credential이 직접 부르는 signBlob HTTP 호출이라 `StorageOptions`의 timeout이 적용되지 않는다. 그래서 모든 서명(upload PUT, MEDIA-02 display, 목록 표시)을 process 전체가 같이 쓰는 `MediaSigningExecutor`에서 실행한다.
   - thread 8개, queue 64개. 가득 차면 즉시 서명 실패로 처리한다.
