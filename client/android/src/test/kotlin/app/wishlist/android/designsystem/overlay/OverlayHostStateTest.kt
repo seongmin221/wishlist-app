@@ -27,14 +27,28 @@ class OverlayHostStateTest {
         var dismissed = 0
         val mine = spec.copy(onDismissed = { dismissed++ })
         s.showDialog(mine)
-        assertFalse(s.dismissDialog(mine)) // still opening
         s.settleOpen()
         assertFalse(s.dismissDialog(spec)) // another spec
         assertTrue(s.dismissDialog(mine))
+        assertFalse(s.dismissDialog(mine)) // already closing
         s.settleClose()
         assertTrue(s.entries.isEmpty())
         assertEquals(1, dismissed)
         assertFalse(s.dismissDialog(mine))
+    }
+
+    @Test fun dismissDialogWhileOpeningClosesItOnceOpen() {
+        val s = OverlayHostState()
+        var dismissed = 0
+        val mine = spec.copy(onDismissed = { dismissed++ })
+        s.showDialog(mine)
+        assertTrue(s.dismissDialog(mine))
+        assertEquals(OverlayPhase.Opening, s.entries.single().phase) // the opening motion is not reversed
+        s.settleOpen()
+        assertEquals(OverlayPhase.Closing, s.entries.single().phase)
+        s.settleClose()
+        assertTrue(s.entries.isEmpty())
+        assertEquals(1, dismissed)
     }
 
     @Test fun dismissDuringOpenIsIgnored() {

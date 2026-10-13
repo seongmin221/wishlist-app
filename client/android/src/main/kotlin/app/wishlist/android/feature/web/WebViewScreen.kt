@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.MutableContextWrapper
 import android.graphics.Bitmap
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewParent
 import android.webkit.RenderProcessGoneDetail
@@ -110,6 +112,12 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
 
     private var pendingLoad: String? = initialUrl
 
+    /** The view built after a renderer crash has no page yet: [reload] opens [page]'s URL in it. */
+    private var emptyAfterCrash = false
+
+    /** D16 one tap, one decision; kept here so a recreated view does not hand out a fresh gesture. */
+    private val tapBudget = WebTapBudget(ViewConfiguration.get(app).scaledTouchSlop.toFloat())
+
     val externalRequests = Channel<ExternalRequest>(Channel.BUFFERED)
 
     /** FWebViewExternal flood guard; kept here so it survives configuration changes with the page. */
@@ -157,25 +165,23 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
         webView?.takeIf { it.canGoForward() }?.goForward()
     }
 
-    /** Reload, or open [page]'s URL in a view that has none (the fresh one built after a renderer crash). */
+    /**
+     * 새로고침 and "다시 시도": reload, or open [page]'s URL in the empty view built after a renderer crash. The
+     * failure cover stays until the new load starts (`onPageStarted`).
+     */
     fun reload() {
         val view = webView
         when {
             view == null -> pendingLoad = page.url
-            view.url == null -> view.loadUrl(page.url)
+            emptyAfterCrash -> view.loadUrl(page.url)
             else -> view.reload()
         }
+        emptyAfterCrash = false
     }
 
     fun stop() {
         webView?.stopLoading()
         page = page.copy(loading = false)
-    }
-
-    /** "다시 시도": [reload] the failed page. */
-    fun retry() {
-        page = page.copy(failed = false)
-        reload()
     }
 
     private fun syncHistory(view: WebView) {
@@ -187,21 +193,32 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
         )
     }
 
+    @SuppressLint("ClickableViewAccessibility") // only watches touches; the WebView handles them (and clicks) itself
     private fun create(): WebView = WebView(context).apply {
         applyWishlistDefaults()
         webViewClient = Client()
         webChromeClient = Chrome()
+        setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> tapBudget.onDown(e.x, e.y)
+                MotionEvent.ACTION_MOVE -> tapBudget.onMove(e.x, e.y)
+                MotionEvent.ACTION_UP -> tapBudget.onUp(e.x, e.y)
+                MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> tapBudget.onCancel()
+            }
+            false
+        }
     }
 
     private inner class Client : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url.toString()
-            val decision = WebNavigationPolicy.decide(schemeOf(url), request.isForMainFrame, request.hasGesture(), isAboutBlank(url))
+            val gesture = tapBudget.use(request.hasGesture())
+            val decision = WebNavigationPolicy.decide(schemeOf(url), request.isForMainFrame, gesture, isAboutBlank(url))
             return when (decision) {
                 WebDecision.LOAD_INSIDE -> false
                 WebDecision.BLOCK -> true
                 WebDecision.OPEN_EXTERNAL, WebDecision.CONFIRM_EXTERNAL -> {
-                    when (val target = WebExternalApps.targetOf(url, request.isForMainFrame, request.hasGesture())) {
+                    when (val target = WebExternalApps.targetOf(url, request.isForMainFrame, gesture)) {
                         is ExternalTarget.Launch ->
                             externalRequests.trySend(ExternalRequest(target, confirm = decision == WebDecision.CONFIRM_EXTERNAL))
                         is ExternalTarget.LoadInside -> view.post { if (view === webView) view.loadUrl(target.url) }
@@ -240,6 +257,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
                 webView = null
                 // The new view has no history: back must close, not call goBack() on an empty view.
                 page = page.copy(loading = false, failed = true, canGoBack = false, canGoForward = false)
+                emptyAfterCrash = true
                 generation++
             }
             return true
@@ -383,7 +401,7 @@ internal fun WebViewScreen(route: WebViewRoute) {
                 }
                 if (page.failed) {
                     Box(Modifier.fillMaxSize().background(c.background)) {
-                        DetailStatusBlock(stringResource(R.string.webview_load_failed), stringResource(R.string.detail_retry), holder::retry)
+                        DetailStatusBlock(stringResource(R.string.webview_load_failed), stringResource(R.string.detail_retry), holder::reload)
                     }
                 }
             }

@@ -49,3 +49,50 @@ fun schemeOf(url: String): String {
     val end = url.indexOfFirst { it == ':' || it == '/' || it == '?' || it == '#' }
     return if (end > 0 && url[end] == ':') url.substring(0, end) else ""
 }
+
+/**
+ * D16 one tap, one decision (iOS `WebViewModel.decide` clears `lastTouch` the same way). Chromium's `hasGesture()`
+ * stays true for every navigation during a tap's user activation, so one tap could otherwise open several apps
+ * that a script clicks after it. The first frame navigation decided with the gesture spends it, whatever it opens
+ * (a page link, an app, a blocked URL; a server redirect that follows is a new decision and asks). Only a new tap
+ * on the web view, a single finger lifted within [slop] of where it went down, gives a new one: a scroll does not.
+ */
+internal class WebTapBudget(private val slop: Float) {
+    private var spent = false
+    private var tracking = false
+    private var downX = 0f
+    private var downY = 0f
+
+    fun onDown(x: Float, y: Float) {
+        tracking = true
+        downX = x
+        downY = y
+    }
+
+    fun onMove(x: Float, y: Float) {
+        if (tracking && !near(x, y)) tracking = false
+    }
+
+    fun onUp(x: Float, y: Float) {
+        if (tracking && near(x, y)) spent = false
+        tracking = false
+    }
+
+    /** A second finger or a cancelled gesture is no tap. */
+    fun onCancel() {
+        tracking = false
+    }
+
+    /** The gesture one navigation may use: [hasGesture] once per tap. */
+    fun use(hasGesture: Boolean): Boolean {
+        if (!hasGesture || spent) return false
+        spent = true
+        return true
+    }
+
+    private fun near(x: Float, y: Float): Boolean {
+        val dx = x - downX
+        val dy = y - downY
+        return dx * dx + dy * dy <= slop * slop
+    }
+}

@@ -64,6 +64,9 @@ enum class OverlayPhase { Opening, Open, Closing }
 internal sealed class OverlayEntry(val id: Long) {
     var phase by mutableStateOf(OverlayPhase.Opening)
 
+    /** [OverlayHostState.dismissDialog] came while this was opening: it starts closing as soon as it is open. */
+    var closeWhenOpened = false
+
     /** 뒤 화면을 흐리고 어둡게 하는 overlay(시트·확인창)인지. 메뉴는 아니다. */
     abstract val needsScrim: Boolean
 }
@@ -124,9 +127,9 @@ class OverlayHostState {
     }
 
     /**
-     * [spec]로 연 확인창이 가장 위에 열려 있으면 닫는다(`onDismissed`가 불린다). 아직 열리길 기다리는 중이면 버린다
-     * (`onDropped`). 그 확인창을 띄운 화면이 사라질 때 쓴다.
-     * 열리는 중이거나 다른 overlay가 위에 있으면 false(호출한 쪽이 `onConfirm`을 따로 막는다).
+     * [spec]로 연 확인창이 가장 위에 열려 있으면 닫는다(`onDismissed`가 불린다). 아직 열리는 중이면 다 열리자마자 닫고,
+     * 열리길 기다리는 중이면 버린다(`onDropped`). 그 확인창을 띄운 화면이 사라질 때 쓴다.
+     * 다른 overlay가 위에 있거나 이미 닫히는 중이면 false.
      */
     fun dismissDialog(spec: WLDialogSpec): Boolean {
         if (pending?.dialog === spec) {
@@ -135,6 +138,10 @@ class OverlayHostState {
         }
         val top = entries.lastOrNull() as? DialogEntry ?: return false
         if (top.spec !== spec) return false
+        if (top.phase == OverlayPhase.Opening) {
+            top.closeWhenOpened = true
+            return true
+        }
         return requestDismiss(top.id)
     }
 
@@ -168,7 +175,8 @@ class OverlayHostState {
     }
 
     internal fun onOpened(id: Long) {
-        entries.firstOrNull { it.id == id && it.phase == OverlayPhase.Opening }?.phase = OverlayPhase.Open
+        val entry = entries.firstOrNull { it.id == id && it.phase == OverlayPhase.Opening } ?: return
+        entry.phase = if (entry.closeWhenOpened) OverlayPhase.Closing else OverlayPhase.Open
     }
 
     internal fun onClosed(id: Long) {
