@@ -14,10 +14,12 @@ object WishlistItemRowMapper {
        i.analysis_failure_code, i.client_created_at, i.created_at, i.updated_at,
        coalesce(pc.name, cc.name) category_name, coalesce(pc.parent_id, cc.parent_id) category_parent,
        case when i.custom_category_id is not null then 'CUSTOM' when i.category_id is not null then 'PUBLIC' end category_kind,
-       p.name purpose_name, p.color_key purpose_color_key, p.icon_key purpose_icon_key"""
+       p.name purpose_name, p.color_key purpose_color_key, p.icon_key purpose_icon_key,
+       m.id media_id, m.object_key media_object_key"""
     val joins = """left join public_categories pc on pc.id=i.category_id
 left join custom_categories cc on cc.owner_id=i.owner_id and cc.id=i.custom_category_id and cc.deleted_at is null
-left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id"""
+left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id
+left join media_assets m on m.owner_id=i.owner_id and m.id=i.media_asset_id and m.status='READY'"""
 
     fun map(row: ResultSet): WishlistItem {
         val overrides = row.getArray("user_override_fields")
@@ -62,6 +64,7 @@ left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id"""
             brand = row.getString("product_brand"), price = row.getBigDecimal("product_price"),
             currency = row.getString("product_currency"), merchant = row.getString("merchant_name"),
             metadataCheckedAt = row.getTimestamp("metadata_checked_at")?.toInstant(),
+            mediaId = row.getObject("media_id", UUID::class.java), mediaObjectKey = row.getString("media_object_key"),
         )
     }
 }

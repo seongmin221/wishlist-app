@@ -124,7 +124,7 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
     }
     val storage = mediaStorage ?: openMediaStorage(env, resources)
     val signing = resources.own(MediaSigningExecutor())
-    val signer = MediaUrlSigner { key -> signing.await { storage.readUrl(key, MediaLimits.READ_VALIDITY) } }
+    val signer = CachingMediaUrlSigner(storage, signing)
     val media = MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), signing), signer)
     routing {
         get("/health") { call.respondText("ok") }
@@ -137,12 +137,12 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
 fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, media: MediaWiring, resolve: suspend (ApplicationCall) -> UUID?) {
     val readService = WishlistReadService(source)
     mediaRoutes(media, resolve)
-    wishlistRoutes(CreateWishlistItemService(source, dispatchAfterCommit), GetWishlistItemService(source), resolve)
-    wishlistReadRoutes(readService, resolve)
-    homeActionRoutes(readService, resolve)
-    homeSummaryRoutes(HomeReadService(source), resolve)
+    wishlistRoutes(CreateWishlistItemService(source, dispatchAfterCommit), GetWishlistItemService(source), media.signer, resolve)
+    wishlistReadRoutes(readService, media.signer, resolve)
+    homeActionRoutes(readService, media.signer, resolve)
+    homeSummaryRoutes(HomeReadService(source), media.signer, resolve)
     categoryRoutes(CategoryService(source), resolve)
-    purposeRoutes(PurposeService(source), resolve)
+    purposeRoutes(PurposeService(source), media.signer, resolve)
 }
 
 /** GCS when MEDIA_BUCKET is set, otherwise the local file store (local only; production requires the bucket). */

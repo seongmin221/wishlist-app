@@ -1,6 +1,7 @@
 package app.http
 
 import app.home.HomeReadSummary
+import app.media.MediaUrls
 import app.wishlist.*
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -9,15 +10,15 @@ import java.util.UUID
 @Serializable data class HomeDto(val actionGroups: List<HomeActionGroupDto>, val recentPurposes: List<PurposeSummaryItemDto>)
 
 object HomeViewMapper {
-    fun map(owner: UUID, summary: HomeReadSummary): HomeDto {
+    fun map(owner: UUID, summary: HomeReadSummary, urls: MediaUrls): HomeDto {
         val context=WishlistReadCursorCodec.forOwner(owner)
         return HomeDto(
         summary.actionGroups.map { group ->
             HomeActionGroupDto(group.group, group.count, group.items.map {
-                ReadWindowViewMapper.card(context, ReadEndpoint.HOME_ACTION_ITEMS, ReadScope.Action(group.group), it)
+                ReadWindowViewMapper.card(context, ReadEndpoint.HOME_ACTION_ITEMS, ReadScope.Action(group.group), it, urls)
             })
         },
-        summary.recentPurposes.map { it.summaryDto() },
+        summary.recentPurposes.map { it.summaryDto(urls) },
     )
     }
 }

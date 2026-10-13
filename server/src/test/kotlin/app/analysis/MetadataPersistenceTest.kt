@@ -44,7 +44,7 @@ class MetadataPersistenceTest {
         assertEquals("""["Mizuno", 129000.5000, "KRW", "Mizuno Store", true, true]""", columns(source, job))
         assertEquals("2", analysisScalar(source, "select version from wishlist_items where id='${job.itemId}'"))
         val owner = java.util.UUID.fromString(analysisScalar(source, "select owner_id from wishlist_items where id='${job.itemId}'"))
-        val product = WishlistItemViewMapper.map(assertNotNull(GetWishlistItemService(source).get(owner, job.itemId))).product
+        val product = WishlistItemViewMapper.map(assertNotNull(GetWishlistItemService(source).get(owner, job.itemId)), app.media.MediaUrls.NONE).product
         assertEquals("Mizuno", product.brand); assertEquals(BigDecimal("129000.5000"), product.price); assertEquals("KRW", product.currency)
         assertEquals("Mizuno Store", product.merchant); assertNotNull(product.metadataCheckedAt)
     }

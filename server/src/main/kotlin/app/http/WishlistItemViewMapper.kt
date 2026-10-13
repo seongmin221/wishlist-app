@@ -1,18 +1,19 @@
 package app.http
 
+import app.media.MediaUrls
 import app.wishlist.*
 
 object WishlistItemViewMapper {
-    fun map(item: WishlistItem): WishlistItemDto {
+    fun map(item: WishlistItem, urls: MediaUrls): WishlistItemDto {
         val stored = item.storedState
         val state = stored.state
         val policy = WishlistItemPolicy.evaluate(state)
         return WishlistItemDto(
             id = item.id.toString(), clientSubmissionId = item.clientSubmissionId.toString(),
             version = item.version, sourceUrl = item.sourceUrl,
-            product = ProductDto(name = state.productName, imageUrl = item.productImageUrl, price = item.price, currency = item.currency,
+            product = ProductDto(name = state.productName, imageUrl = urls.imageUrl(item.mediaObjectKey, item.productImageUrl), price = item.price, currency = item.currency,
                 brand = item.brand, merchant = item.merchant, metadataCheckedAt = item.metadataCheckedAt?.toString(),
-                nameSource = stored.nameSource, imageSource = stored.imageSource),
+                nameSource = stored.nameSource, imageSource = stored.imageSource, imageMediaId = item.mediaId?.toString()),
             category = CategoryDto(id = state.categoryId, source = stored.categorySource, missingReason = state.categoryMissingReason,
                 name=item.categoryName,parentId=item.categoryParentId,kind=item.categoryKind),
             purpose = PurposeDto(id = stored.purposeId, name = item.purposeName, colorKey = item.purposeColorKey,

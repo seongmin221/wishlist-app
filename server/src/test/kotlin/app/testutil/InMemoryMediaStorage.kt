@@ -15,6 +15,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
     @Volatile var failDelete = false
     @Volatile var signDelayMillis = 0L
     @Volatile var beforeStat: (String) -> Unit = {}
+    @Volatile var deleteDelayMillis = 0L
     val uploadSigns = AtomicInteger()
     val readSigns = AtomicInteger()
     val stats = AtomicInteger()
@@ -53,6 +54,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
 
     override fun delete(objectKey: String) {
         deleteCalls.incrementAndGet()
+        if (deleteDelayMillis > 0) Thread.sleep(deleteDelayMillis)
         if (failDelete) throw MediaStorageException()
         objects.remove(objectKey); deletes += objectKey
     }
@@ -67,3 +69,19 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
 fun mediaWiring(source: javax.sql.DataSource, storage: MediaStorage = InMemoryMediaStorage(),
                 signer: MediaUrlSigner = MediaUrlSigner { key -> runCatching { storage.readUrl(key, MediaLimits.READ_VALIDITY) }.getOrNull() }) =
     app.http.MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), MediaSigningExecutor()), signer)
+
+/** Signer for routes whose tests do not involve user images. */
+val NO_MEDIA = MediaUrlSigner { null }
+
+/** Inserts a media row for [owner] in [status] and returns its id and object key. */
+fun insertMedia(source: javax.sql.DataSource, owner: java.util.UUID, status: String = "READY"): Pair<java.util.UUID, String> {
+    val id = java.util.UUID.randomUUID()
+    val key = MediaKeys.objectKey(owner, id)
+    analysisSql(source, "insert into app_users(id) values ('$owner') on conflict do nothing")
+    analysisSql(source, """insert into media_assets(id,owner_id,idempotency_key,request_fingerprint,object_key,content_type,
+        declared_byte_size,declared_width,declared_height,upload_expires_at,status,byte_size,width,height,ready_at,failure_reason,failed_at)
+        values ('$id','$owner','${java.util.UUID.randomUUID()}','${"a".repeat(64)}','$key','image/jpeg',100,10,10,
+        clock_timestamp(),'$status',100,10,10,clock_timestamp(),
+        ${if (status == "FAILED") "'NOT_JPEG',clock_timestamp()" else "null,null"})""")
+    return id to key
+}

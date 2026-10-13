@@ -23,7 +23,7 @@ class WishlistEmptyPageTest {
         val source = source(direction,mutableListOf())
         val page = assertIs<ReadResult.Success>(WishlistReadService(source).read(owner,ReadQuery(scope,ReadWindow.Page(2,position,direction)))).page
         assertTrue(page.items.isEmpty());assertEquals(1L,page.totalCount)
-        val dto = ReadWindowViewMapper.map(owner,ReadEndpoint.WISHLIST_ITEMS,scope,page)
+        val dto = ReadWindowViewMapper.map(owner,ReadEndpoint.WISHLIST_ITEMS,scope,page, app.media.MediaUrls.NONE)
         val cursor = assertNotNull(if(direction==ReadDirection.OLDER) dto.previousCursor else dto.nextCursor)
         val parsed = assertIs<ReadQueryParseResult.Valid>(WishlistReadQueryParser.wishlist(owner,Parameters.build {
             append("categoryId","C026");append("cursor",cursor)

@@ -10,6 +10,22 @@ data class SignedRead(val url: String, val expiresAt: Instant)
 /** Signs a display URL; null when signing failed or timed out, so callers show a placeholder. */
 fun interface MediaUrlSigner {
     fun sign(objectKey: String): SignedRead?
+
+    /** Signs every key for one response; keys that fail are absent. */
+    fun signAll(objectKeys: Set<String>): MediaUrls =
+        MediaUrls(objectKeys.mapNotNull { key -> sign(key)?.let { key to it } }.toMap())
+}
+
+/** Display URLs signed for one response. */
+class MediaUrls(private val byKey: Map<String, SignedRead>) {
+    /**
+     * A user image wins over the extracted one. When its signing failed the URL is null rather than the extracted image,
+     * so another picture never stands in for the one the user chose.
+     */
+    fun imageUrl(mediaObjectKey: String?, externalUrl: String?): String? =
+        if (mediaObjectKey != null) byKey[mediaObjectKey]?.url else externalUrl
+
+    companion object { val NONE = MediaUrls(emptyMap()) }
 }
 
 /**

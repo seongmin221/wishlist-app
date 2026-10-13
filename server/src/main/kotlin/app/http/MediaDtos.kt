@@ -30,3 +30,8 @@ fun MediaView.toDto(): MediaResponseDto {
         LIMITS,
     )
 }
+
+/** Object keys of the user images a response will show. */
+internal fun Iterable<app.wishlist.WishlistItem>.mediaKeys(): Set<String> = mapNotNullTo(mutableSetOf()) { it.mediaObjectKey }
+internal fun Iterable<app.purpose.PurposeListEntry>.previewMediaKeys(): Set<String> =
+    flatMap { it.previews }.mapNotNullTo(mutableSetOf()) { it.mediaObjectKey }

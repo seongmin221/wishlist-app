@@ -28,7 +28,7 @@ class WishlistItemViewMapperTest {
             Triple(AnalysisStatus.PROCESSING, "secret diagnostic", null),
         )
         for ((status, failure, expected) in cases) {
-            val dto = WishlistItemViewMapper.map(item(status, failure))
+            val dto = WishlistItemViewMapper.map(item(status, failure), app.media.MediaUrls.NONE)
             assertEquals(expected, dto.analysis.failureCode?.name)
             val body = Json.parseToJsonElement(ApiJson.encodeToString(dto)).jsonObject
             assertEquals(expected?.let(::JsonPrimitive) ?: JsonNull, body.getValue("analysis").jsonObject.getValue("failureCode"))
@@ -38,7 +38,7 @@ class WishlistItemViewMapperTest {
 
     @Test fun `archived and deleted snapshots have no actions while preserving actual metadata`() {
         for (lifecycle in listOf(LifecycleStatus.ARCHIVED, LifecycleStatus.DELETED)) {
-            val dto = WishlistItemViewMapper.map(item(AnalysisStatus.READY, null, lifecycle))
+            val dto = WishlistItemViewMapper.map(item(AnalysisStatus.READY, null, lifecycle), app.media.MediaUrls.NONE)
             assertEquals("보관 상품", dto.product.name)
             assertEquals(ValueSource.USER, dto.product.nameSource)
             assertEquals("https://example.com/image", dto.product.imageUrl)
@@ -49,7 +49,7 @@ class WishlistItemViewMapperTest {
 
     @Test fun `stored product metadata is exposed with an exact decimal price`() {
         val dto = WishlistItemViewMapper.map(item(AnalysisStatus.READY, null).copy(brand = "Mizuno", price = java.math.BigDecimal("12900.5000"),
-            currency = "KRW", merchant = "Mizuno Store", metadataCheckedAt = Instant.parse("2026-10-09T01:02:03Z")))
+            currency = "KRW", merchant = "Mizuno Store", metadataCheckedAt = Instant.parse("2026-10-09T01:02:03Z")), app.media.MediaUrls.NONE)
         val product = Json.parseToJsonElement(ApiJson.encodeToString(dto)).jsonObject.getValue("product").jsonObject
         assertEquals("Mizuno", product.getValue("brand").jsonPrimitive.content)
         assertEquals("12900.5000", product.getValue("price").jsonPrimitive.content)

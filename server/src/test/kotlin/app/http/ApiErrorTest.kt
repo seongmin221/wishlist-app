@@ -175,7 +175,7 @@ class ApiErrorTest {
         val source = DatabaseFactory.dataSource("jdbc:postgresql://127.0.0.1:1/not_used", "test", "test")
         application {
             installApiHttpSupport()
-            routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { if (authenticated) UUID.randomUUID() else null } }
+            routing { wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source), app.testutil.NO_MEDIA) { if (authenticated) UUID.randomUUID() else null } }
         }
         val response = client.post("/v1/wishlist-items") {
             header("Idempotency-Key", key)

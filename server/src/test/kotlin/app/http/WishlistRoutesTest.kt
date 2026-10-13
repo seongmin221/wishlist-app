@@ -29,7 +29,7 @@ class WishlistRoutesTest {
         val owner = UUID.randomUUID()
         val key = UUID.randomUUID()
         testApplication {
-            application { installApiHttpSupport(); routing { wishlistRoutes(service, app.wishlist.GetWishlistItemService(source)) { owner } } }
+            application { installApiHttpSupport(); routing { wishlistRoutes(service, app.wishlist.GetWishlistItemService(source), app.testutil.NO_MEDIA) { owner } } }
             suspend fun submit(url: String) = client.post("/v1/wishlist-items") {
                 header("Idempotency-Key", key.toString())
                 contentType(ContentType.Application.Json)
@@ -63,6 +63,7 @@ class WishlistRoutesTest {
         app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes(
             { _, _, _, _ -> app.wishlist.CreateResult.InvalidUrl },
             { _, _ -> block(); null },
+            app.testutil.NO_MEDIA,
         ) { UUID.randomUUID() } }, { get("/v1/wishlist-items/${UUID.randomUUID()}") })
     }
 
@@ -70,17 +71,18 @@ class WishlistRoutesTest {
         app.testutil.assertRouteCancellation({ block -> wishlistRoutes(
             { _, _, _, _ -> app.wishlist.CreateResult.InvalidUrl },
             { _, _ -> block(); null },
+            app.testutil.NO_MEDIA,
         ) { UUID.randomUUID() } }, { get("/v1/wishlist-items/${UUID.randomUUID()}") })
     }
 
     @Test fun `blocking creation runs outside the route executor`() {
-        app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }, { _, _ -> null }) { UUID.randomUUID() } }, {
+        app.testutil.assertBlockingRouteIo({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }, { _, _ -> null }, app.testutil.NO_MEDIA) { UUID.randomUUID() } }, {
             post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
         })
     }
 
     @Test fun `creation cancellation propagates to the request pipeline`() {
-        app.testutil.assertRouteCancellation({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }, { _, _ -> null }) { UUID.randomUUID() } }, {
+        app.testutil.assertRouteCancellation({ block -> wishlistRoutes({ _, _, _, _ -> block(); app.wishlist.CreateResult.InvalidUrl }, { _, _ -> null }, app.testutil.NO_MEDIA) { UUID.randomUUID() } }, {
             post("/v1/wishlist-items") { header("Idempotency-Key", UUID.randomUUID().toString()); setBody("""{"sourceUrl":"https://example.com/item"}""") }
         })
     }
@@ -96,7 +98,7 @@ class WishlistRoutesTest {
             val key = UUID.randomUUID()
 
             testApplication {
-                application { installApiHttpSupport(); routing { wishlistRoutes(service, app.wishlist.GetWishlistItemService(source)) { owner } } }
+                application { installApiHttpSupport(); routing { wishlistRoutes(service, app.wishlist.GetWishlistItemService(source), app.testutil.NO_MEDIA) { owner } } }
                 suspend fun submit(url: String) = client.post("/v1/wishlist-items") {
                     header("Idempotency-Key", key.toString())
                     contentType(ContentType.Application.Json)

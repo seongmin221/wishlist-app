@@ -89,7 +89,7 @@ class CategoryAiIntegrationTest {
             val before=analysisScalar(source,"select version from wishlist_items where id='${claim.itemId}'")
             service.patch(owner,category.id,1,CategoryChanges(name="Renamed"))
             val item=GetWishlistItemService(source).get(owner,claim.itemId)!!
-            val dto=WishlistItemViewMapper.map(item)
+            val dto=WishlistItemViewMapper.map(item, app.media.MediaUrls.NONE)
             assertEquals(category.id.toString(),dto.category.id)
             assertEquals("Renamed",dto.category.name)
             assertEquals(review,dto.reviewStatus.name)

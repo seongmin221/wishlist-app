@@ -1,5 +1,6 @@
 package app.http
 
+import app.media.MediaUrlSigner
 import app.wishlist.*
 import io.ktor.http.*
 import io.ktor.server.application.ApplicationCall
@@ -10,14 +11,15 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import java.util.UUID
 
-fun Route.wishlistReadRoutes(service: WishlistReadService, ownerResolver: suspend (ApplicationCall) -> UUID?) {
+fun Route.wishlistReadRoutes(service: WishlistReadService, signer: MediaUrlSigner, ownerResolver: suspend (ApplicationCall) -> UUID?) {
     get("/v1/wishlist-items") {
         val owner=ownerResolver(call) ?: return@get call.respondApiError(HttpStatusCode.Unauthorized,"UNAUTHORIZED")
-        call.respondReadQuery(owner,ReadEndpoint.WISHLIST_ITEMS,WishlistReadQueryParser.wishlist(owner,call.request.queryParameters),service)
+        call.respondReadQuery(owner,ReadEndpoint.WISHLIST_ITEMS,WishlistReadQueryParser.wishlist(owner,call.request.queryParameters),service,signer)
     }
 }
 
-internal suspend fun ApplicationCall.respondReadQuery(owner: UUID, endpoint: ReadEndpoint, parsed: ReadQueryParseResult, service: WishlistReadService) {
+internal suspend fun ApplicationCall.respondReadQuery(owner: UUID, endpoint: ReadEndpoint, parsed: ReadQueryParseResult, service: WishlistReadService,
+                                                    signer: MediaUrlSigner) {
     val prefix=if(endpoint==ReadEndpoint.WISHLIST_ITEMS) "WISHLIST" else "HOME"
     val query=when(parsed) {
         ReadQueryParseResult.InvalidQuery -> return respondApiError(HttpStatusCode.BadRequest,"INVALID_${prefix}_QUERY")
@@ -27,6 +29,9 @@ internal suspend fun ApplicationCall.respondReadQuery(owner: UUID, endpoint: Rea
     when(val result=withContext(Dispatchers.IO) { service.read(owner,query) }) {
         ReadResult.CategoryNotFound -> respondApiError(HttpStatusCode.NotFound,"CATEGORY_NOT_FOUND")
         ReadResult.PurposeNotFound -> respondApiError(HttpStatusCode.NotFound,"PURPOSE_NOT_FOUND")
-        is ReadResult.Success -> respondText(ApiJson.encodeToString(ReadWindowViewMapper.map(owner,endpoint,query.scope,result.page)),ContentType.Application.Json,HttpStatusCode.OK)
+        is ReadResult.Success -> {
+            val urls=withContext(Dispatchers.IO) { signer.signAll(result.page.items.mediaKeys()) }
+            respondText(ApiJson.encodeToString(ReadWindowViewMapper.map(owner,endpoint,query.scope,result.page,urls)),ContentType.Application.Json,HttpStatusCode.OK)
+        }
     }
 }

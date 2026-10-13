@@ -32,7 +32,7 @@ class ReadCursorHashReuseTest {
         }
         counting {
             val page=ReadPage(items,102,ReadPosition(time,items.first().id),ReadPosition(time,items.last().id),null,null,null)
-            val dto=ReadWindowViewMapper.map(owner,ReadEndpoint.WISHLIST_ITEMS,ReadScope.PurposeUnassigned,page)
+            val dto=ReadWindowViewMapper.map(owner,ReadEndpoint.WISHLIST_ITEMS,ReadScope.PurposeUnassigned,page, app.media.MediaUrls.NONE)
             assertEquals(100,dto.items.size);assertNotNull(dto.previousCursor);assertNotNull(dto.nextCursor)
             assertEquals(1,CountingDigest.digests)
         }

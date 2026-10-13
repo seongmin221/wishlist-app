@@ -23,6 +23,9 @@ data class WishlistItem(
     val currency: String? = null,
     val merchant: String? = null,
     val metadataCheckedAt: Instant? = null,
+    /** READY user image linked to the item; display URLs are signed outside the read transaction. */
+    val mediaId: UUID? = null,
+    val mediaObjectKey: String? = null,
 ) {
     val id: UUID get() = storedState.id
     val version: Int get() = storedState.version
