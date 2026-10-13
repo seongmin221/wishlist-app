@@ -58,7 +58,7 @@ class WishlistReadRepositoryTest {
             for (item in loaded) {
                 val detail=assertNotNull(WishlistItemRepository(source).findOwned(owner,item.id))
                 assertEquals(detail,item)
-                val dto=WishlistItemViewMapper.map(item)
+                val dto=WishlistItemViewMapper.map(item, app.media.MediaUrls.NONE)
                 assertEquals(WishlistItemPolicy.evaluate(item.storedState.state).allowedActions,dto.allowedActions)
                 assertNull(dto.product.brand);assertNull(dto.product.price);assertNull(dto.product.currency);assertNull(dto.product.merchant);assertNull(dto.product.metadataCheckedAt)
             }

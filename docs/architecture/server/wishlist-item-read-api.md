@@ -97,7 +97,8 @@ categoryId·purposeId·purposeUnassigned 중 **정확히 하나**를 받는다. 
           "merchant": null,
           "metadataCheckedAt": null,
           "nameSource": "USER",
-          "imageSource": null
+          "imageSource": null,
+          "imageMediaId": null
         },
         "category": {
           "id": "C026",
@@ -178,6 +179,8 @@ Authorization: Bearer {firebaseIdToken}
 ```
 
 query를 받지 않는다. 고정순서의 세 actionGroups를 반환하며 각 count와 최대4개 최신 previews가 함께 나온다. 빈 그룹도 count=0/previews=[]로 유지한다. preview는 HOME-02 anchorCursor를 포함한다. 별도 todo 합계 필드는 없고 기기 pending은 클라이언트에서 합성한다.
+
+B6부터 `product.imageMediaId`와 미리보기의 `imageMediaId`가 추가됐다. 연결된 READY 사용자 이미지가 있으면 `imageUrl`은 45~60분 유효한 signed URL이고 `imageMediaId`가 cache key다. 서명 실패 시 `imageUrl`만 null이며 외부 이미지로 대신하지 않는다. 자세한 규칙은 [사용자 이미지 업로드 API](media-upload-api.md#표시-url)에 있다.
 
 recentPurposes는 B3 summary DTO이며 ACTIVE activity_at DESC/id DESC 최대3개, 빈 목적도 포함한다. candidateCount는 ACTIVE 전체, previews는 최근 저장 후보 최대4개다. 이미지 없는 후보도 한 자리를 차지하고 imageUrl=null이면 클라이언트 placeholder를 쓴다. 아래는 빈 그룹과 빈 목적 예시다.
 

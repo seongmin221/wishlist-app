@@ -17,7 +17,7 @@ class PurposeRoutesTest {
     @Test fun `purpose routes enforce auth keys input owner version and query contracts`() = withAnalysisDatabase { source ->
         val owner = UUID.randomUUID(); val other = UUID.randomUUID()
         testApplication {
-            application { installApiHttpSupport(); routing { purposeRoutes(PurposeService(source)) { call ->
+            application { installApiHttpSupport(); routing { purposeRoutes(PurposeService(source), app.testutil.NO_MEDIA) { call ->
                 when (call.request.headers["Test-Owner"]) { "owner" -> owner; "other" -> other; else -> null }
             } } }
             fun HttpRequestBuilder.me() = header("Test-Owner", "owner")
@@ -59,7 +59,7 @@ class PurposeRoutesTest {
         val owner = UUID.randomUUID(); val other = UUID.randomUUID(); val service = PurposeService(source)
         repeat(3) { insertPurpose(source, owner, "p$it", "d$it") }
         testApplication {
-            application { installApiHttpSupport(); routing { purposeRoutes(service) { call ->
+            application { installApiHttpSupport(); routing { purposeRoutes(service, app.testutil.NO_MEDIA) { call ->
                 when (call.request.headers["Test-Owner"]) { "owner" -> owner; "other" -> other; else -> null } } } }
             fun HttpRequestBuilder.me() = header("Test-Owner", "owner")
             for (query in listOf("", "?projection=ALL", "?projection=SELECT&projection=SUMMARY", "?projection=SELECT&limit=0",
@@ -84,7 +84,7 @@ class PurposeRoutesTest {
         val owner = UUID.randomUUID()
         repeat(3) { insertPurpose(source, owner, "p$it", null) }
         testApplication {
-            application { installApiHttpSupport(); routing { purposeRoutes(PurposeService(source)) { owner } } }
+            application { installApiHttpSupport(); routing { purposeRoutes(PurposeService(source), app.testutil.NO_MEDIA) { owner } } }
             val cursor = json(client.get("/v1/purposes?projection=SELECT&limit=2").bodyAsText())["nextCursor"]!!.jsonPrimitive.content
             val parts = String(java.util.Base64.getUrlDecoder().decode(cursor)).split("|").toMutableList()
             for (micros in listOf("-9000000000000000000", "9223372036854775808")) {
@@ -105,7 +105,7 @@ class PurposeRoutesTest {
     @Test fun `limit and rate errors carry codes and retry header`() = withAnalysisDatabase { source ->
         val owner = UUID.randomUUID(); val service = PurposeService(source)
         testApplication {
-            application { installApiHttpSupport(); routing { purposeRoutes(service) { owner } } }
+            application { installApiHttpSupport(); routing { purposeRoutes(service, app.testutil.NO_MEDIA) { owner } } }
             repeat(10) { n -> client.post("/v1/purposes") { header("Idempotency-Key", UUID.randomUUID()); setBody(createBody.replace("출퇴근", "n$n")) } }
             val limited = client.post("/v1/purposes") { header("Idempotency-Key", UUID.randomUUID()); setBody(createBody) }
             assertEquals(HttpStatusCode.TooManyRequests, limited.status)

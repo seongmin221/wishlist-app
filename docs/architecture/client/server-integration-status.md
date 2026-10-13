@@ -68,9 +68,19 @@ FakeStore가 단독으로 생성 idempotency·최신 snapshot 재전송·삭제 
 | ARC-07 | B10 미구현 | C11 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C11 | 미실행 | 미실행 |
 | ARC-08 | B10 미구현 | C11 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C11 | 미실행 | 미실행 |
 | ARC-09 | B10 미구현 | C11 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C11 | 미실행 | 미실행 |
-| MEDIA-01 | B6 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C8 | 미실행 | 미실행 |
-| MEDIA-02 | B6 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C8 | 미실행 | 미실행 |
+| MEDIA-01 | B6 구현 | C8 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C8 | 미실행 | 미실행 |
+| MEDIA-02 | B6 구현 | C8 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C8 | 미실행 | 미실행 |
 
 37개 API를 `ApiId`와 같은 순서로 등록했다(ITEM 8 / HOME 2 / DUP 2 / CAT 6 / PUR 8 / ARC 9 / MEDIA 2). SYS/WORK/OPS는 제품 API 표에 포함하지 않는다.
+
+## C8 사진 업로드 클라이언트 계약 (서버 B6)
+
+서버 계약은 [사용자 이미지 업로드 API](../server/media-upload-api.md)에 있다. C8 클라이언트는 다음을 지킨다.
+
+- 회전(EXIF orientation)을 픽셀에 적용한 뒤 긴 변 2048px JPEG로 다시 인코딩한다. 결과는 EXIF·XMP 등 APP0·APP2(ICC)·APP14 외 segment와 MPF 보조 이미지(HDR gain map 포함)가 없는 단일 JPEG여야 한다. iOS `jpegData`·Android `Bitmap.compress` 출력이 이를 만족하는지 C8에서 확인한다.
+- MEDIA-01의 `byteSize`는 인코딩한 실제 byte 수, `width`·`height`는 회전 후 치수다.
+- `upload.headers`를 이름과 값 그대로 PUT에 보낸다.
+- MEDIA-01 503은 **같은 key**로 재시도한다. 410·422(`MEDIA_INVALID_IMAGE`)는 새 key로 처음부터 다시 한다. completion 409(`MEDIA_OBJECT_MISSING`)는 업로드를 마친 뒤 다시 부른다.
+- 이미지 cache key는 바뀌는 `imageUrl`이 아니라 `imageMediaId`다. 표시 URL의 남은 유효시간은 45~60분이다. `imageMediaId`가 있는데 `imageUrl`이 null이면 placeholder를 보이고 다음 조회에서 다시 얻는다.
 
 근거: [서버 API 목록](../server/mvp-api-inventory.md), [서버 구현 순서](../server/mvp-api-implementation-order.md), [B1 생성·상세](../server/wishlist-item-read-api.md), [B2 카테고리 계약](../server/category-management-api.md), [클라이언트 로드맵](../../superpowers/specs/2026-10-05-client-implementation-roadmap-design.md), [C2 실행 계획](../../superpowers/plans/2026-10-07-client-c2-kmp-core.md), [C3 실행 계획](../../superpowers/plans/2026-10-07-client-c3-share-save.md).

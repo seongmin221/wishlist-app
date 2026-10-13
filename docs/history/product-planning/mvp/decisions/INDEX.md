@@ -24,6 +24,7 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 
 ## 상품 확인과 편집
 
+- [B6 사용자 이미지 업로드](b6-media-upload-policy-2026-10-12.md) — 제품·운영 정책 확정 · JPEG 5MiB·긴 변 2048·signed PUT·15분 intent·24시간 미참조 정리·1시간 읽기 URL·외부 이미지 URL 보관·APP0·APP2 ICC·APP14 외 segment 거절·PENDING 10개
 - [B4 상품 목록과 홈 조회](b4-read-api-policy-2026-10-07.md) — 제품 정책 확정 · 홈 목적 3개·빈 목적 포함·restart·목록 기준 category count·별도 할 일 합계 없음
 - [상품 정보 직접 보완의 완료 기준](manual-completion.md) — 확정 · 2026-09-10
 - [홈 조치 필요 영역의 우선순위](home-action-priority.md) — 2026-09-10 결정 · 카테고리 미지정 영역은 2026-10-02 정보 보완에 통합

@@ -45,7 +45,7 @@ class WishlistReadPolicyParityTest {
                     assertEquals(state.lifecycleStatus == LifecycleStatus.ACTIVE && !state.productName.isNullOrBlank(), r.getBoolean("visible"), state.toString())
                     val item = WishlistItemRowMapper.map(r)
                     assertEquals(state, item.storedState.state)
-                    assertEquals(policy.allowedActions, app.http.WishlistItemViewMapper.map(item).allowedActions)
+                    assertEquals(policy.allowedActions, app.http.WishlistItemViewMapper.map(item, app.media.MediaUrls.NONE).allowedActions)
                     checked++
                 }
                 assertEquals(fixtures.size, checked)

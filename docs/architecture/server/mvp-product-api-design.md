@@ -206,7 +206,7 @@ B0 Task 1~9에서 기존 requiredAction 값과 별도 홈 projection 정책, 공
 
 기존 GCP 환경을 고려해 Cloud Storage private bucket adapter를 권장한다. API는 owner·형식·크기 제한을 검증해 업로드 intent와 짧은 만료 URL을 발급하고, 앱이 업로드한 뒤 서버가 객체 존재·실제 이미지 형식·치수를 확인해 READY로 만든다. private 이미지 읽기는 서버가 owner 확인 뒤 만료 URL을 발급한다. signed URL은 보유자에게 유효기간 동안 접근 권한을 주므로 로그에 남기지 않는다. [Cloud Storage 공식 signed URL 안내](https://docs.cloud.google.com/storage/docs/access-control/signed-urls)
 
-편집 취소 후 남은 PENDING/미참조 이미지와 archive 참조가 있는 이미지를 구분해 정리한다. 초기 형식·크기 제한, 외부 추출 이미지의 영속 복사 여부와 비용은 이미지 단계에서 결정한다. 사진 선택 자체는 이미 확정된 제품 기능이다.
+편집 취소 후 남은 PENDING/미참조 이미지와 archive 참조가 있는 이미지를 구분해 정리한다. 사진 선택 자체는 이미 확정된 제품 기능이다. 형식·크기 제한, 외부 이미지 보존(URL만 보관), 정리 유예(24시간)는 [B6 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md)에서 정했고 구현 계약은 [사용자 이미지 업로드 API](media-upload-api.md)에 있다.
 
 ## Product cache와 중복 후보
 

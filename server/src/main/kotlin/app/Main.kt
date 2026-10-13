@@ -16,6 +16,7 @@ import app.budget.BudgetMaintenanceService
 import app.budget.LlmBudgetService
 import app.maintenance.MaintenanceReport
 import app.maintenance.MaintenanceService
+import app.media.*
 import app.extraction.*
 import app.http.*
 import app.tasks.CloudTasksConfig
@@ -47,15 +48,17 @@ fun main() {
     embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8080) { module() }.start(wait = true)
 }
 
-fun Application.module(env: Map<String, String> = System.getenv(), resources: RuntimeResources = RuntimeResources(), taskGateway: TaskGateway? = null) {
+fun Application.module(env: Map<String, String> = System.getenv(), resources: RuntimeResources = RuntimeResources(), taskGateway: TaskGateway? = null,
+                       mediaStorage: MediaStorage? = null) {
     monitor.subscribe(ApplicationStopping) { resources.stopAcceptingWork() }
     monitor.subscribe(ApplicationStopped) {
         try { resources.close() } catch (_: Throwable) { log.error("Runtime resources could not all be closed") }
     }
-    configureRuntime(env, resources, taskGateway)
+    configureRuntime(env, resources, taskGateway, mediaStorage)
 }
 
-private fun Application.configureRuntime(env: Map<String, String>, resources: RuntimeResources, taskGateway: TaskGateway?) {
+private fun Application.configureRuntime(env: Map<String, String>, resources: RuntimeResources, taskGateway: TaskGateway?,
+                                         mediaStorage: MediaStorage?) {
     val runtime = RuntimeConfig.fromEnvironment(env)
     install(ContentNegotiation) { json(ApiJson) }
     installApiHttpSupport()
@@ -98,8 +101,9 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
             // Infrastructure routes these structured records to the alert channel.
             log.warn("LLM_BUDGET_ALERT id={} window={} start={} threshold={}", alert.id, alert.windowType, alert.windowStart, alert.thresholdPercent)
         }
+        val cleanup = MediaCleanup(source, mediaStorage ?: openMediaStorage(checkNotNull(runtime.media), resources))
         val service = MaintenanceService({ limit, deadline -> dispatcher.dispatchPending(limit, deadline) },
-            reconciler::reconcileExpired, pending::recover, budget::runOnce)
+            reconciler::reconcileExpired, pending::recover, budget::runOnce, cleanup::run)
         routing {
             get("/health") { call.respondText("ok") }
             maintenanceRoutes {
@@ -119,21 +123,47 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val client = resources.own(CloudTasksClient.create(CloudTasksGateway.clientSettings()))
         OutboxDispatcher(source, CloudTasksGateway(client, config))
     }
+    val mediaConfig = checkNotNull(runtime.media)
+    val storage = mediaStorage ?: openMediaStorage(mediaConfig, resources)
+    val media = buildMediaWiring(source, storage) { resources.own(it) }
     routing {
         get("/health") { call.respondText("ok") }
-        apiRoutes(source, { eventId -> resources.runIfOpen { dispatcher?.dispatchEvent(eventId) } }) { resolver.resolve(it) }
+        apiRoutes(source, { eventId -> resources.runIfOpen { dispatcher?.dispatchEvent(eventId) } }, media) { resolver.resolve(it) }
+        mediaObjectRoutes(mediaConfig, storage)
     }
 }
 
 /** Public product API only; internal Worker and maintenance routes belong to their own runtime roles. */
-fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, resolve: suspend (ApplicationCall) -> UUID?) {
+fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, media: MediaWiring, resolve: suspend (ApplicationCall) -> UUID?) {
     val readService = WishlistReadService(source)
-    wishlistRoutes(CreateWishlistItemService(source, dispatchAfterCommit), GetWishlistItemService(source), resolve)
-    wishlistReadRoutes(readService, resolve)
-    homeActionRoutes(readService, resolve)
-    homeSummaryRoutes(HomeReadService(source), resolve)
+    mediaRoutes(media, resolve)
+    wishlistRoutes(CreateWishlistItemService(source, dispatchAfterCommit), GetWishlistItemService(source), media.signer, resolve)
+    wishlistReadRoutes(readService, media.signer, resolve)
+    homeActionRoutes(readService, media.signer, resolve)
+    homeSummaryRoutes(HomeReadService(source), media.signer, resolve)
     categoryRoutes(CategoryService(source), resolve)
-    purposeRoutes(PurposeService(source), resolve)
+    purposeRoutes(PurposeService(source), media.signer, resolve)
+}
+
+private fun openMediaStorage(config: MediaStorageConfig, resources: RuntimeResources): MediaStorage = when (config) {
+    is MediaStorageConfig.Gcs -> resources.own(GcsMediaStorage.create(config.bucket))
+    is MediaStorageConfig.Local -> LocalMediaStorage(java.nio.file.Path.of(config.directory), config.baseUrl)
+}
+
+/**
+ * Upload and display signing use separate pools: a cold list can queue dozens of display signatures, and that must not
+ * turn a concurrent upload intent into a 503 after its row was written.
+ */
+fun buildMediaWiring(source: DataSource, storage: MediaStorage, own: (AutoCloseable) -> Unit): MediaWiring {
+    val uploadSigning = MediaSigningExecutor(threads = 2, queue = 16).also(own)
+    val displaySigning = MediaSigningExecutor().also(own)
+    val signer = CachingMediaUrlSigner(storage, displaySigning)
+    return MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), uploadSigning), signer)
+}
+
+/** Direct-upload stand-in routes; only a local configuration backed by the local store gets them. */
+fun Route.mediaObjectRoutes(config: MediaStorageConfig, storage: MediaStorage) {
+    if (config.exposesLocalRoutes && storage is LocalMediaStorage) localMediaRoutes(storage)
 }
 
 private fun cloudTasksConfig(env: Map<String, String>): CloudTasksConfig? {

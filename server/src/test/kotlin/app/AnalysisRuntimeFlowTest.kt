@@ -91,7 +91,7 @@ class AnalysisRuntimeFlowTest {
         withAnalysisDatabase { source ->
             val runtime = runtime(source, process)
             testApplication {
-                application { routing { apiRoutes(source, { id -> runtime.dispatcher.dispatchEvent(id) }) { owner } } }
+                application { routing { apiRoutes(source, { id -> runtime.dispatcher.dispatchEvent(id) }, app.testutil.mediaWiring(source)) { owner } } }
                 client.block(source, runtime)
             }
         }

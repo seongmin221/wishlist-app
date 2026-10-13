@@ -1,5 +1,6 @@
 # 구현 계획 INDEX
 
+- [B6 사용자 이미지 업로드](2026-10-12-b6-media-upload.md) — Task 1~10 완료·독립 리뷰 반영·512 tests 510 통과/2 skip · Task 1~10, V18·JPEG 검증·저장소 adapter·MEDIA-01/02·표시 URL·OPS-01 정리·runtime
 - [C4 상품 상세·웹뷰](2026-10-09-client-c4-product-detail.md) — PR A(데이터·Presenter·화면) Task 1~12 구현·로컬 검증 완료, PR B(웹뷰) 4 task 진행 전
 - [B5 비동기 분석·운영 복구](2026-10-09-b5-analysis-runtime-recovery.md) — Native Task1~12 완료·독립 리뷰 반영·435 tests 433 통과/2 skip · migration·추출·병합·합산 예산·DNS·egress proxy·browser/maintenance 역할·PENDING 복구·전체 흐름
 - [B4 상품 목록·홈 조회](2026-10-07-b4-read-api.md) — Native Task1~9 완료·독립 리뷰 지적0·320 통과/1 skip, predicate·cursor·ITEM/HOME·index·회귀

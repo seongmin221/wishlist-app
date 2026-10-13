@@ -176,6 +176,8 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 **통과:** MIME/size/실제 이미지 검증, 다른 owner completion 거절, 완료 재전송 idempotency, 만료/실패 재업로드, 미참조 정리와 참조 보존. OPS-01에 media 정리를 추가한다. 실제 Cloud Storage 권한·접근 만료는 B11에서 확인한다.
 
+**구현 상태:** B6 MEDIA-01·MEDIA-02와 표시 URL·OPS-01 media 정리를 구현했다. [제품·운영 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md), [spec](../../superpowers/specs/2026-10-12-b6-media-upload-design.md), [계획](../../superpowers/plans/2026-10-12-b6-media-upload.md), [계약](media-upload-api.md), [구현 이력](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md)에 범위·검증·B7/B10/B11 인계를 기록했다. 상품 연결(B7)과 실제 bucket 권한(B11)의 완료를 뜻하지 않는다.
+
 ## B7 — 상품 사용자 변경
 
 **산출물:** 일반 편집, 정보 보완, 확정/보류, 삭제, 재분석의 전체 사용자 흐름.
@@ -275,7 +277,7 @@ ARC-07 → ARC-08 → ARC-09. 현재 참조 상태와 복원 정책을 preview/�
 | 홈 목적 개수·빈 목적 노출·연속 restart | B4 (**해결**) | [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md): 최대 3개·빈 목적 포함, restart는 현재 미완료 대상 재조회이며 CONFIRMED/DEFERRED를 검토 대상으로 되돌리지 않음 |
 | category count·서버 할 일 합계 | B4 (**해결**) | [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md): category count는 목록 표시 집합과 일치, HOME-01은 그룹별 count만 제공하고 별도 합계 필드 없음 |
 | retry 예산·deadline·즉시 발행 제한 | B5 (**해결**) | [B5 결정](../../history/product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md): generation 합산 3회·30분, Retryable ACK·scheduleTime backoff, PENDING 5분 정체·재예약 누적 3회 |
-| 이미지 형식/크기·저장소·외부 이미지 보존 | B6 | upload·completion·정리·archive 장기 보존 방향 |
+| 이미지 형식/크기·저장소·외부 이미지 보존 | B6 (**해결**) | [B6 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md): JPEG 5MiB·긴 변 2048, GCS signed PUT 15분, 미참조 24시간 정리, 1시간 읽기 URL, 외부 이미지는 URL만 보관 |
 | 상품명/brand 제한·생성 후 편집 취소 | B7 | CAT POST 성공 뒤 draft 취소 시 새 자원 수명. PUR는 B3에서 유지로 해결 |
 | 후보 filter·선택 유지·분석 상태·bulk 상한 | B8a | 추가 가능 item 상태, 이동 원자성, 최대 요청 크기 |
 | impact token·DELETE 전달 형식·신규 key retention | B2 생성 및 B8 삭제 전, B9/B10 재확인 | 생성 key 정책은 B2부터, 최종 삭제 검증은 B8부터. 기존 ITEM-05는 별도 계약 유지 |

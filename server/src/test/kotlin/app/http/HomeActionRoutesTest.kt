@@ -26,7 +26,7 @@ class HomeActionRoutesTest {
         val fixtures=states.mapIndexed { n,s -> ReadFixture(ReadPosition(time.minusSeconds(n.toLong()),UUID.randomUUID()),s) }
         source.connection.use { c -> insertReadFixtures(c,owner,fixtures);insertReadFixtures(c,other,listOf(fixtures[0].copy(position=ReadPosition(time,UUID.randomUUID())))) }
         testApplication {
-            application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source)) { owner } } }
+            application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source), app.testutil.NO_MEDIA) { owner } } }
             suspend fun group(g:String):JsonObject {
                 val response=client.get("/v1/home/action-items?group=$g")
                 assertEquals(HttpStatusCode.OK,response.status)
@@ -50,7 +50,7 @@ class HomeActionRoutesTest {
         val fixtures=(0 until 5).map { ReadFixture(ReadPosition(time.minusSeconds(it.toLong()),UUID.randomUUID()),state) }
         source.connection.use { c -> insertReadFixtures(c,owner,fixtures) }
         testApplication {
-            application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source)) { owner } } }
+            application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source), app.testutil.NO_MEDIA) { owner } } }
             val initialResponse=client.get("/v1/home/action-items?group=CLASSIFICATION_REVIEW&limit=1")
             assertEquals(HttpStatusCode.OK,initialResponse.status)
             val initial=Json.parseToJsonElement(initialResponse.bodyAsText()).jsonObject
@@ -72,7 +72,7 @@ class HomeActionRoutesTest {
     }
     @Test fun home_cursor_rejects_foreign_scope_and_bad_input() = testApplication {
         val source=app.DatabaseFactory.dataSource("jdbc:postgresql://127.0.0.1:1/not_used","test","test");val owner=UUID.randomUUID()
-        application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source)) { owner } } }
+        application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source), app.testutil.NO_MEDIA) { owner } } }
         val scope=ReadScope.Action(HomeActionGroup.INFORMATION_COMPLETION);val pos=ReadPosition(Instant.parse("2026-10-07T10:00:00Z"),UUID.randomUUID())
         val tokens=listOf("broken",WishlistReadCursorCodec.forOwner(UUID.randomUUID()).encode(ReadEndpoint.HOME_ACTION_ITEMS,scope,ReadCursorUse.NEXT,pos),
             WishlistReadCursorCodec.forOwner(owner).encode(ReadEndpoint.HOME_ACTION_ITEMS,ReadScope.Action(HomeActionGroup.CLASSIFICATION_REVIEW),ReadCursorUse.NEXT,pos),
@@ -89,7 +89,7 @@ class HomeActionRoutesTest {
     }
     @Test fun action_list_requires_authentication() = testApplication {
         val source=app.DatabaseFactory.dataSource("jdbc:postgresql://127.0.0.1:1/not_used","test","test")
-        application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source)) { null } } }
+        application { installApiHttpSupport();routing { homeActionRoutes(WishlistReadService(source), app.testutil.NO_MEDIA) { null } } }
         assertEquals(HttpStatusCode.Unauthorized,client.get("/v1/home/action-items?group=INFORMATION_COMPLETION").status)
     }
 }

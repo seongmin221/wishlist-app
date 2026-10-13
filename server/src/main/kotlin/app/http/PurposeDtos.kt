@@ -1,5 +1,6 @@
 package app.http
 
+import app.media.MediaUrls
 import app.purpose.*
 import kotlinx.serialization.Serializable
 
@@ -12,7 +13,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class PurposeCreationDto(val purpose: PurposeDetailDto, val activeCount: Int, val purposeLimit: Int = PurposeLimits.ACTIVE_LIMIT)
 @Serializable data class PurposeArchiveSummaryDto(val count: Int, val recentTitles: List<String>)
 @Serializable data class PurposeSelectItemDto(val id: String, val name: String, val colorKey: String, val iconKey: String, val version: Int)
-@Serializable data class PurposePreviewDto(val itemId: String, val imageUrl: String?)
+@Serializable data class PurposePreviewDto(val itemId: String, val imageUrl: String?, val imageMediaId: String?)
 @Serializable data class PurposeSummaryItemDto(
     val id: String, val name: String, val colorKey: String, val iconKey: String, val version: Int,
     val description: String?, val candidateCount: Long, val activity: PurposeActivityDto, val previews: List<PurposePreviewDto>,
@@ -28,7 +29,7 @@ internal fun Purpose.toDto() = PurposeDetailDto(id.toString(), input.name, input
 /** B3 has no archive records; count is the real ARCHIVED purpose count and titles come from B10 records. */
 internal fun PurposePage.archiveSummary() = PurposeArchiveSummaryDto(archivedCount, emptyList())
 
-internal fun PurposeListEntry.summaryDto(): PurposeSummaryItemDto = purpose.let { p ->
+internal fun PurposeListEntry.summaryDto(urls: MediaUrls): PurposeSummaryItemDto = purpose.let { p ->
     PurposeSummaryItemDto(p.id.toString(),p.input.name,p.input.color.name,p.input.icon.name,p.version,p.input.description,
-        p.candidateCount,p.activityDto(),previews.map { PurposePreviewDto(it.itemId.toString(),it.imageUrl) })
+        p.candidateCount,p.activityDto(),previews.map { PurposePreviewDto(it.itemId.toString(), urls.imageUrl(it.mediaObjectKey, it.imageUrl), it.mediaId?.toString()) })
 }

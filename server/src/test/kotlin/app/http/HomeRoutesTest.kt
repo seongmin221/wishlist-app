@@ -19,7 +19,7 @@ class HomeRoutesTest {
         val fixture=ReadFixture(ReadPosition(time,UUID.randomUUID()),WishlistItemState(AnalysisStatus.PROCESSING,ReviewStatus.NOT_REQUIRED,LifecycleStatus.ACTIVE,null,null,CategoryMissingReason.EXTRACTION_UNRESOLVED,null))
         source.connection.use { c -> insertReadFixtures(c,owner,listOf(fixture)) }
         testApplication {
-            application { installApiHttpSupport();routing { homeSummaryRoutes(HomeReadService(source)) { call -> if(call.request.headers["Test-Auth"]=="true") owner else null };homeActionRoutes(WishlistReadService(source)) { owner } } }
+            application { installApiHttpSupport();routing { homeSummaryRoutes(HomeReadService(source), app.testutil.NO_MEDIA) { call -> if(call.request.headers["Test-Auth"]=="true") owner else null };homeActionRoutes(WishlistReadService(source), app.testutil.NO_MEDIA) { owner } } }
             assertEquals(HttpStatusCode.Unauthorized,client.get("/v1/home").status)
             val response=client.get("/v1/home") { header("Test-Auth","true") }
             assertEquals(HttpStatusCode.OK,response.status)

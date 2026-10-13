@@ -133,10 +133,10 @@ ARC-01 previewToken은 전체 후보 상태를 나타내며 해당 page의 item 
 
 | API ID | Method·path | 지원 동작·근거 | 요청의 핵심 | 응답·결과의 필수 데이터 | 구현 |
 | --- | --- | --- | --- | --- | --- |
-| MEDIA-01 | `POST /v1/media/upload-intents` | 사진 보관함 선택 후 실제 업로드 준비 · S4 | 파일 MIME/size·이미지 정보, 재전송 key | owner의 mediaId, 만료 upload URL·방법/필수 headers·유효기간·제한 | 없음 |
-| MEDIA-02 | `POST /v1/media/{id}/completion` | 객체 업로드 성공 확인 후 상품에 연결할 자원 확정 · S4 | media ID | 검증된 READY mediaId·치수·표시 접근 정보. 같은 객체 재확인은 idempotent | 없음 |
+| MEDIA-01 | `POST /v1/media/upload-intents` | 사진 보관함 선택 후 실제 업로드 준비 · S4 | 파일 MIME/size·이미지 정보, 재전송 key | owner의 mediaId, 만료 upload URL·방법/필수 headers·유효기간·제한 | **구현(B6)**: JPEG 5MiB·각 변 2048, 15분 signed PUT(생성 전용·크기 범위 header), PENDING 10개, 재전송은 만료 불변. [계약](media-upload-api.md) |
+| MEDIA-02 | `POST /v1/media/{id}/completion` | 객체 업로드 성공 확인 후 상품에 연결할 자원 확정 · S4 | media ID | 검증된 READY mediaId·치수·표시 접근 정보. 같은 객체 재확인은 idempotent | **구현(B6)**: 실제 byte로 JPEG 구조·허용 segment·치수·decode 검증, 실패 사유 8종 FAILED·객체 삭제, 1시간 표시 URL. [계약](media-upload-api.md) |
 
-실제 이미지 byte 업로드는 intent의 저장소 URL로 한다. ITEM-04/ITEM-07에서 mediaId를 연결하고 server는 해당 owner의 READY 자원인지 확인한다. private 이미지 접근 URL은 item/archive 응답에서 갱신해 제공하며 최초 구성에는 별도 media 조회/URL 갱신 API를 추가하지 않는다. 편집 취소 때 상품에 연결되지 않은 자원은 server 정리 작업이 처리한다. 업로드 완료만으로 item 정보가 바뀌지는 않는다.
+실제 이미지 byte 업로드는 intent의 저장소 URL로 한다. ITEM-04/ITEM-07에서 mediaId를 연결하고 server는 해당 owner의 READY 자원인지 확인한다. private 이미지 접근 URL은 item/archive 응답에서 갱신해 제공하며 최초 구성에는 별도 media 조회/URL 갱신 API를 추가하지 않는다. B6부터 ITEM-01·02·03, HOME-01·02, PUR-01 SUMMARY가 연결된 READY media의 signed URL과 `imageMediaId`를 준다(B7 연결 전에는 연결된 media가 없다). 편집 취소 때 상품에 연결되지 않은 자원은 server 정리 작업이 처리한다. 업로드 완료만으로 item 정보가 바뀌지는 않는다.
 
 ## 공통·내부 HTTP — 제품 API 수에 포함하지 않음
 
@@ -145,7 +145,7 @@ ARC-01 previewToken은 전체 후보 상태를 나타내며 해당 page의 item 
 | SYS-01 | `GET /health` | 실행 상태 확인 | 현재 `ok`. DB readiness 검사는 별도 요구 시 검토 | 구현 |
 | WORK-01 | `POST /internal/worker/general` | Cloud Tasks → private 일반 Worker | jobId/generation. 완료·stale·retry outbox 저장 ACK 204, durable 기록이 없는 retry(claim 전 마감·executor 포화·90초 timeout)만 503 | **구현(B5)**: brand·가격·판매처·canonical 추출, generation 합산 예산, DNS 실패 Retryable·BLOCKED_ADDRESS |
 | WORK-02 | `POST /internal/worker/browser` | Cloud Tasks → private browser Worker | jobId/generation, 제한된 rendering·최종 분류/보완 상태, 응답 규칙은 WORK-01과 같음 | **구현(B5)**: browser-worker 역할, pinning egress proxy 경유 Chromium. 배포 egress firewall은 B11 |
-| OPS-01 | `POST /internal/maintenance/run` | Scheduler → private maintenance 서비스 | outbox backlog 발행·만료 RUNNING·오래된 PENDING 복구·예산 정산/경고를 공통 deadline(50초) 안에서 단계별 격리. 단계 실패 시 500 + report | **구현(B5)**: maintenance 역할. 미사용 media 정리는 B6, Scheduler OIDC 실호출은 B11 |
+| OPS-01 | `POST /internal/maintenance/run` | Scheduler → private maintenance 서비스 | outbox backlog 발행·만료 RUNNING·오래된 PENDING 복구·예산 정산/경고를 공통 deadline(50초) 안에서 단계별 격리. 단계 실패 시 500 + report | **구현(B5)**: maintenance 역할. **B6**: 마지막 `media` 단계가 만료·실패·미참조 media를 24시간 뒤 tombstone으로 정리. Scheduler OIDC 실호출은 B11 |
 
 private 경로를 공개 API 서비스에 같이 등록하지 않는다. Firebase 사용자 token과 service OIDC를 혼용하지 않는다. parser·분류·캐시 조회·AI 품질 평가·DB migration은 공개 endpoint가 아니라 서버 내부 함수/작업/CLI다. 현재 사용자 UI에는 별도의 public AI 호출·outbox 제어 API가 필요하지 않다.
 
@@ -265,7 +265,7 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 | 아카이브 후보의 분석 상태 | 일반적으로 비교 가능 item을 다루지만 PROCESSING/보완 필요 후보를 목적에 추가·archive할 수 있는지 명확히 필요 | PUR-07/PUR-08, ARC-01/ARC-02/ARC-08 |
 | archive 정렬·snapshot 후보 순서 | 최근 종료순은 디자인의 가정, 구매 item 맨앞은 최신 결정. 나머지 후보 sort 고정 필요 | ARC-03/ARC-05 |
 | Share Extension 직접 전송 | C3는 app group inbox에 기록 후 본 앱 전송으로 확정([ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)). 실제 background 직접 전송은 인증 연결 단계에서 구현·검증 | ITEM-01, client share 수신 |
-| image 저장 제한·외부 이미지 영속 보관 | 사용자 사진 선택은 확정, MIME/size·관리 저장소·archive 외부 이미지 보존 방식은 기술 설계 필요 | MEDIA-01/MEDIA-02, ITEM/ARC GET |
+| image 저장 제한·외부 이미지 영속 보관 | **B6 해결**: [B6 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md). JPEG 5MiB·긴 변 2048, GCS private bucket signed PUT, 외부 이미지는 URL만 보관·깨지면 placeholder | MEDIA-01/MEDIA-02, ITEM/ARC GET |
 
 미결정은 해당 필터·validation·정렬·snapshot 구현의 선행 조건이며, 상품 생성 응답 수정·상세 조회·공통 상태·기본 목록 구현을 모두 막지는 않는다.
 

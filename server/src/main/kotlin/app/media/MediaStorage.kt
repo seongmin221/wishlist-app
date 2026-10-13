@@ -1,0 +1,61 @@
+package app.media
+
+import java.time.Duration
+import java.time.Instant
+import java.util.UUID
+
+data class UploadTarget(val method: String, val url: String, val headers: Map<String, String>, val expiresAt: Instant)
+data class SignedRead(val url: String, val expiresAt: Instant)
+
+/** Signs a display URL; null when signing failed or timed out, so callers show a placeholder. */
+fun interface MediaUrlSigner {
+    fun sign(objectKey: String): SignedRead?
+
+    /** Signs every key for one response; keys that fail are absent. */
+    fun signAll(objectKeys: Set<String>): MediaUrls =
+        MediaUrls(objectKeys.mapNotNull { key -> sign(key)?.let { key to it } }.toMap())
+}
+
+/** Display URLs signed for one response. */
+class MediaUrls(private val byKey: Map<String, SignedRead>) {
+    /**
+     * A user image wins over the extracted one. When its signing failed the URL is null rather than the extracted image,
+     * so another picture never stands in for the one the user chose.
+     */
+    fun imageUrl(mediaObjectKey: String?, externalUrl: String?): String? =
+        if (mediaObjectKey != null) byKey[mediaObjectKey]?.url else externalUrl
+
+    companion object { val NONE = MediaUrls(emptyMap()) }
+}
+
+/**
+ * Object store for user images. Calls run outside DB transactions. Signing may be a remote call (IAM signBlob), so every
+ * signing path goes through [MediaSigningExecutor].
+ */
+interface MediaStorage {
+    fun uploadTarget(objectKey: String, contentType: String, expiresAt: Instant): UploadTarget
+    fun readUrl(objectKey: String, validFor: Duration): SignedRead
+    /** Null when the object does not exist. */
+    fun stat(objectKey: String): StoredObject?
+    /** Throws [MediaObjectTooLarge] past [maxBytes]. */
+    fun read(objectKey: String, maxBytes: Int): ByteArray
+    /** Succeeds when the object is already gone. */
+    fun delete(objectKey: String)
+}
+
+class MediaStorageException(cause: Throwable? = null) : RuntimeException("Media storage unavailable", cause)
+class MediaObjectTooLarge : RuntimeException("Media object exceeds the read limit")
+
+object MediaKeys {
+    private val pattern = Regex("media/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\\.jpg")
+
+    fun objectKey(owner: UUID, media: UUID) = "media/$owner/$media.jpg"
+    fun isValid(objectKey: String) = pattern.matches(objectKey)
+    /** Media id for logs; never log the key's URL form. */
+    fun mediaId(objectKey: String) = objectKey.substringAfterLast('/').removeSuffix(".jpg")
+
+    /** Headers the client must send unchanged; each one is part of the upload signature. */
+    fun uploadHeaders(contentType: String) = linkedMapOf(
+        "Content-Type" to contentType, "x-goog-if-generation-match" to "0", "x-goog-content-length-range" to MediaLimits.CONTENT_LENGTH_RANGE,
+    )
+}

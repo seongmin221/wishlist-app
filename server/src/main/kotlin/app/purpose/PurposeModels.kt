@@ -30,7 +30,7 @@ class PurposeException(val code: String, val fields: Set<String> = emptySet(), v
 
 enum class PurposeProjection { SUMMARY, SELECT }
 data class PurposeCursorPosition(val activityAt: Instant, val id: UUID)
-data class PurposePreview(val itemId: UUID, val imageUrl: String?)
+data class PurposePreview(val itemId: UUID, val imageUrl: String?, val mediaId: UUID? = null, val mediaObjectKey: String? = null)
 data class PurposeListEntry(val purpose: Purpose, val previews: List<PurposePreview>)
 data class PurposePage(val projection: PurposeProjection, val entries: List<PurposeListEntry>, val next: PurposeCursorPosition?,
     val activeCount: Int, val archivedCount: Int)

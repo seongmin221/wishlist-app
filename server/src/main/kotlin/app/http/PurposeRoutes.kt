@@ -1,6 +1,8 @@
 package app.http
 
 import app.common.parseCanonicalUuid
+import app.media.MediaUrlSigner
+import app.media.MediaUrls
 import app.purpose.*
 import io.ktor.http.*
 import io.ktor.server.application.ApplicationCall
@@ -13,7 +15,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.util.UUID
 
-fun Route.purposeRoutes(service: PurposeService, ownerResolver: suspend (ApplicationCall) -> UUID?) {
+fun Route.purposeRoutes(service: PurposeService, signer: MediaUrlSigner, ownerResolver: suspend (ApplicationCall) -> UUID?) {
     get("/v1/purposes") {
         val owner = ownerResolver(call) ?: return@get call.respondApiError(HttpStatusCode.Unauthorized, "UNAUTHORIZED")
         val query = call.request.queryParameters
@@ -25,13 +27,16 @@ fun Route.purposeRoutes(service: PurposeService, ownerResolver: suspend (Applica
             ?: if (query["limit"] == null) PurposeLimits.PAGE_LIMIT else return@get call.respondApiError(HttpStatusCode.BadRequest, "INVALID_PURPOSE_QUERY")
         val after = query["cursor"]?.let { PurposeCursorCodec.decode(owner, projection, it)
             ?: return@get call.respondApiError(HttpStatusCode.BadRequest, "INVALID_PURPOSE_CURSOR") }
-        val page = withContext(Dispatchers.IO) { service.list(owner, projection, limit, after) }
+        val (page, urls) = withContext(Dispatchers.IO) {
+            val page = service.list(owner, projection, limit, after)
+            page to if (projection == PurposeProjection.SUMMARY) signer.signAll(page.entries.previewMediaKeys()) else MediaUrls.NONE
+        }
         val next = page.next?.let { PurposeCursorCodec.encode(owner, projection, it) }
         val payload = when (projection) {
             PurposeProjection.SELECT -> ApiJson.encodeToString(PurposeSelectListDto(projection.name, page.entries.map { (p, _) ->
                 PurposeSelectItemDto(p.id.toString(), p.input.name, p.input.color.name, p.input.icon.name, p.version) },
                 next, page.activeCount, PurposeLimits.ACTIVE_LIMIT, page.archiveSummary()))
-            PurposeProjection.SUMMARY -> ApiJson.encodeToString(PurposeSummaryListDto(projection.name, page.entries.map { it.summaryDto() },
+            PurposeProjection.SUMMARY -> ApiJson.encodeToString(PurposeSummaryListDto(projection.name, page.entries.map { it.summaryDto(urls) },
                 next, page.activeCount, PurposeLimits.ACTIVE_LIMIT, page.archiveSummary()))
         }
         call.respondText(payload, ContentType.Application.Json)

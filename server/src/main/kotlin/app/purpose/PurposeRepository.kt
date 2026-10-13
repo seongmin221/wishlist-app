@@ -60,13 +60,15 @@ class PurposeRepository {
         if (ids.isEmpty()) return emptyMap()
         val array = c.createArrayOf("uuid", ids.toTypedArray())
         try {
-            return c.prepareStatement("""select purpose_id,id,product_image_url from (
-                select purpose_id,id,product_image_url,created_at,row_number() over (partition by purpose_id order by created_at desc,id desc) rank
+            return c.prepareStatement("""select ranked.purpose_id,ranked.id,ranked.product_image_url,m.id,m.object_key from (
+                select purpose_id,id,product_image_url,media_asset_id,created_at,
+                    row_number() over (partition by purpose_id order by created_at desc,id desc) rank
                 from wishlist_items where owner_id=? and lifecycle_status='ACTIVE' and purpose_id=any(?)) ranked
-                where rank<=4 order by purpose_id,rank""").use { s ->
-                s.setObject(1, owner); s.setArray(2, array)
+                left join media_assets m on m.owner_id=? and m.id=ranked.media_asset_id and m.status='READY'
+                where rank<=4 order by ranked.purpose_id,rank""").use { s ->
+                s.setObject(1, owner); s.setArray(2, array); s.setObject(3, owner)
                 s.executeQuery().use { r -> buildList { while (r.next()) add(r.getObject(1, UUID::class.java) to
-                    PurposePreview(r.getObject(2, UUID::class.java), r.getString(3))) } }
+                    PurposePreview(r.getObject(2, UUID::class.java), r.getString(3), r.getObject(4, UUID::class.java), r.getString(5))) } }
             }.groupBy({ it.first }, { it.second })
         } finally { array.free() }
     }

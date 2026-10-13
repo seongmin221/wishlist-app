@@ -43,6 +43,8 @@ data class ProductDto(
     val metadataCheckedAt: String? = null,
     val nameSource: ValueSource? = null,
     val imageSource: ValueSource? = null,
+    /** Stable cache key for a user image; the signed [imageUrl] changes between responses. */
+    val imageMediaId: String? = null,
 )
 
 @Serializable

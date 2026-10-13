@@ -74,7 +74,7 @@ class RealUrlPilotTest {
 
             testApplication {
                 application { routing {
-                    wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source)) { owner }
+                    wishlistRoutes(CreateWishlistItemService(source), app.wishlist.GetWishlistItemService(source), app.testutil.NO_MEDIA) { owner }
                     workerRoutes(worker)
                 } }
                 for (case in cases) {

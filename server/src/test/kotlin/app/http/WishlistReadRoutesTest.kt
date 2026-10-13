@@ -20,8 +20,8 @@ class WishlistReadRoutesTest {
         val source=DatabaseFactory.dataSource("jdbc:postgresql://127.0.0.1:1/not_used","test","test")
         val owner=UUID.randomUUID()
         application { installApiHttpSupport(); routing {
-            wishlistRoutes(CreateWishlistItemService(source),GetWishlistItemService(source)) { call -> if(call.request.headers["Test-Auth"]=="true") owner else null }
-            wishlistReadRoutes(WishlistReadService(source)) { call -> if(call.request.headers["Test-Auth"]=="true") owner else null }
+            wishlistRoutes(CreateWishlistItemService(source),GetWishlistItemService(source), app.testutil.NO_MEDIA) { call -> if(call.request.headers["Test-Auth"]=="true") owner else null }
+            wishlistReadRoutes(WishlistReadService(source), app.testutil.NO_MEDIA) { call -> if(call.request.headers["Test-Auth"]=="true") owner else null }
         } }
         assertEquals(HttpStatusCode.Unauthorized,client.get("/v1/wishlist-items?purposeUnassigned=true").status)
         for ((query,code) in listOf("" to "INVALID_WISHLIST_QUERY", "categoryId=C999" to "INVALID_WISHLIST_QUERY", "purposeUnassigned=true&limit=101" to "INVALID_WISHLIST_QUERY",
@@ -45,8 +45,8 @@ class WishlistReadRoutesTest {
         source.connection.use { c -> insertReadFixtures(c,owner,listOf(first,second,nameless)) }
         testApplication {
             application { installApiHttpSupport(); routing {
-                wishlistRoutes(CreateWishlistItemService(source),GetWishlistItemService(source)) { owner }
-                wishlistReadRoutes(WishlistReadService(source)) { owner }
+                wishlistRoutes(CreateWishlistItemService(source),GetWishlistItemService(source), app.testutil.NO_MEDIA) { owner }
+                wishlistReadRoutes(WishlistReadService(source), app.testutil.NO_MEDIA) { owner }
             } }
             val response=client.get("/v1/wishlist-items?categoryId=C026&limit=1")
             assertEquals(HttpStatusCode.OK,response.status)
