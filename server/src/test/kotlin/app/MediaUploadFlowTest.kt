@@ -74,7 +74,7 @@ class MediaUploadFlowTest {
         assertEquals(0, maintenance.runOnce().mediaDeleted)
         val mediaId = analysisScalar(source, "select media_asset_id from wishlist_items where media_asset_id is not null")!!
         analysisSql(source, "update wishlist_items set media_asset_id=null where media_asset_id='$mediaId'")
-        analysisSql(source, "update media_assets set released_at=clock_timestamp()-interval '25 hours' where id='$mediaId'")
+        analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours' where id='$mediaId'")
         val report = maintenance.runOnce()
         assertEquals(1, report.mediaDeleted)
         assertEquals(emptyList(), report.failedSteps)

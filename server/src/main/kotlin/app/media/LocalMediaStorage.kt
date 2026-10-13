@@ -15,7 +15,12 @@ import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-enum class LocalUploadResult { STORED, FORBIDDEN, EXISTS, TOO_LARGE }
+enum class LocalUploadResult { STORED, FORBIDDEN, EXISTS, TOO_LARGE, EMPTY }
+sealed interface LocalRead {
+    data object Forbidden : LocalRead
+    data object Missing : LocalRead
+    class Found(val bytes: ByteArray) : LocalRead
+}
 
 /**
  * Local-only stand-in for the bucket. URLs carry an HMAC over method, key and expiry with a per-process key, and uploads
@@ -59,21 +64,29 @@ class LocalMediaStorage(
         if (!authorized("PUT", objectKey, query)) return LocalUploadResult.FORBIDDEN
         if (MediaKeys.uploadHeaders(MediaLimits.CONTENT_TYPE).any { (name, value) -> header(name) != value }) return LocalUploadResult.FORBIDDEN
         if (Files.exists(target)) return LocalUploadResult.EXISTS
-        Files.createDirectories(target.parent)
-        val temp = Files.createTempFile(target.parent, ".upload-", ".part")
-        try {
-            val size = Files.newOutputStream(temp).use { out -> body.readNBytes(MediaLimits.MAX_BYTES + 1).also(out::write).size }
-            if (size !in 1..MediaLimits.MAX_BYTES) return LocalUploadResult.TOO_LARGE
-            return try { Files.createLink(target, temp); LocalUploadResult.STORED } catch (_: FileAlreadyExistsException) { LocalUploadResult.EXISTS }
-        } finally {
-            Files.deleteIfExists(temp)
+        return io {
+            Files.createDirectories(target.parent)
+            val temp = Files.createTempFile(target.parent, ".upload-", ".part")
+            try {
+                val size = Files.newOutputStream(temp).use { out -> body.readNBytes(MediaLimits.MAX_BYTES + 1).also(out::write).size }
+                when {
+                    // GCS rejects an empty body as a bad request, not as too large.
+                    size == 0 -> LocalUploadResult.EMPTY
+                    size > MediaLimits.MAX_BYTES -> LocalUploadResult.TOO_LARGE
+                    else -> try { Files.createLink(target, temp); LocalUploadResult.STORED } catch (_: FileAlreadyExistsException) { LocalUploadResult.EXISTS }
+                }
+            } finally {
+                Files.deleteIfExists(temp)
+            }
         }
     }
 
-    /** The file for a valid GET signature, or null. */
-    fun openForRead(objectKey: String, query: Map<String, String>): Path? {
-        val file = file(objectKey) ?: return null
-        return if (authorized("GET", objectKey, query) && Files.isRegularFile(file)) file else null
+    /** Bytes for a valid GET signature. An object deleted after signing (cleanup, failed completion) is [LocalRead.Missing]. */
+    fun readSigned(objectKey: String, query: Map<String, String>): LocalRead {
+        val file = file(objectKey) ?: return LocalRead.Forbidden
+        if (!authorized("GET", objectKey, query)) return LocalRead.Forbidden
+        return try { LocalRead.Found(Files.readAllBytes(file)) } catch (_: NoSuchFileException) { LocalRead.Missing }
+            catch (error: IOException) { throw MediaStorageException(error) }
     }
 
     private fun url(method: String, objectKey: String, expiresAt: Instant): String {

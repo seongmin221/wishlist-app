@@ -66,7 +66,8 @@ class MediaRepository {
 
     /** Applies a verdict only to a row still PENDING; the caller holds the row lock. */
     fun markReady(c: Connection, id: UUID, verdict: ImageVerdict.Valid) = c.prepareStatement("""
-        update media_assets set status='READY', byte_size=?, width=?, height=?, ready_at=clock_timestamp(), updated_at=clock_timestamp()
+        update media_assets set status='READY', byte_size=?, width=?, height=?, ready_at=clock_timestamp(), unreferenced_since=clock_timestamp(),
+            updated_at=clock_timestamp()
         where id=? and status='PENDING'
     """).use { s ->
         s.setInt(1, verdict.byteSize); s.setInt(2, verdict.width); s.setInt(3, verdict.height); s.setObject(4, id)

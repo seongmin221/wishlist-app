@@ -42,11 +42,13 @@ class LocalMediaStorageTest {
         assertContentEquals(bytes, storage.read(key, MediaLimits.MAX_BYTES))
         val read = storage.readUrl(key, Duration.ofHours(1))
         assertEquals(now.plus(Duration.ofHours(1)), read.expiresAt)
-        assertEquals(root.resolve(key), storage.openForRead(pathKey(read.url), query(read.url)))
-        assertNull(storage.openForRead(pathKey(read.url), query(read.url) + ("signature" to "x")))
-        assertNull(storage.openForRead(pathKey(read.url), query(target.url)))  // an upload signature cannot read
+        assertContentEquals(bytes, (storage.readSigned(pathKey(read.url), query(read.url)) as LocalRead.Found).bytes)
+        assertEquals(LocalRead.Forbidden, storage.readSigned(pathKey(read.url), query(read.url) + ("signature" to "x")))
+        assertEquals(LocalRead.Forbidden, storage.readSigned(pathKey(read.url), query(target.url)))  // an upload signature cannot read
         storage.delete(key); storage.delete(key)
         assertNull(storage.stat(key))
+        // Deleted between signing and reading (cleanup or a failed completion): missing, not a server error.
+        assertEquals(LocalRead.Missing, storage.readSigned(pathKey(read.url), query(read.url)))
         // A missing object while reading is a storage failure, matching GCS, not a raw IO exception.
         assertFailsWith<MediaStorageException> { storage.read(key, MediaLimits.MAX_BYTES) }
     }
@@ -61,7 +63,7 @@ class LocalMediaStorageTest {
             assertEquals(LocalUploadResult.FORBIDDEN, put(target, body(), headers = target.headers + (name to "other")), name)
         }
         assertEquals(LocalUploadResult.FORBIDDEN, put(target, body(), objectKey = "media/../../etc/passwd"))
-        assertEquals(LocalUploadResult.TOO_LARGE, put(target, ByteArrayInputStream(ByteArray(0))))
+        assertEquals(LocalUploadResult.EMPTY, put(target, ByteArrayInputStream(ByteArray(0))))
         assertEquals(LocalUploadResult.TOO_LARGE, put(target, ByteArrayInputStream(ByteArray(MediaLimits.MAX_BYTES + 1))))
         assertNull(storage.stat(key))
         now = now.plusSeconds(901)
@@ -92,5 +94,15 @@ class LocalMediaStorageTest {
         } finally { gate.countDown(); pool.shutdown() }
         assertContentEquals(second, storage.read(key, MediaLimits.MAX_BYTES))
         assertEquals(1, Files.list(root.resolve(key).parent).use { it.count() })
+    }
+
+    @Test fun `filesystem failures while accepting an upload are storage errors`() {
+        val blocked = Files.createTempFile("not-a-directory", ".tmp")
+        val broken = LocalMediaStorage(blocked, "http://localhost:8080", clock = { now })
+        val target = broken.uploadTarget(key, MediaLimits.CONTENT_TYPE, now.plusSeconds(900))
+        assertFailsWith<MediaStorageException> {
+            broken.acceptUpload(pathKey(target.url), query(target.url), { name -> target.headers.entries.firstOrNull { it.key.equals(name, true) }?.value },
+                ByteArrayInputStream(MediaFixtures.jpeg(4, 4)))
+        }
     }
 }

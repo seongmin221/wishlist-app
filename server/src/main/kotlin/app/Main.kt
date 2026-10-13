@@ -125,9 +125,7 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
     }
     val mediaConfig = checkNotNull(runtime.media)
     val storage = mediaStorage ?: openMediaStorage(mediaConfig, resources)
-    val signing = resources.own(MediaSigningExecutor())
-    val signer = CachingMediaUrlSigner(storage, signing)
-    val media = MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), signing), signer)
+    val media = buildMediaWiring(source, storage) { resources.own(it) }
     routing {
         get("/health") { call.respondText("ok") }
         apiRoutes(source, { eventId -> resources.runIfOpen { dispatcher?.dispatchEvent(eventId) } }, media) { resolver.resolve(it) }
@@ -150,6 +148,17 @@ fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, med
 private fun openMediaStorage(config: MediaStorageConfig, resources: RuntimeResources): MediaStorage = when (config) {
     is MediaStorageConfig.Gcs -> resources.own(GcsMediaStorage.create(config.bucket))
     is MediaStorageConfig.Local -> LocalMediaStorage(java.nio.file.Path.of(config.directory), config.baseUrl)
+}
+
+/**
+ * Upload and display signing use separate pools: a cold list can queue dozens of display signatures, and that must not
+ * turn a concurrent upload intent into a 503 after its row was written.
+ */
+fun buildMediaWiring(source: DataSource, storage: MediaStorage, own: (AutoCloseable) -> Unit): MediaWiring {
+    val uploadSigning = MediaSigningExecutor(threads = 2, queue = 16).also(own)
+    val displaySigning = MediaSigningExecutor().also(own)
+    val signer = CachingMediaUrlSigner(storage, displaySigning)
+    return MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), uploadSigning), signer)
 }
 
 /** Direct-upload stand-in routes; only a local configuration backed by the local store gets them. */

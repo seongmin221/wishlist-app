@@ -19,7 +19,8 @@ create table media_assets (
     upload_expires_at timestamptz not null,
     ready_at timestamptz,
     failed_at timestamptz,
-    released_at timestamptz,
+    -- Start of the cleanup grace: set when the row becomes READY and when an item releases it; null while linked.
+    unreferenced_since timestamptz,
     deleted_at timestamptz,
     created_at timestamptz not null default clock_timestamp(),
     updated_at timestamptz not null default clock_timestamp(),
@@ -42,7 +43,7 @@ create index media_assets_pending_owner_idx on media_assets (owner_id, upload_ex
 -- One partial index per cleanup discovery condition.
 create index media_assets_cleanup_pending_idx on media_assets (upload_expires_at, id) where status = 'PENDING';
 create index media_assets_cleanup_failed_idx on media_assets (failed_at, id) where status = 'FAILED';
-create index media_assets_cleanup_ready_idx on media_assets ((coalesce(released_at, ready_at)), id) where status = 'READY';
+create index media_assets_cleanup_ready_idx on media_assets (unreferenced_since, id) where status = 'READY' and unreferenced_since is not null;
 create index media_assets_cleanup_deleting_idx on media_assets (updated_at, id) where status = 'DELETING';
 
 alter table wishlist_items

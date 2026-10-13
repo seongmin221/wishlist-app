@@ -3,6 +3,8 @@ package app.http
 import app.media.MediaLimits
 import app.media.MediaStatus
 import app.media.MediaView
+import app.purpose.PurposeListEntry
+import app.wishlist.WishlistItem
 import kotlinx.serialization.Serializable
 
 @Serializable data class MediaDto(
@@ -32,6 +34,6 @@ fun MediaView.toDto(): MediaResponseDto {
 }
 
 /** Object keys of the user images a response will show. */
-internal fun Iterable<app.wishlist.WishlistItem>.mediaKeys(): Set<String> = mapNotNullTo(mutableSetOf()) { it.mediaObjectKey }
-internal fun Iterable<app.purpose.PurposeListEntry>.previewMediaKeys(): Set<String> =
+internal fun Iterable<WishlistItem>.mediaKeys(): Set<String> = mapNotNullTo(mutableSetOf()) { it.mediaObjectKey }
+internal fun Iterable<PurposeListEntry>.previewMediaKeys(): Set<String> =
     flatMap { it.previews }.mapNotNullTo(mutableSetOf()) { it.mediaObjectKey }

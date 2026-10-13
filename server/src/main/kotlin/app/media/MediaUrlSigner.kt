@@ -7,8 +7,9 @@ import org.slf4j.LoggerFactory
 
 /**
  * Display URLs valid for an hour, reused while at least 45 minutes remain, so a list does not issue one signBlob per
- * item. Misses are signed on the shared [MediaSigningExecutor]; one response waits at most [budget] in total, and a
- * signature that finishes late still lands in the cache for the next request.
+ * item. Misses are signed on the display [MediaSigningExecutor]; one response starts at most [maxNewPerResponse] new
+ * signatures so a single cold list cannot fill the pool for everyone, waits at most [budget] in total, and a signature
+ * that finishes late still lands in the cache for the next request.
  */
 class CachingMediaUrlSigner(
     private val storage: MediaStorage,
@@ -18,6 +19,7 @@ class CachingMediaUrlSigner(
     private val reuseWhile: Duration = MediaLimits.READ_REUSE_MINIMUM,
     private val maxEntries: Int = 10_000,
     private val budget: Duration = signing.wait,
+    private val maxNewPerResponse: Int = 32,
 ) : MediaUrlSigner {
     private val cache = ConcurrentHashMap<String, SignedRead>()
     private val log = LoggerFactory.getLogger(CachingMediaUrlSigner::class.java)
@@ -28,7 +30,7 @@ class CachingMediaUrlSigner(
     override fun signAll(objectKeys: Set<String>): MediaUrls {
         val deadline = System.nanoTime() + budget.toNanos()
         val hits = objectKeys.mapNotNull { key -> cache[key]?.takeIf(::fresh)?.let { key to it } }.toMap()
-        val pending = (objectKeys - hits.keys).associateWith(::signed)
+        val pending = (objectKeys - hits.keys).take(maxNewPerResponse).associateWith(::signed)
         val signed = pending.mapNotNull { (key, future) -> signing.await(future, deadline)?.let { key to it } }.toMap()
         return MediaUrls(hits + signed)
     }

@@ -16,6 +16,8 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
     @Volatile var signDelayMillis = 0L
     @Volatile var beforeStat: (String) -> Unit = {}
     @Volatile var deleteDelayMillis = 0L
+    @Volatile var readDelayMillis: (String) -> Long = { 0L }
+    @Volatile var readSignDelayMillis = 0L
     val uploadSigns = AtomicInteger()
     val readSigns = AtomicInteger()
     val stats = AtomicInteger()
@@ -33,6 +35,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
 
     override fun readUrl(objectKey: String, validFor: Duration): SignedRead {
         readSigns.incrementAndGet(); delay()
+        if (readSignDelayMillis > 0) Thread.sleep(readSignDelayMillis)
         if (failSign) throw MediaStorageException()
         val expiresAt = now().plus(validFor)
         return SignedRead("memory://read/$objectKey?exp=${expiresAt.epochSecond}", expiresAt)
@@ -46,6 +49,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
 
     override fun read(objectKey: String, maxBytes: Int): ByteArray {
         reads.incrementAndGet()
+        readDelayMillis(objectKey).takeIf { it > 0 }?.let(Thread::sleep)
         if (failRead) throw MediaStorageException()
         val bytes = objects[objectKey]?.first ?: throw MediaStorageException()
         if (bytes.size > maxBytes) throw MediaObjectTooLarge()
@@ -79,9 +83,9 @@ fun insertMedia(source: javax.sql.DataSource, owner: java.util.UUID, status: Str
     val key = MediaKeys.objectKey(owner, id)
     analysisSql(source, "insert into app_users(id) values ('$owner') on conflict do nothing")
     analysisSql(source, """insert into media_assets(id,owner_id,idempotency_key,request_fingerprint,object_key,content_type,
-        declared_byte_size,declared_width,declared_height,upload_expires_at,status,byte_size,width,height,ready_at,failure_reason,failed_at)
+        declared_byte_size,declared_width,declared_height,upload_expires_at,status,byte_size,width,height,ready_at,failure_reason,failed_at,unreferenced_since)
         values ('$id','$owner','${java.util.UUID.randomUUID()}','${"a".repeat(64)}','$key','image/jpeg',100,10,10,
         clock_timestamp(),'$status',100,10,10,clock_timestamp(),
-        ${if (status == "FAILED") "'NOT_JPEG',clock_timestamp()" else "null,null"})""")
+        ${if (status == "FAILED") "'NOT_JPEG',clock_timestamp()" else "null,null"},${if (status == "READY") "clock_timestamp()" else "null"})""")
     return id to key
 }

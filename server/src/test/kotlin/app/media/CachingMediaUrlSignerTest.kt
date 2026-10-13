@@ -47,7 +47,7 @@ class CachingMediaUrlSignerTest {
     @Test fun `one response waits at most the budget and late signatures fill the cache`() {
         storage.signDelayMillis = 1_000
         MediaSigningExecutor(threads = 8, queue = 64, wait = Duration.ofMillis(1_500)).use { signing ->
-            val signer = CachingMediaUrlSigner(storage, signing, { now })
+            val signer = CachingMediaUrlSigner(storage, signing, { now }, maxNewPerResponse = 40)
             val keys = (1..40).map { "k$it" }.toSet()
             val started = System.nanoTime()
             val urls = signer.signAll(keys)
@@ -84,5 +84,14 @@ class CachingMediaUrlSignerTest {
         assertEquals("signed", urls.imageUrl("k", "https://shop.example/x.jpg"))
         assertNull(urls.imageUrl("missing", "https://shop.example/x.jpg"))
         assertEquals("https://shop.example/x.jpg", urls.imageUrl(null, "https://shop.example/x.jpg"))
+    }
+
+    @Test fun `one response starts at most its share of new signatures`() {
+        MediaSigningExecutor().use { signing ->
+            val signer = CachingMediaUrlSigner(storage, signing, { now }, maxNewPerResponse = 32)
+            val urls = signer.signAll((1..100).map { "k$it" }.toSet())
+            assertEquals(32, (1..100).count { urls.imageUrl("k$it", null) != null })
+            assertEquals(32, storage.readSigns.get())
+        }
     }
 }

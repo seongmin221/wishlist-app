@@ -1,36 +1,41 @@
 package app.media
 
+import java.time.Duration
+
 /**
- * The one place that decides whether a media row is still in use. B10 adds archive snapshot references here.
- * A DELETED item keeps protecting its image for the grace period after its last change, so a missed release time in an
- * item deletion still leaves 24 hours before the object goes.
+ * The one place that decides whether a media row is still in use and whether cleanup may take it. B10 adds archive
+ * snapshot references to [referenced].
  */
 object MediaReferences {
-    fun referenced(alias: String) = """exists (select 1 from wishlist_items ref
-        where ref.owner_id=$alias.owner_id and ref.media_asset_id=$alias.id
-          and (ref.lifecycle_status in ('ACTIVE','ARCHIVED') or ref.updated_at > clock_timestamp() - interval '24 hours'))"""
+    private val grace = seconds(MediaLimits.CLEANUP_GRACE)
+    private val lease = seconds(MediaLimits.DELETE_LEASE)
 
     /**
-     * Discovery: one branch per status so each uses its partial index and stops at the batch size, instead of one OR
-     * predicate that re-evaluates every old linked READY row each run.
+     * A DELETED item keeps protecting its image for the grace period after its last change, so a missed release in an
+     * item deletion still leaves 24 hours before the object goes.
      */
-    fun discovery(alias: String) = """select id from (
-        (select $alias.id, $alias.updated_at from media_assets $alias where $alias.status='PENDING'
-            and $alias.upload_expires_at <= clock_timestamp() - interval '24 hours' order by $alias.upload_expires_at, $alias.id limit ?)
-        union all (select $alias.id, $alias.updated_at from media_assets $alias where $alias.status='FAILED'
-            and $alias.failed_at <= clock_timestamp() - interval '24 hours' order by $alias.failed_at, $alias.id limit ?)
-        union all (select $alias.id, $alias.updated_at from media_assets $alias where $alias.status='READY'
-            and coalesce($alias.released_at, $alias.ready_at) <= clock_timestamp() - interval '24 hours' and not ${referenced(alias)}
-            order by coalesce($alias.released_at, $alias.ready_at), $alias.id limit ?)
-        union all (select $alias.id, $alias.updated_at from media_assets $alias where $alias.status='DELETING'
-            and $alias.updated_at <= clock_timestamp() - interval '2 minutes' order by $alias.updated_at, $alias.id limit ?)
-    ) candidates order by updated_at, id limit ?"""
+    fun referenced(alias: String) = """exists (select 1 from wishlist_items ref
+        where ref.owner_id=$alias.owner_id and ref.media_asset_id=$alias.id
+          and (ref.lifecycle_status in ('ACTIVE','ARCHIVED') or ref.updated_at > clock_timestamp() - $grace))"""
 
-    /** Rows the cleanup may delete now, including DELETING rows whose lease expired. */
-    fun cleanupCandidate(alias: String) = """(
-        ($alias.status='PENDING' and $alias.upload_expires_at <= clock_timestamp() - interval '24 hours')
-        or ($alias.status='FAILED' and $alias.failed_at <= clock_timestamp() - interval '24 hours')
-        or ($alias.status='READY' and coalesce($alias.released_at, $alias.ready_at) <= clock_timestamp() - interval '24 hours'
-            and not ${referenced(alias)})
-        or ($alias.status='DELETING' and $alias.updated_at <= clock_timestamp() - interval '2 minutes'))"""
+    /** Per-status condition and the column its partial index orders by. */
+    private fun branches(alias: String) = listOf(
+        "$alias.status='PENDING' and $alias.upload_expires_at <= clock_timestamp() - $grace" to "$alias.upload_expires_at",
+        "$alias.status='FAILED' and $alias.failed_at <= clock_timestamp() - $grace" to "$alias.failed_at",
+        // Linked READY rows have no unreferenced_since and are not in the partial index at all.
+        "$alias.status='READY' and $alias.unreferenced_since is not null and $alias.unreferenced_since <= clock_timestamp() - $grace " +
+            "and not ${referenced(alias)}" to "$alias.unreferenced_since",
+        "$alias.status='DELETING' and $alias.updated_at <= clock_timestamp() - $lease" to "$alias.updated_at",
+    )
+
+    /** One limited branch per status so each uses its own partial index; takes the batch size five times. */
+    fun discovery(alias: String) = branches(alias).joinToString("\n        union all ", "select id from (\n        ",
+        "\n    ) candidates order by updated_at, id limit ?") { (condition, order) ->
+        "(select $alias.id, $alias.updated_at from media_assets $alias where $condition order by $order, $alias.id limit ?)"
+    }
+
+    /** The same rule for one row, re-checked under the lease lock. */
+    fun cleanupCandidate(alias: String) = branches(alias).joinToString(" or ", "(", ")") { "(${it.first})" }
+
+    private fun seconds(duration: Duration) = "interval '${duration.seconds} seconds'"
 }

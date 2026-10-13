@@ -74,20 +74,25 @@ class MediaService(
         } catch (_: MediaStorageException) {
             return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
         } ?: return settledOr(owner, id, "MEDIA_OBJECT_MISSING")
-        val verdict = validator.precheck(stored, asset.declared)?.let(ImageVerdict::Invalid) ?: validator.gated {
-            try {
-                validator.verify(storage.read(asset.objectKey, MediaLimits.MAX_BYTES), asset.declared)
+        // The read stays outside the gate so a slow bucket does not hold decode permits.
+        val verdict = validator.precheck(stored, asset.declared)?.let(ImageVerdict::Invalid) ?: run {
+            val bytes = try {
+                storage.read(asset.objectKey, MediaLimits.MAX_BYTES)
             } catch (_: MediaObjectTooLarge) {
-                ImageVerdict.Invalid(MediaFailureReason.SIZE_MISMATCH)
+                return@run ImageVerdict.Invalid(MediaFailureReason.SIZE_MISMATCH)
             } catch (_: MediaStorageException) {
-                null
+                return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
             }
-        } ?: return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
+            validator.gated { validator.verify(bytes, asset.declared) }
+        }
         beforeApply(id)
         var failedNow = false
         val settled = source.inTransaction { c ->
             val locked = media.find(c, owner, id, lock = true) ?: throw MediaException("MEDIA_NOT_FOUND")
             if (locked.status != MediaStatus.PENDING) return@inTransaction locked
+            // Expiry is judged at apply time with the DB clock, so the outcome near the deadline does not depend on how
+            // long verification took.
+            if (locked.expired) return@inTransaction locked
             when (verdict) {
                 is ImageVerdict.Valid -> media.markReady(c, id, verdict)
                 is ImageVerdict.Invalid -> { media.markFailed(c, id, verdict.reason); failedNow = true }

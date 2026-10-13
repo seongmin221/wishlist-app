@@ -44,6 +44,7 @@ class LocalMediaRoutesTest {
             assertEquals(HttpStatusCode.Forbidden, put(image, headers + ("x-goog-content-length-range" to "1,9")))
             assertEquals(HttpStatusCode.Forbidden, put(image, target = url.replace("signature=", "signature=x")))
             assertEquals(HttpStatusCode.PayloadTooLarge, put(ByteArray(5_242_881)))
+            assertEquals(HttpStatusCode.BadRequest, put(ByteArray(0)))
             assertEquals(HttpStatusCode.OK, put(image))
             assertEquals(HttpStatusCode.PreconditionFailed, put(MediaFixtures.jpeg(10, 10)))
 
@@ -56,6 +57,8 @@ class LocalMediaRoutesTest {
             assertContentEquals(image, read.bodyAsBytes())
             assertEquals(HttpStatusCode.Forbidden, client.get(url).status)  // the upload signature cannot read
             assertEquals(HttpStatusCode.Forbidden, client.get(display.replace("signature=", "signature=x")).status)
+            storage.delete("media/$owner/$id.jpg")
+            assertEquals(HttpStatusCode.NotFound, client.get(display).status)
         }
     }
 }

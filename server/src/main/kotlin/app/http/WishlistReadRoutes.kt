@@ -1,6 +1,7 @@
 package app.http
 
 import app.media.MediaUrlSigner
+import app.media.MediaUrls
 import app.wishlist.*
 import io.ktor.http.*
 import io.ktor.server.application.ApplicationCall
@@ -26,12 +27,13 @@ internal suspend fun ApplicationCall.respondReadQuery(owner: UUID, endpoint: Rea
         ReadQueryParseResult.InvalidCursor -> return respondApiError(HttpStatusCode.BadRequest,"INVALID_${prefix}_CURSOR")
         is ReadQueryParseResult.Valid -> parsed.query
     }
-    when(val result=withContext(Dispatchers.IO) { service.read(owner,query) }) {
+    val (result,urls)=withContext(Dispatchers.IO) {
+        val result=service.read(owner,query)
+        result to if(result is ReadResult.Success) signer.signAll(result.page.items.mediaKeys()) else MediaUrls.NONE
+    }
+    when(result) {
         ReadResult.CategoryNotFound -> respondApiError(HttpStatusCode.NotFound,"CATEGORY_NOT_FOUND")
         ReadResult.PurposeNotFound -> respondApiError(HttpStatusCode.NotFound,"PURPOSE_NOT_FOUND")
-        is ReadResult.Success -> {
-            val urls=withContext(Dispatchers.IO) { signer.signAll(result.page.items.mediaKeys()) }
-            respondText(ApiJson.encodeToString(ReadWindowViewMapper.map(owner,endpoint,query.scope,result.page,urls)),ContentType.Application.Json,HttpStatusCode.OK)
-        }
+        is ReadResult.Success -> respondText(ApiJson.encodeToString(ReadWindowViewMapper.map(owner,endpoint,query.scope,result.page,urls)),ContentType.Application.Json,HttpStatusCode.OK)
     }
 }

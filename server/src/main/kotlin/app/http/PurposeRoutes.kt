@@ -2,6 +2,7 @@ package app.http
 
 import app.common.parseCanonicalUuid
 import app.media.MediaUrlSigner
+import app.media.MediaUrls
 import app.purpose.*
 import io.ktor.http.*
 import io.ktor.server.application.ApplicationCall
@@ -28,7 +29,7 @@ fun Route.purposeRoutes(service: PurposeService, signer: MediaUrlSigner, ownerRe
             ?: return@get call.respondApiError(HttpStatusCode.BadRequest, "INVALID_PURPOSE_CURSOR") }
         val (page, urls) = withContext(Dispatchers.IO) {
             val page = service.list(owner, projection, limit, after)
-            page to if (projection == PurposeProjection.SUMMARY) signer.signAll(page.entries.previewMediaKeys()) else app.media.MediaUrls.NONE
+            page to if (projection == PurposeProjection.SUMMARY) signer.signAll(page.entries.previewMediaKeys()) else MediaUrls.NONE
         }
         val next = page.next?.let { PurposeCursorCodec.encode(owner, projection, it) }
         val payload = when (projection) {

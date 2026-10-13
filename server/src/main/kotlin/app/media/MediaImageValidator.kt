@@ -43,7 +43,7 @@ class MediaImageValidator(maxConcurrent: Int = 4) {
         return ImageVerdict.Valid(bytes.size, header.width, header.height)
     }
 
-    /** Bounds concurrent byte reads and decodes; storage lookups stay outside. */
+    /** Bounds concurrent decodes; storage calls stay outside. */
     fun <T> gated(block: () -> T): T {
         if (!permits.tryAcquire()) throw MediaException("MEDIA_BUSY", retryAfterSeconds = 1)
         try { return block() } finally { permits.release() }

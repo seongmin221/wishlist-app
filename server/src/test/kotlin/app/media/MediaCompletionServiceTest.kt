@@ -149,4 +149,41 @@ class MediaCompletionServiceTest {
         assertFailsWith<MediaException> { media.complete(owner, failed.id) }
         assertEquals(MediaStatus.READY, media.complete(owner, intent(media, storage, owner).id).asset.status)
     }
+
+    @Test fun `a slow storage read does not hold a verification permit`() = withAnalysisDatabase { source ->
+        val storage = InMemoryMediaStorage()
+        val owner = UUID.randomUUID()
+        val setup = service(source, storage)
+        val first = intent(setup, storage, owner); val second = intent(setup, storage, owner)
+        // The first read is slow; the second completes and verifies while the first is still reading.
+        storage.readDelayMillis = { key -> if (key == first.objectKey) 800 else 0 }
+        val media = service(source, storage, MediaImageValidator(maxConcurrent = 1))
+        val pool = Executors.newFixedThreadPool(2)
+        try {
+            val slow = pool.submit(Callable { media.complete(owner, first.id) })
+            Thread.sleep(200)
+            val fast = pool.submit(Callable { media.complete(owner, second.id) })
+            val views = listOf(slow, fast).map { it.get(10, TimeUnit.SECONDS) }
+            assertEquals(listOf(MediaStatus.READY, MediaStatus.READY), views.map { it.asset.status })
+        } finally { pool.shutdown() }
+    }
+
+    @Test fun `expiry is judged again when the result is applied`() = withAnalysisDatabase { source ->
+        val storage = InMemoryMediaStorage()
+        val owner = UUID.randomUUID()
+        val asset = intent(service(source, storage), storage, owner)
+        val media = service(source, storage, beforeApply = { id ->
+            analysisSql(source, "update media_assets set upload_expires_at=clock_timestamp()-interval '1 second' where id='$id'")
+        })
+        assertEquals("MEDIA_UPLOAD_EXPIRED", assertFailsWith<MediaException> { media.complete(owner, asset.id) }.code)
+        assertEquals("PENDING", status(source, asset.id))
+    }
+
+    @Test fun `ready media starts unreferenced for cleanup`() = withAnalysisDatabase { source ->
+        val storage = InMemoryMediaStorage(); val media = service(source, storage)
+        val owner = UUID.randomUUID()
+        val asset = intent(media, storage, owner)
+        media.complete(owner, asset.id)
+        assertEquals("t", analysisScalar(source, "select unreferenced_since = ready_at from media_assets where id='${asset.id}'"))
+    }
 }

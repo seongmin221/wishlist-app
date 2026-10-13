@@ -11,6 +11,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 import kotlin.test.*
+import kotlinx.serialization.json.*
 
 class MediaCleanupTest {
     private val farFuture get() = System.nanoTime() + 60_000_000_000
@@ -49,24 +50,26 @@ class MediaCleanupTest {
         val dropPending = media("PENDING", "upload_expires_at=clock_timestamp()-interval '24 hours 1 second'")
         val keepFailed = media("FAILED", "failed_at=clock_timestamp()-interval '23 hours 59 minutes'")
         val dropFailed = media("FAILED", "failed_at=clock_timestamp()-interval '24 hours 1 second'")
-        val dropReady = media("READY", "ready_at=clock_timestamp()-interval '25 hours'")
-        val keepFresh = media("READY", "ready_at=clock_timestamp()-interval '23 hours'")
-        val keepReleased = media("READY", "ready_at=clock_timestamp()-interval '25 hours',released_at=clock_timestamp()-interval '1 hour'")
-        val dropReleased = media("READY", "ready_at=clock_timestamp()-interval '50 hours',released_at=clock_timestamp()-interval '25 hours'")
-        val keepActive = media("READY", "ready_at=clock_timestamp()-interval '25 hours'").also { item(source, owner, it) }
-        val keepArchived = media("READY", "ready_at=clock_timestamp()-interval '25 hours'").also { item(source, owner, it, "ARCHIVED") }
-        val keepRecentDelete = media("READY", "ready_at=clock_timestamp()-interval '25 hours'").also { item(source, owner, it, "DELETED", "1 hour") }
-        val dropOldDelete = media("READY", "ready_at=clock_timestamp()-interval '25 hours'").also { item(source, owner, it, "DELETED", "25 hours") }
+        val old = "unreferenced_since=clock_timestamp()-interval '25 hours'"
+        val dropReady = media("READY", old)
+        val keepFresh = media("READY", "unreferenced_since=clock_timestamp()-interval '23 hours'")
+        val keepReleased = media("READY", "ready_at=clock_timestamp()-interval '50 hours',unreferenced_since=clock_timestamp()-interval '1 hour'")
+        val keepLinked = media("READY", "ready_at=clock_timestamp()-interval '50 hours',unreferenced_since=null").also { item(source, owner, it) }
+        // A stale unreferenced_since on a linked row (a missed link update) is still protected by the reference re-check.
+        val keepActive = media("READY", old).also { item(source, owner, it) }
+        val keepArchived = media("READY", old).also { item(source, owner, it, "ARCHIVED") }
+        val keepRecentDelete = media("READY", old).also { item(source, owner, it, "DELETED", "1 hour") }
+        val dropOldDelete = media("READY", old).also { item(source, owner, it, "DELETED", "25 hours") }
 
         val report = MediaCleanup(source, storage).run(farFuture)
-        val dropped = listOf(dropPending, dropFailed, dropReady, dropReleased, dropOldDelete)
+        val dropped = listOf(dropPending, dropFailed, dropReady, dropOldDelete)
         assertEquals(MediaCleanupReport(dropped.size, 0), report)
         for (id in dropped) {
             assertEquals("DELETED", status(source, id))
             assertEquals("t", analysisScalar(source, "select deleted_at is not null from media_assets where id='$id'"))
             assertTrue(MediaKeys.objectKey(owner, id) in storage.deletes)
         }
-        for (id in listOf(keepPending, keepFailed, keepFresh, keepReleased, keepActive, keepArchived, keepRecentDelete))
+        for (id in listOf(keepPending, keepFailed, keepFresh, keepReleased, keepLinked, keepActive, keepArchived, keepRecentDelete))
             assertNotEquals("DELETED", status(source, id), id.toString())
         assertEquals(MediaCleanupReport(0, 0), MediaCleanup(source, storage).run(farFuture))
 
@@ -84,7 +87,7 @@ class MediaCleanupTest {
         val storage = InMemoryMediaStorage().apply { failDelete = true }
         val owner = UUID.randomUUID()
         val (id, _) = insertMedia(source, owner)
-        analysisSql(source, "update media_assets set ready_at=clock_timestamp()-interval '25 hours' where id='$id'")
+        analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours' where id='$id'")
         assertEquals(MediaCleanupReport(0, 1), MediaCleanup(source, storage).run(farFuture))
         assertEquals("DELETING", status(source, id))
         storage.failDelete = false
@@ -98,7 +101,7 @@ class MediaCleanupTest {
         val storage = InMemoryMediaStorage()
         val owner = UUID.randomUUID()
         repeat(55) { insertMedia(source, owner) }
-        analysisSql(source, "update media_assets set ready_at=clock_timestamp()-interval '25 hours'")
+        analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours'")
         assertEquals(MediaCleanupReport(0, 0), MediaCleanup(source, storage).run(System.nanoTime()))
         assertEquals(0, storage.deleteCalls.get())
         assertEquals(MediaCleanupReport(50, 0), MediaCleanup(source, storage).run(farFuture))
@@ -109,7 +112,7 @@ class MediaCleanupTest {
         val storage = InMemoryMediaStorage().apply { deleteDelayMillis = 50 }
         val owner = UUID.randomUUID()
         repeat(10) { insertMedia(source, owner) }
-        analysisSql(source, "update media_assets set ready_at=clock_timestamp()-interval '25 hours'")
+        analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours'")
         val start = CountDownLatch(1)
         val pool = Executors.newFixedThreadPool(2)
         try {
@@ -124,7 +127,7 @@ class MediaCleanupTest {
         val storage = InMemoryMediaStorage()
         val owner = UUID.randomUUID()
         fun staleReady() = insertMedia(source, owner).first.also {
-            analysisSql(source, "update media_assets set ready_at=clock_timestamp()-interval '25 hours' where id='$it'")
+            analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours' where id='$it'")
         }
         fun freeItem() = CreateWishlistItemService(source).create(owner, UUID.randomUUID(), "https://shop.example/${UUID.randomUUID()}").createdItemId
 
@@ -158,5 +161,34 @@ class MediaCleanupTest {
         assertEquals(third.toString(), analysisScalar(source, "select media_asset_id from wishlist_items where id='$thirdItem'"))
         assertEquals("DELETED", status(source, second))
         assertNull(analysisScalar(source, "select media_asset_id from wishlist_items where id='$secondItem'"))
+    }
+
+    @Test fun `linked images are not in the ready discovery index at all`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        repeat(200) {
+            val (id, _) = insertMedia(source, owner)
+            analysisSql(source, "update media_assets set ready_at=clock_timestamp()-interval '50 hours',unreferenced_since=null where id='$id'")
+            item(source, owner, id)
+        }
+        val (candidate, _) = insertMedia(source, owner)
+        analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours' where id='$candidate'")
+        analysisSql(source, "analyze media_assets")
+        val plan = source.connection.use { c ->
+            c.prepareStatement("explain (analyze, format json) " + MediaReferences.discovery("m")).use { s ->
+                for (index in 1..5) s.setInt(index, 50)
+                s.executeQuery().use { r -> check(r.next()); r.getString(1) }
+            }
+        }
+        fun nodes(e: JsonElement): List<JsonObject> = when (e) {
+            is JsonObject -> listOf(e) + e.values.flatMap(::nodes)
+            is JsonArray -> e.flatMap(::nodes)
+            else -> emptyList()
+        }
+        val ready = nodes(Json.parseToJsonElement(plan)).filter { it["Index Name"]?.jsonPrimitive?.content == "media_assets_cleanup_ready_idx" }
+        assertEquals(1, ready.size, "READY branch must use its partial index: $plan")
+        // Linked rows carry no unreferenced_since, so the index yields only the one candidate.
+        assertEquals(1, ready.single()["Actual Rows"]!!.jsonPrimitive.int, plan)
+        assertEquals(MediaCleanupReport(1, 0), MediaCleanup(source, InMemoryMediaStorage()).run(farFuture))
+        assertEquals("DELETED", status(source, candidate))
     }
 }
