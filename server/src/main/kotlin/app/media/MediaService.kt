@@ -29,8 +29,9 @@ data class MediaView(val asset: MediaAsset, val upload: UploadTarget?, val displ
 data class MediaIntentResult(val view: MediaView, val replayed: Boolean)
 
 /**
- * MEDIA-01 and MEDIA-02. Transactions stay short and storage calls run outside them. Intents serialize on the owner lock;
- * completion locks only the media row.
+ * MEDIA-01 and MEDIA-02. Transactions stay short and storage calls run outside them. Intents serialize on the owner
+ * structure lock: a narrower lock would not help, because the media row's FK check takes KEY SHARE on the owner row,
+ * which conflicts with that lock's FOR UPDATE. Completion locks only the media row.
  */
 class MediaService(
     private val source: DataSource,
@@ -45,15 +46,16 @@ class MediaService(
     private val log = LoggerFactory.getLogger(MediaService::class.java)
 
     fun createIntent(owner: UUID, key: UUID, request: IntentRequest): MediaIntentResult {
-        request.violation()?.let { throw MediaException(it) }
         val fingerprint = request.fingerprint()
         val (asset, replayed) = source.inTransaction { c ->
             OwnerStructureLock.lock(c, owner)
+            // Key first, like item creation: a reused key with a different body is a conflict even if that body is invalid.
             val existing = media.findByKey(c, owner, key)
             if (existing != null) {
                 if (existing.fingerprint != fingerprint) throw MediaException("IDEMPOTENCY_KEY_REUSED")
                 return@inTransaction existing.asset to true
             }
+            request.violation()?.let { throw MediaException(it) }
             val (live, retryAfter) = media.livePending(c, owner)
             if (live >= MediaLimits.PENDING_LIMIT) throw MediaException("MEDIA_UPLOAD_LIMIT_REACHED", retryAfterSeconds = retryAfter)
             media.insert(c, owner, key, fingerprint, request) to false
@@ -74,18 +76,17 @@ class MediaService(
         } catch (_: MediaStorageException) {
             return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
         } ?: return settledOr(owner, id, "MEDIA_OBJECT_MISSING")
-        // Reads and decodes have separate permits: a slow bucket cannot hold decode permits, and concurrent reads cannot
-        // hold unbounded bytes. After precheck the stat size equals the declared size, so it bounds the read buffer.
-        val verdict = validator.precheck(stored, asset.declared)?.let(ImageVerdict::Invalid) ?: run {
-            val bytes = try {
-                validator.readGated { storage.read(asset.objectKey, stored.byteSize.toInt()) }
+        // One slot covers the read and the decode, so a busy server rejects before downloading and memory stays bounded.
+        // After precheck the stat size equals the declared size, so it bounds the read buffer.
+        val verdict = validator.precheck(stored, asset.declared)?.let(ImageVerdict::Invalid) ?: validator.gated {
+            try {
+                validator.verify(storage.read(asset.objectKey, stored.byteSize.toInt()), asset.declared)
             } catch (_: MediaObjectTooLarge) {
-                return@run ImageVerdict.Invalid(MediaFailureReason.SIZE_MISMATCH)
+                ImageVerdict.Invalid(MediaFailureReason.SIZE_MISMATCH)
             } catch (_: MediaStorageException) {
-                return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
+                null
             }
-            validator.gated { validator.verify(bytes, asset.declared) }
-        }
+        } ?: return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
         beforeApply(id)
         var failedNow = false
         val settled = source.inTransaction { c ->
@@ -96,9 +97,8 @@ class MediaService(
             if (locked.expired) return@inTransaction locked
             when (verdict) {
                 is ImageVerdict.Valid -> media.markReady(c, id, verdict)
-                is ImageVerdict.Invalid -> { media.markFailed(c, id, verdict.reason); failedNow = true }
+                is ImageVerdict.Invalid -> media.markFailed(c, id, verdict.reason).also { failedNow = true }
             }
-            checkNotNull(media.find(c, owner, id))
         }
         if (failedNow) try {
             storage.delete(asset.objectKey)

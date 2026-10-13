@@ -98,11 +98,31 @@ class LocalMediaStorageTest {
 
     @Test fun `filesystem failures while accepting an upload are storage errors`() {
         val blocked = Files.createTempFile("not-a-directory", ".tmp")
-        val broken = LocalMediaStorage(blocked, "http://localhost:8080", clock = { now })
+        val broken = LocalMediaStorage(blocked, "http://localhost:8080", secret = ByteArray(32), clock = { now })
         val target = broken.uploadTarget(key, MediaLimits.CONTENT_TYPE, now.plusSeconds(900))
         assertFailsWith<MediaStorageException> {
             broken.acceptUpload(pathKey(target.url), query(target.url), { name -> target.headers.entries.firstOrNull { it.key.equals(name, true) }?.value },
                 ByteArrayInputStream(MediaFixtures.jpeg(4, 4)))
         }
+    }
+
+    @Test fun `a volume without hard links is a storage error`() {
+        val noLinks = LocalMediaStorage(root, "http://localhost:8080", clock = { now }, publish = { _, _ -> throw UnsupportedOperationException() })
+        val target = noLinks.uploadTarget(key, MediaLimits.CONTENT_TYPE, now.plusSeconds(900))
+        assertFailsWith<MediaStorageException> {
+            noLinks.acceptUpload(pathKey(target.url), query(target.url), { name -> target.headers.entries.firstOrNull { it.key.equals(name, true) }?.value },
+                ByteArrayInputStream(MediaFixtures.jpeg(4, 4)))
+        }
+        assertNull(noLinks.stat(key))
+    }
+
+    @Test fun `signed urls survive a restart on the same directory`() {
+        val target = storage.uploadTarget(key, MediaLimits.CONTENT_TYPE, now.plusSeconds(900))
+        val restarted = LocalMediaStorage(root, "http://localhost:8080", clock = { now })
+        assertEquals(LocalUploadResult.STORED, restarted.acceptUpload(pathKey(target.url), query(target.url),
+            { name -> target.headers.entries.firstOrNull { it.key.equals(name, true) }?.value }, ByteArrayInputStream(MediaFixtures.jpeg(4, 4))))
+        val other = LocalMediaStorage(Files.createTempDirectory("other-media"), "http://localhost:8080", clock = { now })
+        assertEquals(LocalUploadResult.FORBIDDEN, other.acceptUpload(pathKey(target.url), query(target.url),
+            { name -> target.headers.entries.firstOrNull { it.key.equals(name, true) }?.value }, ByteArrayInputStream(MediaFixtures.jpeg(4, 4))))
     }
 }

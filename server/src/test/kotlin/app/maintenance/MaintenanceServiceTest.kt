@@ -55,7 +55,9 @@ class MaintenanceServiceTest {
             totalMillis = 50_000, dispatchMillis = 30_000, nanoTime = { now },
         ).runOnce()
         assertEquals(listOf(30_000_000_000L), deadlines)
-        assertEquals(listOf("timeout:reconcile", "timeout:pending", "timeout:media"), report.failedSteps)
+        assertEquals(listOf("timeout:reconcile", "timeout:pending"), report.failedSteps)
+        // Media cleanup has a 24-hour grace, so running out of time defers it rather than failing the run.
+        assertEquals(listOf("media"), report.deferredSteps)
         assertEquals(1, budgetRuns)
         assertEquals(BudgetMaintenanceReport(1, 0), report.budget)
     }

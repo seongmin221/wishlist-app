@@ -2,7 +2,9 @@ package app.media
 
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.time.Duration
 import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import javax.imageio.ImageReader
 import javax.imageio.event.IIOReadWarningListener
@@ -19,10 +21,10 @@ sealed interface ImageVerdict {
  * so a small file cannot claim a huge raster. Decoder warnings count as failures because the JDK reader fills truncated
  * entropy data instead of throwing.
  */
-class MediaImageValidator(maxConcurrent: Int = 4, maxReads: Int = 8) {
-    private val permits = Semaphore(maxConcurrent)
-    /** Separate from decode permits: bounds bytes held in memory without letting a slow bucket block decoding. */
-    private val readPermits = Semaphore(maxReads)
+class MediaImageValidator(maxConcurrent: Int = 4, private val wait: Duration = MediaLimits.SLOT_WAIT) {
+    /** One slot covers reading the object and decoding it: at most [maxConcurrent] × 5MiB in memory, and a request that
+     * cannot get a slot is rejected before it downloads anything. */
+    private val slots = Semaphore(maxConcurrent)
 
     init { ImageIO.setUseCache(false) }
 
@@ -45,15 +47,10 @@ class MediaImageValidator(maxConcurrent: Int = 4, maxReads: Int = 8) {
         return ImageVerdict.Valid(bytes.size, header.width, header.height)
     }
 
-    /** Bounds concurrent decodes; storage calls stay outside. */
-    fun <T> gated(block: () -> T): T = permits.held(block)
-
-    /** Bounds concurrent object reads (at most [MediaLimits.MAX_BYTES] each in memory). */
-    fun <T> readGated(block: () -> T): T = readPermits.held(block)
-
-    private fun <T> Semaphore.held(block: () -> T): T {
-        if (!tryAcquire()) throw MediaException("MEDIA_BUSY", retryAfterSeconds = 1)
-        try { return block() } finally { release() }
+    /** Runs [block] (object read and verification) in a slot, waiting up to [wait]; MEDIA_BUSY when none frees up. */
+    fun <T> gated(block: () -> T): T {
+        if (!slots.tryAcquire(wait.toMillis(), TimeUnit.MILLISECONDS)) throw MediaException("MEDIA_BUSY", retryAfterSeconds = 1)
+        try { return block() } finally { slots.release() }
     }
 
     private fun decodes(bytes: ByteArray, width: Int, height: Int): Boolean {

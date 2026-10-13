@@ -150,21 +150,19 @@ class MediaCompletionServiceTest {
         assertEquals(MediaStatus.READY, media.complete(owner, intent(media, storage, owner).id).asset.status)
     }
 
-    @Test fun `a slow storage read does not hold a verification permit`() = withAnalysisDatabase { source ->
+    @Test fun `a completion waits briefly for a verification slot instead of failing at once`() = withAnalysisDatabase { source ->
         val storage = InMemoryMediaStorage()
         val owner = UUID.randomUUID()
         val setup = service(source, storage)
         val first = intent(setup, storage, owner); val second = intent(setup, storage, owner)
-        // The first read is slow; the second completes and verifies while the first is still reading.
-        storage.readDelayMillis = { key -> if (key == first.objectKey) 800 else 0 }
+        storage.readDelayMillis = { key -> if (key == first.objectKey) 500 else 0 }
         val media = service(source, storage, MediaImageValidator(maxConcurrent = 1))
         val pool = Executors.newFixedThreadPool(2)
         try {
             val slow = pool.submit(Callable { media.complete(owner, first.id) })
-            Thread.sleep(200)
-            val fast = pool.submit(Callable { media.complete(owner, second.id) })
-            val views = listOf(slow, fast).map { it.get(10, TimeUnit.SECONDS) }
-            assertEquals(listOf(MediaStatus.READY, MediaStatus.READY), views.map { it.asset.status })
+            Thread.sleep(150)
+            val waiting = pool.submit(Callable { media.complete(owner, second.id) })
+            assertEquals(listOf(MediaStatus.READY, MediaStatus.READY), listOf(slow, waiting).map { it.get(10, TimeUnit.SECONDS).asset.status })
         } finally { pool.shutdown() }
     }
 
@@ -187,19 +185,21 @@ class MediaCompletionServiceTest {
         assertEquals("t", analysisScalar(source, "select unreferenced_since = ready_at from media_assets where id='${asset.id}'"))
     }
 
-    @Test fun `concurrent object reads are bounded so memory stays bounded`() = withAnalysisDatabase { source ->
+    @Test fun `a busy slot rejects before downloading so bytes are never read and thrown away`() = withAnalysisDatabase { source ->
         val storage = InMemoryMediaStorage()
         val owner = UUID.randomUUID()
         val setup = service(source, storage)
         val first = intent(setup, storage, owner); val second = intent(setup, storage, owner)
-        storage.readDelayMillis = { key -> if (key == first.objectKey) 800 else 0 }
-        val media = service(source, storage, MediaImageValidator(maxConcurrent = 4, maxReads = 1))
+        storage.readDelayMillis = { key -> if (key == first.objectKey) 2_000 else 0 }
+        val media = service(source, storage, MediaImageValidator(maxConcurrent = 1))
         val pool = Executors.newSingleThreadExecutor()
         try {
             val slow = pool.submit(Callable { media.complete(owner, first.id) })
             Thread.sleep(200)
+            val readsBefore = storage.reads.get()
             val busy = assertFailsWith<MediaException> { media.complete(owner, second.id) }
             assertEquals("MEDIA_BUSY", busy.code); assertEquals(1, busy.retryAfterSeconds)
+            assertEquals(readsBefore, storage.reads.get())  // no download for the rejected request
             assertEquals(MediaStatus.READY, slow.get(10, TimeUnit.SECONDS).asset.status)
         } finally { pool.shutdown() }
         assertEquals("PENDING", status(source, second.id))

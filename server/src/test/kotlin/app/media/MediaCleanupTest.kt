@@ -197,4 +197,14 @@ class MediaCleanupTest {
         val query = MediaReferences.discovery("m")
         assertEquals(query.sql.count { it == '?' }, query.limits)
     }
+
+    @Test fun `no object delete starts unless a whole storage call fits before the deadline`() = withAnalysisDatabase { source ->
+        val storage = InMemoryMediaStorage()
+        val owner = UUID.randomUUID()
+        insertMedia(source, owner)
+        analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours'")
+        assertEquals(MediaCleanupReport(0, 0), MediaCleanup(source, storage).run(System.nanoTime() + 4_000_000_000))
+        assertEquals(0, storage.deleteCalls.get())
+        assertEquals("READY", status(source, UUID.fromString(analysisScalar(source, "select id from media_assets")!!)))
+    }
 }

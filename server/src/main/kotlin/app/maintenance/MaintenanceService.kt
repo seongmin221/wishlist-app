@@ -15,6 +15,7 @@ data class MaintenanceReport(
     val pendingCancelled: Int, val pendingAlive: Int, val lookupFailed: Int,
     val budget: BudgetMaintenanceReport?, val failedSteps: List<String>,
     val mediaDeleted: Int = 0, val mediaDeleteFailed: Int = 0,
+    val deferredSteps: List<String> = emptyList(),
 )
 
 /**
@@ -41,8 +42,13 @@ class MaintenanceService(
         val started = nanoTime()
         val deadline = started + totalMillis * 1_000_000
         val failed = mutableListOf<String>()
-        fun <T> step(name: String, bounded: Boolean = true, action: () -> T): T? {
-            if (bounded && nanoTime() - deadline >= 0) { failed += "timeout:$name"; return null }
+        val deferred = mutableListOf<String>()
+        // deferrable: skipping for lack of time is a normal hand-off to the next run, not a failure (no 500).
+        fun <T> step(name: String, bounded: Boolean = true, deferrable: Boolean = false, action: () -> T): T? {
+            if (bounded && nanoTime() - deadline >= 0) {
+                if (deferrable) deferred += name else failed += "timeout:$name"
+                return null
+            }
             return try { action() } catch (cause: Exception) {
                 if (cause is CancellationException || cause is InterruptedException) throw cause
                 log(name, cause.javaClass.name); failed += name; null
@@ -52,14 +58,15 @@ class MaintenanceService(
         val recovered = step("reconcile") { reconcile(deadline) }
         val pending = step("pending") { recoverPending(deadline) }
         val settled = step("budget", bounded = false) { budget() }
-        // Last: object deletes are remote calls and must not delay recovery or the budget.
-        val cleaned = media?.let { cleanup -> step("media") { cleanup(deadline) } }
+        // Last: object deletes are remote calls and must not delay recovery or the budget. Media has a 24-hour grace,
+        // so running out of time defers it; recovery timeouts above stay failures because operators must see them.
+        val cleaned = media?.let { cleanup -> step("media", deferrable = true) { cleanup(deadline) } }
         return MaintenanceReport(
             publishedEvents = published?.published ?: 0, failedEvents = published?.failed ?: 0, recoveredRunning = recovered ?: 0,
             pendingRescheduled = pending?.rescheduled ?: 0, pendingFailed = pending?.failed ?: 0,
             pendingRescheduleExhausted = pending?.rescheduleExhausted ?: 0, pendingCancelled = pending?.cancelled ?: 0,
             pendingAlive = pending?.alive ?: 0, lookupFailed = pending?.lookupFailed ?: 0, budget = settled, failedSteps = failed,
-            mediaDeleted = cleaned?.deleted ?: 0, mediaDeleteFailed = cleaned?.deleteFailed ?: 0,
+            mediaDeleted = cleaned?.deleted ?: 0, mediaDeleteFailed = cleaned?.deleteFailed ?: 0, deferredSteps = deferred,
         )
     }
 

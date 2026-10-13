@@ -26,7 +26,6 @@ class MediaCleanup(
     private val log = LoggerFactory.getLogger(MediaCleanup::class.java)
 
     fun run(deadline: Long): MediaCleanupReport {
-        if (nanoTime() - deadline >= 0) return MediaCleanupReport(0, 0)
         val candidates = source.inTransaction { c ->
             val query = MediaReferences.discovery("m")
             c.prepareStatement(query.sql).use { s ->
@@ -36,8 +35,10 @@ class MediaCleanup(
         }
         var deleted = 0
         var failed = 0
+        val callNanos = MediaLimits.STORAGE_CALL.toNanos()
         for (id in candidates) {
-            if (nanoTime() - deadline >= 0) break
+            // Start a candidate only if a whole delete call still fits, so the step never runs past the deadline.
+            if (nanoTime() + callNanos - deadline >= 0) break
             beforeLease(id)
             val objectKey = lease(id) ?: continue
             beforeDelete(id)

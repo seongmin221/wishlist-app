@@ -46,27 +46,25 @@ fun Route.mediaRoutes(wiring: MediaWiring, ownerResolver: suspend (ApplicationCa
     }
 }
 
-/** Every code [MediaException] can carry; a new code must be added here with its status. */
-internal val MEDIA_ERROR_CODES = listOf(
-    "MEDIA_NOT_FOUND", "IDEMPOTENCY_KEY_REUSED", "MEDIA_OBJECT_MISSING", "MEDIA_UPLOAD_EXPIRED",
-    "INVALID_MEDIA_REQUEST", "UNSUPPORTED_MEDIA_TYPE", "MEDIA_TOO_LARGE", "MEDIA_DIMENSIONS_EXCEEDED", "MEDIA_INVALID_IMAGE",
-    "MEDIA_UPLOAD_LIMIT_REACHED", "MEDIA_STORAGE_UNAVAILABLE", "MEDIA_BUSY",
+/** Status for every code [MediaException] can carry; a new code must be added here. */
+internal val MEDIA_ERROR_STATUS: Map<String, HttpStatusCode> = mapOf(
+    "MEDIA_NOT_FOUND" to HttpStatusCode.NotFound,
+    "IDEMPOTENCY_KEY_REUSED" to HttpStatusCode.Conflict,
+    "MEDIA_OBJECT_MISSING" to HttpStatusCode.Conflict,
+    "MEDIA_UPLOAD_EXPIRED" to HttpStatusCode.Gone,
+    "INVALID_MEDIA_REQUEST" to HttpStatusCode.UnprocessableEntity,
+    "UNSUPPORTED_MEDIA_TYPE" to HttpStatusCode.UnprocessableEntity,
+    "MEDIA_TOO_LARGE" to HttpStatusCode.UnprocessableEntity,
+    "MEDIA_DIMENSIONS_EXCEEDED" to HttpStatusCode.UnprocessableEntity,
+    "MEDIA_INVALID_IMAGE" to HttpStatusCode.UnprocessableEntity,
+    "MEDIA_UPLOAD_LIMIT_REACHED" to HttpStatusCode.TooManyRequests,
+    "MEDIA_STORAGE_UNAVAILABLE" to HttpStatusCode.ServiceUnavailable,
+    "MEDIA_BUSY" to HttpStatusCode.ServiceUnavailable,
 )
-
-internal fun mediaErrorStatus(code: String): HttpStatusCode? = when (code) {
-    "MEDIA_NOT_FOUND" -> HttpStatusCode.NotFound
-    "IDEMPOTENCY_KEY_REUSED", "MEDIA_OBJECT_MISSING" -> HttpStatusCode.Conflict
-    "MEDIA_UPLOAD_EXPIRED" -> HttpStatusCode.Gone
-    "INVALID_MEDIA_REQUEST", "UNSUPPORTED_MEDIA_TYPE", "MEDIA_TOO_LARGE", "MEDIA_DIMENSIONS_EXCEEDED", "MEDIA_INVALID_IMAGE" ->
-        HttpStatusCode.UnprocessableEntity
-    "MEDIA_UPLOAD_LIMIT_REACHED" -> HttpStatusCode.TooManyRequests
-    "MEDIA_STORAGE_UNAVAILABLE", "MEDIA_BUSY" -> HttpStatusCode.ServiceUnavailable
-    else -> null
-}
 
 private suspend fun mediaErrors(call: ApplicationCall, block: suspend () -> Unit) {
     try { block() } catch (error: MediaException) {
-        val status = mediaErrorStatus(error.code) ?: run {
+        val status = MEDIA_ERROR_STATUS[error.code] ?: run {
             // An unmapped code is a server bug; do not let it pass as a client conflict.
             LoggerFactory.getLogger("app.http.MediaRoutes").error("Unmapped media error code={}", error.code)
             HttpStatusCode.InternalServerError

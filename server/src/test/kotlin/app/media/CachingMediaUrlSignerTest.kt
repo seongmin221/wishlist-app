@@ -44,23 +44,22 @@ class CachingMediaUrlSignerTest {
         }
     }
 
-    @Test fun `one response waits at most the budget and late signatures fill the cache`() {
+    @Test fun `one response waits at most the budget and in-flight signatures fill the cache late`() {
         storage.signDelayMillis = 1_000
         MediaSigningExecutor(threads = 8, queue = 64, wait = Duration.ofMillis(1_500)).use { signing ->
-            val signer = CachingMediaUrlSigner(storage, signing, { now }, maxNewPerResponse = 40)
+            val signer = CachingMediaUrlSigner(storage, signing, { now })
             val keys = (1..40).map { "k$it" }.toSet()
             val started = System.nanoTime()
             val urls = signer.signAll(keys)
             val elapsed = Duration.ofNanos(System.nanoTime() - started)
             assertTrue(elapsed < Duration.ofMillis(2_200), elapsed.toString())
-            val signedNow = keys.count { urls.imageUrl(it, null) != null }
-            assertEquals(8, signedNow)
-            Thread.sleep(5_500)
+            // Four at a time: the first four finish within the budget, the next four are still running at the deadline.
+            assertEquals(4, keys.count { urls.imageUrl(it, null) != null })
+            Thread.sleep(1_500)
             storage.signDelayMillis = 0
             val calls = storage.readSigns.get()
-            val later = signer.signAll(keys)
-            assertEquals(40, keys.count { later.imageUrl(it, null) != null })
-            assertEquals(calls, storage.readSigns.get())
+            assertEquals(40, keys.count { signer.signAll(keys).imageUrl(it, null) != null })
+            assertEquals(calls + 32, storage.readSigns.get())  // the eight started earlier came from the cache
         }
     }
 
@@ -86,12 +85,20 @@ class CachingMediaUrlSignerTest {
         assertEquals("https://shop.example/x.jpg", urls.imageUrl(null, "https://shop.example/x.jpg"))
     }
 
-    @Test fun `one response starts at most its share of new signatures`() {
+    @Test fun `a full page is signed within the budget while one response runs at most four at a time`() {
+        val running = java.util.concurrent.atomic.AtomicInteger(); val peak = java.util.concurrent.atomic.AtomicInteger()
+        val tracked = object : MediaStorage by storage {
+            override fun readUrl(objectKey: String, validFor: Duration): SignedRead {
+                peak.accumulateAndGet(running.incrementAndGet(), ::maxOf)
+                try { Thread.sleep(50); return storage.readUrl(objectKey, validFor) } finally { running.decrementAndGet() }
+            }
+        }
         MediaSigningExecutor().use { signing ->
-            val signer = CachingMediaUrlSigner(storage, signing, { now }, maxNewPerResponse = 32)
+            val signer = CachingMediaUrlSigner(tracked, signing, { now })
             val urls = signer.signAll((1..100).map { "k$it" }.toSet())
-            assertEquals(32, (1..100).count { urls.imageUrl("k$it", null) != null })
-            assertEquals(32, storage.readSigns.get())
+            assertEquals(100, (1..100).count { urls.imageUrl("k$it", null) != null })
+            assertTrue(peak.get() in 1..4, peak.get().toString())
         }
     }
+
 }

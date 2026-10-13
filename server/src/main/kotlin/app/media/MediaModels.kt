@@ -13,6 +13,12 @@ object MediaLimits {
     val READ_REUSE_MINIMUM: Duration = Duration.ofMinutes(45)
     val CLEANUP_GRACE: Duration = Duration.ofHours(24)
     val DELETE_LEASE: Duration = Duration.ofMinutes(2)
+    /** Total time one GCS stat, read or delete may take (one attempt). */
+    val STORAGE_CALL: Duration = Duration.ofSeconds(5)
+    /** How long a completion waits for a verification slot before MEDIA_BUSY. */
+    val SLOT_WAIT: Duration = Duration.ofSeconds(1)
+    /** Display signatures one response keeps running at once. */
+    const val SIGNING_PER_RESPONSE = 4
     /** Signed PUT header value; the lower bound matches the minimum declared size. */
     const val CONTENT_LENGTH_RANGE = "1,$MAX_BYTES"
 }

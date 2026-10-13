@@ -65,21 +65,21 @@ class MediaRepository {
     }
 
     /** Applies a verdict only to a row still PENDING; the caller holds the row lock. */
-    fun markReady(c: Connection, id: UUID, verdict: ImageVerdict.Valid) = c.prepareStatement("""
+    fun markReady(c: Connection, id: UUID, verdict: ImageVerdict.Valid): MediaAsset = c.prepareStatement("""
         update media_assets set status='READY', byte_size=?, width=?, height=?, ready_at=clock_timestamp(), unreferenced_since=clock_timestamp(),
             updated_at=clock_timestamp()
-        where id=? and status='PENDING'
+        where id=? and status='PENDING' returning $COLUMNS
     """).use { s ->
         s.setInt(1, verdict.byteSize); s.setInt(2, verdict.width); s.setInt(3, verdict.height); s.setObject(4, id)
-        check(s.executeUpdate() == 1)
+        s.executeQuery().use { r -> check(r.next()); map(r) }
     }
 
-    fun markFailed(c: Connection, id: UUID, reason: MediaFailureReason) = c.prepareStatement("""
+    fun markFailed(c: Connection, id: UUID, reason: MediaFailureReason): MediaAsset = c.prepareStatement("""
         update media_assets set status='FAILED', failure_reason=?, failed_at=clock_timestamp(), updated_at=clock_timestamp()
-        where id=? and status='PENDING'
+        where id=? and status='PENDING' returning $COLUMNS
     """).use { s ->
         s.setString(1, reason.name); s.setObject(2, id)
-        check(s.executeUpdate() == 1)
+        s.executeQuery().use { r -> check(r.next()); map(r) }
     }
 
     private fun map(r: ResultSet) = MediaAsset(

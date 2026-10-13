@@ -7,9 +7,9 @@ import org.slf4j.LoggerFactory
 
 /**
  * Display URLs valid for an hour, reused while at least 45 minutes remain, so a list does not issue one signBlob per
- * item. Misses are signed on the display [MediaSigningExecutor]; one response starts at most [maxNewPerResponse] new
- * signatures so a single cold list cannot fill the pool for everyone, waits at most [budget] in total, and a signature
- * that finishes late still lands in the cache for the next request.
+ * item. Misses are signed on the display [MediaSigningExecutor] with at most [parallelism] running per response, so one
+ * cold list cannot fill the pool for everyone, yet keeps going until [budget] runs out and usually signs a full page.
+ * A signature still running at the deadline lands in the cache for the next request.
  */
 class CachingMediaUrlSigner(
     private val storage: MediaStorage,
@@ -19,7 +19,7 @@ class CachingMediaUrlSigner(
     private val reuseWhile: Duration = MediaLimits.READ_REUSE_MINIMUM,
     private val maxEntries: Int = 10_000,
     private val budget: Duration = signing.wait,
-    private val maxNewPerResponse: Int = 32,
+    private val parallelism: Int = MediaLimits.SIGNING_PER_RESPONSE,
 ) : MediaUrlSigner {
     private val cache = ConcurrentHashMap<String, SignedRead>()
     private val log = LoggerFactory.getLogger(CachingMediaUrlSigner::class.java)
@@ -30,8 +30,17 @@ class CachingMediaUrlSigner(
     override fun signAll(objectKeys: Set<String>): MediaUrls {
         val deadline = System.nanoTime() + budget.toNanos()
         val hits = objectKeys.mapNotNull { key -> cache[key]?.takeIf(::fresh)?.let { key to it } }.toMap()
-        val pending = (objectKeys - hits.keys).take(maxNewPerResponse).associateWith(::signed)
-        val signed = pending.mapNotNull { (key, future) -> signing.await(future, deadline)?.let { key to it } }.toMap()
+        val signed = HashMap<String, SignedRead>()
+        val misses = (objectKeys - hits.keys).iterator()
+        val running = ArrayDeque<Pair<String, java.util.concurrent.CompletableFuture<SignedRead>>>()
+        while (System.nanoTime() - deadline < 0) {
+            while (running.size < parallelism && misses.hasNext()) {
+                val key = misses.next()
+                signed(key)?.let { running.addLast(key to it) }  // null: the pool is full, the key stays unsigned
+            }
+            val (key, future) = running.removeFirstOrNull() ?: break
+            signing.await(future, deadline)?.let { signed[key] = it }
+        }
         return MediaUrls(hits + signed)
     }
 

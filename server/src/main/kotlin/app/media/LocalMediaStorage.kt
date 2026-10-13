@@ -30,9 +30,13 @@ sealed interface LocalRead {
 class LocalMediaStorage(
     private val root: Path,
     private val baseUrl: String,
-    private val secret: ByteArray = ByteArray(32).also(SecureRandom()::nextBytes),
+    /** Signing key; by default kept in [root] so URLs survive a restart (hot reload) of the local server. */
+    secret: ByteArray? = null,
     private val clock: () -> Instant = Instant::now,
+    private val publish: (Path, Path) -> Unit = { target, temp -> Files.createLink(target, temp) },
 ) : MediaStorage {
+    private val secret: ByteArray by lazy { secret ?: io { loadOrCreateKey(root.resolve(".signing-key")) } }
+
     override fun uploadTarget(objectKey: String, contentType: String, expiresAt: Instant): UploadTarget =
         UploadTarget("PUT", url("PUT", objectKey, expiresAt), MediaKeys.uploadHeaders(contentType), expiresAt)
 
@@ -56,8 +60,31 @@ class LocalMediaStorage(
 
     override fun delete(objectKey: String) { io { file(objectKey)?.let(Files::deleteIfExists) } }
 
-    /** Same failure contract as GCS: IO problems surface as [MediaStorageException]. */
-    private fun <T> io(block: () -> T): T = try { block() } catch (error: IOException) { throw MediaStorageException(error) }
+    /**
+     * Same failure contract as GCS: IO problems surface as [MediaStorageException]. Hard links are required; a volume
+     * without them (exFAT, some bind mounts) throws UnsupportedOperationException, mapped the same way.
+     */
+    private fun <T> io(block: () -> T): T = try {
+        block()
+    } catch (error: IOException) {
+        throw MediaStorageException(error)
+    } catch (error: UnsupportedOperationException) {
+        throw MediaStorageException(error)
+    }
+
+    /** Created once per directory and published with a hard link so two starting processes agree on one key. */
+    private fun loadOrCreateKey(path: Path): ByteArray {
+        if (Files.exists(path)) return Files.readAllBytes(path)
+        Files.createDirectories(path.parent)
+        val temp = Files.createTempFile(path.parent, ".signing-key-", ".part")
+        try {
+            Files.write(temp, ByteArray(32).also(SecureRandom()::nextBytes))
+            try { Files.createLink(path, temp) } catch (_: FileAlreadyExistsException) { }
+        } finally {
+            Files.deleteIfExists(temp)
+        }
+        return Files.readAllBytes(path)
+    }
 
     fun acceptUpload(objectKey: String, query: Map<String, String>, header: (String) -> String?, body: InputStream): LocalUploadResult {
         val target = file(objectKey) ?: return LocalUploadResult.FORBIDDEN
@@ -73,7 +100,7 @@ class LocalMediaStorage(
                     // GCS rejects an empty body as a bad request, not as too large.
                     size == 0 -> LocalUploadResult.EMPTY
                     size > MediaLimits.MAX_BYTES -> LocalUploadResult.TOO_LARGE
-                    else -> try { Files.createLink(target, temp); LocalUploadResult.STORED } catch (_: FileAlreadyExistsException) { LocalUploadResult.EXISTS }
+                    else -> try { publish(target, temp); LocalUploadResult.STORED } catch (_: FileAlreadyExistsException) { LocalUploadResult.EXISTS }
                 }
             } finally {
                 Files.deleteIfExists(temp)

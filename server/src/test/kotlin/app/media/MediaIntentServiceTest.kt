@@ -137,4 +137,11 @@ class MediaIntentServiceTest {
         } finally { pool.shutdown() }
         assertEquals(1, analysisScalar(source, "select count(*) from media_assets")!!.toInt())
     }
+
+    @Test fun `a reused key with a different invalid body is a key conflict not a value error`() = withAnalysisDatabase { source ->
+        val media = service(source, InMemoryMediaStorage())
+        val owner = UUID.randomUUID(); val key = UUID.randomUUID()
+        media.createIntent(owner, key, request)
+        assertEquals("IDEMPOTENCY_KEY_REUSED", assertFailsWith<MediaException> { media.createIntent(owner, key, request.copy(byteSize = 6_000_000)) }.code)
+    }
 }

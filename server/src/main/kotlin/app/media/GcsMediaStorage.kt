@@ -77,8 +77,9 @@ class GcsMediaStorage internal constructor(
             return buffer.array().copyOf(buffer.position())
         }
         private val retry = RetrySettings.newBuilder().setMaxAttempts(1)
-            .setTotalTimeoutDuration(Duration.ofSeconds(5)).build()
-        private val transport = HttpTransportOptions.newBuilder().setConnectTimeout(5_000).setReadTimeout(5_000).build()
+            .setTotalTimeoutDuration(MediaLimits.STORAGE_CALL).build()
+        private val transport = HttpTransportOptions.newBuilder().setConnectTimeout(MediaLimits.STORAGE_CALL.toMillis().toInt())
+            .setReadTimeout(MediaLimits.STORAGE_CALL.toMillis().toInt()).build()
 
         /** Application Default Credentials; on Cloud Run signing uses the service account through IAM signBlob. */
         fun create(bucket: String): GcsMediaStorage =

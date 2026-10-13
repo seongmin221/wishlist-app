@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class MediaImageValidatorTest {
     private val validator = MediaImageValidator()
@@ -45,7 +46,7 @@ class MediaImageValidatorTest {
         assertEquals(invalid(DECODE_FAILED), MediaFixtures.synthetic().let { validator.verify(it, declared(it, 16, 16)) })
     }
 
-    @Test fun `gate admits four concurrent verifications and rejects the fifth as busy`() {
+    @Test fun `gate admits four concurrent verifications and rejects the fifth after a short wait`() {
         val gate = MediaImageValidator(maxConcurrent = 4)
         val entered = CountDownLatch(4)
         val release = CountDownLatch(1)
@@ -53,12 +54,16 @@ class MediaImageValidatorTest {
         try {
             repeat(4) { pool.submit { gate.gated { entered.countDown(); release.await() } } }
             check(entered.await(5, TimeUnit.SECONDS))
+            val started = System.nanoTime()
             val busy = assertFailsWith<MediaException> { gate.gated { } }
             assertEquals("MEDIA_BUSY", busy.code)
+            val waited = java.time.Duration.ofNanos(System.nanoTime() - started)
+            assertTrue(waited >= java.time.Duration.ofMillis(900) && waited < java.time.Duration.ofSeconds(3), waited.toString())
             release.countDown()
         } finally {
             release.countDown(); pool.shutdown(); pool.awaitTermination(5, TimeUnit.SECONDS)
         }
         assertEquals(1, gate.gated { 1 })
     }
+
 }
