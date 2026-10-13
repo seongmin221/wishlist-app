@@ -7,6 +7,7 @@ import java.util.UUID
 import javax.sql.DataSource
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.slf4j.LoggerFactory
 
 data class IntentRequest(val contentType: String, val byteSize: Int, val width: Int, val height: Int) {
     /** First violated rule, in the public priority order, or null. */
@@ -41,6 +42,7 @@ class MediaService(
     private val beforeApply: (UUID) -> Unit = {},
 ) {
     private val media = MediaRepository()
+    private val log = LoggerFactory.getLogger(MediaService::class.java)
 
     fun createIntent(owner: UUID, key: UUID, request: IntentRequest): MediaIntentResult {
         request.violation()?.let { throw MediaException(it) }
@@ -57,6 +59,57 @@ class MediaService(
             media.insert(c, owner, key, fingerprint, request) to false
         }
         return MediaIntentResult(view(asset), replayed)
+    }
+
+    /**
+     * Verifies the uploaded object and settles the row. Storage reads and decoding run outside transactions; when a
+     * lookup finds no object or fails, the row is re-read first because a concurrent completion may already have settled
+     * it (a FAILED peer deletes the object).
+     */
+    fun complete(owner: UUID, id: UUID): MediaView {
+        val asset = load(owner, id)
+        if (asset.status != MediaStatus.PENDING || asset.expired) return view(asset)
+        val stored = try {
+            storage.stat(asset.objectKey)
+        } catch (_: MediaStorageException) {
+            return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
+        } ?: return settledOr(owner, id, "MEDIA_OBJECT_MISSING")
+        val verdict = validator.precheck(stored, asset.declared)?.let(ImageVerdict::Invalid) ?: validator.gated {
+            try {
+                validator.verify(storage.read(asset.objectKey, MediaLimits.MAX_BYTES), asset.declared)
+            } catch (_: MediaObjectTooLarge) {
+                ImageVerdict.Invalid(MediaFailureReason.SIZE_MISMATCH)
+            } catch (_: MediaStorageException) {
+                null
+            }
+        } ?: return settledOr(owner, id, "MEDIA_STORAGE_UNAVAILABLE")
+        beforeApply(id)
+        var failedNow = false
+        val settled = source.inTransaction { c ->
+            val locked = media.find(c, owner, id, lock = true) ?: throw MediaException("MEDIA_NOT_FOUND")
+            if (locked.status != MediaStatus.PENDING) return@inTransaction locked
+            when (verdict) {
+                is ImageVerdict.Valid -> media.markReady(c, id, verdict)
+                is ImageVerdict.Invalid -> { media.markFailed(c, id, verdict.reason); failedNow = true }
+            }
+            checkNotNull(media.find(c, owner, id))
+        }
+        if (failedNow) try {
+            storage.delete(asset.objectKey)
+        } catch (_: MediaStorageException) {
+            log.warn("Failed media object delete deferred to cleanup mediaId={}", id)
+        }
+        return view(settled)
+    }
+
+    private fun load(owner: UUID, id: UUID): MediaAsset =
+        source.inTransaction { c -> media.find(c, owner, id) } ?: throw MediaException("MEDIA_NOT_FOUND")
+
+    /** The settled row's response when a peer finished first, otherwise [code]. */
+    private fun settledOr(owner: UUID, id: UUID, code: String): MediaView {
+        val current = load(owner, id)
+        if (current.status != MediaStatus.PENDING) return view(current)
+        throw MediaException(code)
     }
 
     /** Response for a stored row: an upload target while PENDING, a display URL once READY, an error otherwise. */

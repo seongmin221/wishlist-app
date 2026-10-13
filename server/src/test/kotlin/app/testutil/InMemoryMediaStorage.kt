@@ -14,6 +14,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
     @Volatile var failRead = false
     @Volatile var failDelete = false
     @Volatile var signDelayMillis = 0L
+    @Volatile var beforeStat: (String) -> Unit = {}
     val uploadSigns = AtomicInteger()
     val readSigns = AtomicInteger()
     val stats = AtomicInteger()
@@ -37,7 +38,7 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
     }
 
     override fun stat(objectKey: String): StoredObject? {
-        stats.incrementAndGet()
+        stats.incrementAndGet(); beforeStat(objectKey)
         if (failStat) throw MediaStorageException()
         return objects[objectKey]?.let { (bytes, type) -> StoredObject(bytes.size.toLong(), type) }
     }
