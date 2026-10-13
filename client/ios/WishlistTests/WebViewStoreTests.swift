@@ -11,9 +11,18 @@ final class WebViewStoreTests: XCTestCase {
 
     private final class RecordingWebView: WKWebView {
         var loaded: [URLRequest] = []
+        var reloads = 0
+        var shownURL: URL?
+
+        override var url: URL? { shownURL }
 
         override func load(_ request: URLRequest) -> WKNavigation? {
             loaded.append(request)
+            return nil
+        }
+
+        override func reload() -> WKNavigation? {
+            reloads += 1
             return nil
         }
     }
@@ -224,6 +233,47 @@ final class WebViewStoreTests: XCTestCase {
 
     // MARK: D13 main-frame failure
 
+    private func recordingModel() -> (WebViewModel, RecordingWebView) {
+        var view: RecordingWebView!
+        let m = WebViewModel(url: start, openExternal: { _ in }, makeWebView: {
+            view = RecordingWebView(frame: .zero, configuration: $0)
+            return view
+        })
+        return (m, view)
+    }
+
+    func testReloadAndRetryOpenTheFailedPageOverThePreviousOne() {
+        let (m, view) = recordingModel()
+        defer { m.close() }
+        view.shownURL = start // after a failure WebKit shows the previous page
+        let failed = URL(string: "https://shop.example.com/p/2")!
+        m.webView(m.webView, didFailProvisionalNavigation: nil, withError: NSError(
+            domain: NSURLErrorDomain, code: NSURLErrorTimedOut, userInfo: [NSURLErrorFailingURLErrorKey: failed]
+        ))
+        XCTAssertTrue(m.page.failed)
+        m.reload() // the bar's 새로고침 and "다시 시도" alike
+        XCTAssertEqual(view.loaded.map(\.url), [failed])
+        XCTAssertEqual(view.reloads, 0)
+        XCTAssertTrue(m.page.failed) // until the new load starts
+        m.mainFrameStarted(url: failed)
+        XCTAssertFalse(m.page.failed)
+        m.reload()
+        XCTAssertEqual(view.reloads, 1)
+    }
+
+    func testReloadOpensTheRouteURLInAViewWithoutAPageAndNothingOnceClosed() {
+        let (m, view) = recordingModel()
+        m.reload()
+        XCTAssertEqual(view.loaded.map(\.url), [start])
+        m.close()
+        m.reload()
+        m.stop()
+        m.goBack()
+        m.goForward()
+        XCTAssertEqual(view.loaded.count, 1)
+        XCTAssertEqual(view.reloads, 0)
+    }
+
     func testOnlyRealLoadErrorsArePageFailures() {
         XCTAssertFalse(WebLoadError.isPageFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)))
         XCTAssertFalse(WebLoadError.isPageFailure(NSError(domain: "WebKitErrorDomain", code: 102)))
@@ -282,6 +332,27 @@ final class WebViewStoreTests: XCTestCase {
         m.webView(m.webView, decidePolicyFor: FakeAction(pay, type: .linkActivated)) { _ in }
         XCTAssertEqual(opened, [tel])
         XCTAssertEqual(prompts.shown, [pay])
+    }
+
+    func testAFragmentJumpLeavesTheTapLikeAndroid() {
+        var opened: [URL] = []
+        let m = model({ opened.append($0) })
+        defer { m.close() }
+        let tel = URL(string: "tel:0109998888")!
+        m.noteTouch()
+        XCTAssertEqual(m.decide(url: URL(string: "https://a.com/p#reviews"), mainFrame: true, userGesture: true, sameDocument: true), .allow)
+        XCTAssertEqual(m.decide(url: tel, mainFrame: true, userGesture: true), .cancel)
+        XCTAssertEqual(opened, [tel])
+    }
+
+    func testSameDocumentIsOnlyAFragmentOfThePageShown() {
+        let page = URL(string: "https://a.com/p?x=1")!
+        XCTAssertTrue(WebUserGesture.isSameDocument(URL(string: "https://a.com/p?x=1#top"), current: page))
+        XCTAssertTrue(WebUserGesture.isSameDocument(URL(string: "https://a.com/p?x=1#b"), current: URL(string: "https://a.com/p?x=1#a")))
+        XCTAssertFalse(WebUserGesture.isSameDocument(URL(string: "https://a.com/p?x=1"), current: page)) // a reload
+        XCTAssertFalse(WebUserGesture.isSameDocument(URL(string: "https://a.com/p?x=2#top"), current: page))
+        XCTAssertFalse(WebUserGesture.isSameDocument(URL(string: "https://b.com/p?x=1#top"), current: page))
+        XCTAssertFalse(WebUserGesture.isSameDocument(URL(string: "https://a.com/p#top"), current: nil))
     }
 
     func testATapUsedByAPageLinkDoesNotOpenAnApp() {

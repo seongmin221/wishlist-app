@@ -14,7 +14,9 @@ import WebKit
 ///   `targetFrame?.isMainFrame ?? true` (nil = a new-window request) and `WebUserGesture` as the user gesture
 ///   (`.linkActivated` and a real tap on the web view within the last second: a script's `a.click()` is also
 ///   `.linkActivated`, and a scroll or drag is not a tap). One tap is one decision: the first one made with it
-///   spends it, whatever it opens (a script's next click asks; Android `WebTapBudget`).
+///   spends it, whatever it opens (a script's next click asks; Android `WebTapBudget`). A same-page `#fragment`
+///   link does not spend it (Android never sees one). VoiceOver, Switch Control and Full Keyboard Access activate
+///   links without a touch and no public API tells: their external links always ask (known limit, kept safe).
 ///   External apps open with `UIApplication.open` (never `canOpenURL`; a false result does nothing, D16); without
 ///   a gesture they go through `ExternalPromptGate` and FWebViewExternal (`presentPrompt`). Every external request,
 ///   from the main frame or an iframe, is cancelled in WebKit, so it never loads into any frame.
@@ -56,11 +58,16 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// `ProcessInfo.systemUptime` of the last real tap's lift on the web view (`WebTouchStampRecognizer`).
     @ObservationIgnored private(set) var lastTouch: TimeInterval?
 
-    init(url: URL, openExternal: @escaping (URL) -> Void = WebViewModel.openWithSystem) {
+    /// `makeWebView`: tests pass a recording `WKWebView` subclass.
+    init(
+        url: URL,
+        openExternal: @escaping (URL) -> Void = WebViewModel.openWithSystem,
+        makeWebView: (WKWebViewConfiguration) -> WKWebView = { WKWebView(frame: .zero, configuration: $0) }
+    ) {
         initialURL = url
         page = WebPageState(url: url.absoluteString)
         self.openExternal = openExternal
-        webView = WKWebView(frame: .zero, configuration: Self.makeConfiguration())
+        webView = makeWebView(Self.makeConfiguration())
         super.init()
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -153,11 +160,13 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     // MARK: Navigation
 
-    /// The policy of one frame navigation (main frame or iframe).
-    func decide(url: URL?, mainFrame: Bool, userGesture: Bool) -> WKNavigationActionPolicy {
+    /// The policy of one frame navigation (main frame or iframe). `sameDocument`: a main-frame `#fragment` jump on
+    /// the page shown (`WebUserGesture.isSameDocument`).
+    func decide(url: URL?, mainFrame: Bool, userGesture: Bool, sameDocument: Bool = false) -> WKNavigationActionPolicy {
         guard !isClosed, let url else { return .cancel }
-        // One tap, one decision (D16): a page link, an app or a blocked URL alike uses it up.
-        if userGesture { lastTouch = nil }
+        // One tap, one decision (D16): a page link, an app or a blocked URL alike uses it up. A fragment jump
+        // leaves it, as on Android, where `shouldOverrideUrlLoading` never sees one.
+        if userGesture && !sameDocument { lastTouch = nil }
         let decision = WebNavigationPolicy.decide(
             scheme: url.scheme ?? "",
             mainFrame: mainFrame,
@@ -211,14 +220,17 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        let url = navigationAction.request.url
+        let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         decisionHandler(decide(
-            url: navigationAction.request.url,
-            mainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
+            url: url,
+            mainFrame: mainFrame,
             userGesture: WebUserGesture.isUserGesture(
                 navigationType: navigationAction.navigationType,
                 lastTouch: lastTouch,
                 now: ProcessInfo.processInfo.systemUptime
-            )
+            ),
+            sameDocument: mainFrame && WebUserGesture.isSameDocument(url, current: webView.url)
         ))
     }
 
@@ -310,6 +322,18 @@ enum WebUserGesture {
         guard navigationType == .linkActivated, let lastTouch else { return false }
         let age = now - lastTouch
         return age >= 0 && age <= window
+    }
+
+    /// `url` only moves to a `#fragment` of the page shown (the same URL without its fragment).
+    static func isSameDocument(_ url: URL?, current: URL?) -> Bool {
+        guard let url, url.fragment != nil, let current else { return false }
+        return withoutFragment(url) == withoutFragment(current)
+    }
+
+    private static func withoutFragment(_ url: URL) -> URL? {
+        var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        parts?.fragment = nil
+        return parts?.url
     }
 }
 
