@@ -32,11 +32,8 @@ internal object WebExternalApps {
     fun targetOf(url: String, mainFrame: Boolean, userGesture: Boolean): ExternalTarget {
         if (schemeOf(url).equals("intent", ignoreCase = true)) {
             val fallbackOk = fallbackAllowed(mainFrame, userGesture)
-            return when (val r = IntentSanitizer.sanitize(url) { true }) {
-                is SanitizedIntent.External -> ExternalTarget.Launch(
-                    r.intent,
-                    r.intent.getStringExtra(BROWSER_FALLBACK_URL)?.takeIf { fallbackOk && WebUrl.isWeb(it) },
-                )
+            return when (val r = IntentSanitizer.sanitize(url)) {
+                is SanitizedIntent.External -> ExternalTarget.Launch(r.intent, r.fallbackUrl?.takeIf { fallbackOk })
                 is SanitizedIntent.Fallback -> if (fallbackOk) ExternalTarget.LoadInside(r.url) else ExternalTarget.None
                 SanitizedIntent.Drop -> ExternalTarget.None
             }

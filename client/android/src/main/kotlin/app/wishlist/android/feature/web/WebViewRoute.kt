@@ -9,6 +9,7 @@ import java.util.Base64
  * `http`/`https` URL with a host; restoring a saved stack re-validates through [decodeToken]. Account-scoped:
  * it closes with the detail routes when the account is left.
  */
+@ConsistentCopyVisibility // copy() stays private too: it would build a route around any URL, skipping [of].
 internal data class WebViewRoute private constructor(val url: String) : WLRoute {
     override val showsTabBar = false
     override val pushStyle = WLPushStyle.Slide

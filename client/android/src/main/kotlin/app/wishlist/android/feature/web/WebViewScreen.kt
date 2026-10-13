@@ -157,8 +157,14 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
         webView?.takeIf { it.canGoForward() }?.goForward()
     }
 
+    /** Reload, or open [page]'s URL in a view that has none (the fresh one built after a renderer crash). */
     fun reload() {
-        webView?.reload()
+        val view = webView
+        when {
+            view == null -> pendingLoad = page.url
+            view.url == null -> view.loadUrl(page.url)
+            else -> view.reload()
+        }
     }
 
     fun stop() {
@@ -166,15 +172,10 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
         page = page.copy(loading = false)
     }
 
-    /** "다시 시도": reload the failed page, or open its URL in the fresh view built after a renderer crash. */
+    /** "다시 시도": [reload] the failed page. */
     fun retry() {
         page = page.copy(failed = false)
-        val view = webView
-        if (view == null || view.url == null) {
-            if (view == null) pendingLoad = page.url else view.loadUrl(page.url)
-        } else {
-            view.reload()
-        }
+        reload()
     }
 
     private fun syncHistory(view: WebView) {

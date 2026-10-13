@@ -12,11 +12,7 @@ import org.junit.Test
  * [IntentSanitizer.sanitize] core with a real `Intent.parseUri` result.
  */
 class IntentSanitizerTest {
-    private val always: (ParsedIntentUri) -> Boolean = { true }
-    private val never: (ParsedIntentUri) -> Boolean = { false }
-
-    private fun sanitize(uri: String, resolvable: (ParsedIntentUri) -> Boolean) =
-        IntentSanitizer.sanitize(ParsedIntentUri.parse(uri), resolvable)
+    private fun sanitize(uri: String) = IntentSanitizer.sanitize(ParsedIntentUri.parse(uri))
 
     @Test
     fun parserReadsTheIntentFields() {
@@ -33,7 +29,7 @@ class IntentSanitizerTest {
 
     @Test
     fun componentIsClearedAndBrowsableIsAdded() {
-        val result = sanitize("intent://scan/#Intent;scheme=zxing;component=com.evil/.Steal;end", always)
+        val result = sanitize("intent://scan/#Intent;scheme=zxing;component=com.evil/.Steal;end")
         val target = (result as SanitizedIntent.External).intent
         assertNull(target.component)
         assertFalse(target.hasSelector)
@@ -45,69 +41,46 @@ class IntentSanitizerTest {
         val parsed = ParsedIntentUri.parse("intent:#Intent;action=android.intent.action.VIEW;SEL;component=com.evil/.Steal;end")!!
         assertTrue(parsed.hasSelector)
         assertNull(parsed.component) // the component belongs to the selector, not the main intent
-        val target = (IntentSanitizer.sanitize(parsed, always) as SanitizedIntent.External).intent
+        val target = (IntentSanitizer.sanitize(parsed) as SanitizedIntent.External).intent
         assertFalse(target.hasSelector)
         assertNull(target.component)
         assertTrue(ParsedIntentUri.CATEGORY_BROWSABLE in target.categories)
     }
 
     @Test
-    fun resolvabilityIsCheckedOnTheSanitizedIntent() {
-        var seenComponent: String? = "unset"
-        var seenSelector = true
-        sanitize("intent://x/#Intent;scheme=pay;component=com.evil/.Steal;SEL;component=a/.B;end") {
-            seenComponent = it.component
-            seenSelector = it.hasSelector
-            true
-        }
-        assertNull(seenComponent)
-        assertFalse(seenSelector)
-    }
-
-    @Test
-    fun unresolvableIntentOpensAnHttpFallbackInside() {
+    fun anHttpFallbackTravelsWithTheIntentForWhenNoAppTakesIt() {
         val uri = "intent://item/1#Intent;scheme=shopapp;package=com.shop;S.browser_fallback_url=https%3A%2F%2Fm.shop.com;end"
-        assertEquals(SanitizedIntent.Fallback("https://m.shop.com"), sanitize(uri, never))
+        assertEquals("https://m.shop.com", (sanitize(uri) as SanitizedIntent.External).fallbackUrl)
     }
 
     @Test
     fun nonWebFallbackIsDropped() {
-        assertEquals(
-            SanitizedIntent.Drop,
-            sanitize("intent://x#Intent;scheme=shopapp;S.browser_fallback_url=javascript%3Aalert(1);end", never),
-        )
-        assertEquals(
-            SanitizedIntent.Drop,
-            sanitize("intent://x#Intent;scheme=shopapp;S.browser_fallback_url=file%3A%2F%2F%2Fetc%2Fhosts;end", never),
-        )
-        assertEquals(SanitizedIntent.Drop, sanitize("intent://x#Intent;scheme=shopapp;end", never))
+        listOf(
+            "intent://x#Intent;scheme=shopapp;S.browser_fallback_url=javascript%3Aalert(1);end",
+            "intent://x#Intent;scheme=shopapp;S.browser_fallback_url=file%3A%2F%2F%2Fetc%2Fhosts;end",
+            "intent://x#Intent;scheme=shopapp;end",
+        ).forEach { assertNull(it, (sanitize(it) as SanitizedIntent.External).fallbackUrl) }
     }
 
     @Test
     fun intentPointingAtHttpDataNeverLeavesTheWebView() {
-        var asked = false
-        val probe: (ParsedIntentUri) -> Boolean = { asked = true; true }
         assertEquals(
             SanitizedIntent.Fallback("https://m.shop.com"),
-            sanitize("intent://m.shop.com/a#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fm.shop.com;end", probe),
+            sanitize("intent://m.shop.com/a#Intent;scheme=https;S.browser_fallback_url=https%3A%2F%2Fm.shop.com;end"),
         )
-        assertEquals(SanitizedIntent.Drop, sanitize("intent://m.shop.com/a#Intent;scheme=http;package=com.evil;end", probe))
-        assertEquals(SanitizedIntent.Drop, sanitize("intent:https://m.shop.com/#Intent;end", probe))
-        assertFalse(asked)
+        assertEquals(SanitizedIntent.Drop, sanitize("intent://m.shop.com/a#Intent;scheme=http;package=com.evil;end"))
+        assertEquals(SanitizedIntent.Drop, sanitize("intent:https://m.shop.com/#Intent;end"))
     }
 
     @Test
     fun localOrScriptDataNeverGoesExternal() {
-        var asked = false
-        val probe: (ParsedIntentUri) -> Boolean = { asked = true; true }
         assertEquals(
             SanitizedIntent.Fallback("https://m.shop.com"),
-            sanitize("intent:///etc/hosts#Intent;scheme=file;S.browser_fallback_url=https%3A%2F%2Fm.shop.com;end", probe),
+            sanitize("intent:///etc/hosts#Intent;scheme=file;S.browser_fallback_url=https%3A%2F%2Fm.shop.com;end"),
         )
-        assertEquals(SanitizedIntent.Drop, sanitize("intent://com.app.provider/x#Intent;scheme=content;end", probe))
-        assertEquals(SanitizedIntent.Drop, sanitize("intent:javascript:alert(1)#Intent;end", probe))
-        assertEquals(SanitizedIntent.Drop, sanitize("intent://x#Intent;scheme=JavaScript;end", probe))
-        assertFalse(asked)
+        assertEquals(SanitizedIntent.Drop, sanitize("intent://com.app.provider/x#Intent;scheme=content;end"))
+        assertEquals(SanitizedIntent.Drop, sanitize("intent:javascript:alert(1)#Intent;end"))
+        assertEquals(SanitizedIntent.Drop, sanitize("intent://x#Intent;scheme=JavaScript;end"))
     }
 
     @Test
@@ -119,8 +92,8 @@ class IntentSanitizerTest {
         val syntax: (String) -> ParsedIntentUri = { throw java.net.URISyntaxException(it, "bad") }
         val other: (String) -> ParsedIntentUri = { throw IndexOutOfBoundsException("odd extra") }
         for (parse in listOf(numberFormat, illegal, syntax, other)) {
-            assertEquals(SanitizedIntent.Fallback("https://m.shop.com"), IntentSanitizer.sanitize(withFallback, parse, always))
-            assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize("intent://x#Intent;i.x=zz;end", parse, always))
+            assertEquals(SanitizedIntent.Fallback("https://m.shop.com"), IntentSanitizer.sanitize(withFallback, parse))
+            assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize("intent://x#Intent;i.x=zz;end", parse))
         }
     }
 
@@ -128,14 +101,12 @@ class IntentSanitizerTest {
     fun guardedPathHardensWhatTheParserReturns() {
         val result = IntentSanitizer.sanitize(
             "intent://scan/#Intent;scheme=zxing;component=com.evil/.Steal;SEL;component=a/.B;end",
-            { ParsedIntentUri.parse(it)!! },
-            always,
-        )
+        ) { ParsedIntentUri.parse(it)!! }
         val target = (result as SanitizedIntent.External).intent
         assertNull(target.component)
         assertFalse(target.hasSelector)
         assertTrue(ParsedIntentUri.CATEGORY_BROWSABLE in target.categories)
-        assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize("intent://scan/", { ParsedIntentUri.parse(it)!! }, always))
+        assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize("intent://scan/") { ParsedIntentUri.parse(it)!! })
     }
 
     @Test
@@ -146,7 +117,7 @@ class IntentSanitizerTest {
             "intent://scan/#Other;scheme=zxing;end",
             "https://shop.com/#Intent;scheme=zxing;end",
         ).forEach { assertNull(it, ParsedIntentUri.parse(it)) }
-        assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize(null, always))
+        assertEquals(SanitizedIntent.Drop, IntentSanitizer.sanitize(null))
     }
 
     @Test
@@ -154,14 +125,7 @@ class IntentSanitizerTest {
         // 0x43 = FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION | FLAG_GRANT_PERSISTABLE_URI_PERMISSION
         val parsed = ParsedIntentUri.parse("intent://x/#Intent;scheme=pay;launchFlags=0x43;end")!!
         assertEquals(0x43, parsed.flags)
-        val target = (IntentSanitizer.sanitize(parsed, always) as SanitizedIntent.External).intent
+        val target = (IntentSanitizer.sanitize(parsed) as SanitizedIntent.External).intent
         assertEquals(0, target.flags)
-    }
-
-    @Test
-    fun flagsAreClearedBeforeResolvabilityIsAsked() {
-        var seen = -1
-        sanitize("intent://x/#Intent;scheme=pay;launchFlags=0x10000000;end") { seen = it.flags; true }
-        assertEquals(0, seen)
     }
 }

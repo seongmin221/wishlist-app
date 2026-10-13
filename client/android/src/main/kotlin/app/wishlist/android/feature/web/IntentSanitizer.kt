@@ -9,8 +9,11 @@ internal const val BROWSER_FALLBACK_URL = "browser_fallback_url"
 
 /** Result of handling an `intent:` navigation (spec §4 Android `intent://`). */
 sealed interface SanitizedIntent<out T> {
-    /** Launch [intent]: component and selector cleared, `CATEGORY_BROWSABLE` added. */
-    data class External<T>(val intent: T) : SanitizedIntent<T>
+    /**
+     * Launch [intent]: component and selector cleared, `CATEGORY_BROWSABLE` added. [fallbackUrl] is its
+     * `browser_fallback_url` when that is `http`/`https`, for [WebExternalApps.launch] when no app takes it.
+     */
+    data class External<T>(val intent: T, val fallbackUrl: String?) : SanitizedIntent<T>
 
     /** Load this `http`/`https` `browser_fallback_url` inside the web view. */
     data class Fallback(val url: String) : SanitizedIntent<Nothing>
@@ -31,19 +34,16 @@ internal interface IntentTarget {
 /**
  * Stops intent-scheme attacks: a page must not start an arbitrary in-device component (explicit `component=`
  * or one hidden in a `SEL;` selector). Only a hardened, BROWSABLE intent leaves the web view; one pointing at
- * `http`/`https` data or that nothing resolves falls back to `browser_fallback_url` (web URLs only) or is dropped.
+ * `http`/`https` (or local/script) data falls back to `browser_fallback_url` (web URLs only) or is dropped.
+ * Whether an app takes the intent is learned only when it is started ([WebExternalApps.launch]).
  */
 internal object IntentSanitizer {
     private val inWebViewOnly = setOf("http", "https", "file", "content", "javascript")
 
     /** Android adapter: `Intent.parseUri(URI_INTENT_SCHEME)` through the guarded pure path below. */
-    fun sanitize(uri: String, resolvable: (Intent) -> Boolean): SanitizedIntent<Intent> =
-        when (
-            val result = sanitize(uri, { AndroidIntentTarget(Intent.parseUri(it, Intent.URI_INTENT_SCHEME)) }) {
-                resolvable(it.intent)
-            }
-        ) {
-            is SanitizedIntent.External -> SanitizedIntent.External(result.intent.intent)
+    fun sanitize(uri: String): SanitizedIntent<Intent> =
+        when (val result = sanitize(uri) { AndroidIntentTarget(Intent.parseUri(it, Intent.URI_INTENT_SCHEME)) }) {
+            is SanitizedIntent.External -> SanitizedIntent.External(result.intent.intent, result.fallbackUrl)
             is SanitizedIntent.Fallback -> result
             SanitizedIntent.Drop -> SanitizedIntent.Drop
         }
@@ -58,7 +58,7 @@ internal object IntentSanitizer {
      * are caught here and end in the fallback or Drop instead of crashing the app. Any other `RuntimeException`
      * (e.g. `BadParcelableException`, index errors on odd extras) is caught the same way.
      */
-    fun <T : IntentTarget> sanitize(uri: String, parse: (String) -> T, resolvable: (T) -> Boolean): SanitizedIntent<T> {
+    fun <T : IntentTarget> sanitize(uri: String, parse: (String) -> T): SanitizedIntent<T> {
         val parsed = ParsedIntentUri.parse(uri) ?: return SanitizedIntent.Drop
         val target = try {
             parse(uri)
@@ -67,11 +67,11 @@ internal object IntentSanitizer {
         } catch (_: RuntimeException) {
             return fallbackOrDrop(parsed.fallbackUrl)
         }
-        return sanitize(target, resolvable)
+        return sanitize(target)
     }
 
-    /** Pure core: hardens [target] in place before asking [resolvable]. */
-    fun <T : IntentTarget> sanitize(target: T?, resolvable: (T) -> Boolean): SanitizedIntent<T> {
+    /** Pure core: hardens [target] in place. */
+    fun <T : IntentTarget> sanitize(target: T?): SanitizedIntent<T> {
         if (target == null) return SanitizedIntent.Drop
         val scheme = target.dataScheme?.lowercase()
         // Web data stays in the web view; local/script data (file:, content:, javascript:) never goes external.
@@ -82,7 +82,7 @@ internal object IntentSanitizer {
         // when starting from the Activity.
         target.clearFlags()
         target.addBrowsableCategory()
-        return if (resolvable(target)) SanitizedIntent.External(target) else fallbackOrDrop(target.fallbackUrl)
+        return SanitizedIntent.External(target, target.fallbackUrl?.takeIf(WebUrl::isWeb))
     }
 
     private fun fallbackOrDrop(url: String?): SanitizedIntent<Nothing> =
