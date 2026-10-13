@@ -11,6 +11,8 @@ final class WLEntryChannels {
     var content: Double = 0
     /// 공유 요소를 전환 층이 그리는 중(상세 안의 사진은 숨는다).
     var animating = true
+    /// 칸 전체 불투명도. `replaceTop`의 cross-fade만 움직인다(그 밖에는 늘 1).
+    var fade: Double = 1
     /// window 좌표. 원래 자리는 push 때, pop·끌기 시작 때 다시 읽는다. 상세 자리도 같다.
     var source: CGRect = .zero
     var target: CGRect = .zero
@@ -95,6 +97,10 @@ final class WLNavMotion {
                     tab(t.tab).opacity = 1
                     tab(t.tab).scale = 1
                     finish(t)
+                case .replace:
+                    if let entry = navigator.entries(t.tab).last { settleIncoming(channels(entry.id)) }
+                    if let old = navigator.exiting?.entry { entryChannels[old.id] = nil }
+                    finish(t)
                 case .backGesture: break
                 }
             }
@@ -111,6 +117,9 @@ final class WLNavMotion {
             startPop(exiting.entry, t, remaining: remaining)
         case .tab(let from):
             startTab(from: from, to: t.tab, t)
+        case .replace:
+            guard let entry = navigator.entries(t.tab).last, let old = navigator.exiting?.entry else { return finish(t) }
+            startReplace(entry, replacing: old, t)
         case .backGesture:
             break // 끌기는 beginDrag가 직접 움직인다.
         }
@@ -147,6 +156,12 @@ final class WLNavMotion {
     }
 
     private func settlePush(_ entry: WLBackStackEntry, _ t: WLNavTransition) {
+        // The push was ended by `dropAccountScoped` (its entry is gone): only give the source photo back.
+        guard navigator.activeTransition == t else {
+            if let key = entry.sourceKey { registry.setHidden(key, false) }
+            entryChannels[entry.id] = nil
+            return
+        }
         let ch = channels(entry.id)
         ch.animating = false
         if let key = entry.sourceKey { registry.setHidden(key, false) }
@@ -205,6 +220,57 @@ final class WLNavMotion {
         }
     }
 
+    /// `replaceTop`: 새 칸은 제자리에서 0 → 1, 바뀐 칸(`exiting`, 위에 그려진다)은 1 → 0으로 함께 옅어진다
+    /// (200 `easeOut`, Android `ReplaceCrossFadeMillis`와 같은 구현 기본값). 사진·밀기 모션은 없다.
+    private func startReplace(_ entry: WLBackStackEntry, replacing old: WLBackStackEntry, _ t: WLNavTransition) {
+        let incoming = channels(entry.id)
+        let outgoing = channels(old.id)
+        snap {
+            settleIncoming(incoming)
+            incoming.fade = 0
+        }
+        withAnimation(C.easeOut.animation(ms: M.dialogIn)) {
+            incoming.fade = 1
+            outgoing.fade = 0
+        } completion: { [weak self] in
+            guard let self else { return }
+            finish(t)
+            entryChannels[old.id] = nil
+        }
+    }
+
+    /// 들어온 칸을 제자리·불투명·전환 층 없음으로 둔다(replace는 사진을 날리지 않는다).
+    private func settleIncoming(_ ch: WLEntryChannels) {
+        ch.phase = 1
+        ch.content = 1
+        ch.animating = false
+        ch.fade = 1
+    }
+
+    // MARK: 계정 범위 화면 정리
+
+    /// `navigator.dropAccountScoped()`를 부르고 빠진 칸의 모션 상태를 정리한다: 끌던 칸이면 끌기를 잊고(이후 끌기 이벤트는
+    /// 아무 일도 하지 않는다), 숨겨 둔 원래 자리 사진을 되돌리고, 칸의 모션 값을 지운다. 화면은 스택만 그리므로 남은 모션은
+    /// 지금 맨 위 칸에 머문다. 빠진 칸 id를 그대로 돌려준다(셸이 그 owner를 바로 닫는다).
+    func dropAccountScoped() -> [Int] {
+        var keys: [Int: String] = [:]
+        for tab in WLTab.allCases {
+            for entry in navigator.entries(tab) { if let key = entry.sourceKey { keys[entry.id] = key } }
+        }
+        let exitingBefore = navigator.exiting?.entry
+        let dropped = navigator.dropAccountScoped()
+        if let old = exitingBefore, navigator.exiting == nil { entryChannels[old.id] = nil } // a replace that ended
+        if let drag, navigator.activeTransition != drag.transition {
+            self.drag = nil
+            pendingPopRemaining = nil
+        }
+        for id in dropped {
+            if let key = keys[id] { registry.setHidden(key, false) }
+            entryChannels[id] = nil
+        }
+        return dropped
+    }
+
     // MARK: 끌어서 뒤로 (진행값 0~1)
 
     /// 가장자리 끌기를 받아도 되는지(전환 중·탭 첫 화면이면 아니다).
@@ -219,7 +285,7 @@ final class WLNavMotion {
     }
 
     func updateDrag(_ progress: Double) {
-        guard let drag else { return }
+        guard let drag, navigator.activeTransition == drag.transition else { return }
         let p = min(1, max(0, progress))
         let ch = channels(drag.entry.id)
         snap {
@@ -234,6 +300,8 @@ final class WLNavMotion {
     func endDrag(progress: Double, velocity: Double) {
         guard let drag else { return }
         self.drag = nil
+        // The gesture was ended elsewhere (dropAccountScoped): nothing to commit or revert.
+        guard navigator.activeTransition == drag.transition else { return }
         let p = min(1, max(0, progress))
         let commit = p >= M.interactiveBackCommitProgress || velocity >= Self.flingProgressPerSecond
         if commit {
@@ -250,7 +318,8 @@ final class WLNavMotion {
         } completion: { [weak self] in
             ch.animating = false
             if let key = drag.entry.sourceKey { self?.registry.setHidden(key, false) }
-            self?.navigator.cancelBackGesture()
+            // Only our own gesture: a drop during the revert ended it, and a later gesture is not ours.
+            if self?.navigator.activeTransition == drag.transition { self?.navigator.cancelBackGesture() }
         }
     }
 

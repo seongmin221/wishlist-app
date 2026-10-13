@@ -1,0 +1,5 @@
+-- v2 -> v3 (C4). Purpose display fields (server wire values) are cached so the detail screen can draw the purpose chip offline.
+-- ALTER appends columns, so Wishlist.sq lists them after client_created_at in the same order.
+ALTER TABLE item_cache ADD COLUMN purpose_name TEXT;
+ALTER TABLE item_cache ADD COLUMN purpose_color_key TEXT;
+ALTER TABLE item_cache ADD COLUMN purpose_icon_key TEXT;

@@ -44,11 +44,28 @@ interface LocalStore {
         retryAfter: Instant?,
     ): ClientResult<Unit>
 
+    /**
+     * Removes a local row that has not been sent, without an account (works signed out). Signed in:
+     * a row bound to the snapshot account or unbound; signed out: unbound rows only. Only PENDING and
+     * FAILED rows go; SUBMITTING is CONFLICT/SUBMISSION_IN_FLIGHT, and an absent row or one bound to
+     * another binding is NOT_FOUND/SUBMISSION_NOT_FOUND. UUIDs compare case-insensitively.
+     */
+    suspend fun deleteSubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<Unit>
+
     /** The snapshot account's cached ACTIVE items whose analysis is still PROCESSING, in no particular order (the submission view sorts them). */
     suspend fun processingItems(snapshot: SessionSnapshot): ClientResult<List<WishlistItem>>
 
+    /**
+     * ITEM-03 GET 결과 전용. 같은 version이면 덮어쓴다(목적·카테고리 편집은 item version을 올리지 않는다).
+     * 더 작은 version은 버린다. [accept]는 `>`를 유지한다.
+     */
     suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit>
+
+    /** UUIDs compare case-insensitively. A row that cannot be decoded is deleted and reads as absent. */
     suspend fun cachedItem(snapshot: SessionSnapshot, id: String): ClientResult<WishlistItem?>
+
+    /** The cached item accepted for [submissionId] (case-insensitive); Success(null) when none. Undecodable rows are dropped. */
+    suspend fun cachedItemBySubmission(snapshot: SessionSnapshot, submissionId: String): ClientResult<WishlistItem?>
 
     /**
      * Atomically writes the accepted item to the cache and deletes its submission. The item must

@@ -22,6 +22,15 @@ sealed interface RelativeTime {
     data class Days(val value: Int) : RelativeTime
 }
 
+/** When an item was saved, for the detail screen; the platform picks the wording. */
+sealed interface SavedLabel {
+    data object JustNow : SavedLabel
+    data object Today : SavedLabel
+
+    /** [year] is set only when it differs from now's local year. */
+    data class OnDate(val year: Int?, val month: Int, val day: Int) : SavedLabel
+}
+
 object DisplayFormat {
     private const val FALLBACK_LENGTH = 40
     private const val SECONDS_PER_DAY = 86_400L
@@ -50,6 +59,31 @@ object DisplayFormat {
         }
     }
 
+    /** Under a minute (or in the future) is JustNow; the same local date is Today; otherwise the local date. */
+    fun saved(at: Instant, now: Instant, utcOffsetSeconds: (Instant) -> Int): SavedLabel {
+        if (now - at < 1.minutes) return SavedLabel.JustNow
+        val atDay = localDay(at, utcOffsetSeconds(at))
+        val nowDay = localDay(now, utcOffsetSeconds(now))
+        if (atDay == nowDay) return SavedLabel.Today
+        val (year, month, day) = civil(atDay)
+        val nowYear = civil(nowDay).first
+        return SavedLabel.OnDate(if (year == nowYear) null else year, month, day)
+    }
+
     private fun localDay(instant: Instant, utcOffsetSeconds: Int): Long =
         (instant.epochSeconds + utcOffsetSeconds).floorDiv(SECONDS_PER_DAY)
+
+    /** Days since 1970-01-01 to (year, month, day); Howard Hinnant's civil_from_days. */
+    private fun civil(day: Long): Triple<Int, Int, Int> {
+        val z = day + 719_468
+        val era = z.floorDiv(146_097)
+        val doe = z - era * 146_097
+        val yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365
+        val y = yoe + era * 400
+        val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+        val mp = (5 * doy + 2) / 153
+        val d = (doy - (153 * mp + 2) / 5 + 1).toInt()
+        val m = (if (mp < 10) mp + 3 else mp - 9).toInt()
+        return Triple((if (m <= 2) y + 1 else y).toInt(), m, d)
+    }
 }

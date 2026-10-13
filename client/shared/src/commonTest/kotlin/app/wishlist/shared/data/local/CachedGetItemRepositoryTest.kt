@@ -51,7 +51,7 @@ class CachedGetItemRepositoryTest {
         }
     }
 
-    @Test fun same_version_response_is_returned_even_though_cache_write_is_skipped() = runTest {
+    @Test fun same_version_response_is_returned_and_replaces_the_cache() = runTest {
         withHarness { h ->
             h.session.changeAccount("A")
             val a = h.session.state.value
@@ -61,7 +61,7 @@ class CachedGetItemRepositoryTest {
             repo.get(itemId).successValue()
             val second = repo.get(itemId).successValue()
             assertEquals("renamed category", second.product.name)
-            assertEquals("old", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+            assertEquals("renamed category", h.store.cachedItem(a, itemId).successValue()!!.product.name)
         }
     }
 
@@ -128,13 +128,43 @@ class CachedGetItemRepositoryTest {
         }
     }
 
-    @Test fun cache_read_failure_is_returned_without_calling_delegate() = runTest {
+    @Test fun store_failure_is_returned_without_calling_delegate() = runTest {
         withHarness { h ->
             h.session.changeAccount("A")
             val delegate = ScriptedDelegate()
             val repo = CachedGetItemRepository(delegate, FailingStore(h.store, failRead = true), h.session)
             assertEquals("LOCAL_STORE_FAILURE", repo.get(itemId).error().code)
             assertEquals(0, delegate.calls)
+        }
+    }
+
+    @Test fun undecodableRowIsDroppedAndTheNetworkAnswerIsCached() = runTest {
+        withHarness { h ->
+            h.session.changeAccount("A")
+            val a = h.session.state.value
+            h.store.upsertItem(a, item(99)).successValue()
+            h.driver.execute(null, "UPDATE item_cache SET analysis_status = 'NOT_A_STATUS'", 0)
+            val delegate = ScriptedDelegate().also { it.enqueueSuccess(item(2)) }
+            val result = CachedGetItemRepository(delegate, h.store, h.session).get(itemId)
+            assertEquals(2, result.successValue().version)
+            assertEquals(1, delegate.calls)
+            assertEquals(2, h.store.cachedItem(a, itemId).successValue()!!.version)
+        }
+    }
+
+    @Test fun uppercaseIdUsesTheCanonicalCacheRow() = runTest {
+        withHarness { h ->
+            h.session.changeAccount("A")
+            val a = h.session.state.value
+            val ids = mutableListOf<String>()
+            val delegate = object : GetItemRepository {
+                override suspend fun get(id: String): ClientResult<WishlistItem> { ids += id; return ClientResult.Success(item(2, id = UUID_A)) }
+            }
+            val repo = CachedGetItemRepository(delegate, h.store, h.session)
+            repo.get(UUID_A.uppercase()).successValue()
+            repo.get(UUID_A.uppercase()).successValue()
+            assertEquals(listOf(UUID_A, UUID_A), ids)
+            assertEquals(UUID_A, h.store.cachedItem(a, UUID_A).successValue()!!.id)
         }
     }
 

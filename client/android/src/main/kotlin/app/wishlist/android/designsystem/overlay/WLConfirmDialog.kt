@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -36,6 +37,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 private val DialogBody = WLType.body.copy(fontSize = 15.sp, lineHeight = 1.6f.em)
+private val DialogTarget = WLType.bodyStrong.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold)
 
 /** 확인창 카드: 제목 + 글머리표 영향 + 취소(왼쪽)·확인(오른쪽, 더 넓음). 모서리 xl 36, 시트색 불투명. */
 @Composable
@@ -50,6 +52,19 @@ fun WLConfirmDialogCard(spec: WLDialogSpec, onCancel: () -> Unit, onConfirm: () 
     ) {
         WLOnSheet {
             WLText(spec.title, WLSheetTitleStyle, color = c.text)
+            spec.target?.let { target ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(c.sheetField, RoundedCornerShape(WishlistTokens.Radius.m))
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    target.thumbnail()
+                    WLText(target.text, DialogTarget, Modifier.weight(1f), color = c.text)
+                }
+            }
             if (spec.bullets.isNotEmpty()) {
                 Column(Modifier.padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     spec.bullets.forEach { b ->

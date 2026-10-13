@@ -9,6 +9,14 @@ import kotlin.test.assertNull
 
 class ModelInvariantTest {
     @Test
+    fun savedAt_prefers_client_created_at_then_server_created_at() {
+        val server = kotlin.time.Instant.parse("2026-10-07T03:00:00Z")
+        val shared = kotlin.time.Instant.parse("2026-10-06T01:00:00Z")
+        assertEquals(server, itemFixture().copy(createdAt = server, clientCreatedAt = null).savedAt)
+        assertEquals(shared, itemFixture().copy(createdAt = server, clientCreatedAt = shared).savedAt)
+    }
+
+    @Test
     fun item_versions_are_positive() {
         for (version in listOf(0, -1)) assertFailsWith<IllegalArgumentException> { itemFixture(version = version) }
         assertEquals(1, itemFixture().version)

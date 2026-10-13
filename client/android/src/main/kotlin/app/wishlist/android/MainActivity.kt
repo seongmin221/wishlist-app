@@ -6,15 +6,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import app.wishlist.android.di.VariantStartup
 import app.wishlist.android.feature.home.HomePresenterOwner
 import app.wishlist.android.feature.session.AccountPresenterOwner
+import app.wishlist.android.navigation.WLEntryViewModelStores
 import app.wishlist.android.ui.WishlistApp
 
 /**
  * 시스템 테마(uiMode)가 바뀌어도 Activity를 다시 만들지 않는다(manifest `configChanges="uiMode"`).
  * 색은 `isSystemInDarkTheme()`로 바로 바뀌고, 탭 스택·열린 시트 같은 화면 상태가 유지된다.
  * 로그인 상태·홈 목록 Presenter의 owner(ViewModel)는 이 Activity의 ViewModelStore에 둔다(구성 변경 동안 유지, 끝나면 close).
+ * 스택 칸별 ViewModelStore 묶음(`WLEntryViewModelStores`)도 같은 곳에 둔다.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,7 +30,8 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) VariantStartup.onMainLaunch(runtime, intent, app.appScope)
         val account = ViewModelProvider(this, AccountPresenterOwner.factory(runtime))[AccountPresenterOwner::class.java]
         val home = ViewModelProvider(this, HomePresenterOwner.factory(runtime))[HomePresenterOwner::class.java]
-        setContent { WishlistApp(account, home) }
+        val entryStores = ViewModelProvider(this, viewModelFactory { initializer { WLEntryViewModelStores() } })[WLEntryViewModelStores::class.java]
+        setContent { WishlistApp(account, home, entryStores) }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

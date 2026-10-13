@@ -16,3 +16,5 @@
 | QA-CLI-010 | Ktor redirect 차단을 MockEngine만으로 확인할 수 있는가? | [QA-CLI-010](QA-CLI-010-ktor-native-redirects.md) |
 | QA-CLI-011 | ObjCName을 붙였는데 Swift getter 이름이 바뀌지 않는 이유는? | [QA-CLI-011](QA-CLI-011-objc-property-name.md) |
 | QA-CLI-012 | iOS는 공유만으로 분석이 시작되지 않는가, C안의 개발자 팀 설정은 복잡한가? | [QA-CLI-012](QA-CLI-012-ios-share-starts-analysis.md) |
+| QA-CLI-013 | lifecycle-viewmodel-compose 없이 화면마다 Presenter owner 수명을 주는 방법은? | [QA-CLI-013](QA-CLI-013-android-per-entry-viewmodel-store.md) |
+| QA-CLI-014 | 로컬 대기 화면은 계정을 떠난 뒤 왜 아무것도 판정하지 않는가? | [QA-CLI-014](QA-CLI-014-local-presenter-sticky-skip.md) |

@@ -41,11 +41,12 @@ final class SharedInteropTests: XCTestCase {
         let collected = states.count
         // Later states must really be published, each one observably new: a retry of the same item
         // would end in a state equal to the current one, so the wait could pass before it ran.
-        // Another account resets to Initial; its retry then ends in NOT_FOUND, which only the
-        // processed retry can produce (so no request is still in flight when the test ends).
+        // Another account resets to Initial (and forgets the last id, so retry would do nothing);
+        // its load of the same id then ends in NOT_FOUND, which only the processed load can produce
+        // (so no request is still in flight when the test ends).
         try await SharedTestRuntime.switchAccount(runtime, to: .apple)
         await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
-        presenter.retry()
+        presenter.load(id: seed.id)
         await SharedTestRuntime.eventually {
             presenter.state.value.loading == false && presenter.state.value.error?.kind == .notFound
         }
@@ -80,15 +81,15 @@ final class SharedInteropTests: XCTestCase {
         try await SharedTestRuntime.switchAccount(runtime, to: .apple)
         await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
 
-        // That account cannot see the first account's item.
+        // D3: the previous account's item is never requested again; retry and refresh do nothing.
         presenter.retry()
-        await SharedTestRuntime.eventually { presenter.state.value.error?.kind == .notFound }
-        XCTAssertNil(presenter.state.value.item)
+        presenter.refresh()
+        await SharedTestRuntime.stays(for: 0.3) { presenter.state.value == ItemDetailState.companion.Initial }
 
-        // Back to the first account (a new generation): cleared again, then retry finds the item.
+        // Back to the first account (a new generation): still cleared, and a fresh load finds the item.
         try await SharedTestRuntime.switchAccount(runtime, to: .google)
         await SharedTestRuntime.eventually { presenter.state.value == ItemDetailState.companion.Initial }
-        presenter.retry()
+        presenter.load(id: seed.id)
         await SharedTestRuntime.eventually { presenter.state.value.item?.id == seed.id }
         XCTAssertNil(presenter.state.value.error)
     }

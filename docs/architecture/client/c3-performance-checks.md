@@ -102,3 +102,19 @@ iPhone 17 Pro 시뮬레이터 iOS 26.5(Apple M4 Pro 호스트), Dynamic Type Lar
 분리하면 host 전용 완료 API를 module 내부로 제한하고 feature→core 역의존을 컴파일러가 막을 수 있다. 지금 즉시 나누면 아직 없는 feature를 위한 Gradle 설정과 공개 API만 늘어날 수 있다. C2 Presenter/domain 계약과 C3 첫 feature 경계가 확정될 때 이동 범위·공개 API·모듈별 테스트 시간을 비교해 결정한다. 그 전에는 `finishTransition`을 feature에서 호출하지 않고 route codec/renderer를 앱이 연결하는 규칙을 유지한다.
 
 **C3 결정(C3-D10, 2026-10-07):** C3에서는 나누지 않았다. C3 화면은 로그인·홈·설정·공유 카드 네 개뿐이라 지금 분리하면 Gradle 설정과 공개 API만 늘어난다. `feature/*` 폴더 경계와 "feature는 `finishTransition`을 호출하지 않는다" 규칙을 유지하고, 카테고리 feature가 들어오는 C5에서 위 표대로 다시 검토한다. Android 쪽 배치는 [Android 구조](android.md#공유-수신로그인홈설정-c3)에 있다.
+
+## C4 측정 결과 (2026-10-10)
+
+C4에서 새로 생긴 깊이는 홈 → 상세 한 단계다. 상세에는 다른 상세·웹뷰로 가는 링크가 없어(웹뷰는 PR B) 깊이 3/5는 도달할 수 없었다. Fake 상품에 이미지 URL이 없어 사진 있음 측정도 못 했다. 이 값은 baseline이며 통과 기준이 아니다.
+
+- **Android 깊이 1:** 에뮬레이터 API 36(`emulator-5554`), 다크, 이미지 없음(자리표시). DEBUG hook `wl.fake.pendingCount 20`으로 분류 중 줄 20개를 만든 뒤 줄 탭 → 상세 → 화면의 뒤로 버튼을 20회 반복했다(`adb input`, 각 0.9초 간격). 상세 GET이 DEBUG에서 분석을 진행시켜 열린 줄은 READY가 되어 목록에서 빠졌으므로 17회는 서로 다른 항목, 나머지는 첫 줄(분석 중 상세)이었다. 같은 항목을 20번 다시 연 측정은 아니다.
+
+| 시점 | TOTAL PSS | Java heap PSS | Native heap PSS | Views | Activities |
+| --- | --- | --- | --- | --- | --- |
+| 반복 전(상세 한 번 연 뒤 홈) | 97,224 KB | 26,168 KB | 11,912 KB | 16 | 1 |
+| 20회 직후 | 117,896 KB | 35,948 KB | 17,100 KB | 16 | 1 |
+| `send-trim-memory RUNNING_CRITICAL` 5초 뒤 | 105,728 KB | 25,260 KB | 14,356 KB | 16 | 1 |
+
+  Views·Activities는 늘지 않았다. 직후 값은 GC 전이라 Java heap이 일시적으로 커졌고 trim 뒤 시작 수준(25MB)으로 돌아왔다. Native heap·PSS는 trim 뒤에도 반복 전보다 높다(+2.4MB·+8.5MB). SQLite 캐시·할당자 보유분으로 추정하며 원인은 확인하지 않았다. 화면 수·ViewModel 해제는 `WLNavigatorTests`·`WLEntryViewModelStoresTest`로 단위 검증한다.
+- **깊이 3/5·이미지 있음:** 측정하지 않음(위 이유). C5 목록과 PR B 웹뷰 때 다시 측정한다.
+- **iOS:** 측정하지 않았다. Instruments Allocations는 CLI 자동 실행이 어렵고, `simctl`로는 상세 반복 조작 harness가 없어 의미 있는 값을 얻지 못한다. 실기기 측정 때 함께 기록한다.

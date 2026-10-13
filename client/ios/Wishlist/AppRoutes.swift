@@ -7,6 +7,19 @@ enum AppDestination: Hashable {
     /// FLogin opened from the home login card or settings "로그인". The first-run offer is not a
     /// route but a layer over the app root (`ContentView`).
     case login
+    /// C4 item detail (server item id): horizontal slide, no tab bar, closed when the account is left.
+    case item(String)
+    /// C4 local (not yet sent) link detail (client submission id): same policy as `item`.
+    case local(String)
 
-    var route: WLRoute { WLRoute(destination: AnyHashable(self), showsTabBar: false, pushStyle: .slide) }
+    var accountScoped: Bool {
+        switch self {
+        case .settings, .login: false
+        case .item, .local: true
+        }
+    }
+
+    var route: WLRoute {
+        WLRoute(destination: AnyHashable(self), showsTabBar: false, pushStyle: .slide, accountScoped: accountScoped)
+    }
 }
