@@ -101,4 +101,25 @@ class MediaRoutesTest {
             assertEquals(HttpStatusCode.ServiceUnavailable, unavailable.status); assertEquals("MEDIA_STORAGE_UNAVAILABLE", code(unavailable.bodyAsText()))
         }
     }
+
+    @Test fun `saturated verification answers busy with retry after and keeps the upload pending`() = withAnalysisDatabase { source ->
+        val storage = InMemoryMediaStorage()
+        val signing = app.media.MediaSigningExecutor()
+        val busy = MediaWiring(app.media.MediaService(source, storage, storage.signer, app.media.MediaImageValidator(0), signing), storage.signer)
+        val owner = UUID.randomUUID()
+        val image = MediaFixtures.jpeg(64, 48)
+        testApplication {
+            application { installApiHttpSupport(); routing { mediaRoutes(busy) { owner } } }
+            val id = json(client.post("/v1/media/upload-intents") {
+                header("Idempotency-Key", UUID.randomUUID().toString()); setBody(body(image.size))
+            }.bodyAsText())["media"]!!.jsonObject["id"]!!.jsonPrimitive.content
+            storage.put("media/$owner/$id.jpg", image)
+            val response = client.post("/v1/media/$id/completion")
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertEquals("MEDIA_BUSY", json(response.bodyAsText())["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
+            assertEquals("1", response.headers[HttpHeaders.RetryAfter])
+        }
+        assertEquals("PENDING", app.testutil.analysisScalar(source, "select status from media_assets"))
+        signing.close()
+    }
 }

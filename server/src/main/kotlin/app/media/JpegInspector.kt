@@ -12,6 +12,8 @@ sealed interface JpegInspection {
  */
 object JpegInspector {
     private val ICC_PROFILE = "ICC_PROFILE\u0000".toByteArray(Charsets.US_ASCII)
+    private val JFIF = "JFIF\u0000".toByteArray(Charsets.US_ASCII)
+    private val ADOBE = "Adobe".toByteArray(Charsets.US_ASCII)
 
     fun inspect(bytes: ByteArray): JpegInspection {
         if (bytes.size < 4 || u8(bytes, 0) != 0xFF || u8(bytes, 1) != 0xD8) return notJpeg
@@ -64,6 +66,7 @@ object JpegInspector {
                             if (sofCount > 1 || u8(bytes, payload) != 8 || components !in setOf(1, 3)) unsupported = true
                         }
                         0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF -> { sofCount++; unsupported = true }
+                        0xC8 -> unsupported = true  // reserved JPG extension
                         0xDC, 0xDE, 0xDF -> unsupported = true  // DNL and hierarchical markers
                         0xDA -> {
                             if (sofCount == 0) return notJpeg
@@ -71,10 +74,14 @@ object JpegInspector {
                             if (scans > MediaLimits.MAX_SCANS) unsupported = true
                             inScan = true
                         }
-                        0xE0, 0xEE -> Unit
+                        // APP0 only as plain JFIF without a thumbnail (JFXX and thumbnails can embed a whole JPEG with
+                        // Exif); APP14 only as the fixed 12-byte Adobe marker.
+                        0xE0 -> if (payloadSize != 14 || !startsWith(bytes, payload, payloadSize, JFIF) ||
+                            u8(bytes, payload + 12) != 0 || u8(bytes, payload + 13) != 0) metadata = true
+                        0xEE -> if (payloadSize != 12 || !startsWith(bytes, payload, payloadSize, ADOBE)) metadata = true
                         0xE2 -> if (!startsWith(bytes, payload, payloadSize, ICC_PROFILE)) metadata = true
                         in 0xE1..0xEF, 0xFE -> metadata = true
-                        0xC4, 0xC8, 0xCC, 0xDB, 0xDD -> Unit
+                        0xC4, 0xCC, 0xDB, 0xDD -> Unit
                         else -> return notJpeg
                     }
                     at += length

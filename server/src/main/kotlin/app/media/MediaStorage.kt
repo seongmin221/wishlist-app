@@ -51,6 +51,8 @@ object MediaKeys {
 
     fun objectKey(owner: UUID, media: UUID) = "media/$owner/$media.jpg"
     fun isValid(objectKey: String) = pattern.matches(objectKey)
+    /** Media id for logs; never log the key's URL form. */
+    fun mediaId(objectKey: String) = objectKey.substringAfterLast('/').removeSuffix(".jpg")
 
     /** Headers the client must send unchanged; each one is part of the upload signature. */
     fun uploadHeaders(contentType: String) = linkedMapOf(

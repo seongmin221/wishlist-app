@@ -18,6 +18,8 @@ class MediaCleanup(
     private val storage: MediaStorage,
     private val batch: Int = 50,
     private val nanoTime: () -> Long = System::nanoTime,
+    /** Test hook between discovery and the lease. */
+    private val beforeLease: (UUID) -> Unit = {},
     /** Test hook after the lease commits and before the object delete. */
     private val beforeDelete: (UUID) -> Unit = {},
 ) {
@@ -26,8 +28,8 @@ class MediaCleanup(
     fun run(deadline: Long): MediaCleanupReport {
         if (nanoTime() - deadline >= 0) return MediaCleanupReport(0, 0)
         val candidates = source.inTransaction { c ->
-            c.prepareStatement("select m.id from media_assets m where ${MediaReferences.cleanupCandidate("m")} order by m.updated_at, m.id limit ?").use { s ->
-                s.setInt(1, batch)
+            c.prepareStatement(MediaReferences.discovery("m")).use { s ->
+                for (index in 1..5) s.setInt(index, batch)
                 s.executeQuery().use { r -> buildList { while (r.next()) add(r.getObject(1, UUID::class.java)) } }
             }
         }
@@ -35,6 +37,7 @@ class MediaCleanup(
         var failed = 0
         for (id in candidates) {
             if (nanoTime() - deadline >= 0) break
+            beforeLease(id)
             val objectKey = lease(id) ?: continue
             beforeDelete(id)
             try {
@@ -44,12 +47,12 @@ class MediaCleanup(
                 failed++
                 continue
             }
-            source.inTransaction { c ->
+            val settled = source.inTransaction { c ->
                 c.prepareStatement("update media_assets set status='DELETED', deleted_at=clock_timestamp(), updated_at=clock_timestamp() where id=? and status='DELETING'").use { s ->
-                    s.setObject(1, id); s.executeUpdate()
+                    s.setObject(1, id); s.executeUpdate() == 1
                 }
             }
-            deleted++
+            if (settled) deleted++
         }
         return MediaCleanupReport(deleted, failed)
     }

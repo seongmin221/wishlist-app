@@ -47,6 +47,8 @@ class LocalMediaStorageTest {
         assertNull(storage.openForRead(pathKey(read.url), query(target.url)))  // an upload signature cannot read
         storage.delete(key); storage.delete(key)
         assertNull(storage.stat(key))
+        // A missing object while reading is a storage failure, matching GCS, not a raw IO exception.
+        assertFailsWith<MediaStorageException> { storage.read(key, MediaLimits.MAX_BYTES) }
     }
 
     @Test fun `upload rejects forged expired header-less and out of range requests`() {

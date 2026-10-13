@@ -149,6 +149,13 @@ class MediaCleanupTest {
         val cleanup = MediaCleanup(source, storage, beforeDelete = { id -> if (id == second) linked = link(source, owner, secondItem, second) })
         assertEquals(MediaCleanupReport(1, 0), cleanup.run(farFuture))
         assertEquals(false, linked)
+
+        // Discovery saw the row unreferenced, then a link committed before the lease: the lease re-check sees it.
+        val third = staleReady(); val thirdItem = freeItem()
+        val racing = MediaCleanup(source, storage, beforeLease = { id -> if (id == third) assertTrue(link(source, owner, thirdItem, third)) })
+        assertEquals(MediaCleanupReport(0, 0), racing.run(farFuture))
+        assertEquals("READY", status(source, third))
+        assertEquals(third.toString(), analysisScalar(source, "select media_asset_id from wishlist_items where id='$thirdItem'"))
         assertEquals("DELETED", status(source, second))
         assertNull(analysisScalar(source, "select media_asset_id from wishlist_items where id='$secondItem'"))
     }

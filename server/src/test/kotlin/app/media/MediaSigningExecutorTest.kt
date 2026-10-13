@@ -43,6 +43,10 @@ class MediaSigningExecutorTest {
             assertNull(executor.submit { "rejected" })
             assertNull(executor.await { "rejected" })
             assertTrue(Duration.ofNanos(System.nanoTime() - started) < Duration.ofMillis(200))
+            // A shared call that cannot be scheduled fails at once for every caller.
+            val rejectedStart = System.nanoTime()
+            assertNull(executor.await(executor.shared("full") { "x" }, System.nanoTime() + 2_000_000_000))
+            assertTrue(Duration.ofNanos(System.nanoTime() - rejectedStart) < Duration.ofMillis(200))
         } finally { release.countDown(); pool.shutdown() }
         executor.close()
         assertNull(executor.await { "closed" })

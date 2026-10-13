@@ -38,6 +38,7 @@ class JpegInspectorTest {
             MediaFixtures.synthetic(sofMarker = 0xC3), MediaFixtures.synthetic(sofMarker = 0xC9), MediaFixtures.synthetic(sofCount = 2),
             MediaFixtures.synthetic(precision = 12), MediaFixtures.synthetic(components = 4), MediaFixtures.synthetic(components = 2),
             MediaFixtures.synthetic(sofMarker = 0xC2, scans = 65),
+            MediaFixtures.withSegment(MediaFixtures.synthetic(), 0xC8, ByteArray(2)),
         )) assertEquals(rejected(UNSUPPORTED_JPEG), JpegInspector.inspect(bytes))
         assertEquals(parsed(16, 16), JpegInspector.inspect(MediaFixtures.synthetic(sofMarker = 0xC2, scans = 64)))
     }
@@ -48,6 +49,11 @@ class JpegInspectorTest {
             MediaFixtures.exif(base), MediaFixtures.xmp(base), MediaFixtures.mpf(base), MediaFixtures.iptc(base), MediaFixtures.comment(base),
             MediaFixtures.withTrailingImage(base), MediaFixtures.withTrailingByte(base),
             MediaFixtures.synthetic(sofMarker = 0xC2, scans = 2, betweenScans = MediaFixtures.segment(0xE1, "Exif\u0000\u0000".toByteArray())),
+            // JFIF with a thumbnail, JFXX (can embed a whole JPEG with Exif), and non-standard Adobe payloads
+            MediaFixtures.withSegment(base, 0xE0, "JFIF\u0000".toByteArray() + byteArrayOf(1, 1, 0, 0, 1, 0, 1, 1, 1) + ByteArray(3)),
+            MediaFixtures.withSegment(base, 0xE0, "JFXX\u0000".toByteArray() + byteArrayOf(0x10) + MediaFixtures.exif(MediaFixtures.jpeg(4, 4))),
+            MediaFixtures.withSegment(base, 0xEE, "Adobe".toByteArray() + ByteArray(8)),
+            MediaFixtures.withSegment(base, 0xEE, "Other".toByteArray() + ByteArray(7)),
         )) assertEquals(rejected(METADATA_PRESENT), JpegInspector.inspect(bytes))
     }
 

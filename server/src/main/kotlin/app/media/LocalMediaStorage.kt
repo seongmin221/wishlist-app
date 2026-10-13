@@ -1,8 +1,10 @@
 package app.media
 
+import java.io.IOException
 import java.io.InputStream
 import java.net.URLEncoder
 import java.nio.file.FileAlreadyExistsException
+import java.nio.file.NoSuchFileException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -34,19 +36,23 @@ class LocalMediaStorage(
         return SignedRead(url("GET", objectKey, expiresAt), expiresAt)
     }
 
-    override fun stat(objectKey: String): StoredObject? {
-        val file = file(objectKey) ?: return null
-        return if (Files.isRegularFile(file)) StoredObject(Files.size(file), MediaLimits.CONTENT_TYPE) else null
+    override fun stat(objectKey: String): StoredObject? = io {
+        val file = file(objectKey) ?: return@io null
+        try { StoredObject(Files.size(file), MediaLimits.CONTENT_TYPE) } catch (_: NoSuchFileException) { null }
     }
 
-    override fun read(objectKey: String, maxBytes: Int): ByteArray {
+    /** A missing object is a storage failure here; the caller re-reads the row (a failed peer may have deleted it). */
+    override fun read(objectKey: String, maxBytes: Int): ByteArray = io {
         val file = file(objectKey) ?: throw MediaStorageException()
         val bytes = Files.newInputStream(file).use { it.readNBytes(maxBytes + 1) }
         if (bytes.size > maxBytes) throw MediaObjectTooLarge()
-        return bytes
+        bytes
     }
 
-    override fun delete(objectKey: String) { file(objectKey)?.let(Files::deleteIfExists) }
+    override fun delete(objectKey: String) { io { file(objectKey)?.let(Files::deleteIfExists) } }
+
+    /** Same failure contract as GCS: IO problems surface as [MediaStorageException]. */
+    private fun <T> io(block: () -> T): T = try { block() } catch (error: IOException) { throw MediaStorageException(error) }
 
     fun acceptUpload(objectKey: String, query: Map<String, String>, header: (String) -> String?, body: InputStream): LocalUploadResult {
         val target = file(objectKey) ?: return LocalUploadResult.FORBIDDEN

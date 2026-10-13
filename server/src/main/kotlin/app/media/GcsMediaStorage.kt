@@ -27,6 +27,7 @@ class GcsMediaStorage internal constructor(
 ) : MediaStorage, AutoCloseable {
     override fun uploadTarget(objectKey: String, contentType: String, expiresAt: Instant): UploadTarget {
         val headers = MediaKeys.uploadHeaders(contentType)
+        // expiresAt is the DB deadline; the app clock only sizes the signature, so a small skew shifts URL expiry slightly.
         val seconds = maxOf(1, Duration.between(now(), expiresAt).seconds)
         val url = storage.signUrl(BlobInfo.newBuilder(bucket, objectKey).build(), seconds, TimeUnit.SECONDS,
             Storage.SignUrlOption.httpMethod(HttpMethod.PUT), Storage.SignUrlOption.withV4Signature(),
@@ -43,7 +44,7 @@ class GcsMediaStorage internal constructor(
 
     override fun stat(objectKey: String): StoredObject? = remote {
         storage.get(BlobId.of(bucket, objectKey), Storage.BlobGetOption.fields(Storage.BlobField.SIZE, Storage.BlobField.CONTENT_TYPE))
-            ?.let { StoredObject(it.size, it.contentType) }
+            ?.let { blob -> StoredObject(blob.size ?: throw MediaStorageException(), blob.contentType) }
     }
 
     override fun read(objectKey: String, maxBytes: Int): ByteArray = remote {

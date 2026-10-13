@@ -119,8 +119,14 @@ class MediaService(
         MediaStatus.DELETING, MediaStatus.DELETED -> throw MediaException("MEDIA_UPLOAD_EXPIRED")
         MediaStatus.PENDING -> {
             if (asset.expired) throw MediaException("MEDIA_UPLOAD_EXPIRED")
-            val upload = signing.await { storage.uploadTarget(asset.objectKey, asset.contentType, asset.uploadExpiresAt) }
-                ?: throw MediaException("MEDIA_STORAGE_UNAVAILABLE")
+            val upload = signing.await {
+                try {
+                    storage.uploadTarget(asset.objectKey, asset.contentType, asset.uploadExpiresAt)
+                } catch (error: Exception) {
+                    log.warn("Media upload signing failed mediaId={} exceptionType={}", asset.id, error.javaClass.name)
+                    throw error
+                }
+            } ?: throw MediaException("MEDIA_STORAGE_UNAVAILABLE")
             MediaView(asset, upload, null)
         }
     }

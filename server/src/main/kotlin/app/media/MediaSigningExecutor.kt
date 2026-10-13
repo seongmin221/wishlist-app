@@ -35,7 +35,10 @@ class MediaSigningExecutor(threads: Int = 8, queue: Int = 64, val wait: Duration
         val existing = inFlight.putIfAbsent(key, created)
         if (existing != null) return existing as CompletableFuture<T>
         val running = submit(block)
-        if (running == null) { inFlight.remove(key, created); return null }
+        if (running == null) {
+            // Callers that joined between the insert and this point must fail now, not at their deadline.
+            inFlight.remove(key, created); created.completeExceptionally(RejectedExecutionException()); return null
+        }
         running.whenComplete { value, error ->
             inFlight.remove(key, created)
             if (error != null) created.completeExceptionally(error) else created.complete(value)
@@ -53,5 +56,10 @@ class MediaSigningExecutor(threads: Int = 8, queue: Int = 64, val wait: Duration
 
     fun <T> await(block: () -> T): T? = await(submit(block), System.nanoTime() + wait.toNanos())
 
-    override fun close() { pool.shutdownNow() }
+    override fun close() {
+        pool.shutdownNow()
+        // Tasks dropped from the queue never complete; release their waiters.
+        inFlight.values.forEach { it.completeExceptionally(RejectedExecutionException()) }
+        inFlight.clear()
+    }
 }
