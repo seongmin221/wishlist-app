@@ -126,3 +126,18 @@ PR A(#15)가 develop에 merge된 뒤 PR B를 develop 위로 rebase하고 다시 
 - **플랫폼별 중복:** #18.
 
 검증: Android unit debug·release 179(`WebTapBudgetTest` 5, overlay 1 추가)·`assembleDebug`·`lintDebug`, iOS XCTest 207개(탭을 페이지 링크가 쓰는 경우, 열리는 중 `dismissDialog` 추가)가 통과했다(실패 0).
+
+## PR #16 6차 리뷰 반영(2026-10-13)
+
+8건 중 7건을 고쳤고, 1건(iOS 보조 기술)은 확인창을 유지하기로 했다.
+
+- **Android 키보드·접근성 회귀:** `WebTapBudget`이 손가락 탭으로만 다시 채워져, TalkBack·Enter·D-pad로 누른 두 번째 외부 링크부터 확인창이 떴다. key down(뒤로·Esc 제외)과 접근성 `ACTION_CLICK`(WebView 하위 클래스가 Chromium의 `AccessibilityNodeProvider`를 감싸 알림)도 새 탭으로 친다.
+- **다시 시도 무반응·첫 로드 실패 후 다시 시도 무효·크래시 플래그 잔류(Android):** 원인이 같았다. WebView는 응답 헤더가 와야 `onPageStarted`를 불러 그 전까지 로드가 보이지 않았다. holder가 `loadUrl`·`reload`를 부르는 순간 `requested()`로 로딩을 표시하고, 그동안 다시 시도는 꺼진다(`canRetry`). 로드 중에는 새로고침이 중지로 바뀌어 요청이 두 번 갈 수 없으므로 `view.url == null` 분기를 되살리고 `emptyAfterCrash`를 없앴다. 리뷰 제안(`!page.loading`)만으로는 첫 로드 직전에 `loading`이 아직 false라 중복을 막지 못한다.
+- **`#fragment` 링크의 플랫폼 차이:** iOS를 Android에 맞췄다. 같은 페이지 fragment 이동은 탭을 쓰지 않는다. 두 플랫폼 모두 "페이지 아무 곳이나 탭하면 앱 하나"를 이미 허용하므로(스크립트 `a.click()`·user activation), 앵커 탭도 그 탭과 같다.
+- **문서:** D16 스펙과 QA-CLI-015에 탭 한 번 규칙, redirect 결정, 보조 기술 동작을 반영했다.
+- **테스트:** 새로고침 판단(`WebReloadStep`), 로딩 표시(`requested`·`canRetry`), 터치·키·접근성 입력에서 탭 판정까지(`WebTapBudget.onTouch` 등, 리스너는 이벤트를 넘기기만 한다)를 JVM 테스트로, iOS는 `makeWebView`로 기록용 웹뷰를 넣어 통합 `reload()`(실패 URL 열기, 닫힌 뒤 무시)와 fragment 판정을 XCTest로 확인한다.
+
+고치지 않은 것:
+- **iOS VoiceOver·Full Keyboard Access:** 웹 링크가 보조 기술로 눌렸는지 알 공개 API가 없다. 보조 기술이 켜져 있을 때 `.linkActivated`만 믿으면 그 사용자에게 스크립트 `a.click()` 우회(Ruling 12 이전)가 다시 열려, 외부 링크마다 확인창을 유지한다(알려진 한계).
+
+검증: Android unit debug·release 183·`assembleDebug`·`lintDebug`, iOS XCTest 211개가 통과했다(실패 0). TalkBack·키보드로 누르는 실기기 확인은 하지 않았다.

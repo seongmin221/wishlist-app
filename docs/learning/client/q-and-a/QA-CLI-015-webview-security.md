@@ -1,6 +1,6 @@
 # QA-CLI-015: 원본 링크 웹뷰는 웹 페이지가 앱을 마음대로 움직이지 못하게 무엇을 막는가?
 
-> 확인 날짜: 2026-10-10 · C4 Task 13~16 · Ruling 11·12 · 구현: [Android 웹뷰](../../../architecture/client/android.md#원본-링크-웹뷰-c4-pr-b), [iOS 웹뷰](../../../architecture/client/ios.md#원본-링크-웹뷰-c4-pr-b) · 규칙: [C4 설계](../../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md#4-웹뷰) §4·D16
+> 확인 날짜: 2026-10-10(탭 한 번 규칙 2026-10-13) · C4 Task 13~16 · Ruling 11·12 · 구현: [Android 웹뷰](../../../architecture/client/android.md#원본-링크-웹뷰-c4-pr-b), [iOS 웹뷰](../../../architecture/client/ios.md#원본-링크-웹뷰-c4-pr-b) · 규칙: [C4 설계](../../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md#4-웹뷰) §4·D16
 
 **질문:** 쇼핑몰 페이지와 그 안의 광고는 우리가 만든 코드가 아니다. 이런 페이지가 앱 안의 화면을 실행하거나, 피싱 페이지로 바꿔치기하거나, 사용자 몰래 다른 앱을 여는 것을 어떻게 막는가?
 
@@ -10,7 +10,8 @@
 - **최상위 `data:`·`blob:` 차단:** 주소창이 없는 웹뷰에서 main frame이 `data:text/html,…`로 바뀌면 진짜 로그인 화면처럼 꾸민 피싱 페이지를 출처 없이 보여줄 수 있다. 그래서 main frame은 `http`/`https`/`about:blank`만 연다(Chrome과 같은 규칙). iframe에서도 `data:`·`blob:` 문서 이동은 막고 `about:blank`·`about:srcdoc`만 둔다(Ruling 11, 설계 §4가 "하위 리소스(iframe 아님)"에만 허용).
 - **iframe 이동 구분:** 광고 iframe이 main frame을 바꾸거나 외부 앱을 열려 하면 사용자는 누가 시켰는지 알 수 없다. iframe에서 온 외부 앱 요청도 탭이 없으면 확인창이고, Android iframe `intent:`의 web fallback을 main frame에 여는 것은 탭이 있을 때만이다. 확인창을 취소하면 main frame이 다른 host로 갈 때까지 탭 없는 요청을 버려 확인창 반복 공격을 막는다(`ExternalPromptGate`). URL 기준이면 페이지가 `?n=2`처럼 쿼리만 바꿔 다시 열어 침묵을 풀 수 있어 host 기준으로 정했다.
 - **꾸밀 수 있는 gesture:** "사용자 탭이면 바로 연다"는 규칙은 탭 판정이 꾸며지면 무너진다. iOS `navigationType == .linkActivated`는 스크립트의 `a.click()`에도 붙어서, 그것만 믿으면 페이지가 확인창 없이 결제 앱·전화를 열 수 있었다(시뮬레이터에서 재현). 그래서 iOS는 `.linkActivated` **그리고** 최근 1초 안에 웹뷰에서 실제 탭(손가락이 거의 움직이지 않고 떼어짐)이 끝났을 때만 탭으로 본다(Ruling 12). 처음에는 '닿음'이었지만 스크롤 터치도 포함돼, 스크롤 직후 스크립트 클릭이 확인 없이 열릴 수 있어 좁혔다. Chromium user activation도 스크롤은 활성화로 치지 않는다. Android `WebResourceRequest.hasGesture()`는 Chromium의 user activation이라 스크립트만으로는 생기지 않는다(탭 직후의 JS 이동은 탭으로 인정된다).
+- **탭 한 번 = 판정 한 번(2026-10-13):** user activation은 몇 초 동안 모든 이동에 붙어서, 그대로 두면 탭 한 번 뒤 스크립트가 `tel:`·`kakaotalk://`·`market://`을 연달아 눌러 모두 확인 없이 열 수 있다. 그래서 탭 뒤 gesture로 판정된 첫 이동이 종류와 상관없이(페이지 링크·외부 앱·막힌 URL) 탭을 쓴다(iOS `lastTouch` 비우기, Android `WebTapBudget`). 같은 페이지 `#fragment` 이동은 Android `shouldOverrideUrlLoading`이 보지 못해 iOS도 탭을 쓰지 않게 맞췄다. 탭한 http 링크가 서버 redirect로 앱 링크에 닿는 경우도 확인창이다. redirect만 예외로 두면 스크립트가 redirect하는 주소로 이동해 같은 탭을 다시 쓰는 틈이 생긴다. 새 탭은 실제 탭(스크롤 아님)으로만 생긴다. Android는 key down과 TalkBack·스위치 접근 클릭(WebView 접근성 provider의 `ACTION_CLICK`)도 새 탭으로 친다. iOS VoiceOver·Full Keyboard Access는 웹 링크를 눌렀는지 알 공개 API가 없어 외부 링크마다 확인창이다(안전한 쪽에 둔 알려진 한계).
 
 **함께 두는 설정:** `addJavascriptInterface`는 쓰지 않는다(페이지 JS가 앱 코드를 부르는 통로). `allowFileAccess`·`allowContentAccess` false, mixed content `NEVER_ALLOW`. 쇼핑몰 로그인 때문에 JavaScript·DOM storage·third-party 쿠키는 켠다.
 
-**대가:** 국내 결제처럼 탭 뒤 JS로 다시 이동하는 흐름은 iOS에서 결제마다 확인창이 뜰 수 있다(D16, 실기기 확인 항목).
+**대가:** 국내 결제처럼 탭 뒤 JS나 redirect로 다시 이동하는 흐름은 결제마다 확인창이 뜰 수 있다(iOS는 JS 이동, 두 플랫폼 모두 탭한 링크의 redirect·탭이 이미 쓰인 뒤의 이동, D16 실기기 확인 항목). iOS 보조 기술 사용자는 외부 링크마다 확인창을 한 번 더 누른다.
