@@ -125,7 +125,9 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
     }
 
-    /// Idempotent. A screen still drawn during its exit keeps the view; it no longer reports or navigates.
+    /// Idempotent. A screen still drawn during its exit keeps the view; it no longer reports or navigates. The
+    /// delegates stay so that `decide` (and `createWebViewWith`) keep cancelling what the page tries meanwhile:
+    /// without a navigation delegate WebKit would allow every navigation unchecked.
     func close() {
         guard !isClosed else { return }
         isClosed = true
@@ -136,8 +138,6 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         observations = []
         webView.stopLoading()
         webView.pauseAllMediaPlayback(completionHandler: nil)
-        webView.navigationDelegate = nil
-        webView.uiDelegate = nil
     }
 
     deinit {
@@ -165,6 +165,8 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         case .loadInside: return .allow
         case .block: return .cancel
         case .openExternal:
+            // One tap opens one app: a script clicking more external links after it asks (D16).
+            lastTouch = nil
             requestExternal(url, confirm: false)
             return .cancel
         case .confirmExternal:
@@ -175,6 +177,7 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     /// The main frame started loading `url` (lifts the gate's silence for a different page).
     func mainFrameStarted(url: URL?) {
+        guard !isClosed else { return }
         if let url { gate.onMainFrameNavigation(url.absoluteString) }
         page.failed = false
         failedURL = nil
@@ -232,6 +235,7 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         // The page's process died: offer "다시 시도" (Android onRenderProcessGone).
+        guard !isClosed else { return }
         failedURL = webView.url ?? URL(string: page.url)
         page.loading = false
         page.failed = true
@@ -240,7 +244,7 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// D13: only the main frame's own errors (WebKit reports no iframe errors here).
     private func mainFrameFailed(_ error: Error) {
         let e = error as NSError
-        guard WebLoadError.isPageFailure(e) else { return }
+        guard !isClosed, WebLoadError.isPageFailure(e) else { return }
         failedURL = (e.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
         page.failed = true
     }

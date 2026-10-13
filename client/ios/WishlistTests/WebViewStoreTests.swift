@@ -171,15 +171,17 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertEqual(prompts.shown, [tel])
     }
 
-    func testCloseClearsDelegatesAndIgnoresLaterRequests() {
+    func testCloseKeepsDelegatesAndCancelsLaterRequests() {
         var opened: [URL] = []
         let m = model({ opened.append($0) })
         m.close()
         m.close() // idempotent
         XCTAssertTrue(m.isClosed)
-        XCTAssertNil(m.webView.navigationDelegate)
-        XCTAssertNil(m.webView.uiDelegate)
+        // Kept so WebKit keeps asking: without a navigation delegate it would allow the page's navigations unchecked.
+        XCTAssertTrue(m.webView.navigationDelegate === m)
+        XCTAssertTrue(m.webView.uiDelegate === m)
         XCTAssertEqual(m.decide(url: URL(string: "tel:1")!, mainFrame: true, userGesture: true), .cancel)
+        XCTAssertEqual(m.decide(url: URL(string: "https://other.example/")!, mainFrame: true, userGesture: false), .cancel)
         XCTAssertTrue(opened.isEmpty)
         let view = RecordingWebView(frame: .zero, configuration: WKWebViewConfiguration())
         _ = m.webView(view, createWebViewWith: WKWebViewConfiguration(), for: FakeAction(start), windowFeatures: WKWindowFeatures())
@@ -265,6 +267,21 @@ final class WebViewStoreTests: XCTestCase {
         m.webView(m.webView, decidePolicyFor: FakeAction(tel, type: .linkActivated)) { policies.append($0) }
         XCTAssertEqual(opened, [tel])
         XCTAssertEqual(policies, [.cancel, .cancel])
+    }
+
+    func testOneTapOpensOneExternalApp() {
+        var opened: [URL] = []
+        let prompts = Prompts()
+        let m = model({ opened.append($0) }, prompts: prompts)
+        defer { m.close() }
+        let tel = URL(string: "tel:0109998888")!
+        let pay = URL(string: "kakaotalk://pay")!
+        m.noteTouch()
+        m.webView(m.webView, decidePolicyFor: FakeAction(tel, type: .linkActivated)) { _ in }
+        // The script clicks a second external link within the same second: the tap was used up.
+        m.webView(m.webView, decidePolicyFor: FakeAction(pay, type: .linkActivated)) { _ in }
+        XCTAssertEqual(opened, [tel])
+        XCTAssertEqual(prompts.shown, [pay])
     }
 
     func testPagesCannotOpenWindowsWithoutAGesture() {
