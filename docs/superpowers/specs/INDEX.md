@@ -6,3 +6,4 @@
 - [B3 목적 관리](2026-10-07-b3-purpose-management-design.md) — 목적 조회·생성·편집·AI 후보
 - [B4 상품 목록·홈 조회](2026-10-07-b4-read-api-design.md) — scope·group·anchor·cursor·snapshot·인덱스
 - [B5 비동기 분석·운영 복구](2026-10-09-b5-analysis-runtime-recovery-design.md) — 구현 완료 · 합산 재시도 예산·metadata·canonical·egress proxy·maintenance·PENDING 복구
+- [B6 사용자 이미지 업로드](2026-10-12-b6-media-upload-design.md) — 승인 · JPEG 5MiB·signed PUT 직접 업로드·15분 intent·completion 검증·표시 URL·24시간 미참조 정리
