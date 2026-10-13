@@ -107,3 +107,22 @@ PR A(#15)가 develop에 merge된 뒤 PR B를 develop 위로 rebase하고 다시 
 - **플랫폼별 중복:** #18.
 
 검증: Android unit debug·release 173(`resolvable` 테스트 2개를 지움)·`assembleDebug`·`lintDebug`, iOS XCTest 205개가 통과했다(실패 0). 실기기 확인은 [C4 화면 확인 기록](c4-detail-verification-2026-10-10.md#pr-16-4차-리뷰-기기-확인2026-10-13)에 있다.
+
+## PR #16 5차 리뷰 반영(2026-10-13)
+
+10건 중 7건을 고쳤다.
+
+- **탭 한 번에 외부 앱 여러 개(Android), 내부 링크 탭이 남김(iOS):** 탭 한 번은 판정 한 번이다. gesture로 판정된 첫 이동이 종류와 상관없이 탭을 쓴다. iOS는 `decide`에서 `lastTouch`를 비우고, Android는 `WebTapBudget`이 `hasGesture()`를 탭마다 한 번만 넘긴다(웹뷰 `OnTouchListener`가 slop 안의 손가락 하나 탭만 새 탭으로 친다). 4차에는 iOS만 외부 앱을 열 때 비워서 두 플랫폼의 D16이 달랐다.
+  - 결정: 탭한 http 링크가 서버 redirect로 외부 앱에 가는 경우도 확인창을 거친다. redirect만 예외로 두면 플랫폼마다 redirect 판정과 상태 추적이 늘고, 스크립트가 redirect하는 주소로 이동해 우회하는 틈이 생긴다.
+- **iOS 클래스 주석:** `close()`가 delegate를 지운다던 문장을 실제 동작(남겨 두고 `isClosed`로 취소)으로 고쳤다.
+- **iOS 닫힌 뒤 `stop`·`goBack`·`goForward`:** `isClosed` 가드를 더했다.
+- **새로고침이 플랫폼마다 다름:** iOS 하단 새로고침은 실패한 URL을 무시하고 이전 페이지를 다시 열었다. 다시 시도와 새로고침을 `reload()` 하나로 합쳐 실패한 URL을 연다. Android는 `retry()`를 없애고 `reload()`만 쓴다. 두 플랫폼 모두 실패 덮개를 미리 지우지 않는다(새 로드 시작이 지운다, 미리 지우면 빈 화면이 잠깐 보인다).
+- **Android 첫 로드 직전 새로고침:** `view.url == null`은 크래시 뒤 빈 view만이 아니라 첫 로드 직전에도 참일 수 있다. `emptyAfterCrash` 플래그로 바꿨다.
+- **열리는 중인 확인창이 닫히는 화면에 남음(3·4차에 알려진 한계로 둔 건):** 두 플랫폼 `OverlayHostState.dismissDialog`가 열리는 중인 확인창에 `closeWhenOpened`를 표시하고, `onOpened`가 바로 닫기를 시작한다.
+
+고치지 않은 것:
+- **이전 요청의 늦은 오류가 정상 페이지를 덮음(Android):** `request.url`과 로드 중 URL 비교는 redirect 뒤의 실제 실패를 숨긴다(`onPageStarted`는 redirect 전, `onReceivedError`는 redirect 뒤 주소). 새 이동에 밀려난 요청은 `ERR_ABORTED`로 끝나고 보고되지 않음을 4차에 실기기로 확인했다.
+- **`ParsedIntentUri`와 플랫폼 파서의 판정 차이(fallback 안의 인코딩 안 된 `#`):** 리뷰의 전제가 틀렸다. SDK 36 `Intent.parseUriInternal`도 `lastIndexOf("#")`로 자르고, 그 자리가 `#Intent;`가 아니면 구형 형식(`getIntentOld`)으로 넘어가 `browser_fallback_url`을 읽지 않는다. 두 파서 모두 새 형식으로 읽지 않으니 판정이 같다.
+- **플랫폼별 중복:** #18.
+
+검증: Android unit debug·release 179(`WebTapBudgetTest` 5, overlay 1 추가)·`assembleDebug`·`lintDebug`, iOS XCTest 207개(탭을 페이지 링크가 쓰는 경우, 열리는 중 `dismissDialog` 추가)가 통과했다(실패 0).
