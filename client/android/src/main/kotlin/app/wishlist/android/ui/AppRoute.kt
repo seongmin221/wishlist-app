@@ -8,6 +8,8 @@ import app.wishlist.android.designsystem.*
 import app.wishlist.android.feature.detail.ItemDetailScreen
 import app.wishlist.android.feature.detail.LocalSubmissionScreen
 import app.wishlist.android.feature.home.HomeScreen
+import app.wishlist.android.feature.web.WebViewRoute
+import app.wishlist.android.feature.web.WebViewScreen
 import app.wishlist.android.feature.login.LoginMode
 import app.wishlist.android.feature.login.LoginScreen
 import app.wishlist.android.feature.settings.SettingsScreen
@@ -22,6 +24,7 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
         LoginRoute -> LoginScreen(LoginMode.Pushed)
         is ItemDetailRoute -> ItemDetailScreen(route.itemId)
         is LocalSubmissionRoute -> LocalSubmissionScreen(route.submissionId)
+        is WebViewRoute -> WebViewScreen(route)
         else -> if (!VariantRoutes.Content(route, sourceKey)) {
             when (route) {
                 is WLRoute.TabRoot -> PlainTabRoot(route.tab)

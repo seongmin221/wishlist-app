@@ -95,6 +95,7 @@ iOS에는 Android `.copy(...)`에 해당하는 `WLTextStyle.resized`와 파생 �
   - `dismiss`는 모든 항목이 `Open`이고 대상이 맨 위일 때만 받는다. 열고 닫는 중의 뒤로·막 누르기 연타는 무시한다.
   - `show*`는 `Opening` 중이면 무시하고, `Closing` 중이면 하나만 줄 세웠다가(나중 것이 앞 것을 대체) 닫기가 끝나면 연다. 메뉴 항목 → 확인창이 이 경로다.
   - `dismissAll`은 쌓인 overlay를 위에서부터 차례로 모두 닫는다. 맨 위가 이미 `Closing`이어도 받아(줄 세운 닫기) 그 닫기가 끝나면 다음을 닫는다. 확인창 `onConfirm`은 창이 닫히기 시작한 뒤 불려 그 안의 `dismiss()`는 무시되므로, "확인 → 아래 시트까지 닫기"는 `onConfirm`에서 `dismissAll()`을 부른다. 그 전에 줄 세운 `show*`는 버린다. 열리는 중이면 무시한다. 두 플랫폼이 같은 단위 테스트를 가진다.
+  - `dismissDialog(spec)`은 그 확인창을 띄운 화면이 사라질 때 쓴다. 맨 위에 열려 있으면 닫고, 대기 중이면 버리고(`onDropped`), 열리는 중이면 열림 모션을 되돌리지 않고 다 열리자마자 닫는다(`closeWhenOpened`).
   - 시트 끌기는 손잡이 줄에서만 시작하고, 놓을 때의 판단(`shouldDismissSheet`, `sheetDragEnd`)은 `Open`일 때만 동작한다. 닫는 중에 취소된 끌기가 되돌림 애니메이션으로 닫기를 끊지 않는다.
   - **속도 토큰 단위는 dp·pt/초다.** `sheetDragDismissVelocity` 1000은 1000dp/s(Android)·1000pt/s(iOS)다. iOS `DragGesture.velocity`는 pt/s라 그대로 쓰고, Android `draggable`의 px/s는 `sheetDragEndPx`가 density로 나눠 판단한다.
 - **시트 높이:** 내용 높이만큼만 올라오고 상한은 min(760, 위 안전 영역 아래부터 화면 아래(키보드가 있으면 키보드 위)까지 − 24)이다(`sheetMaxHeight`, 24는 구현 기본값). 넘치는 내용은 시트 안에서 스크롤한다. 키보드가 올라오면 시트가 키보드 위로 올라간다: Android는 `imePadding` + Activity `windowSoftInputMode="adjustResize"`(없으면 창이 한 번 더 밀려 시트와 키보드 사이에 틈이 생겼다), iOS는 아래 홈 표시줄 안전 영역만 무시(`.ignoresSafeArea(.container, edges: .bottom)`)하고 키보드 영역은 지킨다.

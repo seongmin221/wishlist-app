@@ -61,7 +61,7 @@ struct BriefNotice: Equatable {
 }
 
 /// 상세 공통 틀(Android `DetailScaffold`): 스크롤 본문 위에 뒤로·(선택)⋯가 떠 있는 위쪽 바 56(안전 영역 + 6, 좌우 20),
-/// 하단 고정 "원본 보기"(PR A: `openURL`, 시스템 브라우저). 탭 바는 route가 숨긴다. `originalUrl`이 없으면(첫 로딩·오류)
+/// 하단 고정 "원본 보기"(PR B: 앱 안 웹뷰 `.web`, `http`/`https`가 아니면 누를 수 없다). 탭 바는 route가 숨긴다. `originalUrl`이 없으면(첫 로딩·오류)
 /// 하단 바를 그리지 않는다. `notice`는 위쪽 바 아래의 짧은 안내 줄이다(C1에 토스트 부품이 없다). `refresh`가 있으면
 /// 당겨서 새로고침(시스템 indicator, 홈과 같다)이고 그 작업이 끝날 때까지 indicator가 돈다.
 struct DetailScaffold<Content: View, More: View>: View {
@@ -121,11 +121,12 @@ private struct OriginalBar: View {
     let url: String
 
     @Environment(\.wlColors) private var c
-    @Environment(\.openURL) private var openURL
+    @Environment(\.wlNavigator) private var nav
 
     var body: some View {
+        let page = WebPageURL(string: url)
         Button {
-            if let target = URL(string: url) { openURL(target) }
+            if let page { nav.push(AppDestination.web(page).route, sourceKey: "detail/original") }
         } label: {
             HStack(spacing: WishlistTokens.Space.s8) {
                 WLText(String(localized: "detail.open.original"), .button, color: c.onInverse, maxLines: 1)
@@ -136,6 +137,8 @@ private struct OriginalBar: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .disabled(page == nil)
+        .opacity(page == nil ? wlDisabledOpacity : 1)
         .padding(.horizontal, WishlistTokens.Space.screenMargin)
         .padding(.top, DetailLayout.barTop)
         .padding(.bottom, DetailLayout.barBottom)
@@ -147,7 +150,7 @@ private struct OriginalBar: View {
 
 /// 짧은 안내 줄: 위쪽 바 아래, 카드색 pill 13/400, 나타남·사라짐 opacity 200(구현 기본값). VoiceOver에는 알림으로 읽힌다.
 /// 3초 뒤 스스로 사라진다(같은 `serial`은 다시 보이지 않는다).
-private struct DetailNoticeLine: View {
+struct DetailNoticeLine: View {
     let notice: BriefNotice?
 
     @Environment(\.wlColors) private var c

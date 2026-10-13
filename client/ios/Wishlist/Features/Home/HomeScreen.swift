@@ -200,7 +200,7 @@ struct HomeLinkRow: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityHint(String(localized: String.LocalizationValue(HomeRowText.openDetailKey)))
-            if showsOriginal { OriginalLink(url: row.sourceUrl) }
+            if showsOriginal { OriginalLink(url: row.sourceUrl, sourceKey: "home/row/\(row.key)/original") }
         }
         .padding(10)
         .background(c.sheetField, in: RoundedRectangle(cornerRadius: WishlistTokens.Radius.m, style: .continuous))
@@ -215,15 +215,17 @@ struct HomeLinkRow: View {
     }
 }
 
-/// "원본": C3-D5 a — 시스템 브라우저로 연다(C4 PR A까지, PR B에서 웹뷰). VoiceOver 이름은 "원본 열기".
+/// "원본": C4 PR B — 앱 안 웹뷰(`.web`)로 연다. `http`/`https`가 아니면 흐리게 두고 누를 수 없다. VoiceOver 이름은 "원본 열기".
 private struct OriginalLink: View {
     let url: String
+    let sourceKey: String
 
-    @Environment(\.openURL) private var openURL
+    @Environment(\.wlNavigator) private var nav
 
     var body: some View {
+        let page = WebPageURL(string: url)
         Button {
-            if let target = URL(string: url) { openURL(target) }
+            if let page { nav.push(AppDestination.web(page).route, sourceKey: sourceKey) }
         } label: {
             HStack(spacing: WishlistTokens.Space.s4) {
                 WLText(String(localized: "home.original"), HomeStyles.link, maxLines: 1)
@@ -234,6 +236,8 @@ private struct OriginalLink: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(page == nil)
+        .opacity(page == nil ? wlDisabledOpacity : 1)
         .accessibilityLabel(String(localized: String.LocalizationValue(HomeRowText.openOriginalKey)))
     }
 }

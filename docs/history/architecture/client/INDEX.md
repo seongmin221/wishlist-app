@@ -19,9 +19,10 @@
 - [C3 PR #12 리뷰 반영 (2026-10-09)](c3-pr12-review-2026-10-09.md) — 리뷰 10건: refresh revision으로 상대 시각 갱신, 복원 계정 첫 실행 기록, inbox import 무기한 ready 대기, 시각별 offset, 게시 합치기, Android LAUNCH 단일화, iOS `refreshNow` 대기, 정렬 단일화, parser 죽은 분기, debug hook io. 2차 10건: 429 계정 단위 대기, 재시도 타이머(서버 오류 30초), accept·게시 한 시점, 대기 줄 문구 3종, 조회 중 새 공유 우선, iOS 실제 복귀만, `flushing`·`FlushTrigger` 삭제, 영어 plural, UUID 헬퍼 하나. 3차 9건: ready 전 view 없음, 서버 오류 backoff·flush 중단, 모르는 enum 허용, iOS 임시 파일 복구, Android 늦은 공유 파일 inbox, 분 단위 tick, 선형 괄호 다듬기, 게시 간격, host 규칙 하나
 - [C3 화면 비교·예외 경로·성능 측정·최종 검증 (2026-10-07)](c3-verification-2026-10-07.md) — 보드 대비 차이와 수정, 계정 전환·강제 종료 복구, 대기 목록 20/100/300 baseline, debug 시연 hook, runtime 종료 중 DB 조회 충돌 수정(Task 7c), 최종 명령별 건수(Task 8)
 - [C2 최종 로컬 검증 (2026-10-07)](c2-final-verification-2026-10-07.md) — 실행 명령별 건수·환경·미실행과 C3/C12 인계
-- [C4 Android·iOS 상세·로컬 대기 화면 확인 (2026-10-10)](c4-detail-verification-2026-10-10.md) — 분석 중 → 상세 전환, 로컬 대기 → `MovedTo`, 로그인 전 삭제, 보드 L/D 비교와 확인하지 못한 경로(iOS 절: 끌어서 뒤로·foreground 새로고침 포함)
+- [C4 Android·iOS 상세·로컬 대기 화면 확인 (2026-10-10)](c4-detail-verification-2026-10-10.md) — 분석 중 → 상세 전환, 로컬 대기 → `MovedTo`, 로그인 전 삭제, 보드 L/D 비교와 확인하지 못한 경로(iOS 절: 끌어서 뒤로·foreground 새로고침 포함, PR B 절: 원본 링크 웹뷰 진입·외부 앱 확인창·쿠키 삭제)
 - [C4 의존성: Coil 3 (2026-10-10)](c4-dependency-coil-2026-10-10.md) — 3.5.0 선택 이유(3.6.x는 compileSdk 37·AGP 9.1 필요), OkHttp 재사용, 자리표시
 - [C4 PR A 구현 기록 (2026-10-10)](c4-pr-a-implementation-2026-10-10.md) — Task 1~12 요약, 판단(Ruling), 계획과 달라진 점, 미룬 minor, 검증 건수
+- [C4 PR B 구현 기록 (2026-10-10)](c4-pr-b-implementation-2026-10-10.md) — Task 13~16 원본 링크 웹뷰 요약, Ruling 11·12(iframe `data:`·`blob:` 차단, iOS 실제 터치 규칙), 미룬 minor, 실기기 확인 항목, 검증 건수
 - [C2 `:localdb` 모듈 분리 (2026-10-07)](c2-localdb-module-split-2026-10-07.md) — 계획의 `:shared` 단일 모듈에서 벗어난 이유(SQLDelight 생성 public 타입의 ObjC 노출 차단)
 - [C2 전반부 리뷰 후속 보완 (2026-10-07)](c2-first-half-review-followup-2026-10-07.md) — Fake 재분석 병합, 상품 ID 정규화, 정책 평가 되먹임 제거
 - [C2 의존성과 Swift ABI 호환성 (2026-10-07)](c2-dependency-compatibility-2026-10-07.md) — 후보/선택 버전, actual-use spike, Flow·suspend·callback 관문

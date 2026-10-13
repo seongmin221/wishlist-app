@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 상태: **PR A Task 1~12 구현·로컬 검증 완료 (2026-10-10, 리뷰·draft PR 대기). PR B(Task 13~16) 진행 전.** 초안 v1 검토 뒤 실행 중이다.
+- 상태: **PR A Task 1~12 구현·로컬 검증 완료 (2026-10-10, draft PR #15). PR B Task 13~16 구현·로컬 검증 완료 (2026-10-10, 최종 리뷰·draft PR 대기).** 초안 v1 검토 뒤 실행 중이다.
 - 작업 공간 `/Users/user/orca/workspaces/wishlist-app/client-c4-product-detail`, 브랜치 `client/c4-product-detail`(PR A, base `develop`). PR B는 Task 13 시작 때 `client/c4-product-detail` 위에 `client/c4-webview`를 만들고 base를 A로 연다. A merge 뒤 `origin/develop`으로 rebase하고 base를 `develop`으로 바꾼다(D20). 시작 HEAD `abae37d`(origin/develop, PR #14 merge). merge는 사용자 승인 없이 하지 않는다. 다른 워크스페이스는 수정·삭제하지 않는다.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. 새 의존성은 **Coil 3만**(D5, 사용자 승인). iOS는 의존성 추가 없음. 공유 코드에 Compose/SwiftUI 의존성 없음.
 - 서버 mutation(ITEM-04~08) 호출 없음. `allowedActions`가 있어도 편집·서버 삭제·다시 분석 UI를 두지 않는다(D2).

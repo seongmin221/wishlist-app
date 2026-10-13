@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.wishlist.android.BuildConfig
 import app.wishlist.android.R
+import app.wishlist.android.designsystem.DISABLED_ALPHA
 import app.wishlist.android.designsystem.LocalWLColors
 import app.wishlist.android.designsystem.WLButton
 import app.wishlist.android.designsystem.WLButtonKind
@@ -204,7 +205,7 @@ private fun SettingsRow(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .alpha(if (enabled) 1f else 0.4f)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .then(if (onClick != null) Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick) else Modifier)
             .padding(start = 16.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12),
