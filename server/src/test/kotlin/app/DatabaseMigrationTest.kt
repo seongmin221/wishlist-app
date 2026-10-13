@@ -29,7 +29,7 @@ class DatabaseMigrationTest {
                 }
                 val before = listOf("wishlist_items", "analysis_jobs", "outbox_events").associateWith { snapshot(connection, it, emptyList()) }
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
-                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, (if (table == "wishlist_items") listOf("client_created_at", "custom_category_id", "legacy_purpose_id") else if (table == "analysis_jobs") listOf("pending_purpose_judged") else emptyList()) + V17_COLUMNS.getValue(table))) }
+                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, (if (table == "wishlist_items") listOf("client_created_at", "custom_category_id", "legacy_purpose_id") else if (table == "analysis_jobs") listOf("pending_purpose_judged") else emptyList()) + LATER_COLUMNS.getValue(table))) }
                 connection.createStatement().use { s -> s.executeQuery("select client_created_at from wishlist_items").use { r ->
                     assertTrue(r.next()); assertNull(r.getObject(1))
                 } }
@@ -51,7 +51,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"), versions)
                     }
                 }
             }
@@ -100,8 +100,8 @@ class DatabaseMigrationTest {
                 val itemFields = "review_status,manual_completion_at,category_id,category_source,category_missing_reason,purpose_id,purpose_source,name_source,image_source,user_override_fields,current_generation,client_created_at,custom_category_id,legacy_purpose_id".split(",")
                 val jobFields = listOf("execution_token", "lease_until", "claimed_item_version", "pending_purpose_judged")
                 val queries = mapOf(
-                    "wishlist_items" to itemFields + V17_COLUMNS.getValue("wishlist_items"), "analysis_jobs" to jobFields + V17_COLUMNS.getValue("analysis_jobs"),
-                    "outbox_events" to V17_COLUMNS.getValue("outbox_events"),
+                    "wishlist_items" to itemFields + LATER_COLUMNS.getValue("wishlist_items"), "analysis_jobs" to jobFields + LATER_COLUMNS.getValue("analysis_jobs"),
+                    "outbox_events" to LATER_COLUMNS.getValue("outbox_events"),
                     "llm_budget_windows" to emptyList(), "llm_budget_reservations" to emptyList(), "llm_budget_alerts" to emptyList(),
                 )
                 val before = queries.mapValues { (table, fields) -> snapshot(connection, table, fields) }
@@ -250,7 +250,7 @@ class DatabaseMigrationTest {
                 }
                 val before = listOf("wishlist_items", "analysis_jobs", "outbox_events").associateWith { snapshot(connection, it, emptyList()) }
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
-                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, V17_COLUMNS.getValue(table))) }
+                before.forEach { (table, records) -> assertEquals(records, snapshot(connection, table, LATER_COLUMNS.getValue(table))) }
                 connection.createStatement().use { s ->
                     s.executeQuery("""select product_brand,product_price,product_currency,merchant_name,metadata_checked_at from wishlist_items""").use { r ->
                         assertTrue(r.next()); for (i in 1..5) assertNull(r.getObject(i))
@@ -294,9 +294,88 @@ class DatabaseMigrationTest {
         }
     }
 
+    @Test fun `V18 upgrade keeps V17 rows and adds nullable media reference`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("17").load().migrate()
+            database.createConnection("").use { connection ->
+                val itemId = UUID.randomUUID()
+                connection.createStatement().use { s ->
+                    s.executeUpdate("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,
+                        product_name,product_image_url,version,created_at,updated_at) values ('$itemId','${UUID.randomUUID()}','${UUID.randomUUID()}',
+                        'https://example.com/item','READY','ACTIVE','기존 상품','https://example.com/image',2,'2026-10-12T01:00:00Z','2026-10-12T02:00:00Z')""")
+                    s.executeUpdate("insert into analysis_jobs(id,wishlist_item_id,generation,stage) values ('${UUID.randomUUID()}','$itemId',1,'COMPLETED')")
+                }
+                val before = listOf("wishlist_items", "analysis_jobs").associateWith { snapshot(connection, it, emptyList()) }
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                assertEquals(before["wishlist_items"], snapshot(connection, "wishlist_items", listOf("media_asset_id")))
+                assertEquals(before["analysis_jobs"], snapshot(connection, "analysis_jobs", emptyList()))
+                connection.createStatement().use { s ->
+                    s.executeQuery("select media_asset_id from wishlist_items").use { r -> assertTrue(r.next()); assertNull(r.getObject(1)) }
+                    s.executeQuery("select count(*) from media_assets").use { r -> assertTrue(r.next()); assertEquals(0, r.getInt(1)) }
+                }
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
+    @Test fun `V18 constraints protect media states and owner references`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+            database.createConnection("").use { c ->
+                val owner = UUID.randomUUID(); val other = UUID.randomUUID()
+                fun exec(sql: String) = c.createStatement().use { it.executeUpdate(sql) }
+                exec("insert into app_users(id) values ('$owner'),('$other')")
+                fun item(ownerId: UUID): UUID = UUID.randomUUID().also { id ->
+                    exec("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,current_generation)
+                        values ('$id','$ownerId','${UUID.randomUUID()}','https://example.com/$id','READY','ACTIVE',1)""")
+                }
+                fun media(ownerId: UUID, key: UUID = UUID.randomUUID(), extra: String = "", values: String = ""): String {
+                    val id = UUID.randomUUID()
+                    return """insert into media_assets(id,owner_id,idempotency_key,request_fingerprint,object_key,content_type,
+                        declared_byte_size,declared_width,declared_height,upload_expires_at$extra)
+                        values ('$id','$ownerId','$key','${"a".repeat(64)}','media/$ownerId/$id.jpg','image/jpeg',100,10,10,clock_timestamp()$values)"""
+                }
+                fun readyMedia(ownerId: UUID): UUID {
+                    val id = UUID.randomUUID()
+                    exec("""insert into media_assets(id,owner_id,idempotency_key,request_fingerprint,object_key,content_type,
+                        declared_byte_size,declared_width,declared_height,upload_expires_at,status,byte_size,width,height,ready_at)
+                        values ('$id','$ownerId','${UUID.randomUUID()}','${"a".repeat(64)}','media/$ownerId/$id.jpg','image/jpeg',
+                        100,10,10,clock_timestamp(),'READY',100,10,10,clock_timestamp())""")
+                    return id
+                }
+                val key = UUID.randomUUID()
+                exec(media(owner, key))
+                val ready = readyMedia(owner)
+                val first = item(owner); val second = item(owner); val foreign = item(other)
+                val rejected = listOf(
+                    media(owner).replace("'image/jpeg'", "'image/png'"),
+                    media(owner).replace(",100,10,10,", ",100,2049,10,"),
+                    media(owner).replace(",100,10,10,", ",5242881,10,10,"),
+                    media(owner).replace(",100,10,10,", ",0,10,10,"),
+                    media(owner, extra = ",status", values = ",'READY'"),
+                    media(owner, extra = ",status", values = ",'FAILED'"),
+                    media(owner, extra = ",status,failure_reason,failed_at", values = ",'FAILED','BROKEN',clock_timestamp()"),
+                    media(owner, extra = ",status", values = ",'DELETED'"),
+                    media(owner, extra = ",status", values = ",'EXPIRED'"),
+                    media(owner, key),
+                    "update wishlist_items set media_asset_id='$ready' where id='$foreign'",
+                    "update wishlist_items set media_asset_id='${UUID.randomUUID()}' where id='$first'",
+                )
+                for (sql in rejected) assertFailsWith<SQLException>(sql) { exec(sql) }
+                assertEquals(1, exec("update wishlist_items set media_asset_id='$ready' where id='$first'"))
+                assertFailsWith<SQLException> { exec("update wishlist_items set media_asset_id='$ready' where id='$second'") }
+                exec(media(owner, extra = ",status,failure_reason,failed_at", values = ",'FAILED','NOT_JPEG',clock_timestamp()"))
+                exec(media(owner, extra = ",status,deleted_at", values = ",'DELETED',clock_timestamp()"))
+            }
+        }
+    }
+
     private companion object {
-        val V17_COLUMNS = mapOf(
-            "wishlist_items" to listOf("product_brand", "product_price", "product_currency", "merchant_name", "metadata_checked_at"),
+        /** Columns added by V17 and later; older upgrade snapshots ignore them. */
+        val LATER_COLUMNS = mapOf(
+            "wishlist_items" to listOf("product_brand", "product_price", "product_currency", "merchant_name", "metadata_checked_at", "media_asset_id"),
             "analysis_jobs" to listOf("pending_brand", "pending_price", "pending_currency", "pending_merchant", "recovery_seq", "recovery_check_at"),
             "outbox_events" to listOf("not_before"),
         )
