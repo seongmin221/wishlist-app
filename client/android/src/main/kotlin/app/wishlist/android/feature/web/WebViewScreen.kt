@@ -4,10 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.MutableContextWrapper
 import android.graphics.Bitmap
-import android.view.MotionEvent
+import android.os.Bundle
+import android.view.KeyEvent
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewParent
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityNodeProvider
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -112,9 +115,6 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
 
     private var pendingLoad: String? = initialUrl
 
-    /** The view built after a renderer crash has no page yet: [reload] opens [page]'s URL in it. */
-    private var emptyAfterCrash = false
-
     /** D16 one tap, one decision; kept here so a recreated view does not hand out a fresh gesture. */
     private val tapBudget = WebTapBudget(ViewConfiguration.get(app).scaledTouchSlop.toFloat())
 
@@ -132,6 +132,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
         pendingLoad?.let {
             pendingLoad = null
             view.loadUrl(it)
+            page = page.requested()
         }
         return view
     }
@@ -148,7 +149,9 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
     }
 
     fun load(url: String) {
-        webView?.loadUrl(url)
+        val view = webView ?: return
+        view.loadUrl(url)
+        page = page.requested()
     }
 
     /** Follows the screen's lifecycle: a paused page stops animations, media and geolocation work. */
@@ -166,17 +169,18 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
     }
 
     /**
-     * 새로고침 and "다시 시도": reload, or open [page]'s URL in the empty view built after a renderer crash. The
-     * failure cover stays until the new load starts (`onPageStarted`).
+     * 새로고침 and "다시 시도" ([WebReloadStep]). Both are off while a load runs (the bar shows stop, the retry
+     * button waits: [WebPageState.requested]), so a load is never asked twice. The failure cover stays until the
+     * new load starts (`onPageStarted`).
      */
     fun reload() {
         val view = webView
-        when {
-            view == null -> pendingLoad = page.url
-            emptyAfterCrash -> view.loadUrl(page.url)
-            else -> view.reload()
+        when (WebReloadStep.of(hasView = view != null, viewUrl = view?.url)) {
+            WebReloadStep.QUEUE -> pendingLoad = page.url
+            WebReloadStep.OPEN_PAGE_URL -> view?.loadUrl(page.url)
+            WebReloadStep.RELOAD -> view?.reload()
         }
-        emptyAfterCrash = false
+        page = page.requested()
     }
 
     fun stop() {
@@ -194,17 +198,16 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
     }
 
     @SuppressLint("ClickableViewAccessibility") // only watches touches; the WebView handles them (and clicks) itself
-    private fun create(): WebView = WebView(context).apply {
+    private fun create(): WebView = AccessibilityClickWebView(context, tapBudget::onAccessibilityClick).apply {
         applyWishlistDefaults()
         webViewClient = Client()
         webChromeClient = Chrome()
         setOnTouchListener { _, e ->
-            when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> tapBudget.onDown(e.x, e.y)
-                MotionEvent.ACTION_MOVE -> tapBudget.onMove(e.x, e.y)
-                MotionEvent.ACTION_UP -> tapBudget.onUp(e.x, e.y)
-                MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> tapBudget.onCancel()
-            }
+            tapBudget.onTouch(e.actionMasked, e.x, e.y)
+            false
+        }
+        setOnKeyListener { _, _, e ->
+            if (e.action == KeyEvent.ACTION_DOWN) tapBudget.onKeyDown(e.keyCode)
             false
         }
     }
@@ -221,7 +224,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
                     when (val target = WebExternalApps.targetOf(url, request.isForMainFrame, gesture)) {
                         is ExternalTarget.Launch ->
                             externalRequests.trySend(ExternalRequest(target, confirm = decision == WebDecision.CONFIRM_EXTERNAL))
-                        is ExternalTarget.LoadInside -> view.post { if (view === webView) view.loadUrl(target.url) }
+                        is ExternalTarget.LoadInside -> view.post { if (view === webView) load(target.url) }
                         ExternalTarget.None -> Unit
                     }
                     true
@@ -246,7 +249,7 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
 
         // D13: only the main frame's network / bad-address errors cover the page; sub-resource errors are ignored.
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-            if (request.isForMainFrame) page = page.copy(failed = true)
+            if (request.isForMainFrame) page = page.copy(failed = true, loading = false)
         }
 
         // A renderer crash or kill must not take the app down: drop this view and offer "다시 시도".
@@ -257,7 +260,6 @@ internal class WebViewHolder(private val app: Context, initialUrl: String) : Vie
                 webView = null
                 // The new view has no history: back must close, not call goBack() on an empty view.
                 page = page.copy(loading = false, failed = true, canGoBack = false, canGoForward = false)
-                emptyAfterCrash = true
                 generation++
             }
             return true
@@ -401,7 +403,12 @@ internal fun WebViewScreen(route: WebViewRoute) {
                 }
                 if (page.failed) {
                     Box(Modifier.fillMaxSize().background(c.background)) {
-                        DetailStatusBlock(stringResource(R.string.webview_load_failed), stringResource(R.string.detail_retry), holder::reload)
+                        DetailStatusBlock(
+                            stringResource(R.string.webview_load_failed),
+                            stringResource(R.string.detail_retry),
+                            holder::reload,
+                            enabled = page.canRetry,
+                        )
                     }
                 }
             }
@@ -414,6 +421,50 @@ internal fun WebViewScreen(route: WebViewRoute) {
             )
         }
         DetailNoticeLine(notice, Modifier.align(Alignment.TopCenter))
+    }
+}
+
+/**
+ * Reports TalkBack / Switch Access clicks on page nodes ([AccessibilityNodeInfo.ACTION_CLICK] on a virtual node),
+ * which reach Chromium without any touch: a D16 tap for [WebTapBudget]. Chromium's own provider does the rest.
+ */
+@SuppressLint("ViewConstructor")
+private class AccessibilityClickWebView(context: Context, private val onClick: () -> Unit) : WebView(context) {
+    private var inner: AccessibilityNodeProvider? = null
+    private var wrapper: AccessibilityNodeProvider? = null
+
+    override fun getAccessibilityNodeProvider(): AccessibilityNodeProvider? {
+        val provider = super.getAccessibilityNodeProvider() ?: return null
+        if (provider !== inner) {
+            inner = provider
+            wrapper = ClickReportingProvider(provider, onClick)
+        }
+        return wrapper
+    }
+}
+
+private class ClickReportingProvider(
+    private val inner: AccessibilityNodeProvider,
+    private val onClick: () -> Unit,
+) : AccessibilityNodeProvider() {
+    override fun createAccessibilityNodeInfo(virtualViewId: Int): AccessibilityNodeInfo? =
+        inner.createAccessibilityNodeInfo(virtualViewId)
+
+    override fun findAccessibilityNodeInfosByText(text: String?, virtualViewId: Int): MutableList<AccessibilityNodeInfo>? =
+        inner.findAccessibilityNodeInfosByText(text, virtualViewId)
+
+    override fun findFocus(focus: Int): AccessibilityNodeInfo? = inner.findFocus(focus)
+
+    override fun addExtraDataToAccessibilityNodeInfo(
+        virtualViewId: Int,
+        info: AccessibilityNodeInfo,
+        extraDataKey: String,
+        arguments: Bundle?,
+    ) = inner.addExtraDataToAccessibilityNodeInfo(virtualViewId, info, extraDataKey, arguments)
+
+    override fun performAction(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean {
+        if (action == AccessibilityNodeInfo.ACTION_CLICK) onClick()
+        return inner.performAction(virtualViewId, action, arguments)
     }
 }
 

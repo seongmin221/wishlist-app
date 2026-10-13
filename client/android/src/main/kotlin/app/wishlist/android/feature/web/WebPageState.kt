@@ -47,6 +47,15 @@ internal data class WebPageState(
         failed = false,
     )
 
+    /**
+     * The holder asked the view for a load (`loadUrl`, `reload`): WebView reports `onPageStarted` only once the
+     * response headers arrive, so until then the bars show the load (line, stop) and "다시 시도" waits.
+     */
+    fun requested(): WebPageState = copy(loading = true, progress = 0)
+
+    /** "다시 시도" works once the load it started is over (pressing it again would cancel that load). */
+    val canRetry: Boolean get() = failed && !loading
+
     /** The 2px line hides once the load reaches 100 (D13). */
     val progressVisible: Boolean get() = loading && progress < 100
 

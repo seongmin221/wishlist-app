@@ -74,5 +74,13 @@ class WebNavigationPolicyTest {
         assertEquals(LOAD_INSIDE, WebNavigationPolicy.decide("about", true, false, isAboutBlank("about:blank#x")))
     }
 
+    @Test
+    fun reloadReloadsAViewWithAPageAndOpensThePageURLInOneWithout() {
+        assertEquals(WebReloadStep.RELOAD, WebReloadStep.of(hasView = true, viewUrl = "https://a.com/"))
+        // The fresh view after a renderer crash, or a first load that failed before the view had a URL.
+        assertEquals(WebReloadStep.OPEN_PAGE_URL, WebReloadStep.of(hasView = true, viewUrl = null))
+        assertEquals(WebReloadStep.QUEUE, WebReloadStep.of(hasView = false, viewUrl = null))
+    }
+
     private data class Row(val scheme: String, val isAboutBlank: Boolean, val main: WebDecision?, val sub: WebDecision?)
 }

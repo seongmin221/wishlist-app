@@ -106,4 +106,17 @@ class WebFallbackRuleTest {
         assertTrue(WebExternalApps.fallbackAllowed(mainFrame = false, userGesture = true))
         assertFalse(WebExternalApps.fallbackAllowed(mainFrame = false, userGesture = false))
     }
+
+    @Test
+    fun aRequestedLoadShowsAtOnceAndHoldsRetryUntilItEnds() {
+        val failed = WebPageState(url = "https://a.com/", failed = true, progress = 100)
+        assertTrue(failed.canRetry)
+        val asked = failed.requested() // before onPageStarted, which waits for the response headers
+        assertTrue(asked.failed) // the cover stays until the load starts
+        assertTrue(asked.showsStop)
+        assertTrue(asked.progressVisible)
+        assertFalse(asked.canRetry) // pressing again would cancel this load
+        assertTrue(asked.copy(loading = false).canRetry) // stopped or failed again
+        assertFalse(WebPageState(url = "https://a.com/").canRetry)
+    }
 }

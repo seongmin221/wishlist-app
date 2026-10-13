@@ -207,7 +207,7 @@ internal fun rememberBriefNotice(key: Any?, text: String): String? {
 
 /** 상태 화면(항목 없는 오류·삭제된 상품): 경고 타일 + 18/700 문장 + 버튼 하나, 본문 영역 가운데. */
 @Composable
-internal fun DetailStatusBlock(message: String, buttonText: String, onClick: () -> Unit) {
+internal fun DetailStatusBlock(message: String, buttonText: String, onClick: () -> Unit, enabled: Boolean = true) {
     val c = LocalWLColors.current
     Column(
         Modifier.fillMaxWidth().padding(horizontal = WishlistTokens.Space.s32, vertical = 120.dp),
@@ -216,7 +216,7 @@ internal fun DetailStatusBlock(message: String, buttonText: String, onClick: () 
     ) {
         WLIconTile(size = 56.dp, radius = WishlistTokens.Radius.m, color = c.card) { WLIcon(WLLineIcon.Warning, color = c.textSecondary) }
         WLText(message, WLType.title.copy(fontSize = 18.sp), color = c.text, textAlign = TextAlign.Center)
-        WLButton(buttonText, WLButtonKind.Secondary, onClick = onClick)
+        WLButton(buttonText, WLButtonKind.Secondary, onClick = onClick, enabled = enabled)
     }
 }
 

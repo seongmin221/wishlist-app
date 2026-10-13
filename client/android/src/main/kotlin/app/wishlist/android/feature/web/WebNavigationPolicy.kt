@@ -1,5 +1,8 @@
 package app.wishlist.android.feature.web
 
+import android.view.KeyEvent
+import android.view.MotionEvent
+
 /** What the web view does with one navigation (spec §4 탐색 규칙). */
 enum class WebDecision { LOAD_INSIDE, BLOCK, OPEN_EXTERNAL, CONFIRM_EXTERNAL }
 
@@ -54,8 +57,12 @@ fun schemeOf(url: String): String {
  * D16 one tap, one decision (iOS `WebViewModel.decide` clears `lastTouch` the same way). Chromium's `hasGesture()`
  * stays true for every navigation during a tap's user activation, so one tap could otherwise open several apps
  * that a script clicks after it. The first frame navigation decided with the gesture spends it, whatever it opens
- * (a page link, an app, a blocked URL; a server redirect that follows is a new decision and asks). Only a new tap
- * on the web view, a single finger lifted within [slop] of where it went down, gives a new one: a scroll does not.
+ * (a page link, an app, a blocked URL; a server redirect that follows is a new decision and asks). A same-page
+ * `#fragment` link never reaches `shouldOverrideUrlLoading`, so it leaves the tap (iOS skips it too).
+ *
+ * A new user action on the web view gives a new one: a single finger lifted within [slop] of where it went down
+ * (a scroll is not one), a key pressed (keyboard, D-pad; not back or escape), or an accessibility click (TalkBack,
+ * Switch Access), which reach Chromium without touches.
  */
 internal class WebTapBudget(private val slop: Float) {
     private var spent = false
@@ -63,27 +70,34 @@ internal class WebTapBudget(private val slop: Float) {
     private var downX = 0f
     private var downY = 0f
 
-    fun onDown(x: Float, y: Float) {
-        tracking = true
-        downX = x
-        downY = y
+    /** One `MotionEvent` (`actionMasked`, view coordinates). */
+    fun onTouch(action: Int, x: Float, y: Float) {
+        when (action) {
+            MotionEvent.ACTION_DOWN -> {
+                tracking = true
+                downX = x
+                downY = y
+            }
+            MotionEvent.ACTION_MOVE -> if (tracking && !near(x, y)) tracking = false
+            MotionEvent.ACTION_UP -> {
+                if (tracking && near(x, y)) spent = false
+                tracking = false
+            }
+            // A second finger or a cancelled gesture is no tap.
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> tracking = false
+        }
     }
 
-    fun onMove(x: Float, y: Float) {
-        if (tracking && !near(x, y)) tracking = false
+    /** Chromium activates on key down (a link opens on Enter's down). */
+    fun onKeyDown(keyCode: Int) {
+        if (keyCode != KeyEvent.KEYCODE_BACK && keyCode != KeyEvent.KEYCODE_ESCAPE) spent = false
     }
 
-    fun onUp(x: Float, y: Float) {
-        if (tracking && near(x, y)) spent = false
-        tracking = false
+    fun onAccessibilityClick() {
+        spent = false
     }
 
-    /** A second finger or a cancelled gesture is no tap. */
-    fun onCancel() {
-        tracking = false
-    }
-
-    /** The gesture one navigation may use: [hasGesture] once per tap. */
+    /** The gesture one navigation may use: [hasGesture] once per user action. */
     fun use(hasGesture: Boolean): Boolean {
         if (!hasGesture || spent) return false
         spent = true
@@ -94,5 +108,24 @@ internal class WebTapBudget(private val slop: Float) {
         val dx = x - downX
         val dy = y - downY
         return dx * dx + dy * dy <= slop * slop
+    }
+}
+
+/** What 새로고침 / "다시 시도" does with the holder's view. */
+internal enum class WebReloadStep {
+    /** No view yet (dropped after a renderer crash, not attached again): load the page once it attaches. */
+    QUEUE,
+
+    /** A view without a page (the fresh one after a crash, or a first load that failed before it had a URL). */
+    OPEN_PAGE_URL,
+
+    RELOAD;
+
+    companion object {
+        fun of(hasView: Boolean, viewUrl: String?): WebReloadStep = when {
+            !hasView -> QUEUE
+            viewUrl == null -> OPEN_PAGE_URL
+            else -> RELOAD
+        }
     }
 }

@@ -1,12 +1,22 @@
 package app.wishlist.android.feature.web
 
+import android.view.KeyEvent
+import android.view.MotionEvent
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** D16 one tap, one decision: `hasGesture()` counts once per real tap (iOS `testOneTapOpensOneExternalApp`). */
+/**
+ * D16 one tap, one decision: `hasGesture()` counts once per user action (iOS `testOneTapOpensOneExternalApp`).
+ * The events are the ones the holder's touch and key listeners and the accessibility provider pass on.
+ */
 class WebTapBudgetTest {
-    private fun tapped() = WebTapBudget(slop = 10f).apply { onDown(100f, 100f); onUp(104f, 106f) }
+    private fun WebTapBudget.tap(x: Float = 100f, y: Float = 100f, upX: Float = x, upY: Float = y) {
+        onTouch(MotionEvent.ACTION_DOWN, x, y)
+        onTouch(MotionEvent.ACTION_UP, upX, upY)
+    }
+
+    private fun tapped() = WebTapBudget(slop = 10f).apply { tap(upX = 104f, upY = 106f) }
 
     @Test
     fun oneTapIsUsedByTheFirstGestureDecisionOnly() {
@@ -34,14 +44,44 @@ class WebTapBudgetTest {
     fun aNewTapGivesANewGestureButAScrollDoesNot() {
         val b = tapped()
         b.use(hasGesture = true)
-        b.onDown(100f, 100f); b.onMove(100f, 140f); b.onUp(100f, 100f) // a scroll that came back
+        b.onTouch(MotionEvent.ACTION_DOWN, 100f, 100f)
+        b.onTouch(MotionEvent.ACTION_MOVE, 100f, 140f)
+        b.onTouch(MotionEvent.ACTION_UP, 100f, 100f) // a scroll that came back
         assertFalse(b.use(hasGesture = true))
-        b.onDown(100f, 100f); b.onUp(100f, 111f) // lifted past the slop
+        b.tap(upY = 111f) // lifted past the slop
         assertFalse(b.use(hasGesture = true))
-        b.onDown(100f, 100f); b.onCancel(); b.onUp(100f, 100f) // a second finger or a cancel
+        b.onTouch(MotionEvent.ACTION_DOWN, 100f, 100f)
+        b.onTouch(MotionEvent.ACTION_POINTER_DOWN, 100f, 100f)
+        b.onTouch(MotionEvent.ACTION_UP, 100f, 100f) // a second finger
         assertFalse(b.use(hasGesture = true))
-        b.onDown(50f, 50f); b.onUp(50f, 50f)
+        b.onTouch(MotionEvent.ACTION_DOWN, 100f, 100f)
+        b.onTouch(MotionEvent.ACTION_CANCEL, 100f, 100f)
+        b.onTouch(MotionEvent.ACTION_UP, 100f, 100f)
+        assertFalse(b.use(hasGesture = true))
+        b.tap(50f, 50f)
         assertTrue(b.use(hasGesture = true))
+    }
+
+    @Test
+    fun keyboardAndDpadPressesAreUserActions() {
+        val b = tapped()
+        b.use(hasGesture = true)
+        b.onKeyDown(KeyEvent.KEYCODE_ENTER)
+        assertTrue(b.use(hasGesture = true))
+        b.onKeyDown(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertTrue(b.use(hasGesture = true))
+        b.onKeyDown(KeyEvent.KEYCODE_BACK)
+        b.onKeyDown(KeyEvent.KEYCODE_ESCAPE)
+        assertFalse(b.use(hasGesture = true))
+    }
+
+    @Test
+    fun anAccessibilityClickIsAUserAction() {
+        val b = tapped()
+        b.use(hasGesture = true)
+        b.onAccessibilityClick() // TalkBack double tap, Switch Access: no touches reach the view
+        assertTrue(b.use(hasGesture = true))
+        assertFalse(b.use(hasGesture = true))
     }
 
     @Test
