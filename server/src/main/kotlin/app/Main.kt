@@ -16,6 +16,7 @@ import app.budget.BudgetMaintenanceService
 import app.budget.LlmBudgetService
 import app.maintenance.MaintenanceReport
 import app.maintenance.MaintenanceService
+import app.media.*
 import app.extraction.*
 import app.http.*
 import app.tasks.CloudTasksConfig
@@ -47,15 +48,17 @@ fun main() {
     embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8080) { module() }.start(wait = true)
 }
 
-fun Application.module(env: Map<String, String> = System.getenv(), resources: RuntimeResources = RuntimeResources(), taskGateway: TaskGateway? = null) {
+fun Application.module(env: Map<String, String> = System.getenv(), resources: RuntimeResources = RuntimeResources(), taskGateway: TaskGateway? = null,
+                       mediaStorage: MediaStorage? = null) {
     monitor.subscribe(ApplicationStopping) { resources.stopAcceptingWork() }
     monitor.subscribe(ApplicationStopped) {
         try { resources.close() } catch (_: Throwable) { log.error("Runtime resources could not all be closed") }
     }
-    configureRuntime(env, resources, taskGateway)
+    configureRuntime(env, resources, taskGateway, mediaStorage)
 }
 
-private fun Application.configureRuntime(env: Map<String, String>, resources: RuntimeResources, taskGateway: TaskGateway?) {
+private fun Application.configureRuntime(env: Map<String, String>, resources: RuntimeResources, taskGateway: TaskGateway?,
+                                         mediaStorage: MediaStorage?) {
     val runtime = RuntimeConfig.fromEnvironment(env)
     install(ContentNegotiation) { json(ApiJson) }
     installApiHttpSupport()
@@ -119,21 +122,35 @@ private fun Application.configureRuntime(env: Map<String, String>, resources: Ru
         val client = resources.own(CloudTasksClient.create(CloudTasksGateway.clientSettings()))
         OutboxDispatcher(source, CloudTasksGateway(client, config))
     }
+    val storage = mediaStorage ?: openMediaStorage(env, resources)
+    val signing = resources.own(MediaSigningExecutor())
+    val signer = MediaUrlSigner { key -> signing.await { storage.readUrl(key, MediaLimits.READ_VALIDITY) } }
+    val media = MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), signing), signer)
     routing {
         get("/health") { call.respondText("ok") }
-        apiRoutes(source, { eventId -> resources.runIfOpen { dispatcher?.dispatchEvent(eventId) } }) { resolver.resolve(it) }
+        apiRoutes(source, { eventId -> resources.runIfOpen { dispatcher?.dispatchEvent(eventId) } }, media) { resolver.resolve(it) }
+        if (storage is LocalMediaStorage) localMediaRoutes(storage)
     }
 }
 
 /** Public product API only; internal Worker and maintenance routes belong to their own runtime roles. */
-fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, resolve: suspend (ApplicationCall) -> UUID?) {
+fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, media: MediaWiring, resolve: suspend (ApplicationCall) -> UUID?) {
     val readService = WishlistReadService(source)
+    mediaRoutes(media, resolve)
     wishlistRoutes(CreateWishlistItemService(source, dispatchAfterCommit), GetWishlistItemService(source), resolve)
     wishlistReadRoutes(readService, resolve)
     homeActionRoutes(readService, resolve)
     homeSummaryRoutes(HomeReadService(source), resolve)
     categoryRoutes(CategoryService(source), resolve)
     purposeRoutes(PurposeService(source), resolve)
+}
+
+/** GCS when MEDIA_BUCKET is set, otherwise the local file store (local only; production requires the bucket). */
+private fun openMediaStorage(env: Map<String, String>, resources: RuntimeResources): MediaStorage {
+    env["MEDIA_BUCKET"]?.takeIf { it.isNotBlank() }?.let { return resources.own(GcsMediaStorage.create(it)) }
+    check(env["APP_ENV"] != "production") { "MEDIA_BUCKET is required in production" }
+    val port = env["PORT"] ?: "8080"
+    return LocalMediaStorage(java.nio.file.Path.of(env["MEDIA_LOCAL_DIR"] ?: "build/local-media"), env["MEDIA_LOCAL_BASE_URL"] ?: "http://localhost:$port")
 }
 
 private fun cloudTasksConfig(env: Map<String, String>): CloudTasksConfig? {

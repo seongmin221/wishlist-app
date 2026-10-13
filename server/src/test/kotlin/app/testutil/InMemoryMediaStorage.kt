@@ -62,3 +62,8 @@ class InMemoryMediaStorage(var now: () -> Instant = Instant::now) : MediaStorage
 
     private fun delay() { if (signDelayMillis > 0) Thread.sleep(signDelayMillis) }
 }
+
+/** Media wiring for route tests; signing goes straight to [storage]. */
+fun mediaWiring(source: javax.sql.DataSource, storage: MediaStorage = InMemoryMediaStorage(),
+                signer: MediaUrlSigner = MediaUrlSigner { key -> runCatching { storage.readUrl(key, MediaLimits.READ_VALIDITY) }.getOrNull() }) =
+    app.http.MediaWiring(MediaService(source, storage, signer, MediaImageValidator(), MediaSigningExecutor()), signer)
