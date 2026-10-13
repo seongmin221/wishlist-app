@@ -284,6 +284,24 @@ final class WebViewStoreTests: XCTestCase {
         XCTAssertEqual(prompts.shown, [pay])
     }
 
+    func testATapUsedByAPageLinkDoesNotOpenAnApp() {
+        var opened: [URL] = []
+        let prompts = Prompts()
+        let m = model({ opened.append($0) }, prompts: prompts)
+        defer { m.close() }
+        let tel = URL(string: "tel:0109998888")!
+        var policies: [WKNavigationActionPolicy] = []
+        m.noteTouch()
+        m.webView(m.webView, decidePolicyFor: FakeAction(URL(string: "https://shop.example.com/p/2")!, type: .linkActivated)) {
+            policies.append($0)
+        }
+        // A script clicks an external link while that page loads: the tap went to the page link.
+        m.webView(m.webView, decidePolicyFor: FakeAction(tel, type: .linkActivated)) { policies.append($0) }
+        XCTAssertEqual(policies, [.allow, .cancel])
+        XCTAssertTrue(opened.isEmpty)
+        XCTAssertEqual(prompts.shown, [tel])
+    }
+
     func testPagesCannotOpenWindowsWithoutAGesture() {
         let m = model()
         defer { m.close() }

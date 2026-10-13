@@ -85,6 +85,8 @@ final class OverlayEntry: Identifiable {
     let id: Int
     let kind: OverlayKind
     var phase: OverlayPhase = .opening
+    /// `dismissDialog` came while this was opening: it starts closing as soon as it is open.
+    @ObservationIgnored var closeWhenOpened = false
 
     init(id: Int, kind: OverlayKind) {
         self.id = id
@@ -134,8 +136,9 @@ final class OverlayHostState {
         return requestDismiss(top.id)
     }
 
-    /// `spec`으로 연 확인창이 가장 위에 열려 있으면 닫는다(`onDismissed`가 불린다). 아직 열리길 기다리는 중이면 버린다
-    /// (`onDropped`). 그 확인창을 띄운 화면이 사라질 때 쓴다(Android `dismissDialog`). 열리는 중이거나 다른 overlay가 위에 있으면 false.
+    /// `spec`으로 연 확인창이 가장 위에 열려 있으면 닫는다(`onDismissed`가 불린다). 아직 열리는 중이면 다 열리자마자 닫고,
+    /// 열리길 기다리는 중이면 버린다(`onDropped`). 그 확인창을 띄운 화면이 사라질 때 쓴다(Android `dismissDialog`).
+    /// 다른 overlay가 위에 있거나 이미 닫히는 중이면 false.
     @discardableResult
     func dismissDialog(_ spec: WLDialogSpec) -> Bool {
         if pending?.dialog?.token == spec.token {
@@ -143,6 +146,10 @@ final class OverlayHostState {
             return true
         }
         guard let top = entries.last, case .dialog(let shown) = top.kind, shown.token == spec.token else { return false }
+        if top.phase == .opening {
+            top.closeWhenOpened = true
+            return true
+        }
         return requestDismiss(top.id)
     }
 
@@ -175,7 +182,7 @@ final class OverlayHostState {
     }
 
     func onOpened(_ id: Int) {
-        if let e = entries.first(where: { $0.id == id }), e.phase == .opening { e.phase = .open }
+        if let e = entries.first(where: { $0.id == id }), e.phase == .opening { e.phase = e.closeWhenOpened ? .closing : .open }
     }
 
     func onClosed(_ id: Int) {

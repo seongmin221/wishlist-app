@@ -76,7 +76,7 @@ private struct WebViewContent: View {
                             DetailStatusBlock(
                                 message: String(localized: "webview.load.failed"),
                                 buttonText: String(localized: "detail.retry")
-                            ) { model.retry() }
+                            ) { model.reload() }
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

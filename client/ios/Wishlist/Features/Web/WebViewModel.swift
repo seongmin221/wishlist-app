@@ -5,14 +5,16 @@ import WebKit
 
 /// Lifetime owner of one FWebView route's `WKWebView` (spec §4 수명; Android `WebViewHolder`). Kept per back-stack
 /// entry by `WLEntryOwners.web(_:url:)`, so the page and its history live as long as the entry, including trips to
-/// other apps (D15). `close()` (pop, account change) stops loading and clears the delegates; `deinit` is the backup.
+/// other apps (D15). `close()` (pop, account change) stops loading and turns every later request into a cancel (the
+/// delegates stay: without them WebKit would allow every navigation unchecked); `deinit` is the backup.
 /// After process death the route opens its original URL only (D15).
 ///
 /// It is the web view's navigation and UI delegate:
 /// - `decidePolicyFor` → `decide(url:mainFrame:userGesture:)`: `WebNavigationPolicy` with
 ///   `targetFrame?.isMainFrame ?? true` (nil = a new-window request) and `WebUserGesture` as the user gesture
 ///   (`.linkActivated` and a real tap on the web view within the last second: a script's `a.click()` is also
-///   `.linkActivated`, and a scroll or drag is not a tap).
+///   `.linkActivated`, and a scroll or drag is not a tap). One tap is one decision: the first one made with it
+///   spends it, whatever it opens (a script's next click asks; Android `WebTapBudget`).
 ///   External apps open with `UIApplication.open` (never `canOpenURL`; a false result does nothing, D16); without
 ///   a gesture they go through `ExternalPromptGate` and FWebViewExternal (`presentPrompt`). Every external request,
 ///   from the main frame or an iframe, is cancelled in WebKit, so it never loads into any frame.
@@ -91,16 +93,26 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func goBack() {
+        guard !isClosed else { return }
         if webView.canGoBack { webView.goBack() }
     }
 
     func goForward() {
+        guard !isClosed else { return }
         if webView.canGoForward { webView.goForward() }
     }
 
+    /// 새로고침 and "다시 시도": the page that failed (the web view may still show the previous one), else the page
+    /// shown, else the route URL. The failure cover stays until the new load starts (`mainFrameStarted`).
     func reload() {
         guard !isClosed else { return }
-        if webView.url == nil { webView.load(URLRequest(url: initialURL)) } else { webView.reload() }
+        if let failedURL {
+            webView.load(URLRequest(url: failedURL))
+        } else if webView.url == nil {
+            webView.load(URLRequest(url: initialURL))
+        } else {
+            webView.reload()
+        }
     }
 
     /// A finger tapped the web view (recorded by the screen's non-cancelling recognizer).
@@ -109,20 +121,9 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func stop() {
+        guard !isClosed else { return }
         webView.stopLoading()
         page.loading = false
-    }
-
-    /// "다시 시도": load the page that failed (or reload the one shown).
-    func retry() {
-        guard !isClosed else { return }
-        page.failed = false
-        if let failedURL {
-            self.failedURL = nil
-            webView.load(URLRequest(url: failedURL))
-        } else {
-            reload()
-        }
     }
 
     /// Idempotent. A screen still drawn during its exit keeps the view; it no longer reports or navigates. The
@@ -155,6 +156,8 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
     /// The policy of one frame navigation (main frame or iframe).
     func decide(url: URL?, mainFrame: Bool, userGesture: Bool) -> WKNavigationActionPolicy {
         guard !isClosed, let url else { return .cancel }
+        // One tap, one decision (D16): a page link, an app or a blocked URL alike uses it up.
+        if userGesture { lastTouch = nil }
         let decision = WebNavigationPolicy.decide(
             scheme: url.scheme ?? "",
             mainFrame: mainFrame,
@@ -165,8 +168,6 @@ final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
         case .loadInside: return .allow
         case .block: return .cancel
         case .openExternal:
-            // One tap opens one app: a script clicking more external links after it asks (D16).
-            lastTouch = nil
             requestExternal(url, confirm: false)
             return .cancel
         case .confirmExternal:

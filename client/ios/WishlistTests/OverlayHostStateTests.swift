@@ -234,10 +234,25 @@ final class OverlayHostStateTests: XCTestCase {
                                 onDismissed: { dismissed += 1 }, onConfirm: {})
         let s = OverlayHostState()
         s.showDialog(mine)
-        XCTAssertFalse(s.dismissDialog(mine)) // still opening
         settleOpen(s)
         XCTAssertFalse(s.dismissDialog(spec)) // another spec
         XCTAssertTrue(s.dismissDialog(mine))
+        XCTAssertFalse(s.dismissDialog(mine)) // already closing
+        settleClose(s)
+        XCTAssertTrue(s.entries.isEmpty)
+        XCTAssertEqual(dismissed, 1)
+    }
+
+    func testDismissDialogWhileOpeningClosesItOnceOpen() {
+        var dismissed = 0
+        let mine = WLDialogSpec(title: "t", bullets: [], cancelText: "취소", confirmText: "확인", confirmKind: .primary,
+                                onDismissed: { dismissed += 1 }, onConfirm: {})
+        let s = OverlayHostState()
+        s.showDialog(mine)
+        XCTAssertTrue(s.dismissDialog(mine))
+        XCTAssertEqual(s.entries.map(\.phase), [.opening]) // the opening motion is not reversed
+        settleOpen(s)
+        XCTAssertEqual(s.entries.map(\.phase), [.closing])
         settleClose(s)
         XCTAssertTrue(s.entries.isEmpty)
         XCTAssertEqual(dismissed, 1)
