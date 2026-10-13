@@ -61,7 +61,7 @@ Firebase 인증 owner가 사진 보관함에서 고른 사진을 private 저장�
 
 ## MEDIA-02 업로드 완료 확인
 
-`POST /v1/media/{id}/completion`, body 없음. 응답은 MEDIA-01과 같은 모양이며 READY에서는 `media.expiresAt`·`upload`가 null이고 `display`가 있다. 검증값을 반환한다. 같은 media 재호출은 같은 결과다. 표시 URL 서명이 실패하면 `display`만 null이다. completion은 상품 정보를 바꾸지 않는다.
+`POST /v1/media/{id}/completion`, body 없음. 업로드 만료는 결과를 반영하는 순간의 DB 시각으로 판정한다. 검증하는 사이 기한이 지나면 410이다. 응답은 MEDIA-01과 같은 모양이며 READY에서는 `media.expiresAt`·`upload`가 null이고 `display`가 있다. 검증값을 반환한다. 같은 media 재호출은 같은 결과다. 표시 URL 서명이 실패하면 `display`만 null이다. completion은 상품 정보를 바꾸지 않는다.
 
 `details.reason` 값: `SIZE_MISMATCH`, `CONTENT_TYPE_MISMATCH`, `NOT_JPEG`, `UNSUPPORTED_JPEG`, `METADATA_PRESENT`, `DIMENSIONS_EXCEEDED`, `DIMENSIONS_MISMATCH`, `DECODE_FAILED`. FAILED가 되면 객체를 지우고 PENDING 한도에서 빠진다.
 
@@ -87,13 +87,13 @@ ITEM-01 생성·재전송, ITEM-02, ITEM-03, HOME-01 `actionGroups[].previews`·
 
 - 상품에 READY media가 연결돼 있으면 `product.imageUrl`(미리보기는 `imageUrl`)은 signed GET URL이고 `imageMediaId`는 media id다. 클라이언트는 매 응답 바뀌는 URL 대신 `imageMediaId`를 이미지 cache key로 쓴다.
 - 서명에 실패하거나 응답별 2초 budget을 넘으면 `imageUrl`만 null이고 `imageMediaId`는 그대로다. 외부 이미지 URL로 대신하지 않는다. placeholder를 보여 주고 다음 조회에서 다시 얻는다.
-- cache가 빈 상태의 큰 목록(ITEM-02 `limit=100`)에서는 서명 executor 용량(thread 8 + queue 64)과 2초 budget 때문에 일부 이미지가 첫 응답에서 `imageUrl: null`일 수 있다. 늦게 끝난 서명은 cache에 들어가 다음 조회에서 채워진다. 실제 signBlob 지연을 보고 B11에서 executor 크기를 다시 정한다.
+- 응답 하나는 cache에 없는 이미지를 최대 32개까지 새로 서명한다. 그래서 cache가 빈 상태의 큰 목록(ITEM-02 `limit=100`)에서는 일부 이미지가 첫 응답에서 `imageUrl: null`일 수 있다. 표시 서명 executor(thread 8 + queue 64)와 2초 budget도 같은 결과를 낼 수 있다. 업로드 서명은 별도 executor(thread 2 + queue 16)를 써서 목록 부하에 막히지 않는다. 늦게 끝난 서명은 cache에 들어가 다음 조회에서 채워진다. 실제 signBlob 지연을 보고 B11에서 executor 크기를 다시 정한다.
 - 연결된 media가 없으면 기존처럼 분석으로 얻은 외부 URL이고 `imageMediaId`는 null이다. 외부 URL은 서명·복사하지 않는다.
 
 ## local 개발
 
-`APP_ENV=local`이고 `MEDIA_BUCKET`이 없으면 API가 `MEDIA_LOCAL_DIR`(기본 `build/local-media`)에 저장하고 `/local/media-objects/**` PUT·GET을 연다. URL은 `MEDIA_LOCAL_BASE_URL`(기본 `http://localhost:{PORT}`) 기준이며 Android 에뮬레이터처럼 다른 주소로 접근하면 지정한다. 서명 위조·만료·header 누락 403, 이미 있는 객체 412, 범위 밖 body 413이다. production이나 `MEDIA_BUCKET` 설정에서는 이 경로를 등록하지 않는다.
+`APP_ENV=local`이고 `MEDIA_BUCKET`이 없으면 API가 `MEDIA_LOCAL_DIR`(기본 `build/local-media`)에 저장하고 `/local/media-objects/**` PUT·GET을 연다. URL은 `MEDIA_LOCAL_BASE_URL`(기본 `http://localhost:{PORT}`) 기준이며 Android 에뮬레이터처럼 다른 주소로 접근하면 지정한다. 서명 위조·만료·header 누락 403, 빈 body 400, 이미 있는 객체 412, 5MiB를 넘는 body 413, 서명 뒤 지워진 객체 GET 404, 파일 시스템 오류 503이다. production이나 `MEDIA_BUCKET` 설정에서는 이 경로를 등록하지 않는다.
 
 ## 정리 (OPS-01 `media` 단계)
 
-만료 PENDING, FAILED, 상품(ACTIVE·ARCHIVED, 또는 바뀐 지 24시간이 안 된 DELETED)이 참조하지 않는 READY를 참조가 없어진 때부터 24시간 뒤 지운다. 행은 `DELETED` tombstone으로 남아 멱등 key가 계속 410을 돌려준다. 삭제 실패는 2분 lease 뒤 재시도한다. report에 `mediaDeleted`, `mediaDeleteFailed`를 더했다.
+만료 PENDING, FAILED, 상품(ACTIVE·ARCHIVED, 또는 바뀐 지 24시간이 안 된 DELETED)이 참조하지 않는 READY를 참조가 없어진 때(`unreferenced_since`)부터 24시간 뒤 지운다. `unreferenced_since`는 READY가 될 때 기록되고, 상품에 연결된 동안은 null이라 정리 index에 들어가지 않는다(B7이 연결 때 null, 해제·삭제 때 현재 시각으로 둔다). 행은 `DELETED` tombstone으로 남아 멱등 key가 계속 410을 돌려준다. 삭제 실패는 2분 lease 뒤 재시도한다. report에 `mediaDeleted`, `mediaDeleteFailed`를 더했다.

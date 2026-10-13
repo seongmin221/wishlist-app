@@ -66,16 +66,36 @@
 | upload URL 유효시간을 app 시계로 계산 | 영향이 작아 코드 주석으로 남김 |
 | 요청 로그 query 누출 회귀 테스트 | 미반영. 현재 CallLogging을 설치하지 않아 query가 남지 않는다. B11 로그 점검에서 다시 본다 |
 
+## PR 리뷰 반영 (2026-10-13)
+
+PR #19 리뷰의 지적 10건을 코드와 대조했고, 모두 사실이었다. 테스트를 먼저 바꾸거나 더하고, 새 API는 기존 동작을 유지한 껍데기만 만들었다. 그 상태에서 48개 중 16개가 실패(RED)하는 것을 확인한 뒤 구현했다. 읽기를 gate 밖으로 뺀 수정은, 코드를 잠시 되돌려 테스트가 실패하는지도 확인했다.
+
+| 지적 | 처리 |
+| --- | --- |
+| 연결된 READY가 `coalesce(released_at, ready_at)` 조건에 영구히 걸려 정리 때마다 전부 다시 평가됨 | `released_at` 대신 `unreferenced_since`를 쓴다. READY 때 기록하고, 연결 중 null, 해제 때 기록한다. partial index를 `where status='READY' and unreferenced_since is not null`로 바꿔 연결된 행이 index에 없다. EXPLAIN ANALYZE로 연결 200개 + 후보 1개에서 index가 1행만 내는지 확인한다. V18은 아직 merge·배포되지 않아 같은 PR에서 고쳤다 |
+| cold 목록의 표시 서명이 공용 pool을 채워 upload intent가 503 | 업로드 executor(thread 2·queue 16)와 표시 executor(thread 8·queue 64)를 분리(`buildMediaWiring`), 응답당 새 서명 32개 상한 |
+| 저장소 read 동안 decode 허가를 쥠 | read를 gate 밖으로, gate는 verify만 |
+| 반영 transaction에서 만료를 다시 보지 않음 | 잠근 행의 `expired`로 410 판정(행은 PENDING 유지) |
+| local acceptUpload IO가 예외 매핑 밖 | 전체를 `MediaStorageException`으로 변환, route 503 |
+| 빈 PUT이 413 | `EMPTY` → 400(GCS와 같게) |
+| 확인과 읽기 사이 삭제 시 500 | `readSigned`가 `Missing`을 돌려주고 route 404 |
+| 정리 조건 SQL 두 벌·상수 미사용 | 상태별 조건 목록 하나에서 발견 쿼리와 lease 재확인을 만들고 `CLEANUP_GRACE`·`DELETE_LEASE` 사용 |
+| ITEM-02·HOME-02 조회가 IO 블록 두 번 | 한 블록으로 합침 |
+| 전체 경로 타입 표기 | import로 정리 |
+
+**테스트 환경:** 첫 전체 회귀는 1시간 53분 걸렸고, 502개 중 3개가 실패했다. 실패한 테스트는 `MediaUploadFlowTest`, `LocalMediaRoutesTest`, 그리고 B5의 기존 `OutboxDispatcherTest`다. 세 테스트 모두 DB 시각과 host 시각을 비교한다. Podman VM 시계가 host보다 약 1시간 38분 늦었던 것이 원인이다(절전 뒤 미동기화로 보인다). VM 시계를 맞추자 세 테스트가 단독 실행에서 통과했다. 결과는 아래 최종 회귀에 기록한다.
+
 ## 검증
 
 - 전체 회귀(`a773d2c`, 리뷰 반영 전): **494 tests, 492 통과, 2 opt-in skip**(PlaywrightRealBrowser, RealUrlPilot), 28분 37초. 실제 PostgreSQL Testcontainers 사용.
 - 리뷰 반영(`e73a82f`) 대상 테스트: media·MEDIA route·local route·전체 흐름 46 통과.
 - 최종 전체 회귀(`e73a82f`): **495 tests, 493 통과, 2 opt-in skip**, 26분 35초.
+- PR 리뷰 반영 뒤 전체 회귀(VM 시계 동기화 후): **502 tests, 500 통과, 2 opt-in skip**, 15분 34초.
 - 그보다 앞선 Task 7 시점의 전체 회귀(484개 중 1개 실패)는 같은 build 디렉터리에서 compile을 동시에 실행해 간섭이 있었을 수 있다. 실패 원인(`WishlistReadIndexTest`)은 위 결정대로 고쳤다.
 
 ## B7·B10·B11 인계
 
-- **B7:** ITEM-04·07 연결은 owner → item → media를 `for update`로 잠근다(필수). 이전 media와 새 media는 id 순서로 잠근다. READY인지 확인하고, 연결한 media 행의 `updated_at`을 갱신하고, 이전 media의 `released_at`을 기록하고, `image_source = 'USER'`로 둔다. ITEM-05 삭제 때는 참조를 해제하고 `released_at`과 item `updated_at`을 갱신한다.
+- **B7:** ITEM-04·07 연결은 owner → item → media를 `for update`로 잠근다(필수). 이전 media와 새 media는 id 순서로 잠근다. READY인지 확인하고, 연결한 media는 `unreferenced_since = null`과 `updated_at`을 갱신하고, 이전 media는 `unreferenced_since = now`로 두고, `image_source = 'USER'`로 둔다. ITEM-05 삭제 때는 참조를 해제하고 `unreferenced_since = now`와 item `updated_at`을 갱신한다. 연결을 해제하면서 `unreferenced_since`를 빠뜨리면 그 사진은 정리되지 않고 남는다(삭제되지는 않는 안전한 쪽의 실패).
 - **B10:** archive snapshot 참조를 `MediaReferences.referenced`에 추가한다. 외부 이미지 URL은 snapshot에 복사한다.
 - **B11:** 실제 bucket을 만들고 앱 직접 PUT에 CORS가 필요 없는지 확인한다. 아울러 다음을 확인한다.
   - signBlob 권한(`iam.serviceAccounts.signBlob`)

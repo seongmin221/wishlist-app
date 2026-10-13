@@ -2,7 +2,9 @@
 
 > 2026-10-12 · **spec 승인(2026-10-13) · 구현·독립 리뷰 반영 완료** · 제품·운영 정책 확정
 >
-> 구현 중 변경: local 생성 전용 게시는 hard link, APP0는 썸네일 없는 JFIF·APP14는 12byte Adobe만 허용, 정리 발견은 상태별 쿼리, 파서는 알 수 없는 필드를 fields에 넣고 큰 정수를 MEDIA_TOO_LARGE로 본다. 차이는 [구현 이력](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md)에 있다.
+> 구현 중 변경: local 생성 전용 게시는 hard link, APP0는 썸네일 없는 JFIF·APP14는 12byte Adobe만 허용, 정리 발견은 상태별 쿼리, 파서는 알 수 없는 필드를 fields에 넣고 큰 정수를 MEDIA_TOO_LARGE로 본다.
+>
+> PR 리뷰 반영(2026-10-13): `released_at` 대신 `unreferenced_since`(READY 때 기록, 연결 중 null, 해제 때 기록)로 연결된 행을 정리 index에서 뺀다. 업로드 서명과 표시 서명의 executor를 나누고 목록 응답 하나가 새로 시작하는 서명을 32개로 제한한다. 저장소 read는 decode gate 밖에서 하고, 업로드 만료는 결과를 반영하는 transaction에서 다시 판정한다. 아래 본문은 승인 당시 설계이며 차이는 [구현 이력](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md)에 있다.
 
 ## 목표와 범위
 
@@ -326,6 +328,6 @@ API 역할의 `module()`은 항상 Firebase를 초기화하므로 테스트에�
 
 | 묶음 | 연결할 부분 |
 | --- | --- |
-| B7 | ITEM-04·07 연결은 owner → item → media `for update` 잠금(필수), 이전·새 media 두 행은 id 순서로 잠금, READY 확인, 연결한 media 행의 `updated_at` 갱신, 이전 media의 `released_at` 기록, `image_source = 'USER'`. ITEM-05 삭제 때 참조 해제·`released_at`·item `updated_at` 갱신(7절 방어 조건의 전제) |
+| B7 | ITEM-04·07 연결은 owner → item → media `for update` 잠금(필수), 이전·새 media 두 행은 id 순서로 잠금, READY 확인, 연결한 media의 `unreferenced_since = null`·`updated_at` 갱신, 이전 media의 `unreferenced_since = now`, `image_source = 'USER'`. ITEM-05 삭제 때 참조 해제·`unreferenced_since = now`·item `updated_at` 갱신 (PR 리뷰 반영으로 `released_at`에서 바뀜) |
 | B10 | archive snapshot의 media 참조를 `MediaReferences`에 추가, 외부 URL snapshot 복사 |
 | B11 | 실제 bucket·CORS 불필요 확인(앱 직접 PUT), signBlob 권한(`iam.serviceAccounts.signBlob`), URL 만료, 생성 전용 412, `x-goog-content-length-range` 강제 여부, signBlob 지연과 서명 executor 크기, 로그 누출 |

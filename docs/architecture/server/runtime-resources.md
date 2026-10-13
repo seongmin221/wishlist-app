@@ -81,8 +81,8 @@ maintenance는 outbox 발행·RUNNING 복구·PENDING 복구·budget을 순서�
 
 | 역할 | 저장소 사용 | 소유 자원 | env |
 | --- | --- | --- | --- |
-| api | intent 서명, completion stat·read·delete, 표시 URL 서명 | GCS `Storage` client(GCS일 때), `MediaSigningExecutor`(thread 8·queue 64·대기 2초) | production은 `MEDIA_BUCKET` 필수. local은 없으면 `MEDIA_LOCAL_DIR`(기본 `build/local-media`)·`MEDIA_LOCAL_BASE_URL`(기본 `http://localhost:{PORT}`) |
+| api | intent 서명, completion stat·read·delete, 표시 URL 서명 | GCS `Storage` client(GCS일 때), 업로드 서명 executor(thread 2·queue 16)와 표시 서명 executor(thread 8·queue 64), 대기 2초 | production은 `MEDIA_BUCKET` 필수. local은 없으면 `MEDIA_LOCAL_DIR`(기본 `build/local-media`)·`MEDIA_LOCAL_BASE_URL`(기본 `http://localhost:{PORT}`) |
 | maintenance | 정리 delete | GCS `Storage` client(GCS일 때) | api와 같음 |
 | worker 두 역할 | 없음 | 없음 | 없음 |
 
-GCS RPC(stat·read·delete)는 시도 1회·총 5초이고 read는 5MiB + 1 byte까지만 읽는다. Cloud Run의 서명은 credential이 부르는 IAM signBlob이라 client timeout이 적용되지 않는다. 그래서 모든 서명을 공용 executor에서 실행하고 호출자는 최대 2초만 기다린다. 늦게 끝난 표시 URL은 cache에 들어가고, 같은 key의 표시 서명은 동시에 하나만 실행한다. 저장소 호출 중에는 DB connection을 쥐지 않는다. `module()`의 `mediaStorage` 인자는 테스트 주입점이다. API `module()`은 Firebase를 초기화하므로 route 테스트는 `apiRoutes(…, media)`를 직접 등록한다.
+GCS RPC(stat·read·delete)는 시도 1회·총 5초이고 read는 5MiB + 1 byte까지만 읽는다. Cloud Run의 서명은 credential이 부르는 IAM signBlob이라 client timeout이 적용되지 않는다. 그래서 서명을 크기가 정해진 executor에서 실행하고 호출자는 최대 2초만 기다린다. 업로드와 표시 executor를 나눠, cold 목록의 표시 서명이 업로드 intent를 503으로 만들지 않게 한다. 목록 응답 하나는 새 서명을 32개까지만 시작한다. 늦게 끝난 표시 URL은 cache에 들어가고, 같은 key의 표시 서명은 동시에 하나만 실행한다. 저장소 호출 중에는 DB connection을 쥐지 않는다. `module()`의 `mediaStorage` 인자는 테스트 주입점이다. API `module()`은 Firebase를 초기화하므로 route 테스트는 `apiRoutes(…, media)`를 직접 등록한다.
