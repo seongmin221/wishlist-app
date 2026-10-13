@@ -85,12 +85,29 @@ PR #19 리뷰의 지적 10건을 코드와 대조했고, 모두 사실이었다.
 
 **테스트 환경:** 첫 전체 회귀는 1시간 53분 걸렸고, 502개 중 3개가 실패했다. 실패한 테스트는 `MediaUploadFlowTest`, `LocalMediaRoutesTest`, 그리고 B5의 기존 `OutboxDispatcherTest`다. 세 테스트 모두 DB 시각과 host 시각을 비교한다. Podman VM 시계가 host보다 약 1시간 38분 늦었던 것이 원인이다(절전 뒤 미동기화로 보인다). VM 시계를 맞추자 세 테스트가 단독 실행에서 통과했다. 결과는 아래 최종 회귀에 기록한다.
 
+## PR 2차 리뷰 반영 (2026-10-13)
+
+지적 9건을 코드와 대조했고, 모두 사실이었다. 테스트를 먼저 바꾸거나 더했고, 새 API는 기존 동작을 유지한 껍데기만 만들었다. 그 상태에서 의도한 RED 5건을 확인했다(local GET 503, 오류 매핑, 큰 정수, read 한도, read 허가). 같은 실행에서 2건이 더 실패했는데, 둘 다 container 시작 실패(`ContainerLaunchException`)라 RED로 세지 않았다.
+
+| 지적 | 처리 |
+| --- | --- |
+| read를 gate 밖으로 빼면서 동시 completion의 메모리가 무제한 | decode 허가(4)와 별도로 읽기 허가(8)를 둔다. 가득 차면 503 `MEDIA_BUSY`이고, 메모리 상한은 약 40MiB다. 느린 bucket은 읽기 허가만 쥐므로 decode를 막지 않는다 |
+| GCS read가 요청마다 약 5MB buffer를 할당하고 복사 | stat 크기를 read 상한으로 넘긴다. buffer를 정확한 크기로 잡고, 1byte를 더 읽어 초과 여부를 확인한다. 크기가 맞으면 복사하지 않는다 |
+| local 기본 URL이 실기기에서 동작하지 않음, env 설명 없음 | `server/.env.example`에 `MEDIA_BUCKET`·`MEDIA_LOCAL_DIR`·`MEDIA_LOCAL_BASE_URL`과 LAN·에뮬레이터 주소 예를 추가하고 계약 문서에도 적었다 |
+| local GET이 저장소 오류 시 500 | 503 |
+| 18자리를 넘는 정수가 형식 오류 | 자릿수 제한 없이 받는다. Int 범위를 넘으면 포화시켜 `MEDIA_TOO_LARGE`·`MEDIA_DIMENSIONS_EXCEEDED`가 되고, 음수는 형식 오류다 |
+| 목록에 없는 오류 코드가 기본값 409 | 모든 코드를 명시한 `mediaErrorStatus`로 바꿨다. 목록에 없는 코드는 error log를 남기고 500이다. 테스트가 전체 목록을 고정한다 |
+| 정리 쿼리의 `?` 개수가 5로 고정(B10 분기 추가 시 깨짐) | `DiscoveryQuery.limits` = 분기 수 + 1. 테스트가 placeholder 수와 일치하는지 확인한다 |
+| insert 뒤 재조회 | `insert … returning` |
+| 파서와 서비스가 `violation()`을 두 번 실행 | 파서는 형식만 보고, 값 규칙과 우선순위는 서비스(`IntentRequest.violation`)에서만 적용한다 |
+
 ## 검증
 
 - 전체 회귀(`a773d2c`, 리뷰 반영 전): **494 tests, 492 통과, 2 opt-in skip**(PlaywrightRealBrowser, RealUrlPilot), 28분 37초. 실제 PostgreSQL Testcontainers 사용.
 - 리뷰 반영(`e73a82f`) 대상 테스트: media·MEDIA route·local route·전체 흐름 46 통과.
 - 최종 전체 회귀(`e73a82f`): **495 tests, 493 통과, 2 opt-in skip**, 26분 35초.
 - PR 리뷰 반영 뒤 전체 회귀(VM 시계 동기화 후): **502 tests, 500 통과, 2 opt-in skip**, 15분 34초.
+- PR 2차 리뷰 반영 뒤 전체 회귀: **508 tests, 506 통과, 2 opt-in skip**, 41분 11초. Podman VM이 불안정해 오래 걸렸다. 대상 테스트 실행 중 container 시작 실패가 났던 `MediaIntentServiceTest`는 단독으로 다시 돌려 통과했다.
 - 그보다 앞선 Task 7 시점의 전체 회귀(484개 중 1개 실패)는 같은 build 디렉터리에서 compile을 동시에 실행해 간섭이 있었을 수 있다. 실패 원인(`WishlistReadIndexTest`)은 위 결정대로 고쳤다.
 
 ## B7·B10·B11 인계

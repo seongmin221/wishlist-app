@@ -35,7 +35,7 @@ Firebase 인증 owner가 사진 보관함에서 고른 사진을 private 저장�
 { "contentType": "image/jpeg", "byteSize": 812345, "width": 2048, "height": 1536 }
 ```
 
-`byteSize`는 인코딩한 실제 byte 수, `width`·`height`는 회전을 적용한 뒤의 치수다. completion이 실제 객체와 정확히 비교한다. 알 수 없는 필드는 `INVALID_MEDIA_REQUEST`이고 `details.fields`에 그 이름을 넣는다. 정수는 18자리까지 받으며, 5MiB를 넘는 큰 값은 `MEDIA_TOO_LARGE`다.
+`byteSize`는 인코딩한 실제 byte 수, `width`·`height`는 회전을 적용한 뒤의 치수다. completion이 실제 객체와 정확히 비교한다. 알 수 없는 필드는 `INVALID_MEDIA_REQUEST`이고 `details.fields`에 그 이름을 넣는다. 정수는 자릿수와 관계없이 받고, 범위를 넘는 큰 값은 `MEDIA_TOO_LARGE`나 `MEDIA_DIMENSIONS_EXCEEDED`가 된다.
 
 **응답 201**(새 intent) / **200 + `Idempotency-Replayed: true`**(재전송). `Location`은 없다.
 
@@ -79,7 +79,7 @@ Firebase 인증 owner가 사진 보관함에서 고른 사진을 private 저장�
 | 422 | `MEDIA_INVALID_IMAGE` + `details.reason` | 다시 인코딩해 새 key로 |
 | 429 | `MEDIA_UPLOAD_LIMIT_REACHED` + `Retry-After` | 기다렸다 재시도 |
 | 503 | `MEDIA_STORAGE_UNAVAILABLE` | **같은 key**로 재시도(새 key는 PENDING을 하나 더 차지) |
-| 503 | `MEDIA_BUSY` + `Retry-After: 1` | 잠시 뒤 completion 재시도 |
+| 503 | `MEDIA_BUSY` + `Retry-After: 1` | 잠시 뒤 completion 재시도. 동시 객체 읽기(process당 8개)나 decode(4개)가 가득 찼다 |
 
 ## 표시 URL
 
@@ -92,7 +92,7 @@ ITEM-01 생성·재전송, ITEM-02, ITEM-03, HOME-01 `actionGroups[].previews`·
 
 ## local 개발
 
-`APP_ENV=local`이고 `MEDIA_BUCKET`이 없으면 API가 `MEDIA_LOCAL_DIR`(기본 `build/local-media`)에 저장하고 `/local/media-objects/**` PUT·GET을 연다. URL은 `MEDIA_LOCAL_BASE_URL`(기본 `http://localhost:{PORT}`) 기준이며 Android 에뮬레이터처럼 다른 주소로 접근하면 지정한다. 서명 위조·만료·header 누락 403, 빈 body 400, 이미 있는 객체 412, 5MiB를 넘는 body 413, 서명 뒤 지워진 객체 GET 404, 파일 시스템 오류 503이다. production이나 `MEDIA_BUCKET` 설정에서는 이 경로를 등록하지 않는다.
+`APP_ENV=local`이고 `MEDIA_BUCKET`이 없으면 API가 `MEDIA_LOCAL_DIR`(기본 `build/local-media`)에 저장하고 `/local/media-objects/**` PUT·GET을 연다. URL은 `MEDIA_LOCAL_BASE_URL`(기본 `http://localhost:{PORT}`) 기준이다. 실기기와 에뮬레이터는 host의 localhost에 닿지 않으므로 지정해야 한다. 실기기는 host의 LAN 주소(예: `http://192.168.0.10:8080`), Android 에뮬레이터는 `http://10.0.2.2:8080`이다. 설정 예는 `server/.env.example`에 있다. 서명 위조·만료·header 누락 403, 빈 body 400, 이미 있는 객체 412, 5MiB를 넘는 body 413, 서명 뒤 지워진 객체 GET 404, PUT·GET의 파일 시스템 오류 503이다. production이나 `MEDIA_BUCKET` 설정에서는 이 경로를 등록하지 않는다.
 
 ## 정리 (OPS-01 `media` 단계)
 
