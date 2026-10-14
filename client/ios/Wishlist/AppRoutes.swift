@@ -13,15 +13,23 @@ enum AppDestination: Hashable {
     case local(String)
     /// C4 PR B original-link web view (FWebView): same policy as `item`. Only a validated `WebPageURL`.
     case web(WebPageURL)
+    /// C5 one category's item list (FCategoryList*): tab bar stays, horizontal slide (both screens show the
+    /// tab bar, so it does not move), closed when the account is left.
+    case categoryList(CategoryListTarget)
 
     var accountScoped: Bool {
         switch self {
         case .settings, .login: false
-        case .item, .local, .web: true
+        case .item, .local, .web, .categoryList: true
         }
     }
 
     var route: WLRoute {
-        WLRoute(destination: AnyHashable(self), showsTabBar: false, pushStyle: .slide, accountScoped: accountScoped)
+        WLRoute(destination: AnyHashable(self), showsTabBar: showsTabBar, pushStyle: .slide, accountScoped: accountScoped)
+    }
+
+    var showsTabBar: Bool {
+        if case .categoryList = self { return true }
+        return false
     }
 }

@@ -78,20 +78,6 @@ struct DemoProduct: Hashable {
     var fullName: String { "\(brand) \(name)" }
 }
 
-struct DemoChip: Hashable {
-    let name: String
-    let count: Int
-}
-
-struct DemoTopCategory: Hashable {
-    let name: String
-    let types: [DemoChip]
-
-    /// 레일 글자: 가운뎃점 뒤에 zero-width space를 넣어 어절·가운뎃점 뒤에서만 줄을 바꾼다(보드 `label`과 같다).
-    /// UILabel은 가운뎃점 앞에서도 끊으므로("취미·문화 / ·컬렉터블") 앞에는 word joiner를 넣어 막는다.
-    var railLabel: String { name.replacingOccurrences(of: "·", with: "\u{2060}·\u{200B}") }
-}
-
 enum DemoContent {
     /// 넘침 확인용으로 가장 긴 목적 이름(보드 예시보다 길게). 도현 28·20 줄바꿈과 큰 글자 크기를 본다. 홈 데모에서만 쓴다.
     static let longestPurposeName = "주말 캠핑용 가벼운 의자와 테이블 세트 고르기"
@@ -159,42 +145,8 @@ enum DemoContent {
         headphones[5],
     ]
 
-    /// 보드 FCategoryHomeL `home` 8개 상위와 세부 유형(합계 상품 69개).
-    static let categories: [DemoTopCategory] = [
-        DemoTopCategory(name: "패션·잡화", types: [
-            DemoChip(name: "신발", count: 5), DemoChip(name: "아우터", count: 3), DemoChip(name: "가방", count: 3),
-            DemoChip(name: "상의", count: 2), DemoChip(name: "패션 소품", count: 2),
-        ]),
-        DemoTopCategory(name: "뷰티·퍼스널케어", types: [DemoChip(name: "스킨케어", count: 2), DemoChip(name: "향수", count: 2)]),
-        DemoTopCategory(name: "디지털·IT", types: [
-            DemoChip(name: "헤드폰", count: 8), DemoChip(name: "키보드", count: 3), DemoChip(name: "카메라·액션캠", count: 3),
-            DemoChip(name: "모니터", count: 2), DemoChip(name: "마우스·트랙패드", count: 2), DemoChip(name: "웨어러블 기기", count: 2),
-            DemoChip(name: "이어폰", count: 1), DemoChip(name: "태블릿", count: 1), DemoChip(name: "오디오 케이블·DAC", count: 2),
-        ]),
-        DemoTopCategory(name: "가구·인테리어", types: [
-            DemoChip(name: "조명", count: 3), DemoChip(name: "의자", count: 2), DemoChip(name: "책상·테이블", count: 2),
-        ]),
-        DemoTopCategory(name: "생활·주방·가전", types: [
-            DemoChip(name: "주방 가전", count: 3), DemoChip(name: "공기·온습도 관리", count: 2), DemoChip(name: "조리 도구", count: 1),
-        ]),
-        DemoTopCategory(name: "스포츠·아웃도어·여행", types: [
-            DemoChip(name: "캠핑 용품", count: 4), DemoChip(name: "러닝 용품", count: 2), DemoChip(name: "여행 가방·캐리어", count: 2),
-            DemoChip(name: "백패킹 소품", count: 1),
-        ]),
-        DemoTopCategory(name: "취미·문화·컬렉터블", types: [
-            DemoChip(name: "피규어·컬렉터블", count: 2), DemoChip(name: "보드게임·퍼즐", count: 1), DemoChip(name: "레고", count: 0),
-        ]),
-        DemoTopCategory(name: "건강·웰빙", types: [DemoChip(name: "수면·회복 용품", count: 1)]),
-    ]
-
-    static var productCount: Int { categories.flatMap(\.types).map(\.count).reduce(0, +) }
-
     static func product(_ id: String) -> DemoProduct? {
         (headphones + candidates + homeProducts).first { $0.id == id }
-    }
-
-    static func chip(top: String, name: String) -> DemoChip? {
-        categories.first { $0.name == top }?.types.first { $0.name == name }
     }
 
     static func purpose(_ id: String) -> DemoPurpose? { (purposes + [longestPurpose]).first { $0.id == id } }
@@ -206,13 +158,11 @@ enum DemoContent {
 /// 데모 목적지. 종류마다 탭 바·이동 방식이 다르다(보드: 세부 유형 목록·목적 상세는 탭 바 보임, 상품 상세는 숨김).
 enum DemoDestination: Hashable {
     case product(String)
-    case categoryList(top: String, chip: String)
     case purpose(String)
 
     var route: WLRoute {
         switch self {
         case .product: WLRoute(destination: self, showsTabBar: false, pushStyle: .photo)
-        case .categoryList: WLRoute(destination: self, showsTabBar: true, pushStyle: .slide)
         case .purpose: WLRoute(destination: self, showsTabBar: true, pushStyle: .slide)
         }
     }
@@ -517,21 +467,6 @@ func demoMenuItems(_ overlay: OverlayHostState) -> [WLMenuItem] {
         WLMenuItem(text: "편집") {},
         WLMenuItem(text: "삭제") { overlay.showDialog(demoDeleteDialog()) },
     ]
-}
-
-/// 사진 없는 칩 → 세부 유형 목록(가로 밀기).
-struct DemoListChip: View {
-    let top: String
-    let chip: DemoChip
-    let sourceKey: String
-
-    @Environment(\.wlNavigator) private var nav
-
-    var body: some View {
-        WLChip(text: chip.name, count: chip.count) {
-            nav.push(DemoDestination.categoryList(top: top, chip: chip.name).route, sourceKey: sourceKey)
-        }
-    }
 }
 
 /// 2열 사진 카드(보드 FCategoryListL·FPurposeDetailL): 사진(모서리 20) + 8 + 이름 14/1.35 · 4 · 가격 18/700 · 4 · 메타 12/500.
