@@ -4,7 +4,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-/** How long ago something was saved, for list rows (C3-D5 j). */
+/** How long ago something happened: home rows (C3-D5 j), list cards and the detail price note (C5 D15). */
 sealed interface RelativeTime {
     /** Under a minute, or a time in the future (the clock went backwards). */
     data object JustNow : RelativeTime
@@ -18,8 +18,14 @@ sealed interface RelativeTime {
     /** The previous calendar date. */
     data object Yesterday : RelativeTime
 
-    /** Two or more calendar dates ago. */
+    /** Two to six calendar dates ago. */
     data class Days(val value: Int) : RelativeTime
+
+    /** Seven to 27 calendar dates ago, in whole weeks (C5 D15). */
+    data class Weeks(val value: Int) : RelativeTime
+
+    /** 28 or more calendar dates ago: the local date. [year] is set only when it differs from now's (C5 D15). */
+    data class OnDate(val year: Int?, val month: Int, val day: Int) : RelativeTime
 }
 
 /** When an item was saved, for the detail screen; the platform picks the wording. */
@@ -50,8 +56,14 @@ object DisplayFormat {
     fun relative(from: Instant, now: Instant, utcOffsetSeconds: (Instant) -> Int): RelativeTime {
         val elapsed = now - from
         if (elapsed < 1.minutes) return RelativeTime.JustNow
-        val days = (localDay(now, utcOffsetSeconds(now)) - localDay(from, utcOffsetSeconds(from))).toInt()
+        val nowDay = localDay(now, utcOffsetSeconds(now))
+        val fromDay = localDay(from, utcOffsetSeconds(from))
+        val days = (nowDay - fromDay).toInt()
         return when {
+            days >= 28 -> civil(fromDay).let { (year, month, day) ->
+                RelativeTime.OnDate(if (year == civil(nowDay).first) null else year, month, day)
+            }
+            days >= 7 -> RelativeTime.Weeks(days / 7)
             days >= 2 -> RelativeTime.Days(days)
             days == 1 -> RelativeTime.Yesterday
             elapsed < 1.hours -> RelativeTime.Minutes(elapsed.inWholeMinutes.toInt())
