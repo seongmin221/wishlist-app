@@ -52,6 +52,7 @@ class DisplayFormatTest {
 
     @Test fun twoOrMoreCalendarDaysIsDays() {
         assertEquals(RelativeTime.Days(2), DisplayFormat.relative(noonKst - 2.days, noonKst, kst))
+        assertEquals(RelativeTime.Days(6), DisplayFormat.relative(noonKst - 6.days, noonKst, kst))
     }
 
     @Test fun futureTimeFromAClockGoingBackwardsIsJustNow() {
@@ -101,5 +102,26 @@ class DisplayFormatTest {
         val at = Instant.parse("2026-10-07T03:00:00Z")
         assertEquals(SavedLabel.OnDate(null, 10, 6), DisplayFormat.saved(at, at + 25.hours, minusEight))
         assertEquals(SavedLabel.Today, DisplayFormat.saved(at, at + 2.hours, minusEight))
+    }
+
+    // D15: 7~27 calendar days are weeks, 28 or more a date (year only when it differs).
+    @Test fun sevenDaysIsOneWeek() {
+        assertEquals(RelativeTime.Weeks(1), DisplayFormat.relative(noonKst - 7.days, noonKst, kst))
+        assertEquals(RelativeTime.Weeks(1), DisplayFormat.relative(noonKst - 13.days, noonKst, kst))
+        assertEquals(RelativeTime.Weeks(2), DisplayFormat.relative(noonKst - 14.days, noonKst, kst))
+        assertEquals(RelativeTime.Weeks(3), DisplayFormat.relative(noonKst - 27.days, noonKst, kst))
+    }
+
+    @Test fun twentyEightDaysOrMoreIsADate() {
+        // 2026-10-07 - 28 days = 2026-09-09 (KST).
+        assertEquals(RelativeTime.OnDate(null, 9, 9), DisplayFormat.relative(noonKst - 28.days, noonKst, kst))
+        assertEquals(RelativeTime.OnDate(2025, 10, 7), DisplayFormat.relative(noonKst - 365.days, noonKst, kst))
+    }
+
+    @Test fun weekBoundaryUsesCalendarDates() {
+        // 6 days and 23 hours earlier but 7 local dates before (23:30 → 00:10 seven days later).
+        val from = Instant.parse("2026-09-30T14:30:00Z") // 2026-09-30 23:30 KST
+        val now = Instant.parse("2026-10-06T15:10:00Z") // 2026-10-07 00:10 KST
+        assertEquals(RelativeTime.Weeks(1), DisplayFormat.relative(from, now, kst))
     }
 }
