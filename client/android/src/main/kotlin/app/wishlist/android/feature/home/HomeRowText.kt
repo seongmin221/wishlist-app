@@ -24,6 +24,9 @@ object HomeRowText {
         is RelativeTime.Hours -> ResText(R.string.time_hours, time.value)
         RelativeTime.Yesterday -> ResText(R.string.time_yesterday)
         is RelativeTime.Days -> ResText(R.string.time_days, time.value)
+        is RelativeTime.Weeks -> ResText(R.string.time_weeks, time.value)
+        is RelativeTime.OnDate -> time.year?.let { ResText(R.string.time_date_year, args = listOf(it, time.month, time.day)) }
+            ?: ResText(R.string.time_date, args = listOf(time.month, time.day))
     }
 
     /** The row's second line. Only the signed-out row (`%1$s 저장 · 이 기기에만 있어요`) takes the saved time. */

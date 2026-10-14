@@ -14,6 +14,9 @@ class HomeRowTextTest {
         assertEquals(ResText(R.string.time_hours, 3), HomeRowText.time(RelativeTime.Hours(3)))
         assertEquals(ResText(R.string.time_yesterday), HomeRowText.time(RelativeTime.Yesterday))
         assertEquals(ResText(R.string.time_days, 2), HomeRowText.time(RelativeTime.Days(2)))
+        assertEquals(ResText(R.string.time_weeks, 3), HomeRowText.time(RelativeTime.Weeks(3)))
+        assertEquals(ResText(R.string.time_date, args = listOf(9, 9)), HomeRowText.time(RelativeTime.OnDate(null, 9, 9)))
+        assertEquals(ResText(R.string.time_date_year, args = listOf(2025, 10, 7)), HomeRowText.time(RelativeTime.OnDate(2025, 10, 7)))
     }
 
     @Test fun every_row_status_has_a_meta_key() {
