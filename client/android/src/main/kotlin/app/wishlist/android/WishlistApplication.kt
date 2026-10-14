@@ -41,6 +41,7 @@ class WishlistApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        VariantStartup.onApplicationCreated(this)
         runtime = SharedRuntimeFactory.create(this, AppRuntimeConfig.bindings(BuildConfig.DEBUG), AppRuntimeConfig.remote)
         VariantStartup.onRuntimeAssembled(runtime)
         val submissions = runtime.submissions()

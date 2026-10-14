@@ -10,5 +10,8 @@ internal object VariantStartup {
     fun onRuntimeAssembled(runtime: SharedRuntime) = Unit
 
     @Suppress("UNUSED_PARAMETER")
+    fun onApplicationCreated(context: android.content.Context) = Unit
+
+    @Suppress("UNUSED_PARAMETER")
     fun onMainLaunch(runtime: SharedRuntime, intent: Intent, scope: CoroutineScope) = Unit
 }
