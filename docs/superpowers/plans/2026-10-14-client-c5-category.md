@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 상태: **초안 v1 (2026-10-14, 사용자 검토 대기).**
+- 상태: **확정 v1 (2026-10-14).** 실행 방식: 직접 진행(필요하면 묶음 3·4를 subagent로 병렬). **Android 기기 확인은 사용자 지시(2026-10-14)로 당분간 에뮬레이터 `Medium_Phone_API_36.0`(en-US)로 한다.** 실기기 Flip6 확인은 연결되면 PR 전에 다시 한다.
 - 작업 공간 `/Users/user/orca/workspaces/wishlist-app/client-c5-category`, 브랜치 `client/c5-category`(PR A, base `develop`). PR B는 Task 20 시작 때 `client/c5-category` 위에 `client/c5-photo-transition`을 만들고 base를 A로 연다. A merge 뒤 `origin/develop`으로 rebase하고 base를 `develop`으로 바꾼다(D4). 시작 HEAD `3b13232`(origin/develop `e2653f6` + docs 2커밋). merge는 사용자 승인 없이 하지 않는다. 다른 워크스페이스는 수정·삭제하지 않는다. 이슈 #18(웹뷰 순수 로직 shared 이전)은 건드리지 않는다.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. 새 의존성 없음(multiplatform-settings 대신 `app_state`, Nuke 없음). 공유 코드에 Compose/SwiftUI 의존성 없음.
 - 서버 mutation은 CAT-03·CAT-04만. ITEM-04(상품 카테고리 저장)·CAT-05/06(삭제)은 호출하지 않는다(D1·D7).
@@ -38,7 +38,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 - **KMP_TEST** = 위 두 task. RED는 `:shared:testAndroidHostTest --tests "*<Class>*"`, GREEN 때 두 runtime 전체를 실행해 `shared/build/test-results/*/*.xml`에서 test 수·fail·skip을 센다.
 - **ANDROID_CHECK** = `:android:testDebugUnitTest :android:testReleaseUnitTest :android:assembleDebug :android:assembleRelease :android:lintDebug`.
 - **IOS_TEST** = `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true` 후 `xcodebuild test -project client/ios/Wishlist.xcodeproj -scheme Wishlist -destination 'platform=iOS Simulator,id=<udid>' -derivedDataPath client/ios/DerivedData CODE_SIGNING_ALLOWED=NO`. 시뮬레이터 iPhone 17 Pro(실행 때 `xcrun simctl list devices`로 udid 확인).
-- **ANDROID_DEVICE** = USB 실기기 Galaxy Z Flip6 `adb -s R3CX70ABZHP`(에뮬레이터 아님). 조작 전 `adb -s R3CX70ABZHP shell dumpsys window | grep mCurrentFocus`로 `app.wishlist.android` 포커스를 확인하고 다른 앱은 건드리지 않는다. 화면이 둘이라 `adb -s R3CX70ABZHP shell dumpsys SurfaceFlinger --display-id`로 id를 확인하고 `adb -s R3CX70ABZHP exec-out screencap -d <display id> -p > shot.png`로 찍는다. 기기가 연결돼 있지 않으면 멈추고 사용자에게 연결을 요청한다.
+- **ANDROID_DEVICE** = USB 실기기 Galaxy Z Flip6 `adb -s R3CX70ABZHP`(에뮬레이터 아님). 조작 전 `adb -s R3CX70ABZHP shell dumpsys window | grep mCurrentFocus`로 `app.wishlist.android` 포커스를 확인하고 다른 앱은 건드리지 않는다. 화면이 둘이라 `adb -s R3CX70ABZHP shell dumpsys SurfaceFlinger --display-id`로 id를 확인하고 `adb -s R3CX70ABZHP exec-out screencap -d <display id> -p > shot.png`로 찍는다. 기기가 연결돼 있지 않으면 멈추고 사용자에게 연결을 요청한다. (2026-10-14: 당분간 에뮬레이터 `emulator-5554`를 쓰고 screencap `-d`는 필요 없다.)
 - **Baseline:** Task 0에서 이 공간 기준으로 다시 잰다(C4 PR #16 기록: host 501 · simulator 498 · Android unit debug/release 183 · XCTest 211).
 
 ## Review Focus

@@ -2,7 +2,7 @@
 
 - [B7 상품 사용자 변경](2026-10-14-b7-item-mutations.md) — Task 1~10 완료·독립 리뷰 반영·569 tests 567 통과/2 skip · Task 1~10, V19·파서/값 계산·ITEM-04/07/08/05/06·route·경합/일관성·문서
 - [B6 사용자 이미지 업로드](2026-10-12-b6-media-upload.md) — Task 1~10 완료·독립 리뷰 반영·512 tests 510 통과/2 skip · Task 1~10, V18·JPEG 검증·저장소 adapter·MEDIA-01/02·표시 URL·OPS-01 정리·runtime
-- [C5 카테고리](2026-10-14-client-c5-category.md) — 초안 v1(사용자 검토 대기) · PR A Task 0~19(데이터·Presenter·Android·iOS), PR B Task 20~23(사진 공유 요소)
+- [C5 카테고리](2026-10-14-client-c5-category.md) — 확정 v1 · 진행 중 · PR A Task 0~19(데이터·Presenter·Android·iOS), PR B Task 20~23(사진 공유 요소)
 - [C4 상품 상세·웹뷰](2026-10-09-client-c4-product-detail.md) — 완료(PR #15 merge e5339ba, PR #16 merge e2653f6, 2026-10-13) · PR A(데이터·Presenter·화면) Task 1~12, PR B(웹뷰) Task 13~16
 - [B5 비동기 분석·운영 복구](2026-10-09-b5-analysis-runtime-recovery.md) — Native Task1~12 완료·독립 리뷰 반영·435 tests 433 통과/2 skip · migration·추출·병합·합산 예산·DNS·egress proxy·browser/maintenance 역할·PENDING 복구·전체 흐름
 - [B4 상품 목록·홈 조회](2026-10-07-b4-read-api.md) — Native Task1~9 완료·독립 리뷰 지적0·320 통과/1 skip, predicate·cursor·ITEM/HOME·index·회귀
