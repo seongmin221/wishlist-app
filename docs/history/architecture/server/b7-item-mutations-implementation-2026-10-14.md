@@ -58,3 +58,17 @@
   - B4 anchor 복구 반복: ITEM-05로 anchor 삭제, ITEM-04 category 변경으로 anchor 범위 이동, HOME-02 검토 그룹 anchor 확정 뒤 다음 항목으로 복구(`anchorResolved=false`).
   - 전체 흐름: 비로그인 401 → 로그인 뒤 과거 `clientCreatedAt`으로 생성·응답 유실 재전송(같은 item, 공유 시각 유지) → AI 장애로 합산 3회 소진 FAILED_RETRYABLE → 재분석(replay 포함) → READY·검토 대기 → DEFER(검토 그룹 0) → 사진 연결·stale version 409·사진 해제 → 삭제 두 번 204 → 404, 홈 count 0. 기기 LocalSubmission 자체는 클라이언트 묶음의 범위다.
 - 기존 테스트 변경: `MediaUploadFlowTest`는 B7 전이라 SQL로 사진을 연결·해제했다. 이를 ITEM-04 PATCH로 바꾸고, 해제 직후에는 정리되지 않고(24시간 유예) 유예를 25시간 앞당긴 뒤 정리됨을 확인한다. 통과.
+
+## 계획 대비 결정 요약
+
+- Task 4·5는 한 커밋으로 합쳤다(공통 경로가 Task 3에 있어 진입 메서드만 남았다).
+- `deletionImpact`는 `WishlistItem`의 기본 null 필드와 DTO `@EncodeDefault(NEVER)`로 붙여 route 시그니처를 바꾸지 않았다.
+- 새 route 노출은 `ApiRouteExposureTest` 대신 `WishlistItemMutationRoutesTest`의 `apiRoutes` 조립 테스트로 확인했다.
+- 경합 재현용 test seam 두 개를 추가했다: `GetWishlistItemService(beforeImpactRead)`, `ItemMutationService(afterMediaLock)`. 기본값은 no-op이다.
+- 사용자 문서 검토 기록([B7 문서 검토](b7-item-mutations-document-review-2026-10-14.md))은 첫 docs 커밋에 함께 들어갔다.
+
+## B8·B10·B11 인계
+
+- **B8:** 목적·category 삭제와 후보 이동은 B7과 같은 owner → 목적(ID순) → 상품(ID순) → job 잠금과 `PurposeMembership.recordTransition`을 쓴다. category 삭제가 만드는 `CUSTOM_CATEGORY_DELETED` 상품은 이미 ITEM-04로 재지정된다. CAT-06은 삭제 category의 참조를 비우고 출처 정리를 함께 해야 한다(B7 검토 상태 규칙은 "category가 있는 AI 출처"만 AI 연결로 본다).
+- **B10:** archived 상품에 대한 B7 명령은 allowedActions가 비어 409 `WISHLIST_ITEM_STATE_CONFLICT`다. 실제 ARCHIVED 데이터의 종합 검증과 archive snapshot의 media 참조(`MediaReferences`)는 B10이다. 삭제 tombstone의 category·목적 참조는 진단용으로 남아 있다.
+- **B11:** owner 잠금 경합을 부하 시험에서 관측한 뒤 FOR NO KEY UPDATE 전환을 검토한다(결정 7). 재분석 한도(60초 10건)의 실제 사용 패턴도 확인한다.

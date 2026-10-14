@@ -51,12 +51,14 @@ B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생
 | --- | --- | --- | --- | --- | --- |
 | ITEM-01 | `POST /v1/wishlist-items` | 공유 URL 서버 저장, 로컬 대기 자동/수동 전송, 응답 유실 재전송 · S2/S8 | sourceUrl, 선택 clientCreatedAt, Idempotency-Key=clientSubmissionId | id·실제 item 표현·상태·version, Location, 재전송 표시. URL이 같아도 다른 key면 새 item | **구현(B1)**: 공유 시각 보관·실제 공통 mapper·신규 event 지정 발행. 표시 metadata는 B5에서 저장 연결, 후속 참조 확장은 B6 |
 | ITEM-02 | `GET /v1/wishlist-items` | 카테고리/목적 상품 목록, 스크롤 추가 로딩·복귀 anchor 갱신 · S4/S8 | categoryId 또는 purposeId 또는 purposeUnassigned=true, cursor/limit 또는 anchor/before/after, 명시적 목적 미지정 filter | 카드용 metadata·브랜드·가격/통화·확인 시각·purpose 색/아이콘·review 표시·version, 공용 카드 wrapper·totalCount·앞뒤 cursor·requested/resolved anchor ID·anchorResolved | **구현(B4)**: 단일 scope·page/anchor·공통 상세 mapper, metadata는 B5부터 저장값(없으면 null) |
-| ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 목적 deletionImpact는 ITEM-05와 함께 B7 확장 |
-| ITEM-04 | `PATCH /v1/wishlist-items/{id}` | 일반 편집 한 번에 저장, 브랜드 수정·category 재지정·purpose 선택/해제 · S3/S4 | expectedVersion, 변경된 이름/brand/mediaId/categoryId/purposeId. 생략=유지, optional null=해제 | 갱신된 item·출처·review·version. 사용자 값만 수정, price/currency/sourceUrl 변경 제외 | 없음 |
-| ITEM-05 | `DELETE /v1/wishlist-items/{id}` | 일반·분석 중 삭제, 목적에서 항목 제거 · S2/S4 | item ID. 기존 계약상 expectedVersion 없음 | 204, 늦은 Worker 반영 차단. owner의 이미 삭제한 item 반복 삭제도 204 | 없음 |
-| ITEM-06 | `POST /v1/wishlist-items/{id}/analysis-attempts` | 재시도 가능한 실패를 다시 분석 · S2/S8 | attemptRequestId를 Idempotency-Key로 전달 | 새 generation·PROCESSING item, job/outbox 원자 생성. 수동 완료·terminal·PROCESSING이면 거절 | 없음 |
-| ITEM-07 | `PUT /v1/wishlist-items/{id}/manual-completion` | 실패/PARTIAL에서 직접 보완 저장·저장하고 다음 · S4/S8 | 이름+category 필수, expectedVersion, 선택 brand/mediaId/purposeId | 수동 완료 시각·CONFIRMED·갱신 item. 진단용 원래 분석 결과 유지, 재분석 제외 | 없음 |
-| ITEM-08 | `PUT /v1/wishlist-items/{id}/review-decision` | 분류·목적 확정/보류 버튼·스와이프, 검토 중 연결 수정 · S3/S8 | CONFIRM/DEFER, expectedVersion, 선택 categoryId/purposeId | 갱신 item·CONFIRMED/DEFERRED·version. 보류 자동 재노출 없음 | 없음 |
+| ITEM-03 | `GET /v1/wishlist-items/{id}` | 정상·보완·분석 중 상세, 409 뒤 최신 값, 삭제 확인·도움말 · S4/S8 | item ID | 전체 item·값 출처·실패/누락 이유·allowedActions·version·원본 URL. deletionImpact에 현재 목적명·후보 수·삭제 후 잔여 수·빈 목적 유지 안내 | **구현(B1 기본 조회, B7 deletionImpact)**: owner 격리·DELETED 404·실제 저장값·안전한 실패 code. 단일 응답에 목적 삭제 영향(같은 snapshot) |
+| ITEM-04 | `PATCH /v1/wishlist-items/{id}` | 일반 편집 한 번에 저장, 브랜드 수정·category 재지정·purpose 선택/해제 · S3/S4 | expectedVersion, 변경된 이름/brand/mediaId/categoryId/purposeId. 생략=유지, optional null=해제 | 갱신된 item·출처·review·version. 사용자 값만 수정, price/currency/sourceUrl 변경 제외 | **구현(B7)**: 바뀐 값만 검사·no-op·사진 연결/해제·검토 상태 규칙 |
+| ITEM-05 | `DELETE /v1/wishlist-items/{id}` | 일반·분석 중 삭제, 목적에서 항목 제거 · S2/S4 | item ID. 기존 계약상 expectedVersion 없음 | 204, 늦은 Worker 반영 차단. owner의 이미 삭제한 item 반복 삭제도 204 | **구현(B7)**: 진행 중 job만 취소·사진 참조 해제·membership |
+| ITEM-06 | `POST /v1/wishlist-items/{id}/analysis-attempts` | 재시도 가능한 실패를 다시 분석 · S2/S8 | attemptRequestId를 Idempotency-Key로 전달 | 새 generation·PROCESSING item, job/outbox 원자 생성. 수동 완료·terminal·PROCESSING이면 거절 | **구현(B7)**: receipt replay·owner별 60초 10건·발행 취소 전파 |
+| ITEM-07 | `PUT /v1/wishlist-items/{id}/manual-completion` | 실패/PARTIAL에서 직접 보완 저장·저장하고 다음 · S4/S8 | 이름+category 필수, expectedVersion, 선택 brand/mediaId/purposeId | 수동 완료 시각·CONFIRMED·갱신 item. 진단용 원래 분석 결과 유지, 재분석 제외 | **구현(B7)** |
+| ITEM-08 | `PUT /v1/wishlist-items/{id}/review-decision` | 분류·목적 확정/보류 버튼·스와이프, 검토 중 연결 수정 · S3/S8 | CONFIRM/DEFER, expectedVersion, 선택 categoryId/purposeId | 갱신 item·CONFIRMED/DEFERRED·version. 보류 자동 재노출 없음 | **구현(B7)** |
+
+B7 ITEM-04~08과 ITEM-03 deletionImpact는 [상품 사용자 변경 계약](wishlist-item-mutation-api.md)을 따른다.
 
 ITEM-03의 삭제 영향은 상세에 포함해 별도 item deletion-impact API를 만들지 않는다. 열어 둔 확인창 이후 다른 기기 변경으로 영향이 달라질 수 있다는 점은 ITEM-05의 version 없는 기존 계약과 함께 기록한다. 정확히 확인 당시 영향으로만 삭제해야 한다는 새 요구가 생기면 그 계약을 별도 변경한다.
 
@@ -90,7 +92,7 @@ B2 CAT-01~04와 owner별 AI 후보·stale 보호를 구현·검증했다. [확�
 | CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 ACTIVE 전체 item 수(이름 누락 포함, CAT-01/02 표시용 count와 별도)·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | 없음 |
 | CAT-06 | `DELETE /v1/custom-categories/{id}` | 삭제 확정 · S3/S4 | category version·impactToken | category 삭제·참조 해제·CUSTOM_CATEGORY_DELETED 원자 반영. 영향이 바뀌면 재확인 가능한 409 | 없음 |
 
-CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 ID를 편집 초안에 넣고 ITEM-04/ITEM-07/ITEM-08에서 연결한다. 상품 편집을 취소해도 이미 생성한 category를 삭제하지 않는다. 생성·연결을 하나의 API로 묶거나 취소 시 자동 삭제하려는 요구는 현재 근거에 없으며 후속 제품 확인 대상이다.
+CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 ID를 편집 초안에 넣고 ITEM-04/ITEM-07/ITEM-08에서 연결한다. 상품 편집을 취소해도 이미 생성한 category를 삭제하지 않으며, 생성·연결을 하나의 API로 묶지 않는다([B7 결정](../../history/product-planning/mvp/decisions/b7-item-mutation-policy-2026-10-14.md) 2).
 
 ## 앱 서버 API — 목적 8개
 

@@ -10,7 +10,7 @@
 
 **Spec:** [B7 설계](../specs/2026-10-14-b7-item-mutations-design.md). [제품·운영 결정](../../history/product-planning/mvp/decisions/b7-item-mutation-policy-2026-10-14.md).
 
-> 상태: **계획 초안 · 독립 리뷰·사용자 1차 리뷰 반영(2026-10-14)**
+> 상태: **계획 승인(2026-10-14) · Task 1~9 구현 완료**. 실행 기록·계획 대비 결정은 [구현 이력](../../history/architecture/server/b7-item-mutations-implementation-2026-10-14.md)에 있다. 아래 체크박스는 승인 당시 계획이다.
 
 ## Global Constraints
 

@@ -8,7 +8,7 @@
 
 인증이 없으면 `401 UNAUTHORIZED`, UUID 형식이 잘못되면 `400 INVALID_WISHLIST_ITEM_ID`다. 존재하지 않음·다른 owner·DELETED는 모두 `404 WISHLIST_ITEM_NOT_FOUND`다. ARCHIVED는 조회할 수 있지만 조치는 없다. 생성 key 재전송에는 기존 삭제 tombstone을 반환한다. GET과 생성·발행 JDBC 작업은 `Dispatchers.IO`에서 실행하고 취소를 전파한다.
 
-공개 projection은 이름·이미지·각 값 출처, category/purpose의 현재 ID·출처·누락 사유, analysis/review/lifecycle, version, 수동 완료 시각, 원본 URL과 저장/변경 시각을 반환한다. 가격·통화·brand·merchant·metadataCheckedAt은 B5부터 저장값을 반환하며 신뢰할 값이 없으면 null이다. 가격은 원래 통화의 decimal(scale 4)이다. `classified_at`은 AI 분류 시각이므로 metadata 확인 시각으로 대신 사용하지 않는다. 목적명·후보 수를 사용하는 deletionImpact는 상품 삭제 ITEM-05와 함께 B7에서 확장한다.
+공개 projection은 이름·이미지·각 값 출처, category/purpose의 현재 ID·출처·누락 사유, analysis/review/lifecycle, version, 수동 완료 시각, 원본 URL과 저장/변경 시각을 반환한다. 가격·통화·brand·merchant·metadataCheckedAt은 B5부터 저장값을 반환하며 신뢰할 값이 없으면 null이다. 가격은 원래 통화의 decimal(scale 4)이다. `classified_at`은 AI 분류 시각이므로 metadata 확인 시각으로 대신 사용하지 않는다. B7부터 단일 상품 응답(생성·재전송·상세·변경)에 목적명·후보 수·잔여 수의 `deletionImpact`가 붙고 목록 카드에는 key가 없다. 상세는 REPEATABLE READ 한 snapshot에서 읽는다([상품 사용자 변경 계약](wishlist-item-mutation-api.md#deletionimpact)).
 
 ## 공유 시각과 생성 key
 

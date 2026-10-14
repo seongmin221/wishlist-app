@@ -17,6 +17,8 @@
 | PUR-01~04 클라이언트 계약·요청/응답 예시·오류 | [purpose-management-api.md](purpose-management-api.md) |
 | AI 목적 후보·snapshot v3·T0~T7 단계·판단/판단 없음 | [purpose-ai-candidates.md](purpose-ai-candidates.md) |
 | MEDIA-01·02 클라이언트 계약·한도·오류·표시 URL·local 저장소·정리 | [media-upload-api.md](media-upload-api.md) |
+| ITEM-04~08 편집·보완·검토·삭제·재분석 계약·오류·deletionImpact | [wishlist-item-mutation-api.md](wishlist-item-mutation-api.md) |
+| B7 구현·RED/GREEN·경합·회귀·B8/B10/B11 인계 | [B7 구현 기록](../../history/architecture/server/b7-item-mutations-implementation-2026-10-14.md) |
 | B6 구현·RED/GREEN·리뷰·검증·B7/B10/B11 인계 | [B6 구현 기록](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md) |
 | B3 구현·정책 확인·리뷰·검증 | [B3 구현 기록](../../history/architecture/server/b3-purpose-implementation-2026-10-07.md) |
 | B2 새 worktree baseline·입력 기반·리뷰·검증 경계 | [B2 준비 기록](../../history/architecture/server/b2-category-foundation-2026-10-07.md) |

@@ -188,6 +188,8 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 **후속 확인:** ITEM-03 삭제 영향, ITEM-02/HOME-01/HOME-02 건수·순서와 PUR-01/PUR-03 후보 요약이 변경 후 실제 데이터와 일치한다. 비로그인/오프라인 local pending 전송을 인증 fake로 끝까지 검증한다.
 
+**구현 상태:** B7 ITEM-04·05·06·07·08과 ITEM-03 deletionImpact를 구현했다. [제품·운영 결정](../../history/product-planning/mvp/decisions/b7-item-mutation-policy-2026-10-14.md), [spec](../../superpowers/specs/2026-10-14-b7-item-mutations-design.md), [계획](../../superpowers/plans/2026-10-14-b7-item-mutations.md), [계약](wishlist-item-mutation-api.md), [구현 이력](../../history/architecture/server/b7-item-mutations-implementation-2026-10-14.md)에 통과 조건별 테스트와 B8/B10/B11 인계를 기록했다. local pending은 서버 쪽(지연 생성·응답 유실 재전송부터 삭제까지)만 검증했고 기기 LocalSubmission은 클라이언트 묶음이다. archived 상품 종합 검증(B10)과 클라이언트 연결(C8)의 완료를 뜻하지 않는다.
+
 ## B8 — 후보 이동과 영향 확인 삭제
 
 하위 묶음마다 별도 통과·커밋한다. 재사용하는 연결 변경 transaction은 item·purpose 잠금 순서를 고정한다.
@@ -278,7 +280,7 @@ ARC-07 → ARC-08 → ARC-09. 현재 참조 상태와 복원 정책을 preview/�
 | category count·서버 할 일 합계 | B4 (**해결**) | [B4 제품 결정](../../history/product-planning/mvp/decisions/b4-read-api-policy-2026-10-07.md): category count는 목록 표시 집합과 일치, HOME-01은 그룹별 count만 제공하고 별도 합계 필드 없음 |
 | retry 예산·deadline·즉시 발행 제한 | B5 (**해결**) | [B5 결정](../../history/product-planning/mvp/decisions/b5-analysis-runtime-policy-2026-10-09.md): generation 합산 3회·30분, Retryable ACK·scheduleTime backoff, PENDING 5분 정체·재예약 누적 3회 |
 | 이미지 형식/크기·저장소·외부 이미지 보존 | B6 (**해결**) | [B6 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md): JPEG 5MiB·긴 변 2048, GCS signed PUT 15분, 미참조 24시간 정리, 1시간 읽기 URL, 외부 이미지는 URL만 보관 |
-| 상품명/brand 제한·생성 후 편집 취소 | B7 | CAT POST 성공 뒤 draft 취소 시 새 자원 수명. PUR는 B3에서 유지로 해결 |
+| 상품명/brand 제한·생성 후 편집 취소 | B7 (**해결**) | [B7 결정](../../history/product-planning/mvp/decisions/b7-item-mutation-policy-2026-10-14.md): 상품명·브랜드 200자(바뀐 값만 검사), 편집 취소 뒤 만든 category 유지, 편집의 검토 상태·사진 해제·재분석 60초 10건 |
 | 후보 filter·선택 유지·분석 상태·bulk 상한 | B8a | 추가 가능 item 상태, 이동 원자성, 최대 요청 크기 |
 | impact token·DELETE 전달 형식·신규 key retention | B2 생성 및 B8 삭제 전, B9/B10 재확인 | 생성 key 정책은 B2부터, 최종 삭제 검증은 B8부터. 기존 ITEM-05는 별도 계약 유지 |
 | 다중 중복 후보·다른 판매처 식별 | B9 | 정확한 지원 범위와 사용자 판단 단위 |
