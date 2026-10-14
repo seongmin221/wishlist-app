@@ -26,12 +26,25 @@ enum DebugSessionBootstrap {
 enum DebugLaunchHooks {
     static let delayItem01 = "wl.fake.delayItem01"
     static let pendingCount = "wl.fake.pendingCount"
+    /// C5: `-wl.fake.longCategory <category id>` puts 120 items (tall and slow photos) in that category.
+    static let longCategory = "wl.fake.longCategory"
+    /// C5: `-wl.fake.delayCategoryCreate <ms>` delays the next Fake CAT-03 (a lost answer when the network drops meanwhile).
+    static let delayCategoryCreate = "wl.fake.delayCategoryCreate"
     private static let log = Logger(subsystem: "app.wishlist.ios", category: "debug")
 
     static func apply(_ runtime: SharedRuntime, arguments: [String]) {
         let delay = value(of: delayItem01, in: arguments)
         let count = value(of: pendingCount, in: arguments)
-        guard delay != nil || count != nil, let controls = runtime.debugControls() else { return }
+        let long = string(of: longCategory, in: arguments)
+        let createDelay = value(of: delayCategoryCreate, in: arguments)
+        guard delay != nil || count != nil || long != nil || createDelay != nil, let controls = runtime.debugControls() else { return }
+        if let createDelay { controls.delayNextCategoryCreate(millis: createDelay) }
+        if let long {
+            Task {
+                let result = try? await controls.seedLongCategory(categoryId: long, count: 120)
+                log.info("long category \(long): \(String(describing: result))")
+            }
+        }
         if let delay {
             controls.delayNextItem01(millis: delay)
             log.info("next ITEM-01 delayed \(delay)ms")
@@ -46,6 +59,12 @@ enum DebugLaunchHooks {
                 }
             }
         }
+    }
+
+    /// `-<key> <text>` from the launch arguments.
+    static func string(of key: String, in arguments: [String]) -> String? {
+        guard let index = arguments.firstIndex(of: "-\(key)"), arguments.indices.contains(index + 1) else { return nil }
+        return arguments[index + 1].trimmingCharacters(in: .whitespaces)
     }
 
     /// `-<key> <integer>` from the launch arguments.
