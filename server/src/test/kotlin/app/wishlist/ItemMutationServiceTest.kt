@@ -197,4 +197,108 @@ class ItemMutationServiceTest {
         assertEquals(ReviewStatus.CONFIRMED,
             service.edit(owner, deferred, 4, ItemChanges(category = FieldChange.Set(CategoryRef.Public("C001")))).storedState.state.reviewStatus)
     }
+
+    private fun reviewGroupIds(source: DataSource, owner: UUID): List<UUID> =
+        (WishlistReadService(source).read(owner, ReadQuery(ReadScope.Action(HomeActionGroup.CLASSIFICATION_REVIEW), ReadWindow.Page(100)))
+            as ReadResult.Success).page.items.map { it.id }
+
+    @Test fun `manual completion confirms failed and partial items and keeps diagnostics`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val service = source.service()
+        val purpose = insertPurpose(source, owner, "A", null)
+        val (media, _) = insertMedia(source, owner)
+        for ((status, failure) in listOf("PARTIAL" to "AI_ABSTAINED", "FAILED_RETRYABLE" to "ANALYSIS_RETRYABLE_FAILURE", "FAILED_TERMINAL" to "BLOCKED_ADDRESS")) {
+            val item = seedItem(source, owner, ItemSeed(analysis = status, review = "NOT_REQUIRED", category = null, categorySource = null,
+                missingReason = "AI_ABSTAINED", failureCode = failure, brand = "AI 브랜드"))
+            analysisSql(source, "update wishlist_items set predicted_category_id='C001' where id='$item'")
+            val done = service.completeManually(owner, item, 3, ItemChanges(name = FieldChange.Set("직접 이름"),
+                category = FieldChange.Set(CategoryRef.Public("C026")), purpose = if (status == "PARTIAL") FieldChange.Set(purpose) else FieldChange.Keep,
+                media = if (status == "PARTIAL") FieldChange.Set(media) else FieldChange.Keep))
+            assertEquals(4, done.version, status)
+            assertNotNull(done.storedState.state.manualCompletionAt)
+            assertEquals(ReviewStatus.CONFIRMED, done.storedState.state.reviewStatus)
+            assertEquals(AnalysisStatus.valueOf(status), done.storedState.state.analysisStatus)
+            assertEquals(failure, done.analysisFailureCode)
+            assertEquals("C001", itemColumns(source, item, "predicted_category_id")["predicted_category_id"])
+            assertEquals(ValueSource.USER, done.storedState.nameSource); assertEquals(ValueSource.USER, done.storedState.categorySource)
+            assertNull(done.storedState.state.categoryMissingReason)
+            assertEquals("AI 브랜드", done.brand, "omitted optional fields stay")
+            assertEquals(setOf(ItemAction.EDIT, ItemAction.DELETE), WishlistItemPolicy.evaluate(done.storedState.state).allowedActions)
+            if (status == "PARTIAL") { assertEquals(purpose.toString(), done.storedState.purposeId); assertEquals(media, done.mediaId) }
+            assertEquals(4, expectError("WISHLIST_ITEM_VERSION_CONFLICT") {
+                service.completeManually(owner, item, 3, ItemChanges(name = FieldChange.Set("a"), category = FieldChange.Set(CategoryRef.Public("C026"))))
+            }.currentVersion)
+            expectError("WISHLIST_ITEM_STATE_CONFLICT") {
+                service.completeManually(owner, item, 4, ItemChanges(name = FieldChange.Set("a"), category = FieldChange.Set(CategoryRef.Public("C026"))))
+            }
+        }
+        for (seed in listOf(ItemSeed(), ItemSeed(analysis = "PROCESSING", review = "NOT_REQUIRED"))) {
+            val item = seedItem(source, owner, seed)
+            expectError("WISHLIST_ITEM_STATE_CONFLICT") {
+                service.completeManually(owner, item, 3, ItemChanges(name = FieldChange.Set("a"), category = FieldChange.Set(CategoryRef.Public("C026"))))
+            }
+        }
+    }
+
+    @Test fun `manual completion accepts an unchanged long extracted name and records it as user input`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val extracted = "가".repeat(230) + "\n옵션"
+        val item = seedItem(source, owner, ItemSeed(analysis = "PARTIAL", review = "NOT_REQUIRED", name = extracted, category = null,
+            categorySource = null, missingReason = "AI_ABSTAINED"))
+        val done = source.service().completeManually(owner, item, 3, ItemChanges(name = FieldChange.Set(extracted),
+            category = FieldChange.Set(CategoryRef.Public("C026")), brand = FieldChange.Set(null)))
+        assertEquals(extracted, done.storedState.state.productName)
+        assertEquals(ValueSource.USER, done.storedState.nameSource)
+        assertTrue("NAME" in done.storedState.userOverrideFields)
+        assertNull(done.brand)
+        expectError("INVALID_WISHLIST_ITEM_INPUT") {
+            val other = seedItem(source, owner, ItemSeed(analysis = "PARTIAL", review = "NOT_REQUIRED", category = null, categorySource = null,
+                missingReason = "AI_ABSTAINED"))
+            source.service().completeManually(owner, other, 3, ItemChanges(name = FieldChange.Set("가".repeat(201)),
+                category = FieldChange.Set(CategoryRef.Public("C026"))))
+        }
+    }
+
+    @Test fun `review decisions confirm or defer and deferred items do not come back`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val service = source.service()
+        val purpose = insertPurpose(source, owner, "A", null)
+        val confirm = seedItem(source, owner, ItemSeed(purpose = purpose, purposeSource = "AI"))
+        val defer = seedItem(source, owner, ItemSeed(purpose = purpose, purposeSource = "AI"))
+        val sameValue = seedItem(source, owner, ItemSeed(purpose = purpose, purposeSource = "AI"))
+        assertEquals(setOf(confirm, defer, sameValue), reviewGroupIds(source, owner).toSet())
+
+        val confirmed = service.decideReview(owner, confirm, 3, ReviewDecision.CONFIRM, ItemChanges())
+        assertEquals(ReviewStatus.CONFIRMED, confirmed.storedState.state.reviewStatus); assertEquals(4, confirmed.version)
+        assertEquals(ValueSource.AI, confirmed.storedState.categorySource); assertEquals(ValueSource.AI, confirmed.storedState.purposeSource)
+
+        val kept = service.decideReview(owner, sameValue, 3, ReviewDecision.CONFIRM, ItemChanges(
+            category = FieldChange.Set(CategoryRef.Public("C026")), purpose = FieldChange.Set(purpose)))
+        assertEquals(ValueSource.AI, kept.storedState.categorySource, "same value keeps the AI source")
+        assertEquals(ValueSource.AI, kept.storedState.purposeSource)
+
+        val deferred = service.decideReview(owner, defer, 3, ReviewDecision.DEFER, ItemChanges(
+            category = FieldChange.Set(CategoryRef.Public("C001")), purpose = FieldChange.Set(null)))
+        assertEquals(ReviewStatus.DEFERRED, deferred.storedState.state.reviewStatus)
+        assertEquals(ValueSource.USER, deferred.storedState.categorySource)
+        assertNull(deferred.storedState.purposeId); assertEquals(ValueSource.USER, deferred.storedState.purposeSource)
+        assertEquals(emptyList(), reviewGroupIds(source, owner))
+        assertEquals(ReviewStatus.DEFERRED, service.edit(owner, defer, 4, ItemChanges(name = FieldChange.Set("이름만"))).storedState.state.reviewStatus)
+        assertEquals(emptyList(), reviewGroupIds(source, owner))
+
+        expectError("WISHLIST_ITEM_STATE_CONFLICT") { service.decideReview(owner, confirm, 4, ReviewDecision.DEFER, ItemChanges()) }
+        assertEquals(3, expectError("WISHLIST_ITEM_VERSION_CONFLICT") {
+            service.decideReview(owner, seedItem(source, owner), 2, ReviewDecision.CONFIRM, ItemChanges())
+        }.currentVersion)
+        for (seed in listOf(
+            ItemSeed(analysis = "PARTIAL"), ItemSeed(manualCompleted = true), ItemSeed(review = "NOT_REQUIRED"),
+            ItemSeed(analysis = "PROCESSING"), ItemSeed(lifecycle = "ARCHIVED"),
+        )) {
+            val item = seedItem(source, owner, seed)
+            expectError("WISHLIST_ITEM_STATE_CONFLICT") { service.decideReview(owner, item, 3, ReviewDecision.CONFIRM, ItemChanges()) }
+        }
+        expectError("PURPOSE_NOT_AVAILABLE") {
+            service.decideReview(owner, seedItem(source, owner), 3, ReviewDecision.CONFIRM, ItemChanges(purpose = FieldChange.Set(UUID.randomUUID())))
+        }
+    }
 }
