@@ -37,6 +37,7 @@ internal object ApiErrorMapper {
             requestId = requestId,
             currentVersion = currentVersion(code, envelope),
             retryAfterSeconds = if (status == 429) retryAfterSeconds(response) else null,
+            fields = fields(envelope),
         )
     }
 
@@ -78,6 +79,12 @@ internal object ApiErrorMapper {
         if (code == IDEMPOTENCY_KEY_REUSED) return null
         val value = (envelope?.get("details") as? JsonObject)?.get("currentVersion") as? JsonPrimitive ?: return null
         return if (value.isString) null else value.intOrNull
+    }
+
+    /** `error.details.fields` (B2 422): string elements only; any other shape is ignored. */
+    private fun fields(envelope: JsonObject?): Set<String> {
+        val array = (envelope?.get("details") as? JsonObject)?.get("fields") as? kotlinx.serialization.json.JsonArray ?: return emptySet()
+        return array.mapNotNullTo(linkedSetOf()) { it.stringOrNull() }
     }
 
     private fun retryAfterSeconds(response: HttpResponse): Long? =
