@@ -20,4 +20,6 @@ data class ClientError(
     val requestId: String? = null,
     val currentVersion: Int? = null,
     val retryAfterSeconds: Long? = null,
+    /** Server `details.fields` (input field names of a 422, e.g. `name`, `examples`). Empty when absent. */
+    val fields: Set<String> = emptySet(),
 )

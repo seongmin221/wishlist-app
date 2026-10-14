@@ -141,4 +141,21 @@ class ApiErrorMapperTest {
         assertEquals("low", error.requestId)
         assertEquals(HttpHeaders.RetryAfter, "Retry-After")
     }
+
+    @Test
+    fun fieldsAreReadFromDetails() = runTest {
+        val error = map(HttpStatusCode.UnprocessableEntity, envelope("INVALID_CATEGORY_INPUT", details = """{"fields":["description","examples"]}"""))
+        assertEquals(setOf("description", "examples"), error.fields)
+    }
+
+    @Test
+    fun malformedFieldsAreIgnored() = runTest {
+        val mixed = map(HttpStatusCode.UnprocessableEntity, envelope("INVALID_CATEGORY_INPUT", details = """{"fields":["name",3,null,{"a":1},""]}"""))
+        assertEquals(setOf("name"), mixed.fields)
+        assertEquals(ErrorKind.VALIDATION, mixed.kind)
+        for (details in listOf("""{"fields":"name"}""", """{"fields":{"name":1}}""", "{}", "\"x\"")) {
+            assertEquals(emptySet(), map(HttpStatusCode.UnprocessableEntity, envelope("INVALID_CATEGORY_INPUT", details = details)).fields, details)
+        }
+        assertEquals(emptySet(), map(HttpStatusCode.Conflict, envelope("CATEGORY_VERSION_CONFLICT", details = """{"currentVersion":2}""")).fields)
+    }
 }
