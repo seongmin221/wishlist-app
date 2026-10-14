@@ -9,6 +9,18 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+/** A finished item for the category contracts; a larger [seq] is newer. */
+internal fun contractItem(seq: Int, categoryId: String, name: String?, lifecycle: LifecycleStatus): WishlistItem {
+    val created = fakeTime + seq.milliseconds
+    return WishlistItem(
+        id = Uuid.random().toString(), clientSubmissionId = Uuid.random().toString(), version = 1,
+        sourceUrl = "https://shop.example/$seq", product = ProductSnapshot(name = name),
+        category = ItemCategory(categoryId, ValueSource.USER), purpose = ItemPurpose(),
+        analysis = ItemAnalysis(AnalysisStatus.READY), reviewStatus = ReviewStatus.CONFIRMED,
+        lifecycleStatus = lifecycle, requiredAction = RequiredAction.NONE, createdAt = created, updatedAt = created,
+    )
+}
+
 /** A Fake store with a movable clock and owner switching, for the category contracts. */
 internal class FakeCategoryFixture : CategoryContractFixture {
     var now: Instant = fakeTime
@@ -26,15 +38,7 @@ internal class FakeCategoryFixture : CategoryContractFixture {
     override suspend fun placeItem(ownerId: String, categoryId: String, name: String?, lifecycle: LifecycleStatus): String {
         val previous = session.state.value.accountId
         if (previous != ownerId) session.changeAccount(ownerId)
-        val created = fakeTime + (++itemSeq).milliseconds
-        val item = WishlistItem(
-            id = Uuid.random().toString(), clientSubmissionId = Uuid.random().toString(), version = 1,
-            sourceUrl = "https://shop.example/$itemSeq", product = ProductSnapshot(name = name),
-            category = ItemCategory(categoryId, ValueSource.USER), purpose = ItemPurpose(),
-            analysis = ItemAnalysis(AnalysisStatus.READY), reviewStatus = ReviewStatus.CONFIRMED,
-            lifecycleStatus = lifecycle, requiredAction = RequiredAction.NONE, createdAt = created, updatedAt = created,
-        )
-        val id = store.putItem(item).successValue().id
+        val id = store.putItem(contractItem(++itemSeq, categoryId, name, lifecycle)).successValue().id
         if (previous != null && previous != ownerId) session.changeAccount(previous)
         return id
     }
