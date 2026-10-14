@@ -61,6 +61,18 @@ interface LocalStore {
      */
     suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem): ClientResult<Unit>
 
+    /**
+     * ITEM-02 list cards (the same representation as a GET), with the [upsertItem] rule for each.
+     * The SQL store writes them in one transaction; the default writes them one by one.
+     */
+    suspend fun upsertItems(snapshot: SessionSnapshot, items: List<WishlistItem>): ClientResult<Unit> {
+        for (item in items) {
+            val result = upsertItem(snapshot, item)
+            if (result is ClientResult.Failure) return result
+        }
+        return ClientResult.Success(Unit)
+    }
+
     /** UUIDs compare case-insensitively. A row that cannot be decoded is deleted and reads as absent. */
     suspend fun cachedItem(snapshot: SessionSnapshot, id: String): ClientResult<WishlistItem?>
 
