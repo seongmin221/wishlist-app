@@ -88,9 +88,9 @@ class SharedModulesTest {
     @Test fun unimplemented_api_cannot_be_bound_to_remote_or_fake() {
         val remote = RemoteConfig(TEST_BASE_URL, FakeTokenSource())
         assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.HOME_01 to Backend.REMOTE), remote) }
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.CAT_01 to Backend.FAKE)) }
-        // The seed catalog does not make ITEM-02/CAT-01/PUR-01 Fake wire APIs.
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.ITEM_02 to Backend.FAKE)) }
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.CAT_05 to Backend.FAKE)) }
+        // The seed catalog does not make PUR-01 a Fake wire API (C6).
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.PUR_01 to Backend.FAKE)) }
     }
 
     @Test fun remote_config_is_required_if_and_only_if_some_api_is_remote() {
@@ -121,6 +121,15 @@ class SharedModulesTest {
         ApiId.entries.filter { it != ApiId.ITEM_01 && it != ApiId.ITEM_03 }
             .forEach { assertEquals(Backend.UNAVAILABLE, debug.resolvedBackend(it), it.wireId) }
         debug.close()
+
+        // C5: CAT-01~04 and ITEM-02 each follow their own binding.
+        val categories = createRuntime(
+            debugBindings(ApiId.CAT_01 to Backend.FAKE, ApiId.CAT_02 to Backend.REMOTE, ApiId.CAT_03 to Backend.FAKE, ApiId.ITEM_02 to Backend.REMOTE),
+            RemoteConfig(TEST_BASE_URL, FakeTokenSource()),
+        )
+        assertEquals(listOf(Backend.FAKE, Backend.REMOTE, Backend.FAKE, Backend.UNAVAILABLE, Backend.REMOTE),
+            listOf(ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04, ApiId.ITEM_02).map { categories.resolvedBackend(it) })
+        categories.close()
     }
 
     // --- RELEASE graph --------------------------------------------------------------------------

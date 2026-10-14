@@ -9,7 +9,10 @@ import app.wishlist.shared.model.LocalSubmission
 import app.wishlist.shared.model.SubmissionStatus
 import app.wishlist.shared.model.Purpose
 import app.wishlist.shared.model.WishlistItem
+import app.wishlist.shared.model.*
 import app.wishlist.shared.repository.CatalogRepository
+import app.wishlist.shared.repository.CategoryRepository
+import app.wishlist.shared.repository.ItemListRepository
 import app.wishlist.shared.repository.CreateItemCommand
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
@@ -40,6 +43,33 @@ internal object UnavailableCatalogRepository : CatalogRepository {
     override suspend fun purposes(): ClientResult<List<Purpose>> = unavailable(API_UNAVAILABLE)
     override suspend fun items(categoryId: String?, purposeId: String?): ClientResult<List<WishlistItem>> =
         unavailable(API_UNAVAILABLE)
+}
+
+/** The UNAVAILABLE backend for CAT-01~04. */
+internal object UnavailableCategoryRepository : CategoryRepository {
+    override suspend fun catalog(scope: CategoryScope, parentId: String?): ClientResult<CategoryCatalog> = unavailable(API_UNAVAILABLE)
+    override suspend fun custom(id: String): ClientResult<CustomCategoryDetail> = unavailable(API_UNAVAILABLE)
+    override suspend fun create(command: CategoryCommand, idempotencyKey: String): ClientResult<CategoryCreated> = unavailable(API_UNAVAILABLE)
+    override suspend fun update(id: String, expectedVersion: Int, patch: CategoryPatch): ClientResult<CustomCategoryDetail> =
+        unavailable(API_UNAVAILABLE)
+}
+
+/** The UNAVAILABLE backend for ITEM-02. */
+internal object UnavailableItemListRepository : ItemListRepository {
+    override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = unavailable(API_UNAVAILABLE)
+}
+
+/** CAT-01~04 may be bound to different backends; each method uses its own API's delegate. */
+internal class RoutedCategoryRepository(
+    internal val catalog: CategoryRepository,
+    internal val custom: CategoryRepository,
+    internal val create: CategoryRepository,
+    internal val update: CategoryRepository,
+) : CategoryRepository {
+    override suspend fun catalog(scope: CategoryScope, parentId: String?) = catalog.catalog(scope, parentId)
+    override suspend fun custom(id: String) = custom.custom(id)
+    override suspend fun create(command: CategoryCommand, idempotencyKey: String) = create.create(command, idempotencyKey)
+    override suspend fun update(id: String, expectedVersion: Int, patch: CategoryPatch) = update.update(id, expectedVersion, patch)
 }
 
 /*
@@ -74,6 +104,28 @@ internal class GatedCatalogRepository(
         if (ready.value) delegate.purposes() else unavailable(RUNTIME_NOT_READY)
     override suspend fun items(categoryId: String?, purposeId: String?): ClientResult<List<WishlistItem>> =
         if (ready.value) delegate.items(categoryId, purposeId) else unavailable(RUNTIME_NOT_READY)
+}
+
+internal class GatedCategoryRepository(
+    private val ready: StateFlow<Boolean>,
+    internal val delegate: CategoryRepository,
+) : CategoryRepository {
+    override suspend fun catalog(scope: CategoryScope, parentId: String?): ClientResult<CategoryCatalog> =
+        if (ready.value) delegate.catalog(scope, parentId) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun custom(id: String): ClientResult<CustomCategoryDetail> =
+        if (ready.value) delegate.custom(id) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun create(command: CategoryCommand, idempotencyKey: String): ClientResult<CategoryCreated> =
+        if (ready.value) delegate.create(command, idempotencyKey) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun update(id: String, expectedVersion: Int, patch: CategoryPatch): ClientResult<CustomCategoryDetail> =
+        if (ready.value) delegate.update(id, expectedVersion, patch) else unavailable(RUNTIME_NOT_READY)
+}
+
+internal class GatedItemListRepository(
+    private val ready: StateFlow<Boolean>,
+    internal val delegate: ItemListRepository,
+) : ItemListRepository {
+    override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        if (ready.value) delegate.byCategory(categoryId, cursor, limit) else unavailable(RUNTIME_NOT_READY)
 }
 
 internal class GatedLocalStore(

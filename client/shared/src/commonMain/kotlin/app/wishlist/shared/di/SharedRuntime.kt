@@ -167,6 +167,14 @@ class SharedRuntime internal constructor(
     fun getItemRepository(): GetItemRepository =
         GatedGetItemRepository(ready, resolveOr<GetItemRepository>(UnavailableItemRepository) { get() })
 
+    /** CAT-01~04 facade over each API's explicitly bound backend. */
+    fun categoryRepository(): app.wishlist.shared.repository.CategoryRepository =
+        GatedCategoryRepository(ready, resolveOr<app.wishlist.shared.repository.CategoryRepository>(UnavailableCategoryRepository) { get() })
+
+    /** ITEM-02 (category scope) facade over the bound backend. */
+    fun itemListRepository(): app.wishlist.shared.repository.ItemListRepository =
+        GatedItemListRepository(ready, resolveOr<app.wishlist.shared.repository.ItemListRepository>(UnavailableItemListRepository) { get() })
+
     /** Debug seed catalog (DEBUG); UNAVAILABLE in RELEASE. Not a CAT/PUR/ITEM-02 wire backend. */
     fun catalogRepository(): CatalogRepository =
         GatedCatalogRepository(ready, resolveOr<CatalogRepository>(UnavailableCatalogRepository) { get() })
@@ -330,6 +338,16 @@ class SharedRuntime internal constructor(
     internal fun resolvedBackend(apiId: ApiId): Backend = when (apiId) {
         ApiId.ITEM_01 -> backendOf(koin.get<SnapshotCreateItemRepository>(ITEM_01_DELEGATE))
         ApiId.ITEM_03 -> backendOf(koin.get<GetItemRepository>(ITEM_03_DELEGATE))
+        ApiId.ITEM_02 -> backendOf(koin.get<app.wishlist.shared.repository.ItemListRepository>(ITEM_02_DELEGATE))
+        ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04 -> {
+            val routed = koin.get<app.wishlist.shared.repository.CategoryRepository>() as RoutedCategoryRepository
+            backendOf(when (apiId) {
+                ApiId.CAT_01 -> routed.catalog
+                ApiId.CAT_02 -> routed.custom
+                ApiId.CAT_03 -> routed.create
+                else -> routed.update
+            })
+        }
         else -> Backend.UNAVAILABLE
     }
 
