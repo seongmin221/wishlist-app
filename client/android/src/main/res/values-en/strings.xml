@@ -46,6 +46,9 @@
     <string name="time_yesterday">yesterday</string>
     <!-- RelativeTime.Days is always 2 or more, so the plural form is fixed. -->
     <string name="time_days" tools:ignore="PluralsCandidate">%1$d days ago</string>
+    <string name="time_weeks" tools:ignore="PluralsCandidate">%1$d wk ago</string>
+    <string name="time_date">%1$d/%2$d</string>
+    <string name="time_date_year">%2$d/%3$d/%1$d</string>
     <string name="settings_title">Settings</string>
     <string name="settings_account">Account</string>
     <string name="settings_signed_in_google">Signed in with Google</string>

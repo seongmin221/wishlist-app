@@ -44,6 +44,9 @@
     <string name="time_hours">%1$d시간 전</string>
     <string name="time_yesterday">어제</string>
     <string name="time_days">%1$d일 전</string>
+    <string name="time_weeks">%1$d주 전</string>
+    <string name="time_date">%1$d월 %2$d일</string>
+    <string name="time_date_year">%1$d년 %2$d월 %3$d일</string>
     <string name="settings_title">설정</string>
     <string name="settings_account">계정</string>
     <string name="settings_signed_in_google">Google로 로그인됨</string>
