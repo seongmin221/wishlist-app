@@ -2,6 +2,7 @@
 package app.wishlist.shared.data.fake
 
 import app.wishlist.shared.core.*
+import app.wishlist.shared.domain.CategoryInputRules
 import app.wishlist.shared.domain.evaluateItem
 import app.wishlist.shared.domain.isListEligible
 import app.wishlist.shared.model.*
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -29,9 +31,16 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         val submissionIds = mutableMapOf<String, String>()
         /** Item keys are canonical UUID strings, so platform casing never splits one item in two. */
         fun entry(id: String): Entry? = canonicalUuidOrNull(id)?.let(entries::get)
-        var categories: List<Category> = emptyList()
+        val customs = mutableListOf<FakeCustom>()
+        /** CAT-03 receipts by idempotency key: never expire (B2). */
+        val receipts = mutableMapOf<String, FakeReceipt>()
+        /** Successful (non-replay) creation times, for the 60-second limit. */
+        val creations = mutableListOf<Instant>()
         var purposes: List<Purpose> = emptyList()
         var seeded = false
+        /** The board seed's first leaf (DEBUG analysis files items there); null before seeding. */
+        var firstSeedLeaf: String? = null
+        fun custom(id: String): FakeCustom? = canonicalUuidOrNull(id)?.let { key -> customs.firstOrNull { it.id == key && !it.deleted } }
     }
     private data class Injection(val error: ClientError? = null, val millis: Long = 0)
     private val mutex = Mutex()
@@ -101,7 +110,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         val item = owner.entries[key]?.item
         if (item == null || item.lifecycleStatus == LifecycleStatus.DELETED)
             failure(ErrorKind.NOT_FOUND, "WISHLIST_ITEM_NOT_FOUND")
-        else ClientResult.Success(item)
+        else ClientResult.Success(present(owner, item))
     }
 
     /** Initializes the current owner's demo namespace once, preserving subsequent edits/replays. */
@@ -114,8 +123,13 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
                 ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
             item.copy(id = id, clientSubmissionId = key)
         }
-        owner.categories = data.categories.toList()
+        data.categories.filter { it.kind == "CUSTOM" }.forEach { custom ->
+            val id = canonicalUuidOrNull(custom.id) ?: return@request failure(ErrorKind.VALIDATION)
+            val parent = custom.parentId ?: return@request failure(ErrorKind.VALIDATION)
+            owner.customs += FakeCustom(id, parent, custom.name, null, emptyList(), custom.version ?: 1, nextCustomOrder(owner, parent))
+        }
         owner.purposes = data.purposes.toList()
+        owner.firstSeedLeaf = data.categories.firstOrNull { it.parentId != null }?.id
         val displayed = items.map { item ->
             if (item.purpose.id == null) item else item.copy(purpose = purpose(owner, item.purpose.id, item.purpose.source))
         }
@@ -128,10 +142,18 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         owner.seeded = true
         ClientResult.Success(Unit)
     }
-    suspend fun categories(): ClientResult<List<Category>> = request(ApiId.CAT_01) { ClientResult.Success(it.categories) }
+    /** C2 seed-shaped flat list (groups, public leaves, live customs); the C5 screens use [catalog]. */
+    suspend fun categories(): ClientResult<List<Category>> = request(ApiId.CAT_01) { owner ->
+        ClientResult.Success(FakeTaxonomy.groups.flatMap { group ->
+            listOf(Category(group.id, group.name)) +
+                FakeTaxonomy.leavesOf(group.id).map { Category(it.id, it.name, group.id, "PUBLIC") } +
+                owner.customs.filter { it.parentId == group.id && !it.deleted }.map { Category(it.id, it.name, group.id, "CUSTOM", it.version) }
+        })
+    }
+    suspend fun firstSeedLeaf(): ClientResult<String?> = request(null) { ClientResult.Success(it.firstSeedLeaf) }
     suspend fun purposes(): ClientResult<List<Purpose>> = request(ApiId.PUR_01) { ClientResult.Success(it.purposes) }
     suspend fun items(categoryId: String?, purposeId: String?): ClientResult<List<WishlistItem>> = request(ApiId.ITEM_02) { owner ->
-        ClientResult.Success(owner.entries.values.map { it.item }.filter {
+        ClientResult.Success(owner.entries.values.map { present(owner, it.item) }.filter {
             isListEligible(it) && (categoryId == null || it.category.id == categoryId) &&
                 (purposeId == null || it.purpose.id == purposeId)
         }.sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id }))
@@ -289,10 +311,153 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         val definition = owner.purposes.firstOrNull { it.id == id }
         return ItemPurpose(id, source, definition?.name, definition?.colorKey?.uppercase(), definition?.iconKey?.uppercase())
     }
-    private fun category(owner: OwnerStore, id: String?, source: ValueSource): ItemCategory {
-        val definition = owner.categories.firstOrNull { it.id == id }
-        return ItemCategory(id, source, null, definition?.name, definition?.parentId, definition?.kind)
+    private fun category(owner: OwnerStore, id: String?, source: ValueSource): ItemCategory =
+        displayed(owner, ItemCategory(id, source))
+
+    /** Like the server's B2 mapper: name/parentId/kind come from the current row (a renamed custom shows its new name). */
+    private fun displayed(owner: OwnerStore, category: ItemCategory): ItemCategory {
+        val id = category.id ?: return category.copy(name = null, parentId = null, kind = null)
+        FakeTaxonomy.leaf(id)?.let { return category.copy(name = it.name, parentId = it.groupId, kind = "PUBLIC") }
+        val custom = owner.custom(id) ?: return category
+        return category.copy(id = custom.id, name = custom.name, parentId = custom.parentId, kind = "CUSTOM")
     }
+    private fun present(owner: OwnerStore, item: WishlistItem): WishlistItem = item.copy(category = displayed(owner, item.category))
+    // ---- B2 CAT-01~04 and B4 ITEM-02 (category scope) ----
+
+    /** Server `WishlistReadPredicates.categoryVisible`: ACTIVE with a non-blank name. */
+    private fun visible(item: WishlistItem) = item.lifecycleStatus == LifecycleStatus.ACTIVE && !item.product.name.isNullOrBlank()
+
+    private fun counts(owner: OwnerStore): Map<String, Int> =
+        owner.entries.values.map { it.item }.filter(::visible).mapNotNull { it.category.id }.groupingBy { it }.eachCount()
+
+    private fun nextCustomOrder(owner: OwnerStore, parent: String): Int =
+        owner.customs.filter { it.parentId == parent }.maxOfOrNull { it.order + 1 } ?: FakeTaxonomy.leavesOf(parent).size
+
+    private fun detail(owner: OwnerStore, custom: FakeCustom) = CustomCategoryDetail(
+        custom.id, custom.name, custom.parentId, custom.description, custom.examples, counts(owner)[custom.id] ?: 0, custom.version)
+
+    private fun liveCustomCount(owner: OwnerStore) = owner.customs.count { !it.deleted }
+
+    suspend fun catalog(scope: CategoryScope, parentId: String?): ClientResult<CategoryCatalog> = request(ApiId.CAT_01) { owner ->
+        if (parentId != null && FakeTaxonomy.group(parentId) == null)
+            return@request failure(ErrorKind.VALIDATION, "INVALID_CATEGORY_PARENT", fields = setOf("parentId"))
+        val counts = counts(owner)
+        val groups = FakeTaxonomy.groups.filter { parentId == null || it.id == parentId }.mapNotNull { group ->
+            val public = FakeTaxonomy.leavesOf(group.id).map {
+                CategoryEntry(it.id, it.name, group.id, CategoryKind.PUBLIC, "PUBLIC", it.order, counts[it.id] ?: 0)
+            }
+            val personal = owner.customs.filter { it.parentId == group.id && !it.deleted }.sortedBy { it.order }.map {
+                CategoryEntry(it.id, it.name, group.id, CategoryKind.CUSTOM, "CUSTOM", it.order, counts[it.id] ?: 0)
+            }
+            val entries = (public + personal).filter { scope == CategoryScope.SELECT || it.kind == CategoryKind.CUSTOM || it.itemCount > 0 }
+            if (scope == CategoryScope.BROWSE && entries.isEmpty()) null
+            else CategoryGroup(group.id, group.name, group.order, entries.sumOf { it.itemCount }, entries)
+        }
+        ClientResult.Success(CategoryCatalog(scope, FakeTaxonomy.VERSION, groups, liveCustomCount(owner), CUSTOM_LIMIT))
+    }
+
+    suspend fun customCategory(id: String): ClientResult<CustomCategoryDetail> = request(ApiId.CAT_02) { owner ->
+        if (canonicalUuidOrNull(id) == null) return@request failure(ErrorKind.VALIDATION, "INVALID_CATEGORY_ID")
+        val custom = owner.custom(id) ?: return@request categoryNotFound()
+        ClientResult.Success(detail(owner, custom))
+    }
+
+    /** Server `CategoryService.create` order: input → receipt (replay) → rate → limit → duplicate. */
+    suspend fun createCategory(command: CategoryCommand, idempotencyKey: String): ClientResult<CategoryCreated> = request(ApiId.CAT_03) { owner ->
+        val key = canonicalUuidOrNull(idempotencyKey) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
+        if (FakeTaxonomy.group(command.parentId) == null)
+            return@request failure(ErrorKind.VALIDATION, "INVALID_CATEGORY_PARENT", fields = setOf("parentId"))
+        val invalid = CategoryInputRules.validate(command)
+        if (invalid.isNotEmpty()) return@request failure(ErrorKind.VALIDATION, "INVALID_CATEGORY_INPUT", fields = invalid)
+        owner.receipts[key]?.let { receipt ->
+            if (receipt.command != command) return@request failure(ErrorKind.CONFLICT, "IDEMPOTENCY_KEY_REUSED")
+            val row = owner.custom(receipt.customId) ?: return@request failure(ErrorKind.CONFLICT, "CATEGORY_NOT_AVAILABLE")
+            return@request ClientResult.Success(CategoryCreated(detail(owner, row), liveCustomCount(owner), CUSTOM_LIMIT))
+        }
+        val now = clock.now()
+        val recent = owner.creations.filter { now - it < CREATE_WINDOW }
+        if (recent.size >= CREATE_PER_WINDOW) {
+            val wait = (recent.min() + CREATE_WINDOW - now).inWholeMilliseconds
+            return@request ClientResult.Failure(ClientError(ErrorKind.RATE_LIMITED, "CATEGORY_CREATE_RATE_LIMITED",
+                retryAfterSeconds = maxOf(1L, (wait + 999) / 1000)))
+        }
+        if (liveCustomCount(owner) >= CUSTOM_LIMIT) return@request failure(ErrorKind.CONFLICT, "CATEGORY_LIMIT_REACHED")
+        if (duplicate(owner, command.parentId, command.name, null))
+            return@request failure(ErrorKind.CONFLICT, "CATEGORY_NAME_DUPLICATE", fields = setOf("name"))
+        val custom = FakeCustom(Uuid.parse(ids.newId()).toString(), command.parentId, command.name, command.description,
+            command.examples, 1, nextCustomOrder(owner, command.parentId))
+        owner.customs += custom
+        owner.receipts[key] = FakeReceipt(command, custom.id)
+        owner.creations += now
+        ClientResult.Success(CategoryCreated(detail(owner, custom), liveCustomCount(owner), CUSTOM_LIMIT))
+    }
+
+    /** Server `CategoryService.patch` order: found → version → any change → input → no-op → duplicate. */
+    suspend fun updateCategory(id: String, expectedVersion: Int, patch: CategoryPatch): ClientResult<CustomCategoryDetail> = request(ApiId.CAT_04) { owner ->
+        if (canonicalUuidOrNull(id) == null) return@request failure(ErrorKind.VALIDATION, "INVALID_CATEGORY_ID")
+        val custom = owner.custom(id) ?: return@request categoryNotFound()
+        if (custom.version != expectedVersion)
+            return@request failure(ErrorKind.CONFLICT, "CATEGORY_VERSION_CONFLICT", currentVersion = custom.version)
+        if (patch.isEmpty || expectedVersion <= 0) return@request failure(ErrorKind.VALIDATION, "INVALID_CATEGORY_INPUT")
+        val name = patch.name ?: custom.name
+        val description = when (val change = patch.description) {
+            DescriptionChange.Keep -> custom.description
+            is DescriptionChange.Set -> change.value
+        }
+        val examples = patch.examples ?: custom.examples
+        val invalid = CategoryInputRules.validate(CategoryCommand(custom.parentId, name, description, examples))
+        if (invalid.isNotEmpty()) return@request failure(ErrorKind.VALIDATION, "INVALID_CATEGORY_INPUT", fields = invalid)
+        if (name == custom.name && description == custom.description && examples == custom.examples)
+            return@request ClientResult.Success(detail(owner, custom))
+        if (duplicate(owner, custom.parentId, name, custom.id))
+            return@request failure(ErrorKind.CONFLICT, "CATEGORY_NAME_DUPLICATE", fields = setOf("name"))
+        custom.name = name
+        custom.description = description
+        custom.examples = examples
+        custom.version += 1
+        ClientResult.Success(detail(owner, custom))
+    }
+
+    private fun duplicate(owner: OwnerStore, parent: String, name: String, exceptId: String?): Boolean {
+        val key = CategoryInputRules.normalizedKey(name)
+        return owner.customs.any { !it.deleted && it.parentId == parent && it.id != exceptId && CategoryInputRules.normalizedKey(it.name) == key }
+    }
+
+    /** ITEM-02 category scope: newest first (`createdAt DESC, id DESC`), keyset cursor. */
+    suspend fun itemsByCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = request(ApiId.ITEM_02) { owner ->
+        if (limit !in 1..100) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+        val known = FakeTaxonomy.leaf(categoryId) != null || owner.custom(categoryId) != null
+        if (!known) return@request if (canonicalUuidOrNull(categoryId) != null) categoryNotFound()
+            else failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+        val key = canonicalUuidOrNull(categoryId) ?: categoryId
+        val all = owner.entries.values.map { it.item }.filter { visible(it) && it.category.id == key }
+            .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
+        val after = cursor?.let { raw ->
+            val parts = raw.removePrefix(CURSOR_PREFIX).split('|')
+            val millis = parts.getOrNull(0)?.toLongOrNull()
+            if (!raw.startsWith(CURSOR_PREFIX) || parts.size != 2 || millis == null)
+                return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_CURSOR")
+            Instant.fromEpochMilliseconds(millis) to parts[1]
+        }
+        val rest = if (after == null) all else all.filter {
+            it.createdAt < after.first || (it.createdAt == after.first && it.id < after.second)
+        }
+        val page = rest.take(limit)
+        val next = if (rest.size > limit) page.last().let { "$CURSOR_PREFIX${it.createdAt.toEpochMilliseconds()}|${it.id}" } else null
+        ClientResult.Success(ItemPage(page.map { present(owner, it) }, all.size, next))
+    }
+
+    /** DEBUG/test control: puts a finished item as is (policy applied); replaces one with the same id. */
+    suspend fun putItem(item: WishlistItem): ClientResult<WishlistItem> = request(null) { owner ->
+        val id = canonicalUuidOrNull(item.id) ?: return@request invalidItemId()
+        val stored = withPolicy(item.copy(id = id, category = displayed(owner, item.category)))
+        owner.entries[id] = Entry(stored)
+        owner.submissionIds[stored.clientSubmissionId] = id
+        ClientResult.Success(stored)
+    }
+
+    private fun categoryNotFound() = failure(ErrorKind.NOT_FOUND, "CATEGORY_NOT_FOUND")
+
     private fun next(item: WishlistItem): WishlistItem = withPolicy(item.copy(version = item.version + 1, updatedAt = clock.now()))
     private fun withPolicy(item: WishlistItem): WishlistItem {
         val policy = evaluateItem(item)
@@ -303,7 +468,28 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     private fun invalidItemId() = failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_ID")
     private fun missing(id: String) = if (canonicalUuidOrNull(id) == null) invalidItemId() else notFound()
     private fun conflict(item: WishlistItem) = failure(ErrorKind.CONFLICT, currentVersion = item.version)
-    private fun failure(kind: ErrorKind, code: String? = null, currentVersion: Int? = null) =
-        ClientResult.Failure(ClientError(kind, code, currentVersion = currentVersion))
+    private fun failure(kind: ErrorKind, code: String? = null, currentVersion: Int? = null, fields: Set<String> = emptySet()) =
+        ClientResult.Failure(ClientError(kind, code, currentVersion = currentVersion, fields = fields))
+
+    private companion object {
+        const val CUSTOM_LIMIT = 20
+        const val CREATE_PER_WINDOW = 5
+        val CREATE_WINDOW = 60.seconds
+        const val CURSOR_PREFIX = "fake1:"
+    }
 }
+
+/** A custom category row. [order] is fixed at creation (parent's max + 1, first = its public leaf count). */
+internal class FakeCustom(
+    val id: String,
+    val parentId: String,
+    var name: String,
+    var description: String?,
+    var examples: List<String>,
+    var version: Int,
+    val order: Int,
+    var deleted: Boolean = false,
+)
+
+internal data class FakeReceipt(val command: CategoryCommand, val customId: String)
 

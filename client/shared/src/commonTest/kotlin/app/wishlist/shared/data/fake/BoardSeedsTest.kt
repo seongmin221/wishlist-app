@@ -11,6 +11,15 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class BoardSeedsTest {
+    /** FCategoryHome chip numbers (design/canvas-fresh/gen_category.py `home_data`), by name. */
+    private val boardChips = mapOf(
+        "신발" to 5, "아우터" to 3, "가방" to 3, "상의" to 2, "패션 소품" to 2, "스킨케어" to 2, "향수" to 2,
+        "헤드폰" to 8, "키보드" to 3, "카메라·액션캠" to 3, "모니터" to 2, "마우스·트랙패드" to 2, "웨어러블 기기" to 2,
+        "이어폰" to 1, "태블릿" to 1, "오디오 케이블·DAC" to 2, "조명" to 3, "의자" to 2, "책상·테이블" to 2,
+        "주방 가전" to 3, "공기·온습도 관리" to 2, "조리 도구" to 1, "캠핑 용품" to 4, "러닝 용품" to 2,
+        "여행 가방·캐리어" to 2, "백패킹 소품" to 1, "피규어·컬렉터블" to 2, "보드게임·퍼즐" to 1, "레고" to 0, "수면·회복 용품" to 1,
+    )
+
     private val now = Instant.parse("2026-10-07T00:00:00Z")
     private fun seed(): BoardSeedData {
         var id = 0
@@ -24,7 +33,7 @@ class BoardSeedsTest {
         assertEquals(listOf("G001", "G002", "G003", "G004", "G005", "G006", "G007", "G011"),
             data.categories.filter { it.parentId == null }.map { it.id })
         assertEquals(38, data.categories.size)
-        assertEquals(30, data.displayMetadata.categoryChipCounts.size)
+        assertEquals(boardChips.keys, data.categories.filter { it.parentId != null }.map { it.name }.toSet())
     }
 
     @Test fun public_leaf_ids_and_custom_owner_leaves_match_the_board() {
@@ -56,7 +65,6 @@ class BoardSeedsTest {
         }
         data.purposes.forEach { Uuid.parse(it.id) }
         data.displayMetadata.cards.forEach { assertTrue(it.itemId in itemIds) }
-        assertEquals(categoryIds.filter { it.startsWith("G") }.size + data.displayMetadata.categoryChipCounts.size, categoryIds.size)
         assertEquals(purposeIds, data.displayMetadata.purposeCandidateCounts.keys)
     }
 
@@ -67,8 +75,23 @@ class BoardSeedsTest {
         assertEquals(4, data.items.count { it.purpose.id == data.commuteId })
         assertEquals(5, data.displayMetadata.purposeCandidateCounts[data.commuteId])
         assertEquals(listOf(5, 3, 2, 4, 3, 2, 0), data.purposes.map { data.displayMetadata.purposeCandidateCounts[it.id] })
-        assertEquals(69, data.displayMetadata.categoryChipCounts.values.sum())
-        assertEquals(8, data.items.size)
+        assertEquals(69, data.items.size)
+    }
+
+    @Test fun every_chip_number_is_real_membership() {
+        val data = seed()
+        val names = data.categories.associate { it.id to it.name }
+        val counts = data.items.groupingBy { names.getValue(it.category.id!!) }.eachCount()
+        assertEquals(boardChips.filterValues { it > 0 }, counts)
+        assertEquals(69, boardChips.values.sum())
+        val dac = data.items.filter { names[it.category.id] == "오디오 케이블·DAC" }
+        assertEquals(listOf("FiiO BTR7" to "259000", "오디오퀘스트 DragonFly Red" to "299000"), dac.map { it.product.name to it.product.price!!.canonical })
+    }
+
+    @Test fun headphones_stay_the_newest_items() {
+        val data = seed()
+        val newestEight = data.items.sortedByDescending { it.createdAt }.take(8)
+        assertTrue(newestEight.all { it.category.id == "C026" })
     }
 
     @Test fun category_list_is_canonical_for_marshall_without_a_second_candidate_item() {
@@ -94,7 +117,7 @@ class BoardSeedsTest {
 
     @Test fun prices_preserve_board_decimal_inputs_without_float_conversion() {
         assertEquals(listOf("549000", "499000", "389000", "769000", "229000", "1190000", "279000", "219000"),
-            seed().items.map { it.product.price!!.canonical })
+            seed().items.take(8).map { it.product.price!!.canonical })
     }
 
     @Test fun same_clock_and_id_sequence_are_deterministic_and_time_is_injected() {
@@ -109,7 +132,7 @@ class BoardSeedsTest {
         val boardOrder = data.displayMetadata.cards.filter { it.cardKey.startsWith("l") }.map { it.itemId }
         assertEquals(listOf("l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8"),
             data.displayMetadata.cards.filter { it.cardKey.startsWith("l") }.map { it.cardKey })
-        assertEquals(boardOrder, data.items.map { it.id })
+        assertEquals(boardOrder, data.items.take(8).map { it.id })
         assertEquals(now, data.items.first().createdAt)
         data.items.zipWithNext().forEach { (newer, older) -> assertTrue(newer.createdAt > older.createdAt) }
     }

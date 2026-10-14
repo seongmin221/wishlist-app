@@ -183,7 +183,8 @@ class SharedModulesTest {
         // Signing in seeds that account's namespace.
         runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val items = runtime.catalogRepository().items(null, null).successValue()
-        assertEquals(boardOrder, items.map { it.product.name })
+        assertEquals(boardOrder, items.take(8).map { it.product.name })
+        assertEquals(69, items.size)
         assertEquals(7, runtime.catalogRepository().purposes().successValue().size)
         runtime.close()
     }
@@ -199,7 +200,7 @@ class SharedModulesTest {
         runtime.startDebugSession()
         advanceUntilIdle()
 
-        assertEquals(listOf<Pair<String?, Int>>("fake-apple-0001" to boardOrder.size), seenWhenReady)
+        assertEquals(listOf<Pair<String?, Int>>("fake-apple-0001" to 69), seenWhenReady)
         assertEquals(AuthProvider.APPLE, runtime.auth().account.value?.provider)
         assertNull(runtime.bootstrapFailure.value)
         runtime.close()
