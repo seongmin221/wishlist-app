@@ -159,8 +159,8 @@ internal fun CategorySkeletonCard() {
         Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(PhotoShape).background(c.card).clearAndSetSemantics { })
         Column(Modifier.padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             SkeletonBar(110.dp)
-            SkeletonBar(80.dp, 18.dp)
-            SkeletonBar(96.dp, 12.dp)
+            SkeletonBar(80.dp, height = 18.dp)
+            SkeletonBar(96.dp, height = 12.dp)
         }
     }
 }

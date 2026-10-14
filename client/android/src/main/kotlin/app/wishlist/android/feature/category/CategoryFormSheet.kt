@@ -233,7 +233,7 @@ private fun ParentChips(state: CategoryFormState, form: CategoryFormPresenter, e
         WLText(stringResource(R.string.category_form_parent_label), CategoryCaption, color = c.textSecondary)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
             if (state.parents.isEmpty()) {
-                listOf(80, 110, 70, 96, 120, 64).forEach { SkeletonBar(it.dp, 40.dp) }
+                listOf(80, 110, 70, 96, 120, 64).forEach { SkeletonBar(it.dp, height = 40.dp) }
             } else {
                 state.parents.forEach { parent ->
                     WLChip(parent.name, onClick = { if (editable) form.setParent(parent.id) }, selected = parent.id == state.parentId)

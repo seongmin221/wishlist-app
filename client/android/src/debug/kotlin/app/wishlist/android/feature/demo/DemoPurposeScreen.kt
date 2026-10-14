@@ -91,6 +91,7 @@ fun DemoPurposeScreen() {
             WLText("끝난 비교", DemoCaption, color = c.textSecondary)
             DemoArchiveCard()
         }
+        DemoCategoryPickerEntry()
         TabBarSpacer()
     }
 }

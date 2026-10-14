@@ -43,7 +43,7 @@ internal fun keepAllBreaks(text: String): String = buildString {
 
 /** Skeleton 막대(카드색, 움직임 없음): 칩·이름·가격 자리. */
 @Composable
-internal fun SkeletonBar(width: Dp, height: Dp = 14.dp, modifier: Modifier = Modifier) {
+internal fun SkeletonBar(width: Dp, modifier: Modifier = Modifier, height: Dp = 14.dp) {
     Box(
         modifier
             .width(width)
