@@ -87,14 +87,14 @@ final class ItemDetailPresenterOwnerTests: XCTestCase {
     // MARK: - C4 screen support
 
     func testCloseRulesFollowTheAccountAndTheSignedOutRestore() {
-        let unauthenticated = ClientError(kind: .unauthenticated, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil)
+        let unauthenticated = ClientError(kind: .unauthenticated, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil, fields: [])
         // Initial before the first answer is the load not having started yet.
         XCTAssertFalse(ItemDetailPresenterOwner.shouldClose(item: nil, loading: false, error: nil, seenWork: false))
         XCTAssertTrue(ItemDetailPresenterOwner.shouldClose(item: nil, loading: false, error: nil, seenWork: true))
         XCTAssertTrue(ItemDetailPresenterOwner.shouldClose(item: nil, loading: false, error: unauthenticated, seenWork: false))
         XCTAssertFalse(ItemDetailPresenterOwner.shouldClose(item: nil, loading: true, error: unauthenticated, seenWork: true))
         for kind in ErrorKind.allCases where kind != .unauthenticated {
-            let error = ClientError(kind: kind, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil)
+            let error = ClientError(kind: kind, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil, fields: [])
             XCTAssertFalse(ItemDetailPresenterOwner.shouldClose(item: nil, loading: false, error: error, seenWork: true), kind.name)
         }
         XCTAssertFalse(ItemDetailPresenterOwner.shouldClose(item: nil, loading: true, error: nil, seenWork: true))
@@ -139,8 +139,8 @@ final class ItemDetailPresenterOwnerTests: XCTestCase {
         let seed = try await SharedTestRuntime.firstSeedItem(runtime)
         let owner = ItemDetailPresenterOwner(runtime: runtime)
         defer { owner.close() }
-        let first = ClientError(kind: .network, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil)
-        let second = ClientError(kind: .network, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil)
+        let first = ClientError(kind: .network, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil, fields: [])
+        let second = ClientError(kind: .network, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil, fields: [])
 
         XCTAssertFalse(owner.takeRefreshNotice(item: nil, loading: false, error: first))
         XCTAssertFalse(owner.takeRefreshNotice(item: seed, loading: true, error: first))

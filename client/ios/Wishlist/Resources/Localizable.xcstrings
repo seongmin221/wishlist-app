@@ -1933,6 +1933,57 @@
           }
         }
       }
+    },
+    "time.weeks": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d주 전"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d wk ago"
+          }
+        }
+      }
+    },
+    "time.date": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d월 %2$d일"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d/%2$d"
+          }
+        }
+      }
+    },
+    "time.date.year": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$d년 %2$d월 %3$d일"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$d/%3$d/%1$d"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
