@@ -70,6 +70,34 @@ class DebugControls internal constructor(
         return ClientResult.Success(total)
     }
 
+    /** C5: the next Fake CAT-03 waits [millis] (to time a "lost answer": cut the network meanwhile). */
+    fun delayNextCategoryCreate(millis: Long) {
+        fake.delayNext(ApiId.CAT_03, millis.coerceAtLeast(0))
+    }
+
+    /** C5: [count] items in [categoryId] for the 40-item page boundary, tall and slow photos included. */
+    suspend fun seedLongCategory(categoryId: String, count: Int = 120): ClientResult<Int> = withContext(io) {
+        if (withTimeoutOrNull(READY_WAIT) { ready.first { it } } == null) {
+            return@withContext ClientResult.Failure(ClientError(ErrorKind.UNAVAILABLE, RUNTIME_NOT_READY))
+        }
+        app.wishlist.shared.data.fake.FakeControls(fake).seedLongCategory(categoryId, clock.now(), count)
+    }
+
+    /**
+     * C5: changes a custom category's name as another device would (version + 1), so the open edit
+     * sheet's save meets CATEGORY_VERSION_CONFLICT.
+     */
+    suspend fun editCategoryElsewhere(customId: String, name: String): ClientResult<Unit> = withContext(io) {
+        when (val current = fake.customCategory(customId)) {
+            is ClientResult.Failure -> current
+            is ClientResult.Success -> when (val updated = fake.updateCategory(customId, current.value.version,
+                app.wishlist.shared.model.CategoryPatch(name = name))) {
+                is ClientResult.Failure -> updated
+                is ClientResult.Success -> ClientResult.Success(Unit)
+            }
+        }
+    }
+
     private companion object {
         val READY_WAIT = 30.seconds
     }

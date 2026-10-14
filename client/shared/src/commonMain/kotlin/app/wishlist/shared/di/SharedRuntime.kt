@@ -294,6 +294,22 @@ class SharedRuntime internal constructor(
         )
     }
 
+    /** C5 category tab first screen (CAT-01 BROWSE, last group in app state); the owner calls close. */
+    fun categoryHomePresenter(): app.wishlist.shared.presentation.CategoryHomePresenter =
+        app.wishlist.shared.presentation.CategoryHomePresenter(categoryRepository(), localStore(), session, env.dispatchers.io)
+
+    /** C5 one category's item list (CAT-01/02 header, ITEM-02 pages with the card cache); the owner calls close. */
+    fun categoryListPresenter(): app.wishlist.shared.presentation.CategoryListPresenter =
+        app.wishlist.shared.presentation.CategoryListPresenter(categoryRepository(), itemListRepository(), session, env.dispatchers.io)
+
+    /** C5 custom category create/edit form (CAT-01 SELECT, CAT-02~04; idempotency keys from the runtime IDs). */
+    fun categoryFormPresenter(): app.wishlist.shared.presentation.CategoryFormPresenter =
+        app.wishlist.shared.presentation.CategoryFormPresenter(categoryRepository(), env.ids, session, env.dispatchers.io)
+
+    /** C5 category picker sheet (CAT-01 SELECT); C8 hands its pick to the edit draft. */
+    fun categoryPickerPresenter(): app.wishlist.shared.presentation.CategoryPickerPresenter =
+        app.wishlist.shared.presentation.CategoryPickerPresenter(categoryRepository(), localStore(), session, env.dispatchers.io)
+
     /**
      * **DEBUG only** (null in RELEASE and after [close]): demo hooks for on-device checks — delaying
      * the next Fake ITEM-01 and creating unbound pending rows. Apps call it only from debug code paths.

@@ -368,6 +368,45 @@ class SharedModulesTest {
         late.close()
     }
 
+    @Test fun runtime_category_presenters_run_on_the_seeded_fake() = runTest {
+        val bindings = debugBindings(*listOf(ApiId.ITEM_02, ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04).map { it to Backend.FAKE }.toTypedArray())
+        val runtime = createRuntime(bindings, dispatcher = StandardTestDispatcher(testScheduler))
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
+        advanceUntilIdle()
+
+        val home = runtime.categoryHomePresenter()
+        home.load(); advanceUntilIdle()
+        assertEquals(69, home.state.value.totalCount)
+        assertEquals(8, home.state.value.groups.size)
+
+        val list = runtime.categoryListPresenter()
+        list.load(app.wishlist.shared.presentation.CategoryListHint("C026", "헤드폰", "G003", "디지털·IT", app.wishlist.shared.model.CategoryKind.PUBLIC))
+        advanceUntilIdle()
+        assertEquals(8, list.state.value.items.size)
+        assertEquals(8, list.state.value.header?.count)
+        // The list cards went through the card cache decorator.
+        val first = list.state.value.items.first()
+        assertEquals(first.version, runtime.localStore().cachedItem(runtime.session.state.value, first.id).successValue()?.version)
+
+        val form = runtime.categoryFormPresenter()
+        form.startCreate("G003", app.wishlist.shared.presentation.FormSource.TAB, null); advanceUntilIdle()
+        assertEquals(11, form.state.value.parents.size)
+        assertEquals(3, form.state.value.usedCount)
+        form.setName("책상 장비"); advanceUntilIdle()
+        form.submit(); advanceUntilIdle()
+        assertIs<app.wishlist.shared.presentation.FormResult.Created>(form.state.value.result)
+
+        val picker = runtime.categoryPickerPresenter()
+        picker.open("C026"); advanceUntilIdle()
+        assertEquals("G003", picker.state.value.currentGroupId)
+        assertEquals(87 + 4, picker.state.value.catalog?.groups?.sumOf { it.categories.size })
+
+        listOf(home, list, form, picker).forEach { it.close() }
+        runtime.close()
+    }
+
     @Test fun runtime_detail_load_republishes_the_submission_view() = runTest {
         var now = runtimeTime
         val runtime = createRuntime(debugBindings(), dispatcher = StandardTestDispatcher(testScheduler), clock = Clock { now })
