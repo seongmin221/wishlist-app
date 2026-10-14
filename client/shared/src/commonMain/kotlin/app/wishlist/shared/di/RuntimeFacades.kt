@@ -147,6 +147,8 @@ internal class GatedLocalStore(
     override suspend fun processingItems(snapshot: SessionSnapshot) = gated { delegate.processingItems(snapshot) }
     override suspend fun upsertItem(snapshot: SessionSnapshot, item: WishlistItem) =
         gated { delegate.upsertItem(snapshot, item) }
+    override suspend fun upsertItems(snapshot: SessionSnapshot, items: List<WishlistItem>) =
+        gated { delegate.upsertItems(snapshot, items) }
     override suspend fun cachedItem(snapshot: SessionSnapshot, id: String) =
         gated { delegate.cachedItem(snapshot, id) }
     override suspend fun cachedItemBySubmission(snapshot: SessionSnapshot, submissionId: String) =

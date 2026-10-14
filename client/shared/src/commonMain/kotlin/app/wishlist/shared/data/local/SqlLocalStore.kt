@@ -214,6 +214,12 @@ internal class SqlLocalStore(
             ClientResult.Success(Unit)
         }
 
+    override suspend fun upsertItems(snapshot: SessionSnapshot, items: List<WishlistItem>): ClientResult<Unit> =
+        gatedForAccount(snapshot) { db, account ->
+            db.transaction { items.forEach { db.upsertFromGet(account, it) } }
+            ClientResult.Success(Unit)
+        }
+
     override suspend fun cachedItem(snapshot: SessionSnapshot, id: String): ClientResult<WishlistItem?> =
         gatedForAccount(snapshot) { db, account ->
             db.transactionWithResult {

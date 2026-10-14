@@ -14,6 +14,7 @@ import app.wishlist.shared.data.fake.FakeItemListRepository
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.data.local.CachedGetItemRepository
+import app.wishlist.shared.data.local.CachedItemListRepository
 import app.wishlist.shared.data.local.LazyDriver
 import app.wishlist.shared.data.local.SqlLocalStore
 import app.wishlist.shared.data.local.StoreLease
@@ -210,7 +211,8 @@ private fun coreModule(env: RuntimeEnvironment, storeLease: StoreLease) = module
             Backend.UNAVAILABLE -> UnavailableItemListRepository
         }
     }
-    single<ItemListRepository> { get(ITEM_02_DELEGATE) }
+    // Like the Get facade: the selected ITEM-02 delegate is wrapped once by the card cache decorator.
+    single<ItemListRepository> { CachedItemListRepository(get(ITEM_02_DELEGATE), get(), get()) }
 }
 
 private fun Scope.categoryBackend(backend: Backend): CategoryRepository = when (backend) {
