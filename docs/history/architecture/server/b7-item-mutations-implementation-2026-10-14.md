@@ -43,3 +43,9 @@
 - 첫 실행 6개 중 2개 실패. 둘 다 테스트 코드 오류였다. job 목록 문자열의 시각에 `:`가 있어 `substringBeforeLast`가 잘못 잘랐고, test helper `claimJob`이 generation 1로 고정돼 있어 generation 2 job을 claim하지 못했다. 테스트를 고친 뒤 6개 통과. 구현은 바꾸지 않았다.
 - GREEN 범위: 새 generation·job(attempt 0, first_attempt null)·outbox(`analysis-{job}-{gen}`)·receipt 원자 저장과 dispatch, replay에 job·outbox·dispatch 추가 없음, 다른 상품 같은 key 409, 삭제 뒤 replay 404, READY·PARTIAL·FAILED_TERMINAL·PROCESSING·수동 완료·ARCHIVED 409와 receipt 없음, owner별 60초 10건(11번째 429·Retry-After 1~60, replay 미집계, 다른 owner 무관, 창이 지나면 허용), dispatch 일반 예외는 성공 유지·`CancellationException`은 전파되고 commit된 attempt를 같은 key replay로 받음, 이전 generation 실행의 Complete/Partial/Retryable/Terminal finish와 claim 무시, USER 이름·category와 목적 USER+null이 새 generation 성공 뒤에도 유지.
 - 구현 메모: `WishlistItemRepository.insertInitialAnalysis`를 generation 인자를 받는 `insertAnalysis`로 일반화했다(생성 경로는 generation 1로 같은 SQL). `CreateWishlistItemServiceTest` 10개로 회귀를 확인했다.
+
+### Task 8: HTTP route와 조립
+
+- RED: `WishlistItemMutationRoutesTest`가 `wishlistItemMutationRoutes`·`ItemMutationHandlers` 미정의로 compile 실패.
+- GREEN: 6개 통과, `ApiRouteExposureTest` 3개 통과. 다섯 route의 성공 응답(사진 서명·`imageMediaId`·`deletionImpact`), 401→400→422→404→409 순서와 code·`currentVersion`·정렬된 `fields`, 구조 오류의 빈 details, 삭제 204 반복·다른 owner 404·ARCHIVED 409, 재분석 key 누락 400·body 422·replay header·key 재사용 409·한도 429와 `Retry-After`, 다섯 route 모두 IO dispatcher 실행과 취소 전파, `apiRoutes` 조립.
+- 계획 대비: 새 route의 공개 노출은 `ApiRouteExposureTest`를 고치지 않고 새 테스트의 `public api registers the mutation routes`가 `apiRoutes` 조립으로 확인한다.
