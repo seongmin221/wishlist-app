@@ -60,7 +60,8 @@ class ItemMutationService(
         afterMediaLock()
         ItemTextRules.invalidFields(plan).takeIf { it.isNotEmpty() }?.let { throw ItemMutationException("INVALID_WISHLIST_ITEM_INPUT", fields = it) }
         validateReferences(c, owner, itemId, plan, media)
-        if (!plan.changed) return@inTransaction current(c, owner, itemId)
+        // Manual completion always records its time even when a prior PATCH already stored the same user values.
+        if (!plan.changed && command != ItemCommand.ManualCompletion) return@inTransaction current(c, owner, itemId)
         try {
             ItemMutationRepository.write(c, itemId, plan.next, command == ItemCommand.ManualCompletion)
         } catch (error: SQLException) {

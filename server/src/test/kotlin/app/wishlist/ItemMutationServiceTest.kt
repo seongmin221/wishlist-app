@@ -301,4 +301,21 @@ class ItemMutationServiceTest {
             service.decideReview(owner, seedItem(source, owner), 3, ReviewDecision.CONFIRM, ItemChanges(purpose = FieldChange.Set(UUID.randomUUID())))
         }
     }
+
+    @Test fun `manual completion after a patch with the same values still records completion`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        val service = source.service()
+        val item = seedItem(source, owner, ItemSeed(analysis = "FAILED_RETRYABLE", review = "PENDING", name = null, nameSource = null,
+            category = null, categorySource = null, missingReason = "EXTRACTION_UNRESOLVED"))
+        val patched = service.edit(owner, item, 3, ItemChanges(name = FieldChange.Set("직접 이름"), category = FieldChange.Set(CategoryRef.Public("C026"))))
+        assertEquals(ReviewStatus.CONFIRMED, patched.storedState.state.reviewStatus)
+        assertNull(patched.storedState.state.manualCompletionAt)
+        val done = service.completeManually(owner, item, 4, ItemChanges(name = FieldChange.Set("직접 이름"), category = FieldChange.Set(CategoryRef.Public("C026"))))
+        assertEquals(5, done.version)
+        assertNotNull(done.storedState.state.manualCompletionAt)
+        assertEquals(setOf(ItemAction.EDIT, ItemAction.DELETE), WishlistItemPolicy.evaluate(done.storedState.state).allowedActions)
+        assertEquals("WISHLIST_ITEM_STATE_CONFLICT", assertFailsWith<ItemMutationException> {
+            ReanalysisService(source).reanalyze(owner, item, UUID.randomUUID())
+        }.code)
+    }
 }

@@ -1,6 +1,6 @@
 # B7 상품 사용자 변경 구현 이력
 
-> 2026-10-14 · 진행 중 · [spec](../../../superpowers/specs/2026-10-14-b7-item-mutations-design.md) · [계획](../../../superpowers/plans/2026-10-14-b7-item-mutations.md) · [결정](../../product-planning/mvp/decisions/b7-item-mutation-policy-2026-10-14.md)
+> 2026-10-14 · 구현·독립 리뷰 반영 완료 · [spec](../../../superpowers/specs/2026-10-14-b7-item-mutations-design.md) · [계획](../../../superpowers/plans/2026-10-14-b7-item-mutations.md) · [결정](../../product-planning/mvp/decisions/b7-item-mutation-policy-2026-10-14.md)
 
 ## 실행 기록
 
@@ -58,6 +58,20 @@
   - B4 anchor 복구 반복: ITEM-05로 anchor 삭제, ITEM-04 category 변경으로 anchor 범위 이동, HOME-02 검토 그룹 anchor 확정 뒤 다음 항목으로 복구(`anchorResolved=false`).
   - 전체 흐름: 비로그인 401 → 로그인 뒤 과거 `clientCreatedAt`으로 생성·응답 유실 재전송(같은 item, 공유 시각 유지) → AI 장애로 합산 3회 소진 FAILED_RETRYABLE → 재분석(replay 포함) → READY·검토 대기 → DEFER(검토 그룹 0) → 사진 연결·stale version 409·사진 해제 → 삭제 두 번 204 → 404, 홈 count 0. 기기 LocalSubmission 자체는 클라이언트 묶음의 범위다.
 - 기존 테스트 변경: `MediaUploadFlowTest`는 B7 전이라 SQL로 사진을 연결·해제했다. 이를 ITEM-04 PATCH로 바꾸고, 해제 직후에는 정리되지 않고(24시간 유예) 유예를 25시간 앞당긴 뒤 정리됨을 확인한다. 통과.
+
+### Task 10: 전체 회귀와 독립 리뷰
+
+- 회귀 전 시각 확인: host와 `postgres:16-alpine` container `date -u`가 1초 안에서 일치(07:03 UTC).
+- 전체 회귀(`8310163`, background 1회): **568 tests, 566 통과, 2 opt-in skip**(PlaywrightRealBrowser, RealUrlPilot), 실패·오류 0, 38분 11초. 실제 PostgreSQL Testcontainers 사용, container 시작 실패 없음.
+- 독립 코드 리뷰(gradle 미실행, 읽기 전용): Critical 0, Important 1, Minor 2.
+
+| 지적 | 처리 |
+| --- | --- |
+| Important: PATCH로 이름·category를 USER로 넣고 결정 3으로 CONFIRMED가 된 PARTIAL/실패 상품에, 같은 값의 ITEM-07을 보내면 `ItemRow`에 수동 완료 시각이 없어 no-op으로 판정된다. 그러면 200을 돌려주지만 수동 완료 시각이 기록되지 않고 재분석이 계속 허용된다 | **반영.** 수동 완료는 no-op 판정에서 제외해 항상 저장한다. 회귀 테스트 `manual completion after a patch with the same values still records completion`을 먼저 실행해 RED 확인(기대 version 5, 실제 4). 수정 뒤 `ItemMutationServiceTest` 11·`ItemChangePlanTest` 11·`ItemMutationConcurrencyTest` 7 통과 |
+| Minor: 사진 연결·정리 경합의 세 번째 경우는 연결이 `unreferenced_since`를 비우므로 lease의 READY 조건에서 이미 빠지고, 별도 참조 재확인을 검증하지 않는다 | **주석 정정.** 그 재확인은 B6 `MediaCleanupTest`의 stale `unreferenced_since` 사례가 검증한다고 적었다. 동작 변경 없음 |
+| Minor: ITEM-07 no-op 경로 테스트 없음 | 위 Important 회귀 테스트로 보완 |
+
+- 영향 정리: 수정은 `ItemMutationService.mutate`의 no-op 분기 하나다. ITEM-04·08의 no-op 동작과 기존 테스트 기대는 바뀌지 않는다(ITEM-08은 REVIEW가 PENDING을 요구해 항상 상태가 바뀐다).
 
 ## 계획 대비 결정 요약
 

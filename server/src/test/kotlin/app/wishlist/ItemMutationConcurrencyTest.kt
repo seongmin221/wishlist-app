@@ -139,7 +139,9 @@ class ItemMutationConcurrencyTest {
         assertEquals("DELETED", status(second))
         assertNull(itemColumns(source, secondItem, "media_asset_id")["media_asset_id"])
 
-        // Discovery saw the row unreferenced, then the edit committed before the lease: the lease re-check keeps it.
+        // Discovery saw the row unreferenced, then the edit committed before the lease. The link clears unreferenced_since,
+        // so the lease's READY condition already drops the row; the separate reference re-check for a link that kept a
+        // stale unreferenced_since is B6's MediaCleanupTest case.
         val third = staleReady(); val thirdItem = seedItem(source, owner, ItemSeed(review = "CONFIRMED"))
         val racing = MediaCleanup(source, storage, beforeLease = { id ->
             if (id == third) ItemMutationService(source).edit(owner, thirdItem, 3, ItemChanges(media = FieldChange.Set(third)))
