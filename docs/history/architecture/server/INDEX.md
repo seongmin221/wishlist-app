@@ -1,6 +1,6 @@
 # Server 의사결정
 
-- [B7 상품 사용자 변경 구현 이력](b7-item-mutations-implementation-2026-10-14.md) — ITEM-04~08·deletionImpact·V19, Task별 RED/GREEN·경합·전체 회귀·B8/B10/B11 인계
+- [B7 상품 사용자 변경 구현 이력](b7-item-mutations-implementation-2026-10-14.md) — ITEM-04~08·deletionImpact·V19, Task별 RED/GREEN·경합·569 tests 567 통과/2 opt-in skip·독립 리뷰 Important 1 반영·B8/B10/B11 인계
 - [B7 상품 사용자 변경 문서 검토](b7-item-mutations-document-review-2026-10-14.md) — 3차 정적 검토 완료 · 기존 지적 5건 반영 확인·추가 지적 없음
 - [B6 사용자 이미지 업로드 구현 이력](b6-media-upload-implementation-2026-10-13.md) — MEDIA-01·02·표시 URL·OPS-01 media 정리, 512 tests 510 통과/2 opt-in skip·독립 리뷰 Important 3·PR 리뷰 1~3차 반영·B7/B10/B11 인계
 - [B5 비동기 분석·운영 복구 구현 이력](b5-analysis-runtime-implementation-2026-10-09.md) — 435 tests 433 통과/2 opt-in skip·독립 리뷰 Important 3+재등급 1 반영·B11 이관

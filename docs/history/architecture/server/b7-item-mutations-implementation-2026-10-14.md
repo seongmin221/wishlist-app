@@ -73,6 +73,12 @@
 
 - 영향 정리: 수정은 `ItemMutationService.mutate`의 no-op 분기 하나다. ITEM-04·08의 no-op 동작과 기존 테스트 기대는 바뀌지 않는다(ITEM-08은 REVIEW가 PENDING을 요구해 항상 상태가 바뀐다).
 
+### 리뷰 반영·develop 병합 뒤 전체 회귀
+
+- develop(C4 웹뷰, 서버 코드 변경 없음) 병합은 충돌 없이 `docs/superpowers/plans/INDEX.md`만 자동 병합됐다.
+- 1차 재실행(`c37ad01`): 569 tests 중 2개 실패(`OutboxDispatcherTest` 예정 시각, `LocalMediaRoutesTest` signed URL 403). 실행 중 host가 잠들어 55,389초가 걸렸고, 끝난 뒤 Podman VM 시계가 host보다 약 15시간 늦었다(host 23:08 UTC, container 08:16 UTC). DB 시각과 host 시각을 비교하는 테스트의 **환경 실패**로 분류했다. `chronyc makestep`은 응답 source가 없어 효과가 없었고, VM 시계를 host 시각으로 직접 맞춘 뒤 두 테스트를 단독으로 다시 돌려 10·1개 통과했다.
+- 2차 재실행(`c37ad01`, `caffeinate -i`로 잠들기 방지, 시작·종료 시각 일치): **569 tests, 567 통과, 2 opt-in skip**, 실패·오류 0, 45분 24초. container 시작 실패 없음.
+
 ## 계획 대비 결정 요약
 
 - Task 4·5는 한 커밋으로 합쳤다(공통 경로가 Task 3에 있어 진입 메서드만 남았다).
