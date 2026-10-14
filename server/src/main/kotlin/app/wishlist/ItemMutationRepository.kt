@@ -1,5 +1,6 @@
 package app.wishlist
 
+import app.analysis.transitionAnalysisJob
 import java.sql.Connection
 import java.sql.ResultSet
 import java.util.UUID
@@ -70,6 +71,20 @@ internal object ItemMutationRepository {
     fun releaseMedia(c: Connection, mediaId: UUID) = c.prepareStatement(
         "update media_assets set unreferenced_since=clock_timestamp(), updated_at=clock_timestamp() where id=? and status='READY'",
     ).use { s -> s.setObject(1, mediaId); s.executeUpdate() }
+
+    /** Jobs of one item in ID order with their stages, locked after the item. */
+    fun lockJobs(c: Connection, itemId: UUID): List<Pair<UUID, String>> =
+        c.prepareStatement("select id, stage from analysis_jobs where wishlist_item_id=? order by id for update").use { s ->
+            s.setObject(1, itemId)
+            s.executeQuery().use { r -> buildList { while (r.next()) add(r.getObject(1, UUID::class.java) to r.getString(2)) } }
+        }
+
+    /** Cancels a job and releases its execution identity so a running Worker's later writes are all stale. */
+    fun cancelJob(c: Connection, jobId: UUID) = c.transitionAnalysisJob(jobId, "CANCELLED")
+
+    fun markDeleted(c: Connection, itemId: UUID) = c.prepareStatement(
+        "update wishlist_items set lifecycle_status='DELETED', media_asset_id=null, version=version+1, updated_at=clock_timestamp() where id=?",
+    ).use { s -> s.setObject(1, itemId); check(s.executeUpdate() == 1) }
 
     /** One UPDATE for the planned row; version and updated_at change once. */
     fun write(c: Connection, itemId: UUID, row: ItemRow, completeManually: Boolean) = c.prepareStatement("""

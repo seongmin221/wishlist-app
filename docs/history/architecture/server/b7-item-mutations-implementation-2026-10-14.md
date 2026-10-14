@@ -28,3 +28,11 @@
 - 두 명령은 Task 3의 공통 `mutate` 경로를 그대로 쓰므로 진입 메서드(`completeManually`·`decideReview`)를 잠시 빼고 test compile을 실행해 미정의 compile 실패 RED를 확인한 뒤 되돌렸다. 계획의 두 커밋을 한 커밋으로 합쳤다.
 - GREEN: `ItemMutationServiceTest` 10개 통과. PARTIAL·FAILED_RETRYABLE·FAILED_TERMINAL 수동 완료(분석 상태·failureCode·predicted 진단 유지, 완료 뒤 EDIT/DELETE만), 줄바꿈 섞인 230자 추출명을 그대로 보내도 완료, READY·PROCESSING·완료 반복 409 STATE. CONFIRM/DEFER, 같은 값은 AI 출처 유지, DEFERRED가 HOME-02 검토 그룹에서 빠지고 이후 이름만 편집해도 돌아오지 않음, PARTIAL·수동 완료·NOT_REQUIRED·PROCESSING·ARCHIVED 409 STATE.
 - 계획의 "확정 상품에 Worker가 목적을 채우지 않음"은 B3의 `PurposeFinishTest.reviewed user and override purposes are never filled or replaced`가 CONFIRMED/DEFERRED + UNASSIGNED fixture로 이미 검증한다. B7 명령은 이 보호를 바꾸지 않으므로 같은 fixture 테스트를 복제하지 않았다.
+
+### Task 6: ITEM-05 삭제와 deletionImpact
+
+- RED 1: `ItemDeleteTest`가 `DeleteResult`·`delete` 미정의로 compile 실패.
+- RED 2(snapshot): impact를 먼저 기존 autocommit 상세 조회 위에 붙여 실행했다. 두 경합 테스트가 예측대로 실패했다 — 이동만: 기대 candidateCount 3, 실제 2(N-1). 추가만: 기대 3, 실제 4(N+1).
+- GREEN: `GetWishlistItemService.get`을 `inTransaction(readOnly = true)`(REPEATABLE READ)로 바꾼 뒤 `ItemDeleteTest` 6개 통과. 영향 테스트 `WishlistItemViewMapperTest` 3·`WishlistDetailRoutesTest` 8·`WishlistRoutesTest` 6·`CreateWishlistItemServiceTest` 10·`HomeRoutesTest` 1·`WishlistReadRoutesTest` 3·`MediaUploadFlowTest` 1·`AnalysisRuntimeFlowTest` 4·`MediaDisplayRoutesTest` 1·`HomeActionRoutesTest` 4·`PurposeRoutesTest` 4 통과.
+- 기존 테스트 변경: `WishlistReadRoutesTest`는 상세 JSON과 카드 JSON이 같다고 검사했다. 상세에만 `deletionImpact`가 붙는 것이 B7 계약이므로, 상세에 key가 있고 카드에는 없음을 확인한 뒤 그 key를 뺀 나머지가 같은지 비교하도록 바꿨다.
+- 구현 메모: impact는 `WishlistItem.deletionImpact`(기본 null)에 붙이고 DTO는 `@EncodeDefault(NEVER)`로 null일 때 key를 내지 않는다. 그래서 route 함수 시그니처를 바꾸지 않고 생성·replay·상세·변경 응답이 같은 mapper를 쓴다. 삭제는 진행 중 stage(`GENERAL_/BROWSER_` PENDING·RUNNING)만 `transitionAnalysisJob(CANCELLED)`로 바꾼다.

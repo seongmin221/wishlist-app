@@ -10,6 +10,8 @@ import java.sql.SQLException
 import java.util.UUID
 import javax.sql.DataSource
 
+enum class DeleteResult { DELETED, ALREADY_DELETED }
+
 class ItemMutationException(
     val code: String,
     val currentVersion: Int? = null,
@@ -81,5 +83,32 @@ class ItemMutationService(private val dataSource: DataSource) {
         }
     }
 
-    private fun current(c: Connection, owner: UUID, itemId: UUID): WishlistItem = checkNotNull(items.findOwned(c, owner, itemId))
+    /**
+     * ITEM-05 without a version. Locks owner -> purpose -> item -> media -> jobs, cancels only in-progress jobs and
+     * keeps finished analysis history. Category and purpose references stay on the tombstone for diagnostics.
+     */
+    fun delete(owner: UUID, itemId: UUID): DeleteResult = dataSource.inTransaction { c ->
+        OwnerStructureLock.lock(c, owner)
+        val peek = ItemMutationRepository.find(c, owner, itemId, lock = false) ?: throw ItemMutationException("WISHLIST_ITEM_NOT_FOUND")
+        if (peek.lifecycle == LifecycleStatus.DELETED) return@inTransaction DeleteResult.ALREADY_DELETED
+        ItemMutationRepository.lockPurposes(c, owner, listOfNotNull(peek.row.purposeId))
+        val item = checkNotNull(ItemMutationRepository.find(c, owner, itemId, lock = true))
+        ItemMutationRepository.lockMedia(c, owner, listOfNotNull(item.row.mediaId))
+        val jobs = ItemMutationRepository.lockJobs(c, itemId)
+        if (ItemAction.DELETE !in WishlistItemPolicy.evaluate(item.state).allowedActions) {
+            throw ItemMutationException("WISHLIST_ITEM_STATE_CONFLICT", item.version)
+        }
+        ItemMutationRepository.markDeleted(c, itemId)
+        jobs.filter { (_, stage) -> stage in IN_PROGRESS_STAGES }.forEach { (job, _) -> ItemMutationRepository.cancelJob(c, job) }
+        item.row.purposeId?.let { PurposeMembership.recordTransition(c, owner, it, null) }
+        item.row.mediaId?.let { ItemMutationRepository.releaseMedia(c, it) }
+        DeleteResult.DELETED
+    }
+
+    private fun current(c: Connection, owner: UUID, itemId: UUID): WishlistItem =
+        DeletionImpacts.attach(c, owner, checkNotNull(items.findOwned(c, owner, itemId)))
+
+    private companion object {
+        val IN_PROGRESS_STAGES = setOf("GENERAL_PENDING", "GENERAL_RUNNING", "BROWSER_PENDING", "BROWSER_RUNNING")
+    }
 }

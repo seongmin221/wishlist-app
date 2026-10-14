@@ -26,6 +26,8 @@ data class WishlistItem(
     /** READY user image linked to the item; display URLs are signed outside the read transaction. */
     val mediaId: UUID? = null,
     val mediaObjectKey: String? = null,
+    /** Only single-item responses carry this; list cards leave it null so the JSON key is absent. */
+    val deletionImpact: DeletionImpact? = null,
 ) {
     val id: UUID get() = storedState.id
     val version: Int get() = storedState.version
