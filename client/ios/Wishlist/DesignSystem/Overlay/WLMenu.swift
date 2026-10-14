@@ -27,7 +27,7 @@ struct WLMenuCard: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!item.enabled)
-                .opacity(item.enabled ? 1 : 0.4)
+                .opacity(item.enabled ? 1 : wlDisabledOpacity)
             }
         }
         .padding(.vertical, 6)

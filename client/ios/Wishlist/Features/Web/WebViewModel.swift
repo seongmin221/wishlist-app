@@ -1,0 +1,396 @@
+import Observation
+import UIKit
+import UIKit.UIGestureRecognizerSubclass
+import WebKit
+
+/// Lifetime owner of one FWebView route's `WKWebView` (spec §4 수명; Android `WebViewHolder`). Kept per back-stack
+/// entry by `WLEntryOwners.web(_:url:)`, so the page and its history live as long as the entry, including trips to
+/// other apps (D15). `close()` (pop, account change) stops loading and turns every later request into a cancel (the
+/// delegates stay: without them WebKit would allow every navigation unchecked); `deinit` is the backup.
+/// After process death the route opens its original URL only (D15).
+///
+/// It is the web view's navigation and UI delegate:
+/// - `decidePolicyFor` → `decide(url:mainFrame:userGesture:)`: `WebNavigationPolicy` with
+///   `targetFrame?.isMainFrame ?? true` (nil = a new-window request) and `WebUserGesture` as the user gesture
+///   (`.linkActivated` and a real tap on the web view within the last second: a script's `a.click()` is also
+///   `.linkActivated`, and a scroll or drag is not a tap). One tap is one decision: the first one made with it
+///   spends it, whatever it opens (a script's next click asks; Android `WebTapBudget`). A same-page `#fragment`
+///   link does not spend it (Android never sees one). VoiceOver, Switch Control and Full Keyboard Access activate
+///   links without a touch and no public API tells: their external links always ask (known limit, kept safe).
+///   External apps open with `UIApplication.open` (never `canOpenURL`; a false result does nothing, D16); without
+///   a gesture they go through `ExternalPromptGate` and FWebViewExternal (`presentPrompt`). Every external request,
+///   from the main frame or an iframe, is cancelled in WebKit, so it never loads into any frame.
+/// - `createWebViewWith` loads the request in this web view and returns nil (`target=_blank`, `window.open`). The
+///   load is asked about again as a main-frame navigation. Only a `WebPageURL` (http/https with a host) is loaded;
+///   a blank new window (`window.open()`) or any other scheme is dropped (it would wipe the page).
+/// - Bars: KVO of `url`, `title`, `isLoading`, `estimatedProgress`, `canGoBack`, `canGoForward` into `page`.
+///   Main-frame `didFailProvisionalNavigation`/`didFail` (not a cancel) or a web content crash set `failed`.
+@MainActor
+@Observable
+final class WebViewModel: NSObject, WKNavigationDelegate, WKUIDelegate {
+    /// One FWebViewExternal question. The screen calls `open()` from 열기 and `closed(confirmed)` once the dialog
+    /// is gone (취소, 열기 or escape).
+    struct ExternalPrompt {
+        let url: URL
+        let open: () -> Void
+        let closed: (_ confirmed: Bool) -> Void
+        /// The dialog was discarded before it opened (overlay `onDropped`): nothing was asked, nothing is silenced.
+        let notShown: () -> Void
+    }
+
+    let initialURL: URL
+    private(set) var page: WebPageState
+    private(set) var isClosed = false
+
+    @ObservationIgnored let webView: WKWebView
+    /// The screen's FWebViewExternal; returns false when the dialog could not be shown. Nil = not shown.
+    @ObservationIgnored var presentPrompt: ((ExternalPrompt) -> Bool)?
+    /// Closes the FWebViewExternal the screen has up (set while one is shown or waiting): `close()` calls it so the
+    /// app-wide overlay does not keep it over the next screen (Android `ShownPrompt`).
+    @ObservationIgnored var dismissPrompt: (() -> Void)?
+
+    @ObservationIgnored private let gate = ExternalPromptGate()
+    @ObservationIgnored private let openExternal: (URL) -> Void
+    @ObservationIgnored private var observations: [NSKeyValueObservation] = []
+    @ObservationIgnored private var started = false
+    /// The main-frame URL that failed (retry loads it; the web view may still show the previous page).
+    @ObservationIgnored private var failedURL: URL?
+    /// `ProcessInfo.systemUptime` of the last real tap's lift on the web view (`WebTouchStampRecognizer`).
+    @ObservationIgnored private(set) var lastTouch: TimeInterval?
+
+    /// `makeWebView`: tests pass a recording `WKWebView` subclass.
+    init(
+        url: URL,
+        openExternal: @escaping (URL) -> Void = WebViewModel.openWithSystem,
+        makeWebView: (WKWebViewConfiguration) -> WKWebView = { WKWebView(frame: .zero, configuration: $0) }
+    ) {
+        initialURL = url
+        page = WebPageState(url: url.absoluteString)
+        self.openExternal = openExternal
+        webView = makeWebView(Self.makeConfiguration())
+        super.init()
+        webView.navigationDelegate = self
+        webView.uiDelegate = self
+        webView.allowsBackForwardNavigationGestures = true
+        observe()
+    }
+
+    /// JavaScript on (WebKit default). `javaScriptCanOpenWindowsAutomatically` is set to false on purpose: a page
+    /// cannot open a window, and so cannot replace this page through `createWebViewWith`, without a user gesture.
+    static func makeConfiguration() -> WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = WishlistWebStore.dataStore
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+        configuration.allowsInlineMediaPlayback = true
+        return configuration
+    }
+
+    static func openWithSystem(_ url: URL) {
+        // D16: no `canOpenURL` (it needs LSApplicationQueriesSchemes); a false result does nothing.
+        UIApplication.shared.open(url, options: [:]) { _ in }
+    }
+
+    // MARK: Screen intents
+
+    /// The screen's first appearance opens the route URL; a recreated view does not reload it.
+    func start() {
+        guard !started, !isClosed else { return }
+        started = true
+        webView.load(URLRequest(url: initialURL))
+    }
+
+    func goBack() {
+        guard !isClosed else { return }
+        if webView.canGoBack { webView.goBack() }
+    }
+
+    func goForward() {
+        guard !isClosed else { return }
+        if webView.canGoForward { webView.goForward() }
+    }
+
+    /// 새로고침 and "다시 시도": the page that failed (the web view may still show the previous one), else the page
+    /// shown, else the route URL. The failure cover stays until the new load starts (`mainFrameStarted`).
+    func reload() {
+        guard !isClosed else { return }
+        if let failedURL {
+            webView.load(URLRequest(url: failedURL))
+        } else if webView.url == nil {
+            webView.load(URLRequest(url: initialURL))
+        } else {
+            webView.reload()
+        }
+    }
+
+    /// A finger tapped the web view (recorded by the screen's non-cancelling recognizer).
+    func noteTouch(at uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        lastTouch = uptime
+    }
+
+    func stop() {
+        guard !isClosed else { return }
+        webView.stopLoading()
+        page.loading = false
+    }
+
+    /// Idempotent. A screen still drawn during its exit keeps the view; it no longer reports or navigates. The
+    /// delegates stay so that `decide` (and `createWebViewWith`) keep cancelling what the page tries meanwhile:
+    /// without a navigation delegate WebKit would allow every navigation unchecked.
+    func close() {
+        guard !isClosed else { return }
+        isClosed = true
+        dismissPrompt?()
+        dismissPrompt = nil
+        presentPrompt = nil
+        observations.forEach { $0.invalidate() }
+        observations = []
+        webView.stopLoading()
+        webView.pauseAllMediaPlayback(completionHandler: nil)
+    }
+
+    deinit {
+        // Backup for an owner dropped without close(): the delegates are weak; stop the page's network and scripts.
+        let view = webView
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { view.stopLoading() }
+        } else {
+            DispatchQueue.main.async { view.stopLoading() }
+        }
+    }
+
+    // MARK: Navigation
+
+    /// The policy of one frame navigation (main frame or iframe). `sameDocument`: a main-frame `#fragment` jump on
+    /// the page shown (`WebUserGesture.isSameDocument`).
+    func decide(url: URL?, mainFrame: Bool, userGesture: Bool, sameDocument: Bool = false) -> WKNavigationActionPolicy {
+        guard !isClosed, let url else { return .cancel }
+        // One tap, one decision (D16): a page link, an app or a blocked URL alike uses it up. A fragment jump
+        // leaves it, as on Android, where `shouldOverrideUrlLoading` never sees one.
+        if userGesture && !sameDocument { lastTouch = nil }
+        let decision = WebNavigationPolicy.decide(
+            scheme: url.scheme ?? "",
+            mainFrame: mainFrame,
+            userGesture: userGesture,
+            isAboutBlank: WebNavigationPolicy.isAboutBlank(url.absoluteString)
+        )
+        switch decision {
+        case .loadInside: return .allow
+        case .block: return .cancel
+        case .openExternal:
+            requestExternal(url, confirm: false)
+            return .cancel
+        case .confirmExternal:
+            requestExternal(url, confirm: true)
+            return .cancel
+        }
+    }
+
+    /// The main frame started loading `url` (lifts the gate's silence for a different page).
+    func mainFrameStarted(url: URL?) {
+        guard !isClosed else { return }
+        if let url { gate.onMainFrameNavigation(url.absoluteString) }
+        page.failed = false
+        failedURL = nil
+    }
+
+    private func requestExternal(_ url: URL, confirm: Bool) {
+        switch gate.onRequest(confirm: confirm) {
+        case .launch:
+            openExternal(url)
+        case .drop:
+            break
+        case .prompt:
+            let prompt = ExternalPrompt(
+                url: url,
+                open: { [weak self] in
+                    guard let self, !self.isClosed else { return }
+                    self.openExternal(url)
+                },
+                closed: { [weak self] confirmed in
+                    guard let self else { return }
+                    self.gate.onPromptClosed(confirmed: confirmed, currentURL: self.page.url)
+                },
+                notShown: { [weak self] in self?.gate.onPromptNotShown() }
+            )
+            if presentPrompt?(prompt) != true { gate.onPromptNotShown() }
+        }
+    }
+
+    // MARK: WKNavigationDelegate
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        let url = navigationAction.request.url
+        let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true
+        decisionHandler(decide(
+            url: url,
+            mainFrame: mainFrame,
+            userGesture: WebUserGesture.isUserGesture(
+                navigationType: navigationAction.navigationType,
+                lastTouch: lastTouch,
+                now: ProcessInfo.processInfo.systemUptime
+            ),
+            sameDocument: mainFrame && WebUserGesture.isSameDocument(url, current: webView.url)
+        ))
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        mainFrameStarted(url: webView.url)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        mainFrameFailed(error)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        mainFrameFailed(error)
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        // The page's process died: offer "다시 시도" (Android onRenderProcessGone).
+        guard !isClosed else { return }
+        failedURL = webView.url ?? URL(string: page.url)
+        page.loading = false
+        page.failed = true
+    }
+
+    /// D13: only the main frame's own errors (WebKit reports no iframe errors here).
+    private func mainFrameFailed(_ error: Error) {
+        let e = error as NSError
+        guard !isClosed, WebLoadError.isPageFailure(e) else { return }
+        failedURL = (e.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? webView.url
+        page.failed = true
+    }
+
+    // MARK: WKUIDelegate
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        // Only an http/https URL with a host (`WebPageURL`): a blank window, `data:`, `javascript:` or an
+        // external scheme is dropped rather than loaded over the page.
+        guard !isClosed, let url = navigationAction.request.url, WebPageURL(url) != nil else { return nil }
+        webView.load(navigationAction.request)
+        return nil
+    }
+
+    // MARK: Bars
+
+    private func observe() {
+        func watch<V>(_ key: KeyPath<WKWebView, V>) -> NSKeyValueObservation {
+            webView.observe(key, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.sync() }
+            }
+        }
+        observations = [
+            watch(\.url), watch(\.title), watch(\.isLoading), watch(\.estimatedProgress),
+            watch(\.canGoBack), watch(\.canGoForward),
+        ]
+        sync()
+    }
+
+    private func sync() {
+        guard !isClosed else { return }
+        var next = page
+        next.adopt(currentURL: webView.url)
+        next.title = webView.title
+        next.loading = webView.isLoading
+        next.progress = webView.estimatedProgress
+        next.canGoBack = webView.canGoBack
+        next.canGoForward = webView.canGoForward
+        if next != page { page = next }
+    }
+}
+
+/// D13 on iOS: which main-frame load errors are page failures. A cancel (a newer navigation, stop), WebKit's
+/// "frame load interrupted" (102, a response the web view does not show) and "plug-in will handle load" (204, a
+/// media file handed to the player, which keeps playing) are not.
+enum WebLoadError {
+    static func isPageFailure(_ error: NSError) -> Bool {
+        if error.domain == NSURLErrorDomain, error.code == NSURLErrorCancelled { return false }
+        if error.domain == "WebKitErrorDomain", error.code == 102 || error.code == 204 { return false }
+        return true
+    }
+}
+
+/// D16 "사용자 탭" on iOS (controller Ruling 12): a link activation is a tap only when a real tap on the web view
+/// was lifted within `window` seconds. `.linkActivated` alone is not enough: a script's `a.click()` (or a synthetic click
+/// event) on a `tel:`/app link is reported as `.linkActivated` too.
+enum WebUserGesture {
+    static let window: TimeInterval = 1.0
+
+    static func isUserGesture(navigationType: WKNavigationType, lastTouch: TimeInterval?, now: TimeInterval) -> Bool {
+        guard navigationType == .linkActivated, let lastTouch else { return false }
+        let age = now - lastTouch
+        return age >= 0 && age <= window
+    }
+
+    /// `url` only moves to a `#fragment` of the page shown (the same URL without its fragment).
+    static func isSameDocument(_ url: URL?, current: URL?) -> Bool {
+        guard let url, url.fragment != nil, let current else { return false }
+        return withoutFragment(url) == withoutFragment(current)
+    }
+
+    private static func withoutFragment(_ url: URL) -> URL? {
+        var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        parts?.fragment = nil
+        return parts?.url
+    }
+}
+
+/// Records each real tap on the web view (a single finger lifted within `slop` points of where it went down) and
+/// never takes part otherwise: it never recognizes, does not cancel or delay touches, and recognizes alongside
+/// every other recognizer (scrolling, links, the back swipes keep working). A scroll, drag or pinch is no tap, so a
+/// script clicking a link right after one still asks (Chromium's user activation leaves scrolls out the same way).
+final class WebTouchStampRecognizer: UIGestureRecognizer, UIGestureRecognizerDelegate {
+    static let slop: CGFloat = 10
+
+    private let onTouch: () -> Void
+    private var tracked: UITouch?
+    private var start: CGPoint = .zero
+
+    init(onTouch: @escaping () -> Void) {
+        self.onTouch = onTouch
+        super.init(target: nil, action: nil)
+        cancelsTouchesInView = false
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
+        delegate = self
+    }
+
+    static func isTap(from start: CGPoint, to end: CGPoint) -> Bool {
+        hypot(end.x - start.x, end.y - start.y) <= slop
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        // A second finger (or a touch that is not a finger, pointer or pencil) makes it no tap.
+        guard tracked == nil, touches.count == 1, let touch = touches.first,
+              touch.type == .direct || touch.type == .indirectPointer || touch.type == .pencil
+        else { state = .failed; return }
+        tracked = touch
+        start = touch.location(in: view)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard let tracked, touches.contains(tracked) else { return }
+        if !Self.isTap(from: start, to: tracked.location(in: view)) { state = .failed }
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        guard let tracked, touches.contains(tracked) else { return }
+        if Self.isTap(from: start, to: tracked.location(in: view)) { onTouch() }
+        state = .failed
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        state = .failed
+    }
+
+    override func reset() {
+        super.reset()
+        tracked = nil
+    }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
+}

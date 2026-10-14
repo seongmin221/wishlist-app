@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 공유 카드의 온라인/오프라인 판단과 네트워크 복구 신호(platform/NetworkSignals). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 원본 링크 웹뷰(feature/web)와 이미지·서버 요청. 라이브러리 manifest에 기대지 않고 직접 적는다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".WishlistApplication"

@@ -324,4 +324,4 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 | 같은 version의 표시 metadata(목적 이름·색·아이콘)는 그 항목의 GET에서만 갱신된다. `accept`(전송 응답)나 목록 경로는 같은 version의 cache 행을 덮지 않으므로 목록·목적 화면은 갱신 시점이 다를 수 있다 | C5/C6(목록·목적 화면이 표시 metadata를 읽을 때) |
 | 같은 항목에 겹친 GET이 있으면 version이 같은 채 먼저 시작한 응답이 나중에 써서 표시 이름이 되돌아갈 수 있다(마지막 쓰기 승리) | C5/C6 |
 | `LocalSubmissionDetailPresenter`는 계정을 떠난 뒤 다음 load 전까지 아무것도 판정하지 않는다(sticky skip, Ruling 5). 셸이 늦게 닫으면 그 사이 화면은 미결정 상태다 | 다듬기 |
-| 웹뷰 실기기 확인(D16 외부 앱 확인창 빈도, `window.opener` 손실)은 PR B 문서에서 다룬다 | PR B·인증 연결 |
+| 웹뷰 실기기 확인(D16 외부 앱 확인창 빈도, `window.opener` 손실): 2026-10-10 미확인, [PR B 기록](../../history/architecture/client/c4-pr-b-implementation-2026-10-10.md#실기기-확인-항목미확인) | PR B·인증 연결 |

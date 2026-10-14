@@ -1,6 +1,6 @@
 # C4 상세·분석 중·로컬 대기 화면 확인 (2026-10-10)
 
-> C4 Task 10(Android 절)·Task 11(iOS 절). 에뮬레이터 `emulator-5554`(API 36, 앱 문구 한국어), DEBUG Fake. 캡처는 [c4-shots](c4-shots/)(1200px로 줄임). 비교 기준은 보드 `FProductDetail{L,D}`·`FProductProcessing{L,D}`와 [C4 설계](../../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md) §3 D8·D9·D12.
+> C4 Task 10(Android 절)·Task 11(iOS 절)·Task 16(PR B 웹뷰 절). 에뮬레이터 `emulator-5554`(API 36, 앱 문구 한국어), DEBUG Fake. 캡처는 [c4-shots](c4-shots/)(1200px로 줄임). 비교 기준은 보드 `FProductDetail{L,D}`·`FProductProcessing{L,D}`와 [C4 설계](../../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md) §3 D8·D9·D12.
 
 ## 확인한 흐름
 
@@ -56,3 +56,69 @@
 - **로그아웃 시 상세 닫힘·로그인 뒤 로컬 삭제·목적 색 점:** Android와 같은 이유로 UI 경로가 없다. 닫힘 규칙은 `WLNavigatorTests`·`ItemDetailPresenterOwnerTests.testCloseRules…`, 색은 `DetailTextTests`.
 - **새로고침 실패 안내·삭제 실패 안내:** Fake에서 실패를 만들 조작이 없다. "한 번만" 규칙은 owner 테스트로 확인했다.
 - 영어 화면은 찍지 않았다(문구는 `DetailTextTests`가 en 표로 확인).
+
+## PR B 원본 링크 웹뷰 (Task 16)
+
+> Android 에뮬레이터 `emulator-5554`(API 36, 한국어, 다크 기본) · iOS 시뮬레이터 iPhone 17 Pro `AFBA9C17-206B-4EA6-A508-EF6E0CE2D7B0`(iOS 26.5). DEBUG Fake. 시험 페이지는 scratchpad의 `python3 -m http.server 8781`(상품 페이지·두 번째 페이지·`target=_blank`·`tel:`·탭 1.5초 뒤 JS `tel:`·3초 뒤 스크립트 `market:`·`document.cookie`를 쓰고 보이는 쿠키 페이지). 기준은 보드 `FWebView{L,D}`·`FWebViewExternal`과 [C4 설계](../../../superpowers/specs/2026-10-09-client-c4-product-detail-design.md) §4·D13~D16.
+
+**시험 환경의 제약(커밋하지 않은 임시 변경, 확인 뒤 되돌림):**
+
+- Android 에뮬레이터는 DNS가 안 된다(`example.com` → `net::ERR_NAME_NOT_RESOLVED`). 시험 페이지는 `adb reverse tcp:8781`의 `http://localhost`인데, 앱 manifest에 cleartext 허용이 없어(debug 전용 설정도 없음) 깨끗한 빌드에서는 막히고 실패 덮개가 보인다. 이것도 확인했다. 시험 페이지 확인 동안만 커밋하지 않은 `src/debug/AndroidManifest.xml`(`usesCleartextTraffic`)을 두었다가 지우고 깨끗한 빌드를 다시 설치했다. release 설정은 건드리지 않았다. 시험 URL은 공유(`ACTION_SEND` → `ShareReceiverActivity`)로 로그인 전 대기 줄을 만들어 넣었다.
+- iOS 시뮬레이터는 실제 네트워크가 되고 `http://127.0.0.1`도 ATS 예외 없이 열린다. 로그인 전 대기 줄의 URL을 시험 페이지로 바꾸려고 `DebugControls`의 DEBUG 대기 줄 URL을 잠깐 바꿨다가 되돌렸다(커밋 없음). 조작은 serve-sim(`tap`)과 `/ax` 접근성 트리로 했다.
+
+| 흐름 | Android | iOS | 캡처 |
+| --- | --- | --- | --- |
+| 상세 "원본 보기" → 웹뷰 | 가로 밀기, 탭 바 없음. DNS 실패 → "페이지를 열 수 없어요 · 다시 시도" 덮개, 자물쇠 + `example.com`. 닫기 → 상세로 돌아옴 | `example.com` "Example Domain"이 열림, 자물쇠 + 도메인 / 제목 | `android-web-from-detail-{dark,light}.png`, `ios-web-from-detail-{light,dark}.png` |
+| 로그인 전 홈 줄 "원본" → 웹뷰 | 시험 페이지가 열림(제목 "상품 페이지") | 같음(VoiceOver 이름 "원본 열기") | — |
+| 링크 → 뒤로/앞으로 | 두 번째 페이지 → 뒤로(앞으로 켜짐) → 앞으로(다시 꺼짐). 시스템 뒤로는 기록 먼저 | 같음 | — |
+| `target=_blank` | 같은 웹뷰에 열림(서버 로그 `page2.html?from=blank`) | 같음 | — |
+| 탭 없는 스크립트 외부 scheme | 3초 뒤 `market:` → FWebViewExternal("외부 앱을 열까요?" · "다른 앱이 열려요" · "직접 누르지 않았다면 취소해 주세요" · 취소/열기) | 탭 1.5초 뒤 JS `tel:`(`.other`) → 같은 확인창 | `android-web-from-home-confirm-dark.png` |
+| 사용자 탭 외부 scheme | `tel:` 탭 → 확인창 없이 전화 앱이 열림. 전화 앱은 건드리지 않고 `am start`로 돌아오니 페이지·기록 유지 | `tel:` 탭 → 확인창 없음(시뮬레이터에 전화 앱이 없어 아무 일도 없음) | — |
+| 공유 → 링크 복사 | 시스템 클립보드 표시에 현재 페이지 URL(`…/index.html?market`) | "링크를 복사했어요" 안내, `simctl pbpaste` = 현재 URL | — |
+| 쿠키와 "웹뷰 데이터 삭제" | 쿠키 페이지 첫 방문 "(없음)" → `wl_test=hello`, 다시 방문 때 처음부터 `wl_test=hello`. 닫기 → 설정 → 웹뷰 데이터 삭제 → "방금 삭제했어요" → 다시 열기 → "(없음)" | 같음 | — |
+
+**확인 중 고친 것:** Android에서 그린 내용이 없는 WebView(로딩 중·Chromium 오류 페이지)가 창 전체에 배경을 칠해 위쪽 바(닫기·도메인·제목)와 상태 표시줄 아이콘이 보이지 않았다(다크에서는 검정, 실패 뒤에는 흰 면). 상세·홈 어느 진입점에서도 같았고, 페이지가 그려지면 정상이었다. 웹뷰 칸에 `clipToBounds()`를 두어 고치고 같은 흐름을 다시 확인했다(`693fedf`).
+
+**확인하지 못한 것:**
+
+- **로그아웃 시 웹뷰 닫힘·로그인 시 유지:** 웹뷰는 탭 바를 숨기고 홈 스택 위를 덮어, 웹뷰가 열린 채 로그아웃하거나 로그인할 UI 경로가 없다(상세와 같은 이유). 규칙은 `WebViewRoute`·`AppDestination.web`의 `accountScoped = true`(`WebViewRouteCodecTest`·`WebViewRouteTests`)와 `AppRouteCodecTest.signingInKeepsAccountScopedRoutes`·`WLNavigatorTests.testSigningInKeepsAccountScopedRoutes`·`testLeavingAnAccountDropsAccountScopedRoutesInEveryTab`로 확인했다.
+- **D16 결제 확인창 빈도:** 미확인 · 실기기.
+- **새 창의 `window.opener` 손실(PG 팝업):** 미확인 · 실기기.
+- iOS WKWebView 기록 스와이프(합성 터치로는 안 됨), "외부 브라우저로 열기"(앱을 떠남)는 누르지 않았다. (Android 실제 `intent:` 링크는 아래 최종 리뷰 절에서 확인했다.)
+- ~~Android 실패 덮개 위 제목 줄에 Chromium 오류 페이지 제목("웹페이지를 사용할 수 없음")이 보인다.~~ 최종 리뷰에서 고쳤다(`WebPageState.titleLine`이 실패 중 null, 도메인만).
+
+### 실제 `intent:` 링크(PR B 최종 리뷰, 2026-10-10)
+
+> `emulator-5554`(API 36), 최종 리뷰 수정을 넣은 debug 빌드. 조작 전 `mCurrentFocus` = `app.wishlist.android/.MainActivity` 확인, 다른 앱은 건드리지 않았다. 시험 페이지는 scratchpad `python3 -m http.server 8782`의 `intent.html`(링크 세 개)·`fallback.html`, `adb reverse tcp:8782`, 공유(`ACTION_SEND` → `ShareReceiverActivity`)로 만든 로컬 대기 상세의 "원본 보기"로 열었다. Task 16과 같이 커밋하지 않은 `src/debug/AndroidManifest.xml`(`usesCleartextTraffic`)을 두었다가 지우고, reverse·서버를 끄고 깨끗한 debug 빌드를 다시 설치했다. 세 링크 모두 사용자 탭(확인창 없이 바로 실행 경로)이라 실제 `Intent.parseUri` → `AndroidIntentTarget` → `startSafely`를 탄다.
+
+| 링크(탭) | 결과 |
+| --- | --- |
+| (a) `intent://x#Intent;scheme=wltest;component=app.wishlist.android/.MainActivity;end` | **component가 지워져 시작되지 않음.** logcat `ActivityTaskManager: START u0 {act=android.intent.action.VIEW cat=[android.intent.category.BROWSABLE] dat=wltest://x/... xflg=0x4} … result code=-91`(해석 불가, `cmp=` 없음). `dumpsys activity activities` 앞뒤 모두 `Hist #0: ActivityRecord{254715469 … MainActivity t232}` 하나뿐, 포커스 그대로, 페이지 유지 |
+| (b) `intent://x#Intent;scheme=wltest;package=com.example.none;S.browser_fallback_url=http%3A%2F%2F10.0.2.2%3A8782%2Ffallback.html;end` | `START … pkg=com.example.none (has extras) … result code=-91` → `ActivityNotFoundException` → fallback이 웹뷰 안에 열림(서버 로그 `GET /fallback.html`, 위쪽 바 `10.0.2.2` / "대체 페이지", 본문 "FALLBACK OK"). 아래쪽 뒤로 → `intent.html`로 돌아옴 |
+| (c) `intent://x#Intent;scheme=wltest;launchFlags=q;end` | 앱 비정상 종료 없음: 앱 PID 4333 그대로, logcat에 `START`·`AndroidRuntime`·`FATAL` 없음(fallback이 없어 Drop), 페이지 유지 |
+
+
+## PR #16 3차 리뷰 수정 기기 확인(2026-10-13)
+
+> iOS 시뮬레이터 iPhone 17 Pro `C069C20E-5E93-47BB-9D26-3E88B5A0278D`(iOS 26.5) · Android 실기기 Galaxy Z Flip6 `SM-F741N`(Android 16, USB, `adb reverse tcp:8781`). DEBUG Fake. 시험 페이지는 `tel:` 링크, `<select>`, 숨은 `itms-apps:` 링크, 스크롤한 손가락을 뗀 50ms 뒤 숨은 링크를 `a.click()`하는 스크립트를 담았다. 임시 변경(커밋 없음, 확인 뒤 되돌리고 깨끗한 빌드를 다시 설치함): iOS는 DEBUG 대기 줄 URL을 시험 페이지로 바꿨고, Android는 `src/debug/AndroidManifest.xml`에 cleartext를 허용했다. iOS는 serve-sim WebSocket으로 287~289ms 동안 빠르게 스크롤했다. 한 번에 명령 하나씩 보내는 CLI는 명령마다 약 0.6초가 걸려, 1초 창을 넘겨서 대조가 되지 않았다.
+
+| 흐름 | 결과 |
+| --- | --- |
+| iOS 실제 탭 `tel:` | 클릭이 됨(서버 로그), 확인창 없음 |
+| iOS 빠른 스크롤 → 손을 떼고 50ms 뒤 스크립트 클릭 | 수정 뒤: FWebViewExternal이 뜬다. 고치기 전 인식기(`9e8dce6`)로 대조: 같은 조작에서 확인창 없이 열렸다(리뷰 지적 재현) |
+| iOS 스크롤 | 링크가 화면 밖으로 이동(인식기가 스크롤을 막지 않음) |
+| iOS 1.5초 길게 누름 | WebKit 링크 미리보기가 뜨고 클릭은 아님(시스템 동작) |
+| Android 웹뷰 처음 열기 → `<select>` | 페이지가 그려지고 선택 팝업이 Activity 다크 테마로 뜬다. 앱 오류·`BadTokenException` 없음. 고치기 전 순서로도 이 기기에서는 차이가 없었다(Android 16 WebView). 수정은 생성 순서를 바로잡는 예방 조치로 둔다 |
+| Android 빠른 스크롤 → 스크립트 클릭 | 확인창(Chromium user activation은 스크롤을 치지 않는다, iOS 수정과 같은 결과) |
+| Android 확인창이 떠 있을 때 가로로 회전 → 세로 | Activity가 재생성되어 확인창이 사라지고 페이지는 유지된다. 다시 스크롤 → 확인창이 다시 뜬다(침묵 없음, 5번 수정) |
+| Android 취소 → 다시 스크롤 | 확인창 없음(같은 host 침묵 유지) |
+
+## PR #16 4차 리뷰 기기 확인(2026-10-13)
+
+> Android 실기기 Galaxy Z Flip6(Android 16). 시험 서버는 응답을 12초 늦추는 `/slow`와, 헤더와 본문 앞부분을 바로 보내고 끝을 12초 늦추는 `/drip`을 둔다. 임시 cleartext manifest는 확인 뒤 지우고 깨끗한 빌드를 다시 설치했다.
+
+| 흐름 | 결과 |
+| --- | --- |
+| `/slow` 링크 → 응답 전 하단 버튼 | 응답 헤더가 오기 전에는 `onPageStarted`가 오지 않아 버튼이 "새로고침"이다. 누르면 기다리던 이동이 끊기고 현재 페이지가 다시 열린다. 실패 덮개 없음 |
+| `/drip` 링크 → 로딩 중 "중지" | 받은 부분("DRIP START")이 보이고 버튼이 새로고침으로 돌아온다. 실패 덮개 없음 |
+| `/slow` 이동 1.5초 뒤 스크립트가 다른 페이지로 이동 | 새 페이지가 열린다. 실패 덮개 없음 |

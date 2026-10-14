@@ -11,11 +11,13 @@ enum AppDestination: Hashable {
     case item(String)
     /// C4 local (not yet sent) link detail (client submission id): same policy as `item`.
     case local(String)
+    /// C4 PR B original-link web view (FWebView): same policy as `item`. Only a validated `WebPageURL`.
+    case web(WebPageURL)
 
     var accountScoped: Bool {
         switch self {
         case .settings, .login: false
-        case .item, .local: true
+        case .item, .local, .web: true
         }
     }
 

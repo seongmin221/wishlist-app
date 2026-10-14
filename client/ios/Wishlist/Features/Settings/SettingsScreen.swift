@@ -159,7 +159,7 @@ private struct SettingsRow<Trailing: View>: View {
             Button(action: action) { content.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
                 .disabled(!enabled)
-                .opacity(enabled ? 1 : 0.4)
+                .opacity(enabled ? 1 : wlDisabledOpacity)
         } else {
             content.accessibilityElement(children: .combine)
         }

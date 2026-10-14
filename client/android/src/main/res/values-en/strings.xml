@@ -112,4 +112,20 @@
     <string name="local_delete_failed">Couldn\'t delete</string>
     <string name="home_row_open_detail">View details</string>
     <string name="home_row_open_original">Open original</string>
+    <!-- 원본 링크 웹뷰(C4 FWebView·FWebViewShare·FWebViewExternal) -->
+    <string name="webview_close">Close</string>
+    <string name="webview_back">Back</string>
+    <string name="webview_forward">Forward</string>
+    <string name="webview_reload">Reload</string>
+    <string name="webview_stop">Stop</string>
+    <string name="webview_share">Share</string>
+    <string name="webview_open_browser">Open in browser</string>
+    <string name="webview_copy_link">Copy link</string>
+    <string name="webview_share_other">Share to another app</string>
+    <string name="webview_link_copied">Link copied</string>
+    <string name="webview_load_failed">Can\'t open this page</string>
+    <string name="webview_external_title">Open another app?</string>
+    <string name="webview_external_line_app">Another app will open</string>
+    <string name="webview_external_line_tap">If you didn\'t tap it, cancel</string>
+    <string name="webview_external_open">Open</string>
 </resources>
