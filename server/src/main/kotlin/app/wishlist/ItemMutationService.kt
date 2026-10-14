@@ -23,7 +23,11 @@ class ItemMutationException(
  * ITEM-04/07/08. One transaction per command: owner -> purposes (ID order) -> item -> media (ID order).
  * Checks run on the locked row in the spec's order: version, state, changed text, changed references.
  */
-class ItemMutationService(private val dataSource: DataSource) {
+class ItemMutationService(
+    private val dataSource: DataSource,
+    /** Test seam: runs while the command holds its media row locks. */
+    private val afterMediaLock: () -> Unit = {},
+) {
     private val items = WishlistItemRepository(dataSource)
 
     fun edit(owner: UUID, itemId: UUID, expectedVersion: Int, changes: ItemChanges): WishlistItem =
@@ -53,6 +57,7 @@ class ItemMutationService(private val dataSource: DataSource) {
         }
         val plan = ItemChangePlan.plan(item.row, changes, command)
         val media = ItemMutationRepository.lockMedia(c, owner, listOfNotNull(item.row.mediaId, plan.mediaToLink))
+        afterMediaLock()
         ItemTextRules.invalidFields(plan).takeIf { it.isNotEmpty() }?.let { throw ItemMutationException("INVALID_WISHLIST_ITEM_INPUT", fields = it) }
         validateReferences(c, owner, itemId, plan, media)
         if (!plan.changed) return@inTransaction current(c, owner, itemId)

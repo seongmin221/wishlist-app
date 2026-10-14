@@ -60,8 +60,10 @@ class MediaUploadFlowTest {
             assertEquals(HttpStatusCode.OK, completion.status)
             assertEquals("READY", json(completion.bodyAsText())["media"]!!.jsonObject["status"]!!.jsonPrimitive.content)
 
-            // B7 links media through ITEM-04/07; until then the reference is a fixture.
-            analysisSql(source, "update wishlist_items set media_asset_id='$mediaId',image_source='USER' where id='$item'")
+            // Analysis is not part of this flow; the item is made editable, then ITEM-04 links the photo.
+            analysisSql(source, "update wishlist_items set analysis_status='READY',product_name='의자',category_id='C001',category_source='AI',category_missing_reason=null where id='$item'")
+            val linked = client.patch("/v1/wishlist-items/$item") { setBody("""{"expectedVersion":1,"mediaId":"$mediaId"}""") }
+            assertEquals(HttpStatusCode.OK, linked.status, linked.bodyAsText())
             val product = json(client.get("/v1/wishlist-items/$item").bodyAsText())["product"]!!.jsonObject
             assertEquals(mediaId, product["imageMediaId"]!!.jsonPrimitive.content)
             val shown = client.get(local(product["imageUrl"]!!.jsonPrimitive.content))
@@ -72,8 +74,12 @@ class MediaUploadFlowTest {
         val maintenance = MaintenanceService({ _, _ -> DispatchReport(0, 0) }, { 0 }, { PendingRecoveryReport(0, 0, 0, 0, 0, 0) },
             { BudgetMaintenanceReport(0, 0) }, MediaCleanup(source, storage)::run)
         assertEquals(0, maintenance.runOnce().mediaDeleted)
-        val mediaId = analysisScalar(source, "select media_asset_id from wishlist_items where media_asset_id is not null")!!
-        analysisSql(source, "update wishlist_items set media_asset_id=null where media_asset_id='$mediaId'")
+        val (itemId, mediaId) = analysisScalar(source, "select id||' '||media_asset_id from wishlist_items where media_asset_id is not null")!!.split(' ')
+        // ITEM-04 releases the photo and starts its grace period; the test moves that start 25 hours back.
+        assertNull(analysisScalar(source, "select unreferenced_since from media_assets where id='$mediaId'"))
+        app.wishlist.ItemMutationService(source).edit(owner, UUID.fromString(itemId), 2, app.wishlist.ItemChanges(media = app.common.FieldChange.Set(null)))
+        assertNotNull(analysisScalar(source, "select unreferenced_since from media_assets where id='$mediaId'"))
+        assertEquals(0, maintenance.runOnce().mediaDeleted, "released less than 24 hours ago")
         analysisSql(source, "update media_assets set unreferenced_since=clock_timestamp()-interval '25 hours' where id='$mediaId'")
         val report = maintenance.runOnce()
         assertEquals(1, report.mediaDeleted)

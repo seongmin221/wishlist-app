@@ -49,3 +49,12 @@
 - RED: `WishlistItemMutationRoutesTest`가 `wishlistItemMutationRoutes`·`ItemMutationHandlers` 미정의로 compile 실패.
 - GREEN: 6개 통과, `ApiRouteExposureTest` 3개 통과. 다섯 route의 성공 응답(사진 서명·`imageMediaId`·`deletionImpact`), 401→400→422→404→409 순서와 code·`currentVersion`·정렬된 `fields`, 구조 오류의 빈 details, 삭제 204 반복·다른 owner 404·ARCHIVED 409, 재분석 key 누락 400·body 422·replay header·key 재사용 409·한도 429와 `Retry-After`, 다섯 route 모두 IO dispatcher 실행과 취소 전파, `apiRoutes` 조립.
 - 계획 대비: 새 route의 공개 노출은 `ApiRouteExposureTest`를 고치지 않고 새 테스트의 `public api registers the mutation routes`가 `apiRoutes` 조립으로 확인한다.
+
+### Task 9: 경합·읽기 일관성·전체 흐름
+
+- RED: 경합 테스트의 latch용 `ItemMutationService(afterMediaLock = …)` seam이 없어 compile 실패. seam 추가 뒤 `ItemMutationConcurrencyTest` 7개 통과: 같은 version PATCH·PATCH+review는 하나만 성공하고 나머지는 VERSION 409(`currentVersion` 4), 동시 삭제 두 개는 변경 한 번, 같은 key 재분석 두 개는 Started+Replayed와 job·outbox 하나씩, 재분석과 삭제 경합 뒤 진행 중 job 없음, 같은 새 media를 두 상품이 연결하면 하나만 성공, 사진 연결과 media 정리의 세 순서(편집이 먼저 잠금·정리가 먼저 lease·발견 뒤 lease 전 연결) 모두 "DELETING인데 참조"가 없음, 동시 목적 이동의 membershipVersion 일치.
+- 읽기 일관성(`ItemMutationReadConsistencyTest` 2개)과 전체 흐름(`ItemMutationFlowTest` 1개)은 기존 조회 코드를 새 변경 결과로 확인하는 검증 테스트라 첫 실행에서 통과했다. 실패를 만들 신규 symbol이 없어 별도 RED는 없다.
+  - ITEM-02 category·목적·미지정 목록과 totalCount, HOME-01 group count·preview, HOME-02, PUR-01 활동순·후보 수·미리보기, PUR-03 membershipVersion·후보 수, CAT-01 BROWSE count가 확인·편집·목적 해제·수동 완료·재분석·삭제 뒤 실제 데이터와 일치.
+  - B4 anchor 복구 반복: ITEM-05로 anchor 삭제, ITEM-04 category 변경으로 anchor 범위 이동, HOME-02 검토 그룹 anchor 확정 뒤 다음 항목으로 복구(`anchorResolved=false`).
+  - 전체 흐름: 비로그인 401 → 로그인 뒤 과거 `clientCreatedAt`으로 생성·응답 유실 재전송(같은 item, 공유 시각 유지) → AI 장애로 합산 3회 소진 FAILED_RETRYABLE → 재분석(replay 포함) → READY·검토 대기 → DEFER(검토 그룹 0) → 사진 연결·stale version 409·사진 해제 → 삭제 두 번 204 → 404, 홈 count 0. 기기 LocalSubmission 자체는 클라이언트 묶음의 범위다.
+- 기존 테스트 변경: `MediaUploadFlowTest`는 B7 전이라 SQL로 사진을 연결·해제했다. 이를 ITEM-04 PATCH로 바꾸고, 해제 직후에는 정리되지 않고(24시간 유예) 유예를 25시간 앞당긴 뒤 정리됨을 확인한다. 통과.
