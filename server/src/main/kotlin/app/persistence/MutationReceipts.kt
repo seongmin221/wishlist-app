@@ -5,7 +5,7 @@ import java.sql.Connection
 import java.util.UUID
 import kotlinx.serialization.json.JsonObject
 
-enum class ReceiptTarget(val column: String) { CATEGORY("category_id"), PURPOSE("purpose_id") }
+enum class ReceiptTarget(val column: String) { CATEGORY("category_id"), PURPOSE("purpose_id"), WISHLIST_ITEM("wishlist_item_id") }
 data class MutationReceipt(val fingerprint: String, val targetId: UUID)
 
 /** Creation receipts are kept for the account lifetime. Callers hold the owner structure lock. */

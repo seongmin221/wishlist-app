@@ -51,7 +51,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"), versions)
                     }
                 }
             }
@@ -368,6 +368,57 @@ class DatabaseMigrationTest {
                 assertFailsWith<SQLException> { exec("update wishlist_items set media_asset_id='$ready' where id='$second'") }
                 exec(media(owner, extra = ",status,failure_reason,failed_at", values = ",'FAILED','NOT_JPEG',clock_timestamp()"))
                 exec(media(owner, extra = ",status,deleted_at", values = ",'DELETED',clock_timestamp()"))
+            }
+        }
+    }
+
+    @Test fun `V19 upgrade keeps V18 receipts and limits receipts to one owned target`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("18").load().migrate()
+            database.createConnection("").use { c ->
+                val owner = UUID.randomUUID(); val other = UUID.randomUUID()
+                fun exec(sql: String) = c.createStatement().use { it.executeUpdate(sql) }
+                exec("insert into app_users(id) values ('$owner'),('$other')")
+                fun item(ownerId: UUID): UUID = UUID.randomUUID().also { id ->
+                    exec("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,current_generation)
+                        values ('$id','$ownerId','${UUID.randomUUID()}','https://example.com/$id','FAILED_RETRYABLE','ACTIVE',1)""")
+                }
+                val category = UUID.randomUUID(); val purpose = UUID.randomUUID()
+                exec("""insert into custom_categories(id,owner_id,parent_id,name,normalized_name,display_order)
+                    select '$category','$owner',id,'내 카테고리','내 카테고리',1 from public_category_groups order by id limit 1""")
+                exec("""insert into purposes(id,owner_id,name,color_key,icon_key,activity_at) values ('$purpose','$owner','목적','CORAL','HEART',clock_timestamp())""")
+                exec("""insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,category_id)
+                    values ('$owner','CREATE_CUSTOM_CATEGORY','${UUID.randomUUID()}','${"a".repeat(64)}','$category')""")
+                exec("""insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,purpose_id)
+                    values ('$owner','CREATE_PURPOSE','${UUID.randomUUID()}','${"b".repeat(64)}','$purpose')""")
+                val mine = item(owner); val foreign = item(other)
+                fun receipts() = c.createStatement().use { s ->
+                    s.executeQuery("select (to_jsonb(t) - 'wishlist_item_id')::text from mutation_receipts t order by operation").use { r ->
+                        buildList { while (r.next()) add(r.getString(1)) }
+                    }
+                }
+                val before = receipts()
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                assertEquals(before, receipts())
+                fun itemReceipt(target: String, extra: String = "", values: String = "") =
+                    """insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,wishlist_item_id$extra)
+                        values ('$owner','REANALYZE_WISHLIST_ITEM','${UUID.randomUUID()}','${"c".repeat(64)}',$target$values)"""
+                assertEquals(1, exec(itemReceipt("'$mine'")))
+                val rejected = listOf(
+                    itemReceipt("'$foreign'"),
+                    itemReceipt("'${UUID.randomUUID()}'"),
+                    itemReceipt("null"),
+                    itemReceipt("'$mine'", ",purpose_id", ",'$purpose'"),
+                    itemReceipt("'$mine'", ",category_id", ",'$category'"),
+                )
+                for (sql in rejected) assertFailsWith<SQLException>(sql) { exec(sql) }
+                c.createStatement().use { s ->
+                    s.executeQuery("select count(*) from pg_constraint where conname='wishlist_items_owner_id_unique'").use { r ->
+                        assertTrue(r.next()); assertEquals(1, r.getInt(1))
+                    }
+                }
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
             }
         }
     }
