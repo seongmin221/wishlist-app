@@ -90,10 +90,6 @@ internal data class DemoItem(
     val candidateMeta get() = "$shop · $checked 확인"
 }
 
-internal data class DemoType(val name: String, val count: Int)
-
-internal data class DemoTop(val name: String, val types: List<DemoType>)
-
 /** 보드(FCategoryHomeL·FCategoryListL·FPurposeHomeL·FPurposeDetailL·FProductDetailL)의 예시 값과 넘침 확인용 긴 이름. */
 internal object DemoContent {
     /** 넘침 확인용으로 가장 긴 목적 이름(보드 예시보다 길게). 도현 28·20 줄바꿈과 큰 글자 크기를 본다. */
@@ -136,27 +132,8 @@ internal object DemoContent {
         DemoItem("c5", "마샬", "MAJOR V", "229000", DemoPhotoLook.Green, 1.25f, "commute", "1주 전", "29CM", pending = true),
     )
 
-    /** FCategoryHomeL `home` 8개 상위와 세부 유형. */
-    val tops = listOf(
-        DemoTop("패션·잡화", types("신발" to 5, "아우터" to 3, "가방" to 3, "상의" to 2, "패션 소품" to 2)),
-        DemoTop("뷰티·퍼스널케어", types("스킨케어" to 2, "향수" to 2)),
-        DemoTop("디지털·IT", types("헤드폰" to 8, "키보드" to 3, "카메라·액션캠" to 3, "모니터" to 2, "마우스·트랙패드" to 2,
-            "웨어러블 기기" to 2, "이어폰" to 1, "태블릿" to 1, "오디오 케이블·DAC" to 2)),
-        DemoTop("가구·인테리어", types("조명" to 3, "의자" to 2, "책상·테이블" to 2)),
-        DemoTop("생활·주방·가전", types("주방 가전" to 3, "공기·온습도 관리" to 2, "조리 도구" to 1)),
-        DemoTop("스포츠·아웃도어·여행", types("캠핑 용품" to 4, "러닝 용품" to 2, "여행 가방·캐리어" to 2, "백패킹 소품" to 1)),
-        DemoTop("취미·문화·컬렉터블", types("피규어·컬렉터블" to 2, "보드게임·퍼즐" to 1, "레고" to 0)),
-        DemoTop("건강·웰빙", types("수면·회복 용품" to 1)),
-    )
-
-    /** 보드 머리의 "상품 69개". */
-    val productTotal = tops.sumOf { t -> t.types.sumOf { it.count } }
-
-    private fun types(vararg t: Pair<String, Int>) = t.map { DemoType(it.first, it.second) }
-
     fun item(id: String) = (items + candidates).firstOrNull { it.id == id }
     fun purpose(id: String) = purposes.firstOrNull { it.id == id } ?: longestPurpose.takeIf { it.id == id }
-    fun type(top: String, type: String) = tops.firstOrNull { it.name == top }?.types?.firstOrNull { it.name == type }
 }
 
 /**
