@@ -8,10 +8,12 @@ enum WLLineIcon {
     case back, chevronRight, settings, person, clock, sorting, external, heart, check, checkBold, clockBold, warning, more, trash
     // 원본 링크 웹뷰(FWebView·FWebViewShare·FWebViewExternal, Android와 같은 path).
     case close, lock, reload, share, globe, copy, apps, phone
+    // C5 카테고리: 점선 추가 칩의 +, ⋯ 메뉴 편집 연필, 미확정 표시 ✳.
+    case plus, pen, pending
 
     var stroke: CGFloat {
         switch self {
-        case .sorting, .checkBold, .clockBold, .warning: 2
+        case .sorting, .checkBold, .clockBold, .warning, .plus, .pen, .pending: 2
         default: 1.8
         }
     }
@@ -154,6 +156,14 @@ enum WLLineIcon {
             path.addLine(to: p(8, 16))
         case .apps: // four rect 7×7 r2
             for (x, y) in [(4.0, 4.0), (13.0, 4.0), (4.0, 13.0), (13.0, 13.0)] { path.addPath(Self.rect(x, y, 7, 7, 2)) }
+        case .plus: // M12 5v14M5 12h14
+            path = Self.lines([(p(12, 5), p(12, 19)), (p(5, 12), p(19, 12))])
+        case .pen: // M4 20h4L19 9l-4-4L4 16z M13 7l4 4
+            path.addLines([p(4, 20), p(8, 20), p(19, 9), p(15, 5), p(4, 16)])
+            path.closeSubpath()
+            path.addPath(Self.lines([(p(13, 7), p(17, 11))]))
+        case .pending: // M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7
+            path = Self.lines([(p(12, 4), p(12, 20)), (p(4, 12), p(20, 12)), (p(6.3, 6.3), p(17.7, 17.7)), (p(17.7, 6.3), p(6.3, 17.7))])
         case .phone: // rect 7 3 10 18 r2 + M11 18h2
             path.addPath(Self.rect(7, 3, 10, 18, 2))
             path.addPath(Self.lines([(p(11, 18), p(13, 18))]))
