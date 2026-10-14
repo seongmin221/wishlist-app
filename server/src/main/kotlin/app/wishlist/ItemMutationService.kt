@@ -108,7 +108,7 @@ class ItemMutationService(private val dataSource: DataSource) {
     private fun current(c: Connection, owner: UUID, itemId: UUID): WishlistItem =
         DeletionImpacts.attach(c, owner, checkNotNull(items.findOwned(c, owner, itemId)))
 
-    private companion object {
+    internal companion object {
         val IN_PROGRESS_STAGES = setOf("GENERAL_PENDING", "GENERAL_RUNNING", "BROWSER_PENDING", "BROWSER_RUNNING")
     }
 }

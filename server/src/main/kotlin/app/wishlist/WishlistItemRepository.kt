@@ -57,14 +57,18 @@ class WishlistItemRepository(private val dataSource: DataSource) {
             statement.executeUpdate() == 1
         }
 
-    internal fun insertInitialAnalysis(connection: Connection, itemId: UUID): UUID {
+    internal fun insertInitialAnalysis(connection: Connection, itemId: UUID): UUID = insertAnalysis(connection, itemId, 1)
+
+    /** A GENERAL_PENDING job for [generation] and its outbox event; returns the event ID for post-commit dispatch. */
+    internal fun insertAnalysis(connection: Connection, itemId: UUID, generation: Int): UUID {
         val jobId = UUID.randomUUID()
         val eventId = UUID.randomUUID()
         connection.prepareStatement(
-            "insert into analysis_jobs (id, wishlist_item_id, generation, stage) values (?, ?, 1, 'GENERAL_PENDING')",
+            "insert into analysis_jobs (id, wishlist_item_id, generation, stage) values (?, ?, ?, 'GENERAL_PENDING')",
         ).use { statement ->
             statement.setObject(1, jobId)
             statement.setObject(2, itemId)
+            statement.setInt(3, generation)
             check(statement.executeUpdate() == 1)
         }
         connection.prepareStatement(
@@ -72,7 +76,7 @@ class WishlistItemRepository(private val dataSource: DataSource) {
         ).use { statement ->
             statement.setObject(1, eventId)
             statement.setObject(2, jobId)
-            statement.setString(3, "analysis-$jobId-1")
+            statement.setString(3, "analysis-$jobId-$generation")
             check(statement.executeUpdate() == 1)
         }
         return eventId

@@ -86,6 +86,13 @@ internal object ItemMutationRepository {
         "update wishlist_items set lifecycle_status='DELETED', media_asset_id=null, version=version+1, updated_at=clock_timestamp() where id=?",
     ).use { s -> s.setObject(1, itemId); check(s.executeUpdate() == 1) }
 
+    /** ITEM-06: the next generation becomes current and PROCESSING; user values, review and metadata stay. */
+    fun startGeneration(c: Connection, itemId: UUID, generation: Int) = c.prepareStatement("""
+        update wishlist_items set current_generation=?, analysis_status='PROCESSING', analysis_failure_code=null,
+            version=version+1, updated_at=clock_timestamp()
+        where id=?
+    """.trimIndent()).use { s -> s.setInt(1, generation); s.setObject(2, itemId); check(s.executeUpdate() == 1) }
+
     /** One UPDATE for the planned row; version and updated_at change once. */
     fun write(c: Connection, itemId: UUID, row: ItemRow, completeManually: Boolean) = c.prepareStatement("""
         update wishlist_items set product_name=?, name_source=?, product_brand=?, category_id=?, custom_category_id=?,

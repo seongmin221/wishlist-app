@@ -36,3 +36,10 @@
 - GREEN: `GetWishlistItemService.get`을 `inTransaction(readOnly = true)`(REPEATABLE READ)로 바꾼 뒤 `ItemDeleteTest` 6개 통과. 영향 테스트 `WishlistItemViewMapperTest` 3·`WishlistDetailRoutesTest` 8·`WishlistRoutesTest` 6·`CreateWishlistItemServiceTest` 10·`HomeRoutesTest` 1·`WishlistReadRoutesTest` 3·`MediaUploadFlowTest` 1·`AnalysisRuntimeFlowTest` 4·`MediaDisplayRoutesTest` 1·`HomeActionRoutesTest` 4·`PurposeRoutesTest` 4 통과.
 - 기존 테스트 변경: `WishlistReadRoutesTest`는 상세 JSON과 카드 JSON이 같다고 검사했다. 상세에만 `deletionImpact`가 붙는 것이 B7 계약이므로, 상세에 key가 있고 카드에는 없음을 확인한 뒤 그 key를 뺀 나머지가 같은지 비교하도록 바꿨다.
 - 구현 메모: impact는 `WishlistItem.deletionImpact`(기본 null)에 붙이고 DTO는 `@EncodeDefault(NEVER)`로 null일 때 key를 내지 않는다. 그래서 route 함수 시그니처를 바꾸지 않고 생성·replay·상세·변경 응답이 같은 mapper를 쓴다. 삭제는 진행 중 stage(`GENERAL_/BROWSER_` PENDING·RUNNING)만 `transitionAnalysisJob(CANCELLED)`로 바꾼다.
+
+### Task 7: ITEM-06 재분석
+
+- RED: `ReanalysisServiceTest`가 `ReanalysisService` 미정의로 compile 실패.
+- 첫 실행 6개 중 2개 실패. 둘 다 테스트 코드 오류였다. job 목록 문자열의 시각에 `:`가 있어 `substringBeforeLast`가 잘못 잘랐고, test helper `claimJob`이 generation 1로 고정돼 있어 generation 2 job을 claim하지 못했다. 테스트를 고친 뒤 6개 통과. 구현은 바꾸지 않았다.
+- GREEN 범위: 새 generation·job(attempt 0, first_attempt null)·outbox(`analysis-{job}-{gen}`)·receipt 원자 저장과 dispatch, replay에 job·outbox·dispatch 추가 없음, 다른 상품 같은 key 409, 삭제 뒤 replay 404, READY·PARTIAL·FAILED_TERMINAL·PROCESSING·수동 완료·ARCHIVED 409와 receipt 없음, owner별 60초 10건(11번째 429·Retry-After 1~60, replay 미집계, 다른 owner 무관, 창이 지나면 허용), dispatch 일반 예외는 성공 유지·`CancellationException`은 전파되고 commit된 attempt를 같은 key replay로 받음, 이전 generation 실행의 Complete/Partial/Retryable/Terminal finish와 claim 무시, USER 이름·category와 목적 USER+null이 새 generation 성공 뒤에도 유지.
+- 구현 메모: `WishlistItemRepository.insertInitialAnalysis`를 generation 인자를 받는 `insertAnalysis`로 일반화했다(생성 경로는 generation 1로 같은 SQL). `CreateWishlistItemServiceTest` 10개로 회귀를 확인했다.
