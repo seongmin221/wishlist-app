@@ -21,9 +21,9 @@ internal class DebugAnalysisDriver(
 ) {
     /** How many items were completed. */
     suspend fun advance(): ClientResult<Int> {
-        val leaf = when (val categories = store.categories()) {
-            is ClientResult.Failure -> return categories
-            is ClientResult.Success -> categories.value.firstOrNull { it.parentId != null }?.id
+        val leaf = when (val first = store.firstSeedLeaf()) {
+            is ClientResult.Failure -> return first
+            is ClientResult.Success -> first.value
         }
         return store.completeDueAnalyses(clock.now(), minAge) { item -> outcome(item, leaf) }
     }

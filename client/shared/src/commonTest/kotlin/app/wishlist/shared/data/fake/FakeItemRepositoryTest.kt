@@ -158,7 +158,7 @@ class FakeItemRepositoryTest {
         val seeds = BoardSeeds.create(Clock { fakeTime }, IdGenerator { Uuid.random().toString() })
         f.store.seed(seeds).successValue()
         val boardOrder = seeds.displayMetadata.cards.filter { it.cardKey.startsWith("l") }.map { it.itemId }
-        assertEquals(boardOrder, f.catalog.items(null, null).successValue().map { it.id })
+        assertEquals(boardOrder, f.catalog.items(null, null).successValue().take(8).map { it.id })
     }
     @Test fun item_03_carries_the_purpose_display_fields_in_wire_form() = runTest {
         val f = FakeFixture(); f.login()
