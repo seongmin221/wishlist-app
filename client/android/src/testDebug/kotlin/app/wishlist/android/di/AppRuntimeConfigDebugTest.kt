@@ -17,7 +17,8 @@ class AppRuntimeConfigDebugTest {
         assertEquals(ClientBuildMode.DEBUG, bindings.buildMode)
         assertEquals(ApiId.entries.toSet(), bindings.backends.keys)
         ApiId.entries.forEach { api ->
-            val expected = if (api == ApiId.ITEM_01 || api == ApiId.ITEM_03) Backend.FAKE else Backend.UNAVAILABLE
+            val faked = setOf(ApiId.ITEM_01, ApiId.ITEM_03, ApiId.ITEM_02, ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04)
+            val expected = if (api in faked) Backend.FAKE else Backend.UNAVAILABLE
             assertEquals(api.wireId, expected, bindings.backendOf(api))
         }
         assertNull(AppRuntimeConfig.remote)
