@@ -71,7 +71,20 @@ internal sealed class OverlayEntry(val id: Long) {
     abstract val needsScrim: Boolean
 }
 
-internal class SheetEntry(id: Long, val draggable: Boolean, val title: String?, val content: @Composable () -> Unit) : OverlayEntry(id) {
+/**
+ * What a user dismiss (scrim tap, system back, drag down) does to a sheet: close it, ignore it (e.g. a
+ * save in flight), or ask first ([OverlayHostState.showSheet] `onConfirmDismiss`, e.g. "변경 사항을 버릴까요?").
+ */
+enum class SheetDismiss { Allow, Block, Confirm }
+
+internal class SheetEntry(
+    id: Long,
+    val draggable: Boolean,
+    val title: String?,
+    val dismissGuard: () -> SheetDismiss = { SheetDismiss.Allow },
+    val onConfirmDismiss: () -> Unit = {},
+    val content: @Composable () -> Unit,
+) : OverlayEntry(id) {
     override val needsScrim get() = true
 }
 
@@ -112,8 +125,32 @@ class OverlayHostState {
     /** overlay가 하나라도 있는지(닫히는 중 포함). 뒤 화면을 접근성에서 숨기고 라우터의 뒤로를 끈다. */
     val isShowing: Boolean get() = entries.isNotEmpty()
 
-    fun showSheet(draggable: Boolean = true, title: String? = null, content: @Composable () -> Unit): Boolean =
-        push { SheetEntry(it, draggable, title, content) }
+    /**
+     * [dismissGuard] is asked on every user dismiss of this sheet (scrim, back, drag); [dismiss] from
+     * code (the sheet's own close button after its own checks) is not guarded.
+     */
+    fun showSheet(
+        draggable: Boolean = true,
+        title: String? = null,
+        dismissGuard: () -> SheetDismiss = { SheetDismiss.Allow },
+        onConfirmDismiss: () -> Unit = {},
+        content: @Composable () -> Unit,
+    ): Boolean = push { SheetEntry(it, draggable, title, dismissGuard, onConfirmDismiss, content) }
+
+    /**
+     * A user dismiss (scrim tap, system back, drag): the top sheet's guard decides; other overlays close
+     * as with [dismiss]. True when closing started.
+     */
+    fun userDismiss(): Boolean {
+        val top = entries.lastOrNull() ?: return false
+        if (top !is SheetEntry) return requestDismiss(top.id)
+        if (top.phase != OverlayPhase.Open || isAnimating) return false
+        return when (top.dismissGuard()) {
+            SheetDismiss.Allow -> requestDismiss(top.id)
+            SheetDismiss.Block -> false
+            SheetDismiss.Confirm -> { top.onConfirmDismiss(); false }
+        }
+    }
 
     fun showDialog(spec: WLDialogSpec): Boolean = push(spec) { DialogEntry(it, spec) }
 
@@ -264,7 +301,7 @@ fun OverlayHost(state: OverlayHostState, content: @Composable () -> Unit) {
                     color = colors.scrimDim,
                     onTap = {
                         // 막 누르기는 시트만 닫는다. 확인창은 취소·확인 버튼으로만 닫힌다. 전환 중에는 dismiss가 무시한다.
-                        if (state.entries.lastOrNull() is SheetEntry) state.dismiss()
+                        if (state.entries.lastOrNull() is SheetEntry) state.userDismiss()
                     },
                 )
             }
@@ -287,7 +324,7 @@ fun OverlayHost(state: OverlayHostState, content: @Composable () -> Unit) {
         }
         // 뒤로 우선순위: 라우터(WLNavHost)의 뒤로 처리는 overlay가 있는 동안 꺼진다(`LocalOverlayHostState.isShowing`).
         // 등록 순서에 기대지 않으므로 overlay 아래에서 새 탭 스택이 그려져 나중에 등록되어도 뒤로가 그 아래로 새지 않는다.
-        if (state.isShowing) BackHandler { state.dismiss() }
+        if (state.isShowing) BackHandler { state.userDismiss() }
     }
 }
 

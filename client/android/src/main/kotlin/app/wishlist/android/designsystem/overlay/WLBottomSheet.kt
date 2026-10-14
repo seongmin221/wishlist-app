@@ -215,7 +215,8 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                             onDragStopped = { velocity ->
                                 val distance = (1f - p.value + dragFraction) * heightPx
                                 when (sheetDragEndPx(entry.phase, distance, heightPx, velocity, density.density)) {
-                                    SheetDragEnd.Dismiss -> if (!state.requestDismiss(entry.id)) scope.launch {
+                                    // The guard may refuse (saving) or ask first (unsaved edits): the sheet then snaps back.
+                                    SheetDragEnd.Dismiss -> if (state.entries.lastOrNull()?.id != entry.id || !state.userDismiss()) scope.launch {
                                         p.snapTo((p.value - dragFraction).coerceIn(0f, 1f))
                                         dragFraction = 0f
                                         snapBack(p)

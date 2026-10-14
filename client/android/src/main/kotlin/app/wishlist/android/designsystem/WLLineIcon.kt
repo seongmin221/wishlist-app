@@ -51,7 +51,12 @@ enum class WLLineIcon(private vararg val d: String, val stroke: Float = 1.8f, va
     Globe(circle(12f, 12f, 9f), "M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"),
     Copy(rect(8f, 8f, 12f, 12f, 2f), "M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"),
     Apps(rect(4f, 4f, 7f, 7f, 2f), rect(13f, 4f, 7f, 7f, 2f), rect(4f, 13f, 7f, 7f, 2f), rect(13f, 13f, 7f, 7f, 2f)),
-    Phone(rect(7f, 3f, 10f, 18f, 2f), "M11 18h2");
+    Phone(rect(7f, 3f, 10f, 18f, 2f), "M11 18h2"),
+
+    // C5 카테고리(gen_category.py·gen_full_home.py 아이콘).
+    Pending("M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7", stroke = 2f),
+    Pen("M4 20h4L19 9l-4-4L4 16z", "M13 7l4 4", stroke = 2f),
+    Plus("M12 5v14M5 12h14", stroke = 2f);
 
     // 처음 그릴 때 만든다(JVM 단위 테스트에서 enum 값만 다룰 때 android Path를 만들지 않는다).
     internal val path by lazy { PathParser().parsePathString(d.joinToString("")).toPath() }
