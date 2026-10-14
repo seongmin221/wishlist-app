@@ -160,7 +160,7 @@ struct SheetLayer: View {
             }
             .onEnded { v in
                 switch sheetDragEnd(phase: entry.phase, dragDistance: dragOffset, sheetHeight: height, velocity: v.velocity.height) {
-                case .dismiss: if !state.requestDismiss(entry.id) { snapBack() }
+                case .dismiss: if !state.userDismiss(entry.id) { snapBack() }
                 case .snapBack: snapBack()
                 case .ignore: break
                 }
