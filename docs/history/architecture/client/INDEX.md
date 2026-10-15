@@ -22,6 +22,7 @@
 - [C2 최종 로컬 검증 (2026-10-07)](c2-final-verification-2026-10-07.md) — 실행 명령별 건수·환경·미실행과 C3/C12 인계
 - [C4 Android·iOS 상세·로컬 대기 화면 확인 (2026-10-10)](c4-detail-verification-2026-10-10.md) — 분석 중 → 상세 전환, 로컬 대기 → `MovedTo`, 로그인 전 삭제, 보드 L/D 비교와 확인하지 못한 경로(iOS 절: 끌어서 뒤로·foreground 새로고침 포함, PR B 절: 원본 링크 웹뷰 진입·외부 앱 확인창·쿠키 삭제)
 - [C4 의존성: Coil 3 (2026-10-10)](c4-dependency-coil-2026-10-10.md) — 3.5.0 선택 이유(3.6.x는 compileSdk 37·AGP 9.1 필요), OkHttp 재사용, 자리표시
+- [C5 PR A 구현 기록 (2026-10-15)](c5-pr-a-implementation-2026-10-15.md) — Task 0~19 요약, Ruling 1~8(한도 선검사 분기 없음·key 유지 조건·D15 홈 적용 등), 사용자 결정, 에뮬레이터·시뮬레이터 확인과 고친 결함, 검증 건수
 - [C4 PR A 구현 기록 (2026-10-10)](c4-pr-a-implementation-2026-10-10.md) — Task 1~12 요약, 판단(Ruling), 계획과 달라진 점, 미룬 minor, 검증 건수
 - [C4 PR B 구현 기록 (2026-10-10)](c4-pr-b-implementation-2026-10-10.md) — Task 13~16 원본 링크 웹뷰 요약, Ruling 11·12(iframe `data:`·`blob:` 차단, iOS 실제 터치 규칙), 미룬 minor, 실기기 확인 항목, 검증 건수
 - [C2 `:localdb` 모듈 분리 (2026-10-07)](c2-localdb-module-split-2026-10-07.md) — 계획의 `:shared` 단일 모듈에서 벗어난 이유(SQLDelight 생성 public 타입의 ObjC 노출 차단)
