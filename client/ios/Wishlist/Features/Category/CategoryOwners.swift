@@ -146,6 +146,8 @@ final class CategoryListOwner: CategoryStateOwner<CategoryListState> {
     }
 
     override func applied(_ state: CategoryListState) {
+        // Built once per state: the masonry looks cards up by id in every body (a linear search there is O(n²)).
+        itemsById = Dictionary(state.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let items = state.items.map { PhotoPagePlan.Item(id: $0.id, hasPhoto: remotePhotoURL($0.product.imageUrl) != nil) }
         if items.map(\.id) != plan.knownIds {
             let before = plan.knownIds
@@ -164,7 +166,10 @@ final class CategoryListOwner: CategoryStateOwner<CategoryListState> {
         partialShown = state.partialFailed
     }
 
-    func item(_ id: String) -> WishlistItem? { state.items.first { $0.id == id } }
+    /// The state's item by id (the index follows every applied state).
+    func item(_ id: String) -> WishlistItem? { itemsById[id] }
+
+    @ObservationIgnored private var itemsById: [String: WishlistItem] = [:]
 
     private func fetchSizes() {
         guard column != nil else { return }

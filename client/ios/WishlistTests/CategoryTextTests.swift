@@ -82,4 +82,29 @@ final class CategoryTextTests: XCTestCase {
         XCTAssertEqual(CategoryPagerMath.target(page: 2, count: 3, offset: -300, velocity: -900, height: 600), 2)
         XCTAssertEqual(CategoryPagerMath.target(page: 0, count: 3, offset: 300, velocity: 900, height: 600), 0)
     }
+
+    // MARK: Review fixes
+
+    func testLoadMoreAsksWhenIdleAtTheEnd() {
+        let ids = (1...40).map { "i\($0)" }
+        // A short first page: every card is on screen.
+        XCTAssertTrue(CategoryLoadMore.wants(hasMore: true, busy: false, waiting: false, laidIds: ["a", "b"], visible: ["a", "b"]))
+        // At the end of a long list.
+        XCTAssertTrue(CategoryLoadMore.wants(hasMore: true, busy: false, waiting: false, laidIds: ids, visible: ["i39", "i40"]))
+        // Not near the end, nothing more, in flight / failed, or a page still laying out.
+        XCTAssertFalse(CategoryLoadMore.wants(hasMore: true, busy: false, waiting: false, laidIds: ids, visible: ["i1", "i2"]))
+        XCTAssertFalse(CategoryLoadMore.wants(hasMore: false, busy: false, waiting: false, laidIds: ids, visible: ["i40"]))
+        XCTAssertFalse(CategoryLoadMore.wants(hasMore: true, busy: true, waiting: false, laidIds: ids, visible: ["i40"]))
+        XCTAssertFalse(CategoryLoadMore.wants(hasMore: true, busy: false, waiting: true, laidIds: ids, visible: ["i40"]))
+        XCTAssertFalse(CategoryLoadMore.wants(hasMore: true, busy: false, waiting: false, laidIds: [], visible: []))
+    }
+
+    func testOnlyTheEditBaselineReplacesTheTypedDraft() {
+        XCTAssertTrue(CategoryFormView.replacesDraft(mode: .edit, from: .loading, to: .ready))
+        // A create form's SELECT arriving keeps what is being typed.
+        XCTAssertFalse(CategoryFormView.replacesDraft(mode: .create, from: .loading, to: .ready))
+        XCTAssertFalse(CategoryFormView.replacesDraft(mode: .create, from: .loadFailed, to: .ready))
+        XCTAssertFalse(CategoryFormView.replacesDraft(mode: .edit, from: .ready, to: .ready))
+        XCTAssertFalse(CategoryFormView.replacesDraft(mode: .edit, from: .conflictUnresolved, to: .ready))
+    }
 }

@@ -20,7 +20,6 @@ struct CategoryFormView: View {
     @State private var name = ""
     @State private var description = ""
     @State private var pending = ""
-    @State private var syncedSerial = -1
 
     private var state: CategoryFormState { owner.state }
     private var editing: Bool { state.mode == .edit }
@@ -46,7 +45,16 @@ struct CategoryFormView: View {
             message
         }
         .padding(.top, WishlistTokens.Space.s4)
-        .onChange(of: syncKey, initial: true) { _, key in sync(key) }
+        .onAppear {
+            // A sheet reopened on an edit form that already has its baseline.
+            if editing && state.phase == .ready && name.isEmpty { copyDraft() }
+        }
+        .onChange(of: state.phase) { old, new in
+            if Self.replacesDraft(mode: state.mode, from: old, to: new) { copyDraft() }
+        }
+        .onChange(of: state.message) { _, new in
+            if new == .conflictLoaded { copyDraft() }
+        }
     }
 
     // MARK: Parts
@@ -185,13 +193,14 @@ struct CategoryFormView: View {
 
     // MARK: Syncing the local text with the Presenter's draft
 
-    /// Bumps when the Presenter replaced the draft (edit baseline, conflict reload, form restart).
-    private var syncKey: String {
-        "\(state.mode)|\(state.phase)|\(state.message == .conflictLoaded ? "conflict" : "")|\(state.itemCount?.intValue ?? -1)"
+    /// The fields are overwritten only when the Presenter replaced the draft: the edit baseline arrived
+    /// (EDIT, LOADING → READY) or a version conflict loaded the latest detail (CONFLICT_LOADED). Anything
+    /// else (a create form's SELECT arriving, errors) keeps what is being typed.
+    static func replacesDraft(mode: FormMode, from: FormPhase, to: FormPhase) -> Bool {
+        mode == .edit && from == .loading && to == .ready
     }
 
-    private func sync(_ key: String) {
-        guard state.phase == .ready || state.phase == .loading else { return }
+    private func copyDraft() {
         if name != state.name { name = state.name }
         if description != state.description_ { description = state.description_ }
         if pending != state.pendingExample { pending = state.pendingExample }
