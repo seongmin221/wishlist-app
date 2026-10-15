@@ -72,4 +72,14 @@ class CategoryRouteTest {
         assertEquals(1, first.presenter.closed)
         assertEquals(1, form.presenter.closed)
     }
+
+    @Test fun ownerSeesAnEditSavedWhileItsScreenWasAway() {
+        val store = ViewModelStore()
+        val entry = object : ViewModelStoreOwner { override val viewModelStore = store }
+        val home = CategoryPresenterOwner.of(entry, "home") { FakePresenter() }
+        assertFalse(home.markSeen(CategoryChanges.revision.value)) // nothing changed since it was made
+        CategoryChanges.changed() // a list screen saved an edit while the home composition was gone
+        assertTrue(home.markSeen(CategoryChanges.revision.value)) // on return: refresh once
+        assertFalse(home.markSeen(CategoryChanges.revision.value))
+    }
 }

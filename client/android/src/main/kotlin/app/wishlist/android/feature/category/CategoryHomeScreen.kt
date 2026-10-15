@@ -134,13 +134,10 @@ fun CategoryHomeScreen() {
         onPauseOrDispose { }
     }
 
-    // Back from a list (an edit may have renamed a chip, counts may have moved): refresh the chips.
-    LaunchedEffect(nav, home) {
-        var previous = nav.stack(WLTab.Category).size
-        snapshotFlow { nav.stack(WLTab.Category).size }.collect { size ->
-            if (size == 1 && previous > 1) home.refresh()
-            previous = size
-        }
+    // An edit saved on a list screen: refresh the chips. The owner remembers the revision it has shown,
+    // because this root's composition may be gone while the list covers it (then the check runs on return).
+    LaunchedEffect(owner) {
+        CategoryChanges.revision.collect { revision -> if (owner.markSeen(revision)) home.refresh() }
     }
     // A group to show once the list holds it (a category just made under a group that had no page yet).
     var focusGroup by remember { mutableStateOf<String?>(null) }
@@ -242,16 +239,18 @@ private fun GroupPager(
     val density = LocalDensity.current
     val overflowToPager = remember(pager, density) { OverflowToPager(pager, scope, with(density) { PageFlingThreshold.toPx() }) }
 
-    // The shown group follows the settled page (remembered per account by the Presenter).
+    // The group the pager itself last settled on. A refresh that changes the groups restores this one,
+    // not the Presenter's current group: that one lags a fling by a lane hop, and restoring it would
+    // snap the page back right after a fast swipe.
+    val shownGroup = remember { mutableStateOf(groups.getOrNull(startPage)?.id) }
     val latestGroups by androidx.compose.runtime.rememberUpdatedState(groups)
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.distinctUntilChanged().collect { page ->
-            latestGroups.getOrNull(page)?.let { onShowGroup(it.id) }
+            latestGroups.getOrNull(page)?.let { shownGroup.value = it.id; onShowGroup(it.id) }
         }
     }
-    // A refresh can change the groups: keep the page of the group shown before.
     LaunchedEffect(groups) {
-        val want = groups.indexOfFirst { it.id == currentGroupId }
+        val want = groups.indexOfFirst { it.id == shownGroup.value }
         if (want >= 0 && want != pager.currentPage && anchor == null && !pager.isScrollInProgress) pager.scrollToPage(want)
     }
     LaunchedEffect(groups, focusGroup) {
