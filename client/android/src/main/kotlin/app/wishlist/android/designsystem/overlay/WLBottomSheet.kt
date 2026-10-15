@@ -237,6 +237,10 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
             } else {
                 Box(Modifier.height(WishlistTokens.Space.s20))
             }
+            if (entry.selfLaidOut) {
+                // The content scrolls its own body and keeps its footer above the nav bar (see [WLSheetBody]).
+                Box(Modifier.weight(1f, fill = false)) { WLOnSheet { entry.content() } }
+            } else
             // 상한보다 긴 내용(큰 글자·키보드)은 시트 안에서 스크롤한다. 짧으면 내용 높이만큼만 차지한다.
             Box(
                 Modifier
@@ -254,4 +258,36 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
 
 private suspend fun snapBack(p: Animatable<Float, *>) {
     p.animateTo(1f, tween(WishlistTokens.Motion.sheetDragDismissSnapBack, easing = WishlistTokens.Curve.springSheet))
+}
+
+/**
+ * Body of a `selfLaidOut` sheet (FCategoryAddSheet·EditSheet): [header] stays at the top, [body] scrolls
+ * in between, and [footer] (취소 · 만들기) is pinned at the sheet bottom above the navigation bar (and
+ * above the keyboard: the sheet itself sits on the IME inset). [sidePadding] is the content's own margin.
+ */
+@Composable
+fun WLSheetBody(
+    header: @Composable () -> Unit,
+    footer: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    sidePadding: Dp = WishlistTokens.Space.screenMargin,
+    body: @Composable () -> Unit,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Box(Modifier.padding(horizontal = sidePadding)) { header() }
+        Box(
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = sidePadding)
+                .padding(top = WishlistTokens.Space.s20, bottom = WishlistTokens.Space.s16),
+        ) { body() }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(LocalWLColors.current.sheet)
+                .navigationBarsPadding()
+                .padding(start = sidePadding, end = sidePadding, top = WishlistTokens.Space.s12, bottom = WishlistTokens.Space.s16),
+        ) { footer() }
+    }
 }

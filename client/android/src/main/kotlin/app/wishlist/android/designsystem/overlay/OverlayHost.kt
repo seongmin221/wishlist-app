@@ -83,6 +83,8 @@ internal class SheetEntry(
     val title: String?,
     val dismissGuard: () -> SheetDismiss = { SheetDismiss.Allow },
     val onConfirmDismiss: () -> Unit = {},
+    /** The content lays itself out (own side margins, own scroll area, a fixed footer over the nav bar inset). */
+    val selfLaidOut: Boolean = false,
     val content: @Composable () -> Unit,
 ) : OverlayEntry(id) {
     override val needsScrim get() = true
@@ -134,8 +136,9 @@ class OverlayHostState {
         title: String? = null,
         dismissGuard: () -> SheetDismiss = { SheetDismiss.Allow },
         onConfirmDismiss: () -> Unit = {},
+        selfLaidOut: Boolean = false,
         content: @Composable () -> Unit,
-    ): Boolean = push { SheetEntry(it, draggable, title, dismissGuard, onConfirmDismiss, content) }
+    ): Boolean = push { SheetEntry(it, draggable, title, dismissGuard, onConfirmDismiss, selfLaidOut, content) }
 
     /**
      * A user dismiss (scrim tap, system back, drag): the top sheet's guard decides; other overlays close
