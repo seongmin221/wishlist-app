@@ -125,7 +125,10 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
     val openEdit = {
         overlay.showCategoryForm(form, discard, start = { it.startEdit(route.hint.categoryId, header?.parentName ?: route.hint.parentName) }) { result ->
             when (result) {
-                is FormResult.Saved -> list.applyEdited(result.detail)
+                is FormResult.Saved -> {
+                    list.applyEdited(result.detail)
+                    CategoryChanges.changed() // the first screen's chip shows the new name
+                }
                 FormResult.Gone -> list.refreshHeader() // CAT-02 404 → gone
                 is FormResult.Created -> Unit
             }

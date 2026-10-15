@@ -50,12 +50,31 @@ internal data class CategoryListRoute(val hint: CategoryListHint) : WLRoute {
 }
 
 /**
+ * "A custom category changed" (a list screen's edit was saved): the tab's first screen refreshes its
+ * chips. The two screens own separate Presenters in separate entry stores, so the list tells the home
+ * through this process-wide counter instead of reaching its owner.
+ */
+object CategoryChanges {
+    private val mutable = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val revision: kotlinx.coroutines.flow.StateFlow<Int> = mutable
+    fun changed() { mutable.value++ }
+}
+
+/**
  * Lifetime owner of one shared Presenter (no UI): kept across configuration changes, closed in
  * [onCleared] when the screen's entry ViewModelStore is cleared (pop, account leave). The category
  * Presenters' constructors are shared-internal, so the owner takes the runtime-made instance.
  */
 class CategoryPresenterOwner<P : Presenter>(val presenter: P) : ViewModel() {
     private var started = false
+    private var seenRevision = CategoryChanges.revision.value
+
+    /** Records [revision]; true when it is newer than the one this owner saw (the screen should refresh). */
+    fun markSeen(revision: Int): Boolean {
+        if (revision == seenRevision) return false
+        seenRevision = revision
+        return true
+    }
 
     /** Runs [block] on the first call only (the screen's first composition, not a recomposition after rotation). */
     fun once(block: (P) -> Unit) {
