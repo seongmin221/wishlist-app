@@ -49,6 +49,7 @@ import app.wishlist.android.designsystem.overlay.LocalOverlayHostState
 import app.wishlist.android.designsystem.overlay.OverlayHostState
 import app.wishlist.android.designsystem.overlay.SheetDismiss
 import app.wishlist.android.designsystem.overlay.WLDialogSpec
+import app.wishlist.android.designsystem.overlay.WLSheetBody
 import app.wishlist.android.designsystem.overlay.WLSheetHeader
 import app.wishlist.android.designsystem.overlay.WLSheetTitleStyle
 import app.wishlist.shared.domain.CategoryInputRules
@@ -95,6 +96,7 @@ internal fun OverlayHostState.showCategoryForm(
         draggable = true,
         dismissGuard = { formDismiss(form.state.value) },
         onConfirmDismiss = { showDialog(discard) },
+        selfLaidOut = true,
     ) { CategoryFormContent(form, discard, onResult, header = null) }
 }
 
@@ -149,11 +151,15 @@ internal fun CategoryFormContent(
     }
     val editable = !state.submitting && !(state.mode == FormMode.EDIT && state.phase != FormPhase.READY && state.phase != FormPhase.CONFLICT_UNRESOLVED)
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s20)) {
-        if (header != null) header(requestClose) else {
-            val title = stringResource(if (state.mode == FormMode.EDIT) R.string.category_form_edit_title else R.string.category_form_create_title)
-            WLSheetHeader(title, onClose = requestClose)
-        }
+    WLSheetBody(
+        header = {
+            if (header != null) header(requestClose) else {
+                val title = stringResource(if (state.mode == FormMode.EDIT) R.string.category_form_edit_title else R.string.category_form_create_title)
+                WLSheetHeader(title, onClose = requestClose)
+            }
+        },
+        footer = { FormButtons(state, form, example, requestClose) },
+    ) { Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s20)) {
         when (state.mode) {
             FormMode.CREATE -> if (state.source == FormSource.TAB) ParentChips(state, form, editable)
                 else state.parentName?.let { WLText(keepAllBreaks(stringResource(R.string.category_form_picker_note, it)), CategoryCaption.copy(fontSize = 14.sp), color = c.textSecondary) }
@@ -200,19 +206,24 @@ internal fun CategoryFormContent(
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = WishlistTokens.Space.s4), horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12)) {
-            WLButton(stringResource(R.string.dialog_cancel), WLButtonKind.Secondary, onClick = requestClose, modifier = Modifier.weight(1f), enabled = !state.submitting)
-            WLButton(
-                stringResource(if (state.mode == FormMode.EDIT) R.string.category_form_save else R.string.category_form_create),
-                WLButtonKind.Primary,
-                onClick = {
-                    form.setPendingExample(example.text.toString())
-                    form.submit()
-                },
-                modifier = Modifier.weight(2f),
-                enabled = state.canSubmit,
-            )
-        }
+    } }
+}
+
+/** 취소 · 만들기/저장(보드: 시트 하단에 고정, 1 : 2). */
+@Composable
+private fun FormButtons(state: CategoryFormState, form: CategoryFormPresenter, example: TextFieldState, requestClose: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12)) {
+        WLButton(stringResource(R.string.dialog_cancel), WLButtonKind.Secondary, onClick = requestClose, modifier = Modifier.weight(1f), enabled = !state.submitting)
+        WLButton(
+            stringResource(if (state.mode == FormMode.EDIT) R.string.category_form_save else R.string.category_form_create),
+            WLButtonKind.Primary,
+            onClick = {
+                form.setPendingExample(example.text.toString())
+                form.submit()
+            },
+            modifier = Modifier.weight(2f),
+            enabled = state.canSubmit,
+        )
     }
 }
 
@@ -293,12 +304,29 @@ private fun Examples(state: CategoryFormState, form: CategoryFormPresenter, fiel
     }
 }
 
-/** The picker's create page header: back (to the chips) + "신규 카테고리" + close. */
+/**
+ * The picker's create page header (FProductCategoryCreate): back (to the chips) + "신규 카테고리" + close,
+ * both 44dp tile circles like the sheet header's close (sheet field color, not the card color).
+ */
 @Composable
 internal fun PickerCreateHeader(onBack: () -> Unit, onClose: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
-        WLCircleButton(WLLineIcon.Back, stringResource(R.string.category_back), onClick = onBack)
+        SheetTileButton(WLLineIcon.Back, stringResource(R.string.category_back), onBack)
         WLText(stringResource(R.string.category_form_create_title), WLSheetTitleStyle, Modifier.weight(1f))
-        WLCircleButton(WLLineIcon.Close, stringResource(R.string.category_close), onClick = onClose)
+        SheetTileButton(WLLineIcon.Close, stringResource(R.string.category_close), onClose)
     }
+}
+
+/** 44dp circle on the sheet's field color (보드 시트 머리 버튼). */
+@Composable
+internal fun SheetTileButton(icon: WLLineIcon, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(WishlistTokens.Space.minTouch)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(LocalWLColors.current.sheetField)
+            .semantics { contentDescription = description }
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { WLIcon(icon) }
 }

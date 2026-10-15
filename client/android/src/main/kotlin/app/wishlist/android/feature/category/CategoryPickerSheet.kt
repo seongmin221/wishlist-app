@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,6 +77,7 @@ internal fun OverlayHostState.showCategoryPicker(
         draggable = true,
         dismissGuard = { if (page.creating) formDismiss(form.state.value) else SheetDismiss.Allow },
         onConfirmDismiss = { showDialog(discardToChips) },
+        selfLaidOut = true,
     ) { CategoryPickerContent(picker, form, page, discardToChips) }
 }
 
@@ -93,23 +97,26 @@ private fun CategoryPickerContent(picker: CategoryPickerPresenter, form: Categor
             )
             return@Column
         }
-        WLSheetHeader(stringResource(R.string.category_picker_title), onClose = { overlay.dismiss() })
+        // Self-laid-out sheet: the header keeps the side margin, the rail starts at x = 0 (board).
+        Box(Modifier.padding(horizontal = WishlistTokens.Space.screenMargin)) {
+            WLSheetHeader(stringResource(R.string.category_picker_title), onClose = { overlay.dismiss() })
+        }
         Box(Modifier.padding(top = WishlistTokens.Space.s16)) { CategoryDivider() }
         val catalog = state.catalog
         when {
             catalog == null && state.error != null -> Row(
-                Modifier.padding(vertical = WishlistTokens.Space.s24),
+                Modifier.padding(horizontal = WishlistTokens.Space.screenMargin, vertical = WishlistTokens.Space.s24).navigationBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12),
             ) {
                 WLText(stringResource(DetailText.errorText(state.error!!)), WLType.body, Modifier.weight(1f), color = c.textSecondary)
                 WLButton(stringResource(R.string.detail_retry), WLButtonKind.Secondary, onClick = picker::retry)
             }
-            catalog == null -> Column(Modifier.padding(vertical = WishlistTokens.Space.s16), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
+            catalog == null -> Column(Modifier.padding(horizontal = WishlistTokens.Space.screenMargin, vertical = WishlistTokens.Space.s16).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
                 listOf(160, 120, 140).forEach { SkeletonBar(it.dp, height = 40.dp) }
             }
-            else -> Row(Modifier.fillMaxWidth()) {
-                // 레일 120(보드 FProductCategoryPicker): 시트 좌우 여백 안쪽이라 글자 시작은 0.
+            else -> Row(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()).navigationBarsPadding()) {
+                // 레일 120(보드 FProductCategoryPicker): 시트 왼쪽 끝 x = 0부터. 선택 막대 x = 0, 글자는 17(선택)·20부터.
                 Column(Modifier.width(120.dp).padding(top = 6.dp, bottom = WishlistTokens.Space.s16)) {
                     catalog.groups.forEach { group ->
                         val on = group.id == state.currentGroupId
@@ -132,7 +139,7 @@ private fun CategoryPickerContent(picker: CategoryPickerPresenter, form: Categor
                     }
                 }
                 val group = catalog.groups.firstOrNull { it.id == state.currentGroupId } ?: catalog.groups.firstOrNull()
-                Column(Modifier.weight(1f).padding(start = WishlistTokens.Space.s8, top = WishlistTokens.Space.s16), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s16)) {
+                Column(Modifier.weight(1f).padding(start = WishlistTokens.Space.s8, end = WishlistTokens.Space.screenMargin, top = WishlistTokens.Space.s16, bottom = WishlistTokens.Space.s24), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s16)) {
                     group?.let { g ->
                         WLText(g.name, CategoryCaption, color = c.textSecondary)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
