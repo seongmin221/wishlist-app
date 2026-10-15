@@ -69,7 +69,11 @@ private struct AppShell: View {
         }
         // Removed entries are still drawn until their motion ends: close their owners once it did.
         .onChange(of: !navigator.isTransitioning && navigator.hasRemoved, initial: true) { _, ready in
-            if ready { entryOwners.close(navigator.drainRemoved()) }
+            if ready {
+                let removed = navigator.drainRemoved()
+                entryOwners.close(removed)
+                motion.releaseRemoved(removed)
+            }
         }
     }
 }

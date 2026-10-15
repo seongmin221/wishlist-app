@@ -50,4 +50,23 @@ final class WLSharedPhotoFlightTests: XCTestCase {
         XCTAssertTrue(motion.beginDrag())
         XCTAssertTrue(motion.channels(entry.id).back)
     }
+
+    /// Removed entries let go of their held card photo: when the account is left, and after a pop's motion
+    /// (`releaseRemoved`, called by the shell with the drained ids).
+    func testRemovedEntriesLetGoOfTheirHeldPhoto() {
+        let nav = WLNavigator()
+        let motion = WLNavMotion(navigator: nav)
+        motion.reduceMotion = true
+        nav.push(WLRoute(destination: "detail", pushStyle: .photo, accountScoped: true), sourceKey: "photo")
+        let entry = nav.entries(.home).last!
+        motion.handle(nav.activeTransition)
+        motion.handoff.hold(entry.id, UIImage())
+
+        _ = motion.dropAccountScoped()
+        XCTAssertNil(motion.handoff.forward(entry.id))
+
+        motion.handoff.hold(41, UIImage())
+        motion.releaseRemoved([41])
+        XCTAssertNil(motion.handoff.forward(41))
+    }
 }

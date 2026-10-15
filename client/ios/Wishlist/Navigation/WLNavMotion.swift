@@ -280,7 +280,14 @@ final class WLNavMotion {
             if let key = keys[id] { registry.setHidden(key, false) }
             entryChannels[id] = nil
         }
+        handoff.drop(dropped)
         return dropped
+    }
+
+    /// 스택에서 빠진 칸(pop·끌기 확정·replace, 모션이 끝난 뒤 셸이 `drainRemoved()`로 받은 id)의 전환 사진을 놓는다.
+    /// 상세 크기 사진을 못 그린 채 닫힌 상세(주소 없음·실패·받기 전 뒤로)도 카드 사진을 계속 들지 않는다.
+    func releaseRemoved(_ ids: [Int]) {
+        handoff.drop(ids)
     }
 
     // MARK: 끌어서 뒤로 (진행값 0~1)
