@@ -66,3 +66,20 @@ Android는 사용자 지시로 실기기 대신 에뮬레이터(Pixel_5 API 30, 
 | `gen_tokens.py --check`·`test_gen_tokens.py` | 통과 | 통과 |
 
 새 테스트마다 해당 수정만 되돌려 실패를 확인했다(Task별 기록은 plan과 각 커밋 작업 중). 메모리 기록은 [성능 확인](../../../architecture/client/c3-performance-checks.md#c5-측정-결과-2026-10-15). 플랫폼 CI job은 꺼져 있어 로컬 결과가 근거다.
+
+## push 전 독립 리뷰 반영(2026-10-15, `/code-review high`)
+
+10건 중 9건을 고쳤다.
+
+- **Android 계정을 떠날 때 시트가 남음:** 시트에 `accountScoped`를 두고 셸이 계정 범위 화면을 닫는 지점에서 `OverlayHostState.dismissAccountScoped()`로 그 위 확인창까지 닫는다(열리는 중이면 열리자마자). DEBUG hook `wl.fake.signOutAfterMs`로 확인.
+- **Android 선택 시트 생성 페이지의 X가 칩 페이지로 감:** X·바깥 누르기·끌기·시스템 뒤로는 시트를 닫고(입력이 있으면 버리기 확인), 머리 뒤로·취소만 칩 페이지로 간다.
+- **Android 뒤 페이지가 앞 페이지보다 먼저 배치됨:** `PhotoPagePlanner.settle`이 배치된 페이지 수를 세어 다음 페이지만 통과시킨다(iOS와 같은 규칙).
+- **두 플랫폼 생성 폼 입력이 SELECT 도착 때 덮일 수 있음:** 칸 덮어쓰기는 편집 baseline(첫 READY)과 409 교체 때만 한다(Android `FormFieldSync`, iOS `replacesDraft`).
+- **다음 페이지 요청이 다시 일어나지 않는 경우:** 첫 페이지가 화면을 채우지 못하거나 Presenter가 진행 중이라 무시한 뒤에도, 끝 근처 + 남은 페이지 + 받는 중 아님이면 상태가 바뀔 때마다 다시 요청한다(Android `shouldLoadMore`, iOS `wantsMore`).
+- **Android 자동 갱신에도 당겨서 새로고침 표시:** 사용자가 당겼을 때만 표시한다.
+- **iOS 카드마다 선형 탐색:** state를 적용할 때 id 색인을 한 번 만든다.
+- **shared 저장된 상위가 없는 계정이 매번 app state를 읽음, 계정 변경을 먼저 본 intent가 같은 갱신을 또 함:** 읽음 표시와 "세션 갱신 대기 중" 표시를 두었다.
+
+고치지 않은 것: **목록 페이지가 캐시 쓰기를 기다림.** 40개를 한 transaction에 쓰는 짧은 작업이고, 기다리지 않으면 캐시 쓰기와 다음 상세 GET 쓰기의 순서가 보장되지 않는다.
+
+검증: shared Android host 635 · iOS simulator 632, Android unit debug·release 212, iOS XCTest 244(실패·skip 0), assemble·lint(0 errors, 경고 27)·`linkReleaseFrameworkIosArm64`·iOS Release simulator build·`gen_tokens --check` 통과.
