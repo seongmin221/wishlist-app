@@ -1,6 +1,6 @@
 # C5 PR B 구현 기록 (2026-10-15)
 
-> 브랜치 `client/c5-photo-transition`(시작 `6b1ffbb` = PR A `client/c5-category` draft PR #21 위, D4). 설계 [spec](../../../superpowers/specs/2026-10-14-client-c5-category-design.md) §4·D4, [plan](../../../superpowers/plans/2026-10-14-client-c5-category.md) Task 20~23. PR A 기록은 [여기](c5-pr-a-implementation-2026-10-15.md).
+> draft PR #22(base `client/c5-category`, #21 merge 뒤 `develop`으로 rebase). 브랜치 `client/c5-photo-transition`(시작 `6b1ffbb` = PR A `client/c5-category` draft PR #21 위, D4). 설계 [spec](../../../superpowers/specs/2026-10-14-client-c5-category-design.md) §4·D4, [plan](../../../superpowers/plans/2026-10-14-client-c5-category.md) Task 20~23. PR A 기록은 [여기](c5-pr-a-implementation-2026-10-15.md).
 
 ## 작업 요약
 
