@@ -97,7 +97,7 @@ private struct AppRoute: View {
             switch destination {
             case .settings: SettingsScreen()
             case .login: LoginScreen(mode: .pushed)
-            case .item(let itemId): ItemDetailScreen(itemId: itemId)
+            case .item(let itemId, let viaPhoto): ItemDetailScreen(itemId: itemId, viaPhoto: viaPhoto)
             case .local(let submissionId): LocalSubmissionScreen(submissionId: submissionId)
             case .web(let page): WebViewScreen(page: page)
             case .categoryList(let target): CategoryListScreen(target: target)

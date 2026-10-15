@@ -24,6 +24,7 @@ final class WLSharedRegistry {
 
     private var probes: [String: WeakView] = [:]
     private var photos: [String: () -> AnyView] = [:]
+    private var corners: [String: CGFloat] = [:]
     private var visibility: [String: WLSourceVisibility] = [:]
 
     func sourceVisibility(_ key: String) -> WLSourceVisibility {
@@ -43,6 +44,7 @@ final class WLSharedRegistry {
         if probes[key]?.view === view {
             probes[key] = nil
             photos[key] = nil
+            corners[key] = nil
         }
         // window에서 잠깐 빠져도 같은 probe의 관찰 객체는 유지한다. 최종 해제만 관찰 객체를 버린다.
         if releaseVisibility, probes[key]?.view == nil { visibility[key] = nil }
@@ -57,6 +59,11 @@ final class WLSharedRegistry {
 
     func setPhoto(_ key: String, _ builder: @escaping () -> AnyView) { photos[key] = builder }
     func photo(_ key: String?) -> AnyView? { key.flatMap { photos[$0] }?() }
+    func hasPhoto(_ key: String?) -> Bool { key.map { photos[$0] != nil } ?? false }
+
+    /// 상세 자리 사진의 모서리(기본 20). 상품 상세는 0이라 날아가는 동안 20 → 0으로 바뀐다.
+    func setCorner(_ key: String, _ corner: CGFloat) { corners[key] = corner }
+    func corner(_ key: String?) -> CGFloat { key.flatMap { corners[$0] } ?? WishlistTokens.Radius.m }
 }
 
 /// 요소 뒤에 까는 보이지 않는 UIKit 뷰. 자기 자리를 key로 등록만 하고 그리거나 터치·접근성에 끼어들지 않는다.
@@ -64,6 +71,8 @@ struct WLFrameProbe: UIViewRepresentable {
     let key: String
     let registry: WLSharedRegistry?
     var photo: (() -> AnyView)? = nil
+    /// 이 자리 사진의 멈춘 모서리(상세 자리만, 전환 층이 카드 20에서 이 값으로 바꾼다).
+    var corner: CGFloat? = nil
 
     func makeUIView(context: Context) -> ProbeView {
         let view = ProbeView()
@@ -73,6 +82,7 @@ struct WLFrameProbe: UIViewRepresentable {
         view.key = key
         view.registry = registry
         view.photo = photo
+        view.corner = corner
         return view
     }
 
@@ -83,6 +93,7 @@ struct WLFrameProbe: UIViewRepresentable {
         view.key = key
         view.registry = registry
         view.photo = photo
+        view.corner = corner
         view.attach()
     }
 
@@ -94,6 +105,7 @@ struct WLFrameProbe: UIViewRepresentable {
         var key: String?
         weak var registry: WLSharedRegistry?
         var photo: (() -> AnyView)?
+        var corner: CGFloat?
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -105,6 +117,7 @@ struct WLFrameProbe: UIViewRepresentable {
             if window != nil {
                 registry?.register(key, view: self)
                 if let photo { registry?.setPhoto(key, photo) }
+                if let corner { registry?.setCorner(key, corner) }
             } else { registry?.unregister(key, view: self) }
         }
     }
@@ -159,7 +172,10 @@ struct WLSharedPhotoSource<Content: View>: View {
 }
 
 /// 사진 공유 요소의 다음 화면 쪽(상세 사진). 전환 동안은 숨고(전환 층이 그린다), 전환이 끝나면 여기서 그려 상세와 함께 스크롤된다.
+/// 지금 그리는 사진을 target key로 registry에 등록해 뒤로 갈 때 전환 층이 그것을 그린다(C5 PR B). 전환 층은 내용을 이 뷰
+/// 밖에서 다시 만들므로 `content`는 `@State`가 아니라 넘겨받은 값(이미지)으로 그려야 한다. [corner]는 멈춘 모서리다.
 struct WLSharedPhotoTarget<Content: View>: View {
+    var corner: CGFloat = WishlistTokens.Radius.m
     @ViewBuilder let content: () -> Content
 
     @Environment(\.wlNavMotion) private var motion
@@ -168,11 +184,27 @@ struct WLSharedPhotoTarget<Content: View>: View {
     var body: some View {
         let animating = entryID.map { motion.channels($0).animating } ?? false
         content()
-            .clipShape(photoShape)
+            .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
             .opacity(animating ? 0 : 1)
             .background {
-                if let entryID { WLFrameProbe(key: WLSharedRegistry.targetKey(entryID), registry: motion.registry) }
+                if let entryID {
+                    WLFrameProbe(key: WLSharedRegistry.targetKey(entryID), registry: motion.registry, photo: { AnyView(content()) }, corner: corner)
+                }
             }
+    }
+}
+
+/// 전환 층이 그릴 사진: push는 카드 사진(source), pop·끌어서 뒤로(취소해 돌아오는 동안 포함)는 상세가 그리던 사진(target).
+/// 고른 쪽이 없으면 다른 쪽, 둘 다 없으면 자리표시다.
+enum WLFlightPhoto: Equatable {
+    case source, target, placeholder
+
+    static func choose(back: Bool, hasSource: Bool, hasTarget: Bool) -> WLFlightPhoto {
+        let (first, firstHas, second, secondHas): (WLFlightPhoto, Bool, WLFlightPhoto, Bool) =
+            back ? (.target, hasTarget, .source, hasSource) : (.source, hasSource, .target, hasTarget)
+        if firstHas { return first }
+        if secondHas { return second }
+        return .placeholder
     }
 }
 
@@ -184,12 +216,13 @@ private func lerp(_ a: CGRect, _ b: CGRect, _ t: Double) -> CGRect {
     CGRect(x: lerp(a.minX, b.minX, t), y: lerp(a.minY, b.minY, t), width: lerp(a.width, b.width, t), height: lerp(a.height, b.height, t))
 }
 
-/// 날아가는 사진(window 좌표 사각형을 phase로 보간). 모서리 20 유지.
+/// 날아가는 사진(window 좌표 사각형을 phase로 보간). 모서리는 카드(20) → 상세 자리 모서리로 같은 phase로 바뀐다.
 struct WLPhotoFlight: View, Animatable {
     var phase: Double
     let source: CGRect
     let target: CGRect
     let photo: AnyView?
+    var targetCorner: CGFloat = WishlistTokens.Radius.m
 
     @Environment(\.wlColors) private var c
 
@@ -206,7 +239,7 @@ struct WLPhotoFlight: View, Animatable {
                 if let photo { photo } else { c.photo }
             }
             .frame(width: r.width, height: r.height)
-            .clipShape(photoShape)
+            .clipShape(RoundedRectangle(cornerRadius: lerp(WishlistTokens.Radius.m, targetCorner, phase), style: .continuous))
             .offset(x: r.minX - origin.x, y: r.minY - origin.y)
         }
         .ignoresSafeArea()

@@ -31,7 +31,14 @@ struct ProductPhoto: View {
         .accessibilityHidden(true)
     }
 
-    private var placeholder: some View {
+    private var placeholder: some View { DetailPhotoPlaceholder() }
+}
+
+/// 사진 자리표시(D9): 카드색 면 + 중립 상품 아이콘 32(칸 전체).
+struct DetailPhotoPlaceholder: View {
+    @Environment(\.wlColors) private var c
+
+    var body: some View {
         ZStack {
             c.card
             Canvas { ctx, sz in
