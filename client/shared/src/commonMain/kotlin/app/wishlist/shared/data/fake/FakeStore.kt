@@ -126,7 +126,8 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         data.categories.filter { it.kind == "CUSTOM" }.forEach { custom ->
             val id = canonicalUuidOrNull(custom.id) ?: return@request failure(ErrorKind.VALIDATION)
             val parent = custom.parentId ?: return@request failure(ErrorKind.VALIDATION)
-            owner.customs += FakeCustom(id, parent, custom.name, null, emptyList(), custom.version ?: 1, nextCustomOrder(owner, parent))
+            val (description, examples) = BoardSeeds.customText[custom.name] ?: (null to emptyList())
+            owner.customs += FakeCustom(id, parent, custom.name, description, examples, custom.version ?: 1, nextCustomOrder(owner, parent))
         }
         owner.purposes = data.purposes.toList()
         owner.firstSeedLeaf = data.categories.firstOrNull { it.parentId != null }?.id
