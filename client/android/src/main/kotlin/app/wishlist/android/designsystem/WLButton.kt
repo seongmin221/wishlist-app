@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,7 +25,10 @@ const val DISABLED_ALPHA = 0.4f
 
 enum class WLButtonKind { Primary, Secondary, Danger }
 
-/** 높이 52 pill. 큰 글자 크기에서는 늘어난다. Primary=반전색, Secondary=카드색(시트·확인창 위는 sheetField), Danger=위험 빨강(확인창 안에서만). */
+/**
+ * 높이 52 pill. 큰 글자 크기에서는 늘어난다. Primary=반전색, Secondary=카드색(시트·확인창 위는 sheetField), Danger=위험 빨강(확인창 안에서만).
+ * [loading]: 응답을 기다리는 동안(C5 사용자 결정 2026-10-15) 글자 자리에 작은 진행 표시를 그리고 누를 수 없다. 흐리지 않고 크기는 그대로다.
+ */
 @Composable
 fun WLButton(
     text: String,
@@ -32,6 +36,7 @@ fun WLButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    loading: Boolean = false,
 ) {
     val c = LocalWLColors.current
     val onSheet = LocalWLOnSheet.current
@@ -44,14 +49,22 @@ fun WLButton(
     Box(
         modifier = modifier
             .heightIn(min = 52.dp)
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .alpha(if (enabled || loading) 1f else DISABLED_ALPHA)
             .clip(RoundedCornerShape(WishlistTokens.Radius.pill))
             .background(bg)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(enabled = enabled && !loading, role = Role.Button, onClick = onClick)
             .padding(horizontal = WishlistTokens.Space.s20, vertical = WishlistTokens.Space.s12),
         contentAlignment = Alignment.Center,
     ) {
-        WLText(text, style, color = fg, textAlign = TextAlign.Center, maxLines = 1)
+        // The text keeps its place (and is still read by TalkBack); the indicator sits on top of it.
+        WLText(text, style, Modifier.alpha(if (loading) 0f else 1f), color = fg, textAlign = TextAlign.Center, maxLines = 1)
+        if (loading) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = fg,
+                strokeWidth = 2.dp,
+            )
+        }
     }
 }
 
