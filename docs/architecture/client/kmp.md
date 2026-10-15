@@ -40,7 +40,7 @@
 | DI | Koin(`:shared` 안 internal 조립, runtime별 격리 `koinApplication`. 앱은 `SharedRuntimeFactory`만 호출) |
 | Swift 연결 | SKIE(Flow·suspend → AsyncSequence·async). 미지원 시 KMP-NativeCoroutines |
 | 인증 | 플랫폼별 Firebase 공식 SDK가 공개 콜백 `PlatformTokenSource`를 구현해 `RemoteConfig`로 전달(KMP 내부 `AuthTokenProvider`는 `internal`) |
-| 설정 저장 | multiplatform-settings(C5 도입 예정). C3의 기기 상태(fake 계정·첫 실행 안내)는 SQLDelight `app_state` 표에 둔다(C3-D7) |
+| 설정 저장 | SQLDelight `app_state` 표(C3-D7: fake 계정·첫 실행 안내, C5: 계정별 마지막 카테고리 상위 `category.lastGroup.<accountId>`). multiplatform-settings는 도입하지 않았다(C5, 새 의존성 없이 같은 표로 충분) |
 | 테스트 | kotlin.test, Turbine, Ktor MockEngine |
 
 공유 코드는 `:shared`의 패키지로 경계를 나눈다. SQLDelight plugin·schema·생성 코드만 내부 모듈 `:localdb`에 둔다.
@@ -262,6 +262,24 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 - **삭제:** `delete()`는 `canDelete`이고 진행 중이 아닐 때만 돈다. 진행 중에는 행 없는 view(삭제가 바로 게시한 view)로 판정하지 않고 삭제 결과를 기다린다. 성공이면 `Deleted`, `CONFLICT/SUBMISSION_IN_FLIGHT`(그 사이 전송 시작)면 `deleting`만 내려 곧 올 `MovedTo`를 기다리고, 그 밖의 실패는 `deleteFailed = true`(다음 view에서 false)다.
 - outcome은 한 번 정해지면 바뀌지 않는다. `tick()`은 데이터 없이 상대 시각만 다시 계산한다.
 
+## 카테고리·목록 (C5)
+
+> 2026-10-14~15 C5 Task 1~9. 설계 [C5 spec](../../superpowers/specs/2026-10-14-client-c5-category-design.md), 계획 [C5 plan](../../superpowers/plans/2026-10-14-client-c5-category.md).
+
+- **repository(API 단위):** `CategoryRepository`(CAT-01 `catalog(scope, parentId)`, CAT-02 `custom`, CAT-03 `create(command, idempotencyKey)`, CAT-04 `update(id, expectedVersion, patch)`)와 `ItemListRepository.byCategory(categoryId, cursor, limit = 40)`(ITEM-02 카테고리 범위). CAT-01~04는 API마다 binding이 따로라서 runtime이 `RoutedCategoryRepository`로 메서드별 backend를 고른다. `SharedRuntime.categoryRepository()`·`itemListRepository()`가 gated facade다.
+- **모델:** `CategoryCatalog`·`CategoryGroup`·`CategoryEntry`(kind 원문 `rawKind` 보존, 모르는 값은 `UNKNOWN`)·`CustomCategoryDetail`·`CategoryCreated`·`CategoryCommand`·`CategoryPatch`(`DescriptionChange.Keep/Set(null 해제)`)·`ItemPage`. custom id는 canonical 소문자 UUID로 바꾼다.
+- **mapper:** CAT 응답은 JSON tree를 정확한 wire 타입으로 읽는다(kotlinx Int 디코딩은 `"20"`도 받아서 쓰지 않는다). 카드 `item`은 기존 `mapItem`. PATCH body는 바뀐 필드만, 해제한 설명은 명시적 `null`.
+- **오류:** `ClientError.fields`(서버 `details.fields`: `parentId`·`name`·`description`·`examples`·`expectedVersion`)를 더했다. 문자열이 아닌 원소·배열이 아닌 값은 무시한다. 서버 code는 `ClientError.code` 그대로다.
+- **입력 규칙:** `CategoryInputRules`가 서버 `UserTextRules`를 옮긴다. 길이는 code point, 설명만 LF·CRLF 허용, Cc 제어문자·짝 없는 surrogate·U+200B/U+FEFF·bidi 제어 금지, 공백 판정은 Unicode 공백 trim/collapse key. 서버는 key에 NFC를 먼저 적용하지만 common Kotlin에 NFC가 없어 Fake만 근사한다(한계 표). 상수 이름은 `NAME_LIMIT` 등이다: `NAME_MAX`는 POSIX `<limits.h>` 매크로라 ObjC 헤더를 깨뜨렸다.
+- **Fake:** `FakeTaxonomy`가 서버 `V11__category_management.sql`의 11개 상위·87개 공용 leaf를 옮긴다. 생성 검사 순서는 서버 `CategoryService.create`와 같다(상위·입력 → receipt replay → 60초 5건 → 20개 → 이름 중복). 편집은 found → version → 변경 있음 → 입력 → 같은 내용(version 유지) → 중복. 상품 GET·목록은 현재 custom 행에서 이름을 읽어 rename이 바로 보인다. ITEM-02는 `createdAt DESC, id DESC` keyset cursor. `BoardSeeds`는 칩 숫자만큼(69개) 상품을 만들어 BROWSE count가 보드와 같다. DEBUG hook: `seedLongCategory`(120개, 긴·느린 사진), `delayNextCategoryCreate`, `editCategoryElsewhere`.
+- **Remote:** `RemoteCategoryRepository`·`RemoteItemListRepository`가 C2 transport의 session 검사(보내기 전·기다리는 중·돌려주기 전)를 그대로 쓴다. MockEngine 계약은 Fake store를 HTTP로 감싼 `ScriptedCategoryServer`에서 Fake와 같은 시나리오로 돈다(서버 구현 검증이 아니다).
+- **캐시:** `CachedItemListRepository`가 ITEM-02 카드를 `LocalStore.upsertItems`(한 transaction, GET 규칙 `version >=`)로 상세 캐시에 쓴다. 쓰기 실패는 페이지를 실패로 만들지 않는다. 페이지(window) 자체는 저장하지 않는다(C7).
+- **Presenter 넷:** 공통 기반 `SessionLane`(단일 lane, 요청 시점 snapshot의 `withCurrent` 안에서만 발행, 취소된 job은 발행 안 함, 새는 취소는 `UNAVAILABLE/CATEGORY_STEP_FAILURE`).
+  - `CategoryHomePresenter`: BROWSE, 계정별 마지막 상위(`app_state`), 로그인 전은 요청 없음(D5), 빈 groups(D6), `refreshNow()`.
+  - `CategoryListPresenter`: hint로 머리를 바로 그림, 머리(공용 CAT-01 BROWSE parent / custom CAT-02)와 ITEM-02가 따로 성공·실패, 개수는 CAT itemCount 우선, `loadMore` 중복 무시·실패 줄, `refresh`(이어 붙인 페이지 버림), `refreshHeader`·`applyEdited`(목록·cursor 유지), `CATEGORY_NOT_FOUND`는 `gone`.
+  - `CategoryFormPresenter`: 생성은 SELECT로 상위 11개·사용 개수, 편집은 CAT-02 baseline. 제출은 한 번에 하나, key와 보낸 payload를 함께 보관해 같은 payload면 같은 key(결과를 모르는 실패 뒤에만 유지, 확실한 거절은 지움). 409는 최신 상세 재조회 → 보낸 PATCH의 기대 결과와 같으면 `Saved`, 아니면 폼 교체 + `CONFLICT_LOADED`, 재조회 실패는 `CONFLICT_UNRESOLVED`(저장 꺼짐). 422 `fields`는 칸 오류로.
+  - `CategoryPickerPresenter`: SELECT, 선택 칩의 상위를 엶, 시트 안 생성 뒤 그 카테고리를 `result`로(SELECT 재조회 실패해도 detail로).
+
 ## C2 최종 검증 요약
 
 > 2026-10-07 Task 10. 명령·건수·로그 경로는 [C2 최종 검증 기록](../../history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.
@@ -321,7 +339,18 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 
 | 한계 | 담당 단계 |
 |--|--|
-| 같은 version의 표시 metadata(목적 이름·색·아이콘)는 그 항목의 GET에서만 갱신된다. `accept`(전송 응답)나 목록 경로는 같은 version의 cache 행을 덮지 않으므로 목록·목적 화면은 갱신 시점이 다를 수 있다 | C5/C6(목록·목적 화면이 표시 metadata를 읽을 때) |
-| 같은 항목에 겹친 GET이 있으면 version이 같은 채 먼저 시작한 응답이 나중에 써서 표시 이름이 되돌아갈 수 있다(마지막 쓰기 승리) | C5/C6 |
+| 같은 version의 표시 metadata(목적 이름·색·아이콘)는 그 항목의 GET에서만 갱신된다. `accept`(전송 응답)나 목록 경로는 같은 version의 cache 행을 덮지 않으므로 목록·목적 화면은 갱신 시점이 다를 수 있다 | C5: 카테고리 목록 카드도 GET 규칙으로 캐시에 써서 목록을 본 상품은 풀림. 목적 화면은 C6 |
+| 같은 항목에 겹친 GET이 있으면 version이 같은 채 먼저 시작한 응답이 나중에 써서 표시 이름이 되돌아갈 수 있다(마지막 쓰기 승리) | C5에서도 남김(목록 응답도 같은 규칙, C5 한계 표). C7 window 캐시에서 다시 본다 |
 | `LocalSubmissionDetailPresenter`는 계정을 떠난 뒤 다음 load 전까지 아무것도 판정하지 않는다(sticky skip, Ruling 5). 셸이 늦게 닫으면 그 사이 화면은 미결정 상태다 | 다듬기 |
 | 웹뷰 실기기 확인(D16 외부 앱 확인창 빈도, `window.opener` 손실): 2026-10-10 미확인, [PR B 기록](../../history/architecture/client/c4-pr-b-implementation-2026-10-10.md#실기기-확인-항목미확인) | PR B·인증 연결 |
+
+### C5에서 생긴 항목
+
+| 한계 | 담당 단계 |
+|--|--|
+| Fake 이름 중복 비교에 NFC가 없다(서버는 NFC 뒤 비교). NFD로 쓴 같은 한글 이름이 Fake에서는 중복이 아니다 | Remote 전환 때 실서버로 확인 |
+| 목록 `refresh()`는 이어 붙인 페이지를 버리고 첫 페이지부터 받는다. 목록은 foreground 갱신을 하지 않는다 | C7(anchor 갱신) |
+| 카테고리 편집은 item version을 올리지 않아, 편집 전에 시작한 목록·GET 응답이 늦게 오면 같은 version으로 옛 이름을 캐시에 덮을 수 있다(C4 한계 2와 같은 마지막 쓰기 승리). 화면은 `applyEdited`로 바로 고친다 | C7 window 캐시 |
+| 생성 응답을 잃은 뒤 입력을 바꿔 다시 만들면 새 key라서 처음 시도가 실제로 성공했다면 카테고리가 하나 더 생길 수 있다(이름이 같으면 중복 409로 막힘). 폼을 닫았다 다시 열어도 보낸 payload는 잊는다 | 알려진 한계 |
+| code point 상한 근처의 emoji 묶음은 반쪽 대신 통째로 빠진다 | 알려진 한계 |
+| skeleton 제한 시간 3초. 그 뒤 온 사진은 1:1 칸을 채워 자른다 | 알려진 한계 |
