@@ -130,3 +130,18 @@ C4에서 새로 생긴 깊이는 홈 → 상세 한 단계다. 상세에는 다�
 | 25번 스크롤해 3페이지까지 이어 붙인 뒤 | 122.0 MB |
 
 iOS 목록 메모리는 이번에 재지 않았다(PR B의 상세 push/pop 측정 때 함께 잰다). 실기기 측정은 남았다.
+
+## C5 PR B 측정 결과 (2026-10-15)
+
+기록이며 통과 기준이 아니다. 카테고리 목록(키보드 123개, `wl.fake.longCategory C024`)에서 1:4 사진 카드 → 상세(사진 공유 요소) → 뒤로를 20회 반복했다. DEBUG 빌드, memory cache는 비우지 않았다.
+
+- **Android:** emulator Pixel_5 API 30(`emulator-5556`), `adb input` 1.2초 간격, `dumpsys meminfo`.
+
+| 시점 | TOTAL PSS | Java heap | Native heap |
+| --- | --- | --- | --- |
+| 반복 전(목록) | 117.2 MB | 29.2 MB | 32.3 MB |
+| 20회 직후 | 133.9 MB | 37.9 MB | 38.9 MB |
+| `send-trim-memory RUNNING_CRITICAL` 5초 뒤 | 107.8 MB | 23.3 MB | 27.4 MB |
+
+  trim 뒤 반복 전보다 낮아 handoff·칸 ViewModel이 쌓이지 않았다. 프레임(`dumpsys gfxinfo`, 한 번의 전환): push p50 약 30ms(같은 경로의 slide push 25~32ms와 비슷), cache를 비우면 p50 85~93ms. pop은 사진·slide 모두 5~9프레임(p90 0.2~0.85초)으로, 120개 목록이 다시 composition에 들어오는 비용이다(PR A부터). 카드 공유 요소를 상세가 연 카드 하나로 줄여도 차이가 없었다.
+- **iOS:** iPhone 17 Pro 시뮬레이터, serve-sim `tap` 1.2초 간격, `footprint`. 목록 74 MB → 20회 뒤 76 MB → `memory-warning` 3초 뒤 75 MB. 반복 중 탭 하나가 빠져 마지막은 상세에서 끝났다. 로더 메모리 cache 상한(32MB)은 C4 값 그대로다.

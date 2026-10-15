@@ -11,6 +11,9 @@ final class WLEntryChannels {
     var content: Double = 0
     /// 공유 요소를 전환 층이 그리는 중(상세 안의 사진은 숨는다).
     var animating = true
+    /// 사진이 상세에서 원래 자리로 돌아가는 중(pop·끌어서 뒤로, 끌기를 취소해 돌아오는 동안 포함). 전환 층은 이때 상세가
+    /// 그리던 사진을, push에는 카드 사진을 그린다(`WLFlightPhoto`).
+    var back = false
     /// 칸 전체 불투명도. `replaceTop`의 cross-fade만 움직인다(그 밖에는 늘 1).
     var fade: Double = 1
     /// window 좌표. 원래 자리는 push 때, pop·끌기 시작 때 다시 읽는다. 상세 자리도 같다.
@@ -49,6 +52,8 @@ final class WLNavMotion {
     private(set) var arrival: WLArrival?
 
     @ObservationIgnored let registry = WLSharedRegistry()
+    /// 전환 중 사진 보유(C5 PR B): 카드를 누를 때 카드 사진을 든다.
+    @ObservationIgnored let handoff = PhotoHandoff()
     @ObservationIgnored let navigator: WLNavigator
     @ObservationIgnored private var entryChannels: [Int: WLEntryChannels] = [:]
     @ObservationIgnored private var tabChannels: [WLTab: WLTabChannels] = [:]
@@ -133,6 +138,7 @@ final class WLNavMotion {
             ch.phase = 0
             ch.content = 0
             ch.animating = true
+            ch.back = false
             ch.source = entry.route.pushStyle == .photo ? registry.frame(entry.sourceKey) ?? .zero : .zero
         }
         switch entry.route.pushStyle {
@@ -202,8 +208,12 @@ final class WLNavMotion {
             if let source = registry.frame(entry.sourceKey) { ch.source = source }
             if entry.route.pushStyle == .photo, let target = registry.frame(WLSharedRegistry.targetKey(entry.id)) { ch.target = target }
             ch.animating = true
+            ch.back = true
         }
-        if entry.route.pushStyle == .photo, let key = entry.sourceKey { registry.setHidden(key, true) }
+        if entry.route.pushStyle == .photo {
+            PhotoTransitionDebug.onPhotoTransitionStart()
+            if let key = entry.sourceKey { registry.setHidden(key, true) }
+        }
     }
 
     private func startTab(from: WLTab, to: WLTab, _ t: WLNavTransition) {
@@ -270,7 +280,14 @@ final class WLNavMotion {
             if let key = keys[id] { registry.setHidden(key, false) }
             entryChannels[id] = nil
         }
+        handoff.drop(dropped)
         return dropped
+    }
+
+    /// 스택에서 빠진 칸(pop·끌기 확정·replace, 모션이 끝난 뒤 셸이 `drainRemoved()`로 받은 id)의 전환 사진을 놓는다.
+    /// 상세 크기 사진을 못 그린 채 닫힌 상세(주소 없음·실패·받기 전 뒤로)도 카드 사진을 계속 들지 않는다.
+    func releaseRemoved(_ ids: [Int]) {
+        handoff.drop(ids)
     }
 
     // MARK: 끌어서 뒤로 (진행값 0~1)
@@ -328,6 +345,7 @@ final class WLNavMotion {
             ch.content = 1
         } completion: { [weak self] in
             ch.animating = false
+            ch.back = false
             if let key = drag.entry.sourceKey { self?.registry.setHidden(key, false) }
             // Only our own gesture: a drop during the revert ended it, and a later gesture is not ours.
             if self?.navigator.activeTransition == drag.transition { self?.navigator.cancelBackGesture() }

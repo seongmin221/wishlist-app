@@ -26,7 +26,7 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
         WLRoute.TabRoot(WLTab.Category) -> CategoryHomeScreen()
         SettingsRoute -> SettingsScreen()
         LoginRoute -> LoginScreen(LoginMode.Pushed)
-        is ItemDetailRoute -> ItemDetailScreen(route.itemId)
+        is ItemDetailRoute -> ItemDetailScreen(route, sourceKey)
         is LocalSubmissionRoute -> LocalSubmissionScreen(route.submissionId)
         is WebViewRoute -> WebViewScreen(route)
         is CategoryListRoute -> CategoryListScreen(route)

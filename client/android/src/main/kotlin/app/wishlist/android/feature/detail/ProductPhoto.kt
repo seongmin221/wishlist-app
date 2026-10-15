@@ -49,7 +49,7 @@ private const val BagPath = "M6 8h12l1 12H5zM9 8V7a3 3 0 0 1 6 0v1"
 private val bagPath by lazy { PathParser().parsePathString(BagPath).toPath() }
 
 @Composable
-private fun PhotoPlaceholder(modifier: Modifier) {
+internal fun PhotoPlaceholder(modifier: Modifier) {
     val c = LocalWLColors.current
     Box(modifier.background(c.card), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(32.dp)) {

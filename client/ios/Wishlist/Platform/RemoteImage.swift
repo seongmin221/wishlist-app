@@ -1,4 +1,5 @@
 import ImageIO
+import OSLog
 import UIKit
 
 /// 원격(또는 file://) 이미지 로더. URLSession + 디스크 URLCache(50MB), 메모리 NSCache,
@@ -14,6 +15,9 @@ import UIKit
 ///   취소된다. 다른 화면이 같은 key를 기다리면 계속한다.
 /// - 로더 전체의 실제 작업(받기 + 디코드)은 동시에 `maxConcurrent`(6)개까지다. 허가를 기다리다 취소된 작업은 시작하지 않는다.
 /// - `image(for:maxPixel:)`: 긴 변 최대 픽셀을 직접 준다(Task 9 API).
+/// - `bestCached(for:)`(C5 PR B): key는 그대로 두고 주소별 색인을 따로 두어, 그 주소로 메모리에 있는 가장 큰 사진을
+///   돌려준다. 카드(작은 칸)와 상세(큰 칸)는 key가 달라, 상세가 전환 첫 프레임부터 카드 사진을 그리는 데 쓴다.
+///   색인은 NSCache가 빼는 항목을 따라 지운다(`MemoryIndex`가 cache delegate).
 final class RemoteImageLoader: @unchecked Sendable {
     static let shared = RemoteImageLoader(session: RemoteImageLoader.defaultSession())
 
@@ -34,15 +38,40 @@ final class RemoteImageLoader: @unchecked Sendable {
     }
 
     private let session: URLSession
+    #if DEBUG
+    private static let log = Logger(subsystem: "app.wishlist.ios", category: "images")
+    #endif
     private let memory = NSCache<NSString, Loaded>()
+    private let index = MemoryIndex()
     private let lock = NSLock()
     private var inFlight: [String: Entry] = [:]
     let permits: AsyncPermits
 
-    init(session: URLSession? = nil, maxConcurrent: Int = 6) {
+    init(session: URLSession? = nil, maxConcurrent: Int = 6, memoryCostLimit: Int = 32 * 1024 * 1024) {
         self.session = session ?? Self.defaultSession()
         permits = AsyncPermits(maxConcurrent)
-        memory.totalCostLimit = 32 * 1024 * 1024
+        memory.totalCostLimit = memoryCostLimit
+        memory.delegate = index
+    }
+
+    /// The biggest photo of `url` in the memory cache, whatever frame it was decoded for (synchronous).
+    func bestCached(for url: URL) -> UIImage? {
+        index.keys(for: url.absoluteString)
+            .compactMap { memory.object(forKey: $0 as NSString)?.image }
+            .max { pixels($0) < pixels($1) }
+    }
+
+    /// Empties the memory cache (DEBUG `-wl.debug.clearImageMemory`; the disk URLCache stays).
+    func clearMemory() {
+        memory.removeAllObjects()
+        index.removeAll()
+    }
+
+    /// Test hook: how many memory keys the index keeps for `url`.
+    func indexedKeyCount(for url: URL) -> Int { index.keys(for: url.absoluteString).count }
+
+    private func pixels(_ image: UIImage) -> CGFloat {
+        image.size.width * image.scale * image.size.height * image.scale
     }
 
     static func defaultSession() -> URLSession {
@@ -149,6 +178,9 @@ final class RemoteImageLoader: @unchecked Sendable {
     /// leaves before the work ended, the work is cancelled (URLSession stops the transfer, a queued
     /// permit request is dropped).
     private func load(key: String, url: URL, decode: @escaping @Sendable (Data) -> Loaded?) async -> Loaded? {
+        #if DEBUG
+        Self.log.debug("start \(key, privacy: .public)") // C5 PR B device check: loader requests vs fetches
+        #endif
         if let hit = memory.object(forKey: key as NSString) { return hit }
         let me = UUID()
         let entry: Entry = lock.withLock {
@@ -158,13 +190,18 @@ final class RemoteImageLoader: @unchecked Sendable {
             }
             let session = session
             let memory = memory
+            let index = index
             let permits = permits
             let task = Task<Loaded?, Never> {
                 guard await permits.acquire() else { return nil }
                 defer { permits.release() }
+                #if DEBUG
+                Self.log.debug("fetch \(key, privacy: .public)")
+                #endif
                 guard !Task.isCancelled, let data = try? await session.data(from: url).0, !Task.isCancelled,
                       let loaded = decode(data) else { return nil }
                 let image = loaded.image
+                index.add(url: url.absoluteString, key: key, object: loaded) // before: inserting may evict at once
                 memory.setObject(loaded, forKey: key as NSString, cost: Int(image.size.width * image.scale * image.size.height * image.scale * 4))
                 return loaded
             }
@@ -245,4 +282,37 @@ final class AsyncPermits: @unchecked Sendable {
 
     /// Test hook: the highest number of permits held at once.
     var peak: Int { lock.withLock { maxInUse } }
+}
+
+/// Address → memory keys, kept in step with the cache: NSCache tells its delegate before it drops an
+/// object (eviction under the cost limit, `removeAllObjects`), and the entry leaves the index.
+private final class MemoryIndex: NSObject, NSCacheDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var keysByURL: [String: Set<String>] = [:]
+    private var entryOf: [ObjectIdentifier: (url: String, key: String)] = [:]
+
+    func add(url: String, key: String, object: AnyObject) {
+        lock.withLock {
+            keysByURL[url, default: []].insert(key)
+            entryOf[ObjectIdentifier(object)] = (url, key)
+        }
+    }
+
+    func keys(for url: String) -> Set<String> { lock.withLock { keysByURL[url] ?? [] } }
+
+    func removeAll() {
+        lock.withLock {
+            keysByURL = [:]
+            entryOf = [:]
+        }
+    }
+
+    func cache(_ cache: NSCache<AnyObject, AnyObject>, willEvictObject obj: Any) {
+        let id = ObjectIdentifier(obj as AnyObject)
+        lock.withLock {
+            guard let entry = entryOf.removeValue(forKey: id) else { return }
+            keysByURL[entry.url]?.remove(entry.key)
+            if keysByURL[entry.url]?.isEmpty == true { keysByURL[entry.url] = nil }
+        }
+    }
 }

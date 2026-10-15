@@ -149,7 +149,7 @@ private struct WLEntryLayer<Content: View>: View {
                 switch entry.route.pushStyle {
                 case .photo:
                     WLContentFade(channels: ch) { content(entry.route) }
-                    WLPhotoFlightLayer(channels: ch, photo: motion.registry.photo(entry.sourceKey))
+                    WLPhotoFlightLayer(channels: ch, registry: motion.registry, sourceKey: entry.sourceKey, targetKey: WLSharedRegistry.targetKey(entry.id))
                 case .slide:
                     content(entry.route)
                 }
@@ -214,11 +214,18 @@ private struct WLContentFade<Inner: View>: View {
 
 private struct WLPhotoFlightLayer: View {
     let channels: WLEntryChannels
-    let photo: AnyView?
+    let registry: WLSharedRegistry
+    let sourceKey: String?
+    let targetKey: String
 
     var body: some View {
         if channels.animating {
-            WLPhotoFlight(phase: channels.phase, source: channels.source, target: channels.target, photo: photo)
+            let photo: AnyView? = switch WLFlightPhoto.choose(back: channels.back, hasSource: registry.hasPhoto(sourceKey), hasTarget: registry.hasPhoto(targetKey)) {
+            case .source: registry.photo(sourceKey)
+            case .target: registry.photo(targetKey)
+            case .placeholder: nil
+            }
+            WLPhotoFlight(phase: channels.phase, source: channels.source, target: channels.target, photo: photo, targetCorner: registry.corner(targetKey))
         }
     }
 }

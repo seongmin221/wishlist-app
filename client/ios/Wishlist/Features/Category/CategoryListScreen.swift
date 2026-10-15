@@ -234,26 +234,36 @@ private struct CategoryCard: View {
     let owner: CategoryListOwner
 
     @Environment(\.wlNavigator) private var nav
+    @Environment(\.wlNavMotion) private var motion
     @Environment(\.wlColors) private var c
     @State private var image: UIImage?
 
     var body: some View {
+        let sourceKey = "category/item/\(item.id)"
         Button {
-            nav.push(AppDestination.item(item.id).route, sourceKey: "category/item/\(item.id)")
+            // Card photo → detail photo (C5 PR B): the image the card draws travels with the push.
+            PhotoTransitionDebug.onPhotoTransitionStart()
+            if nav.push(AppDestination.item(item.id, viaPhoto: true).route, sourceKey: sourceKey),
+               let image, let entry = nav.entries(nav.currentTab).last {
+                motion.handoff.hold(entry.id, image)
+            }
         } label: {
             VStack(alignment: .leading, spacing: WishlistTokens.Space.s8) {
-                GeometryReader { geo in
-                    ZStack {
-                        if let image {
-                            Image(uiImage: image).resizable().scaledToFill()
-                                .frame(width: geo.size.width, height: geo.size.height).clipped()
-                        } else {
-                            ProductPhoto(imageUrl: nil)
+                // The flight layer rebuilds this content outside the card: it draws the captured `image` value.
+                let shown = image
+                WLSharedPhotoSource(key: sourceKey) {
+                    GeometryReader { geo in
+                        ZStack {
+                            if let shown {
+                                Image(uiImage: shown).resizable().scaledToFill()
+                                    .frame(width: geo.size.width, height: geo.size.height).clipped()
+                            } else {
+                                ProductPhoto(imageUrl: nil)
+                            }
                         }
                     }
                 }
                 .aspectRatio(1 / max(ratio, 0.01), contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: WishlistTokens.Radius.m, style: .continuous))
                 .overlay(alignment: .topLeading) {
                     if CardMetaLineKt.isUnconfirmed(item: item) {
                         WLIconTile(size: 32, radius: WishlistTokens.Radius.xs, color: WishlistTokens.Light.card) {
