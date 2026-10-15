@@ -36,6 +36,16 @@ Android는 사용자 지시대로 에뮬레이터 `emulator-5556`(Pixel_5 API 30
 
 통과 기준이 아니라 기록이다([성능 확인](../../../architecture/client/c3-performance-checks.md#c5-pr-b-측정-결과-2026-10-15)).
 
+## push 전 독립 리뷰 반영(2026-10-15, `/code-review high`)
+
+10건 중 4건을 고쳤다.
+
+- **iOS handoff를 놓는 곳이 없음:** 상세 사진을 못 그리고 닫힌 상세(주소 없음·실패·받기 전 뒤로·계정 떠남)가 카드 `UIImage`를 프로세스 끝까지 들었다. `drainRemoved` 뒤 `releaseRemoved`, `dropAccountScoped`에서 놓는다.
+- **Android overlay clip이 모서리 20 고정:** 공유 요소 overlay가 고정 20 모양으로 잘라 push 내내 20이었다가 끝에서 0으로 튀었다(에뮬레이터 프레임으로 확인). overlay clip도 같은 움직이는 모서리를 쓴다.
+- **Android 상세 사진 실패 때 빈 칸, 요청이 카드 bitmap을 붙잡음:** 카드 사진을 요청의 `placeholder`로 넘기던 것을 상세가 직접 그리게 바꿨다(실패하면 카드 사진이 남고, handoff를 놓으면 bitmap도 풀린다). 같은 값만 옮기던 `DetailPhotoStart`도 지웠다.
+
+고치지 않은 것(경미, 후속): iOS 사진 진입인데 첫 상태가 분석 중·삭제됨·오류면 target이 없어 제자리 전환(카테고리 목록은 완료 상품이라 드묾), iOS target은 시작 때 한 번 재므로 사진을 아직 못 받은 카드는 칸 전체로 날아간 뒤 맞춘 사진으로 바뀜, Android 카드 ✳ 표시가 공유 요소 안(뒤로 갈 때 함께 줄어듦, iOS는 밖), Android 카드마다 역방향 판정(전환 상태가 바뀌면 모든 카드가 다시 그려짐, 측정상 차이 없음), Android DEBUG 떠남 감시 effect가 release에도 돎(아무 일도 안 함).
+
 ## 고치지 않은 것·남은 점
 
 - Android 끌어서 뒤로·취소 기기 확인(API 33+ 기기·에뮬레이터 필요), 실기기(Flip6) 확인.
@@ -46,8 +56,8 @@ Android는 사용자 지시대로 에뮬레이터 `emulator-5556`(Pixel_5 API 30
 
 | 항목 | PR A 끝 | PR B 끝 |
 | --- | --- | --- |
-| Android unit debug / release | 212 / 212 | 228 / 228 |
-| iOS XCTest | 244 | 257 |
+| Android unit debug / release | 212 / 212 | 227 / 227 |
+| iOS XCTest | 244 | 258 |
 | assembleDebug·assembleRelease·lintDebug(0 errors, 경고 27)·iOS Release simulator build | 통과 | 통과 |
 
 shared·localdb는 바뀌지 않아 KMP_TEST는 다시 돌리지 않았다. 새 테스트마다 해당 수정만 되돌려 실패를 확인했다(handoff 놓기 조건, 역방향 떠남 판정, 상자 비율 순서, 상세 자리 유지 규칙, 색인 큰 것 우선·축출 정리, 방향별 공급원, 끌기 방향 표시). 전체 XCTest 한 번에서 손대지 않은 `HomePresenterOwnerTests.testRefreshReturnsOnlyAfterTheRefreshFinished`가 시간 조건으로 실패했고, 단독 3회·다음 전체 실행은 통과했다(수동 시뮬레이터 확인 직후).
