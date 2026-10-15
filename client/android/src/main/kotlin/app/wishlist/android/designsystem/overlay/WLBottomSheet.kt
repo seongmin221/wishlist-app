@@ -271,10 +271,13 @@ fun WLSheetBody(
     footer: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     sidePadding: Dp = WishlistTokens.Space.screenMargin,
+    headerDivider: Boolean = false,
     body: @Composable () -> Unit,
 ) {
     Column(modifier.fillMaxWidth()) {
         Box(Modifier.padding(horizontal = sidePadding)) { header() }
+        // Full sheet width 1dp line under the header (FProductCategoryCreate border-top).
+        if (headerDivider) Box(Modifier.padding(top = WishlistTokens.Space.s16).fillMaxWidth().height(1.dp).background(LocalWLColors.current.line))
         Box(
             Modifier
                 .weight(1f, fill = false)

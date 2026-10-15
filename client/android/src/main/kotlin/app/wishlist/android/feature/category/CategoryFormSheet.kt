@@ -159,6 +159,7 @@ internal fun CategoryFormContent(
             }
         },
         footer = { FormButtons(state, form, example, requestClose) },
+        headerDivider = header != null, // the picker's create page (board line under its header)
     ) { Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s20)) {
         when (state.mode) {
             FormMode.CREATE -> if (state.source == FormSource.TAB) ParentChips(state, form, editable)
@@ -223,6 +224,8 @@ private fun FormButtons(state: CategoryFormState, form: CategoryFormPresenter, e
             },
             modifier = Modifier.weight(2f),
             enabled = state.canSubmit,
+            // While a save (or the 409 re-read) waits: a small indicator instead of the text, not pressable.
+            loading = state.submitting,
         )
     }
 }
