@@ -29,6 +29,17 @@ final class CategoryPickerSheetModel {
         form = nil
     }
 
+    /// Back (or 취소) on the create page: asks first when the draft changed; locked while submitting.
+    func back(overlay: OverlayHostState) {
+        guard let form else { return }
+        if form.state.submitting { return }
+        if form.state.dirty {
+            overlay.showDialog(categoryDiscardDialog(overlay) { [weak self] in self?.endCreate() })
+        } else {
+            endCreate()
+        }
+    }
+
     func close() {
         endCreate()
         picker.close()
@@ -53,6 +64,21 @@ func showCategoryPicker(overlay: OverlayHostState, owners: WLEntryOwners, select
     )
     overlay.showSheet(title: String(localized: "category.picker.title"), guard: sheetGuard) {
         CategoryPickerSheetContent(model: model, onPick: onPick)
+    } footer: {
+        CategoryPickerSheetFooter(model: model)
+    }
+}
+
+/// The create page's pinned 취소 · 만들기 (nothing on the chip page).
+private struct CategoryPickerSheetFooter: View {
+    let model: CategoryPickerSheetModel
+
+    @Environment(\.overlayHostState) private var overlay
+
+    var body: some View {
+        if let form = model.form {
+            CategoryFormButtons(owner: form, onCancel: { if let overlay { model.back(overlay: overlay) } })
+        }
     }
 }
 
@@ -67,7 +93,7 @@ private struct CategoryPickerSheetContent: View {
         let switching = reduceMotion ? nil : WishlistTokens.Curve.emphasized.animation(ms: WishlistTokens.Motion.headerCollapseScroll)
         ZStack {
             if let form = model.form {
-                CategoryFormView(owner: form, onClose: { overlay?.userDismiss() }, onBack: { back(form) })
+                CategoryFormView(owner: form, onClose: { overlay?.userDismiss() }, onBack: { if let overlay { model.back(overlay: overlay) } })
                     .transition(.opacity)
                     .onChange(of: form.state.result == nil) { _, none in
                         guard !none, let result = form.state.result as? FormResultCreated else { return }
@@ -89,16 +115,6 @@ private struct CategoryPickerSheetContent: View {
             onPick(pick)
         }
         .onDisappear { model.close() }
-    }
-
-    private func back(_ form: CategoryFormOwner) {
-        guard let overlay else { return }
-        if form.state.submitting { return }
-        if form.state.dirty {
-            overlay.showDialog(categoryDiscardDialog(overlay) { model.endCreate() })
-        } else {
-            model.endCreate()
-        }
     }
 }
 

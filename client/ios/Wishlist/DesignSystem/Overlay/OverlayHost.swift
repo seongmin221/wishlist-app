@@ -71,8 +71,15 @@ struct SheetGuard {
     let onConfirm: () -> Void
 }
 
+/// A sheet's scrolling content and its optional footer pinned at the sheet's bottom (C5 form buttons:
+/// above the home indicator, and above the keyboard while it is up).
+struct SheetBody {
+    let content: () -> AnyView
+    var footer: (() -> AnyView)?
+}
+
 enum OverlayKind {
-    case sheet(title: String, draggable: Bool, guard: SheetGuard?, content: () -> AnyView)
+    case sheet(title: String, draggable: Bool, guard: SheetGuard?, body: SheetBody)
     case dialog(WLDialogSpec)
     case menu(anchor: CGRect, items: [WLMenuItem])
 
@@ -131,7 +138,15 @@ final class OverlayHostState {
     @discardableResult
     func showSheet<V: View>(title: String = String(localized: "wl.sheet"), draggable: Bool = true, guard sheetGuard: SheetGuard? = nil,
                             @ViewBuilder _ content: @escaping () -> V) -> Bool {
-        push { .sheet(title: title, draggable: draggable, guard: sheetGuard, content: { AnyView(content()) }) }
+        push { .sheet(title: title, draggable: draggable, guard: sheetGuard, body: SheetBody(content: { AnyView(content()) })) }
+    }
+
+    /// A sheet whose `footer` stays at the bottom while `content` scrolls above it.
+    @discardableResult
+    func showSheet<V: View, F: View>(title: String = String(localized: "wl.sheet"), draggable: Bool = true, guard sheetGuard: SheetGuard? = nil,
+                                     @ViewBuilder content: @escaping () -> V, @ViewBuilder footer: @escaping () -> F) -> Bool {
+        push { .sheet(title: title, draggable: draggable, guard: sheetGuard,
+                      body: SheetBody(content: { AnyView(content()) }, footer: { AnyView(footer()) })) }
     }
 
     /// A user's attempt to close the top overlay (scrim tap, sheet drag, VoiceOver escape). A guarded
@@ -363,8 +378,8 @@ struct OverlayHost<Content: View>: View {
     private func layer(_ entry: OverlayEntry, isTop: Bool, hasBelow: Bool) -> some View {
         Group {
             switch entry.kind {
-            case .sheet(_, let draggable, _, let content):
-                SheetLayer(entry: entry, state: state, draggable: draggable, content: content)
+            case .sheet(_, let draggable, _, let body):
+                SheetLayer(entry: entry, state: state, draggable: draggable, content: body.content, footer: body.footer)
             case .dialog(let spec):
                 DialogLayer(entry: entry, state: state, spec: spec, dimBelow: hasBelow)
             case .menu(let anchor, let items):
