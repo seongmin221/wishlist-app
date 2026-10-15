@@ -229,7 +229,7 @@ private struct InfoRow<Value: View>: View {
 }
 
 /// 목적 색 점 10: 아는 색은 그 토큰, 모르는 key는 중립(`textSecondary`).
-private struct PurposeColorDot: View {
+struct PurposeColorDot: View {
     let colorKey: String?
 
     @Environment(\.wlColors) private var c

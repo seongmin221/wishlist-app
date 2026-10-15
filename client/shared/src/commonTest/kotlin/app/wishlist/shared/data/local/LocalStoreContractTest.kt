@@ -139,6 +139,21 @@ class LocalStoreContractTest {
         }
     }
 
+    @Test fun list_cards_are_written_together_with_the_get_rule() = runTest {
+        withHarness { h ->
+            val a = h.session.login("A")
+            val other = "00000000-0000-0000-0000-0000000000a2"
+            h.store.upsertItem(a, item(5, name = "five")).successValue()
+            h.store.upsertItems(a, listOf(item(5, name = "renamed"), item(1, id = other, name = "new"))).successValue()
+            assertEquals("renamed", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+            assertEquals("new", h.store.cachedItem(a, other).successValue()!!.product.name)
+            h.store.upsertItems(a, listOf(item(4, name = "older"))).successValue()
+            assertEquals("renamed", h.store.cachedItem(a, itemId).successValue()!!.product.name)
+            h.login(null)
+            assertEquals(ErrorKind.UNAUTHENTICATED, h.store.upsertItems(h.session.state.value, listOf(item(9))).error().kind)
+        }
+    }
+
     @Test fun lower_version_is_skipped_and_same_or_higher_replaces() = runTest {
         withHarness { h ->
             val a = h.session.login("A")

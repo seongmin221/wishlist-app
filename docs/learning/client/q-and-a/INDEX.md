@@ -19,3 +19,5 @@
 | QA-CLI-013 | lifecycle-viewmodel-compose 없이 화면마다 Presenter owner 수명을 주는 방법은? | [QA-CLI-013](QA-CLI-013-android-per-entry-viewmodel-store.md) |
 | QA-CLI-014 | 로컬 대기 화면은 계정을 떠난 뒤 왜 아무것도 판정하지 않는가? | [QA-CLI-014](QA-CLI-014-local-presenter-sticky-skip.md) |
 | QA-CLI-015 | 원본 링크 웹뷰는 웹 페이지가 앱을 마음대로 움직이지 못하게 무엇을 막는가? | [QA-CLI-015](QA-CLI-015-webview-security.md) |
+| QA-CLI-016 | 카테고리 만들기 응답을 잃으면 다시 눌러도 하나만 생기는가? | [QA-CLI-016](QA-CLI-016-category-create-idempotency.md) |
+| QA-CLI-017 | 카테고리 이름 "최대 40자"는 무엇을 세고, 한글 입력 중에는 어떻게 자르는가? | [QA-CLI-017](QA-CLI-017-code-point-input-limit.md) |

@@ -1,22 +1,34 @@
 import Foundation
 import Shared
 
-/// A string-catalog key with its integer argument, if any (resolved only for display).
+/// A string-catalog key with its integer arguments, if any (resolved only for display).
 struct HomeText: Equatable {
     let key: String
-    let arg: Int32?
+    let args: [Int32]
 
     init(_ key: String, _ arg: Int32? = nil) {
         self.key = key
-        self.arg = arg
+        self.args = arg.map { [$0] } ?? []
+    }
+
+    init(_ key: String, args: [Int32]) {
+        self.key = key
+        self.args = args
     }
 
     /// Formats in the language the table was read from, so a plural variation follows that
-    /// language's rules (not the device region's: Korean has no "one", English does).
+    /// language's rules (not the device region's: Korean has no "one", English does). Several
+    /// arguments are a date (`time.date*`): no locale, so a year never gets grouping ("2,025"),
+    /// like `DetailLine.resolve`.
     func resolve(_ bundle: Bundle = .main) -> String {
         let format = bundle.localizedString(forKey: key, value: nil, table: nil)
-        let locale = bundle.preferredLocalizations.first.map(Locale.init(identifier:)) ?? .current
-        return arg.map { String(format: format, locale: locale, $0) } ?? format
+        switch args.count {
+        case 0: return format
+        case 1:
+            let locale = bundle.preferredLocalizations.first.map(Locale.init(identifier:)) ?? .current
+            return String(format: format, locale: locale, args[0])
+        default: return String(format: format, arguments: args.map { $0 as CVarArg })
+        }
     }
 }
 
@@ -30,6 +42,10 @@ enum HomeRowText {
         case .hours(let t): HomeText("time.hours", t.value)
         case .yesterday: HomeText("time.yesterday")
         case .days(let t): HomeText("time.days", t.value)
+        case .weeks(let t): HomeText("time.weeks", t.value)
+        case .onDate(let d):
+            if let year = d.year { HomeText("time.date.year", args: [year.int32Value, d.month, d.day]) }
+            else { HomeText("time.date", args: [d.month, d.day]) }
         }
     }
 

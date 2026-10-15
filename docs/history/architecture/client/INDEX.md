@@ -15,12 +15,14 @@
 
 ## 검증 기록
 
+- [C5 카테고리 설계 검토 (2026-10-14)](c5-category-design-review-2026-10-14.md) — 1~3차 피드백 반영 확인, 4차 추가 P1/P2 없음·계획 진행 가능, D15 대기
 - [Client·Server 연동 정밀검사 (2026-10-09)](client-server-integration-audit-2026-10-09.md) — C3/B4 병합 계약 대조·실HTTP/DB 검증, URL scheme·계정 전환 실패 재현, B3/B4 모델·목록 인계와 인증 연결 선행 작업
 - [C3 PR #12 리뷰 반영 (2026-10-09)](c3-pr12-review-2026-10-09.md) — 리뷰 10건: refresh revision으로 상대 시각 갱신, 복원 계정 첫 실행 기록, inbox import 무기한 ready 대기, 시각별 offset, 게시 합치기, Android LAUNCH 단일화, iOS `refreshNow` 대기, 정렬 단일화, parser 죽은 분기, debug hook io. 2차 10건: 429 계정 단위 대기, 재시도 타이머(서버 오류 30초), accept·게시 한 시점, 대기 줄 문구 3종, 조회 중 새 공유 우선, iOS 실제 복귀만, `flushing`·`FlushTrigger` 삭제, 영어 plural, UUID 헬퍼 하나. 3차 9건: ready 전 view 없음, 서버 오류 backoff·flush 중단, 모르는 enum 허용, iOS 임시 파일 복구, Android 늦은 공유 파일 inbox, 분 단위 tick, 선형 괄호 다듬기, 게시 간격, host 규칙 하나
 - [C3 화면 비교·예외 경로·성능 측정·최종 검증 (2026-10-07)](c3-verification-2026-10-07.md) — 보드 대비 차이와 수정, 계정 전환·강제 종료 복구, 대기 목록 20/100/300 baseline, debug 시연 hook, runtime 종료 중 DB 조회 충돌 수정(Task 7c), 최종 명령별 건수(Task 8)
 - [C2 최종 로컬 검증 (2026-10-07)](c2-final-verification-2026-10-07.md) — 실행 명령별 건수·환경·미실행과 C3/C12 인계
 - [C4 Android·iOS 상세·로컬 대기 화면 확인 (2026-10-10)](c4-detail-verification-2026-10-10.md) — 분석 중 → 상세 전환, 로컬 대기 → `MovedTo`, 로그인 전 삭제, 보드 L/D 비교와 확인하지 못한 경로(iOS 절: 끌어서 뒤로·foreground 새로고침 포함, PR B 절: 원본 링크 웹뷰 진입·외부 앱 확인창·쿠키 삭제)
 - [C4 의존성: Coil 3 (2026-10-10)](c4-dependency-coil-2026-10-10.md) — 3.5.0 선택 이유(3.6.x는 compileSdk 37·AGP 9.1 필요), OkHttp 재사용, 자리표시
+- [C5 PR A 구현 기록 (2026-10-15)](c5-pr-a-implementation-2026-10-15.md) — Task 0~19 요약, Ruling 1~8(한도 선검사 분기 없음·key 유지 조건·D15 홈 적용 등), 사용자 결정, 에뮬레이터·시뮬레이터 확인과 고친 결함, 검증 건수
 - [C4 PR A 구현 기록 (2026-10-10)](c4-pr-a-implementation-2026-10-10.md) — Task 1~12 요약, 판단(Ruling), 계획과 달라진 점, 미룬 minor, 검증 건수
 - [C4 PR B 구현 기록 (2026-10-10)](c4-pr-b-implementation-2026-10-10.md) — Task 13~16 원본 링크 웹뷰 요약, Ruling 11·12(iframe `data:`·`blob:` 차단, iOS 실제 터치 규칙), 미룬 minor, 실기기 확인 항목, 검증 건수
 - [C2 `:localdb` 모듈 분리 (2026-10-07)](c2-localdb-module-split-2026-10-07.md) — 계획의 `:shared` 단일 모듈에서 벗어난 이유(SQLDelight 생성 public 타입의 ObjC 노출 차단)

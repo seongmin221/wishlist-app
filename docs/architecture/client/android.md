@@ -114,3 +114,16 @@
 - **그리기 영역:** 웹뷰 칸(`Box(weight(1f))`)에 `clipToBounds()`. 그린 내용이 없는 WebView(로딩 중·Chromium 오류 페이지)가 창 전체에 배경을 칠해 위쪽 바(닫기·도메인)를 덮었다(Task 16 에뮬레이터 확인 중 발견·수정).
 - **오류:** main frame `onReceivedError`만 `webview_load_failed` + `detail_retry` 덮개(`DetailStatusBlock`). 중지나 다른 이동으로 끊긴 로드(`ERR_ABORTED`)는 WebView가 이 콜백에 넘기지 않아 덮개가 뜨지 않는다(2026-10-13 실기기 확인). 그래서 iOS처럼 오류 코드로 거르지 않는다. `request.url`을 지금 로드 중인 URL과 비교하는 것도 하지 않는다. `onPageStarted`는 redirect 전 주소를, `onReceivedError`는 redirect 뒤 주소를 주어 redirect 뒤의 실제 실패를 숨기기 때문이다. 새 이동에 밀려난 요청은 `ERR_ABORTED`로 끝나 늦은 오류가 정상 페이지를 덮지 않는다. 하위 리소스 오류·HTTP 오류는 무시한다. SSL 오류는 WebView 기본값(취소)이라 안내 없이 빈 페이지가 보인다.
 - **공유 시트(FWebViewShare):** `OverlayHost.showSheet`(블러 배경, 웹뷰에도 적용됨을 에뮬레이터에서 확인). 현재 페이지 URL(웹 URL이 아니면 route URL)로 외부 브라우저(`ACTION_VIEW` + BROWSABLE)·링크 복사(`ClipboardManager`, API 33 미만에서만 "링크를 복사했어요" 짧은 안내 — `DetailNoticeLine` 재사용)·다른 앱(`ACTION_SEND` chooser). 줄을 누르면 시트를 닫고 실행한다.
+
+## 카테고리 탭 (C5)
+
+> 2026-10-15 C5 Task 10~14. 규칙은 [C5 설계](../../superpowers/specs/2026-10-14-client-c5-category-design.md), iOS 쪽은 [ios.md](ios.md#카테고리-탭-c5). 화면 확인 사진은 `docs/history/architecture/client/c5-shots/android/`(emulator Pixel_5 API 30, ko-KR — 사용자 지시로 실기기 대신 에뮬레이터).
+
+- **화면 위치:** `feature/category/{CategoryHomeScreen,CategoryListScreen,CategoryCard,CategoryFormSheet,CategoryPickerSheet,CategoryLayout,CategoryRoutes,CategoryText,PhotoPagePlanner}`. route `CategoryListRoute(hint)`는 탭 바를 보이는 slide·계정 범위이고, codec token은 필드별 base64url `category/<id>/<b64 이름>/<parentId>/<b64 상위>/<kind>`. 모듈은 나누지 않았다(C3-D10 유지: feature 폴더 경계로 충분하고 빌드 시간 문제가 없다).
+- **owner:** 공용 `CategoryPresenterOwner<P : Presenter>` 하나를 칸별 `ViewModelStore`(C4)로 둔다. shared Presenter 생성자가 internal이라 owner 수명은 가짜 Presenter로 테스트한다.
+- **첫 화면:** 레일 124dp + `VerticalPager`(300ms `emphasized` 스냅). 넘치는 페이지는 안쪽 스크롤이 끝난 뒤 남은 끌기를 페이저로 넘긴다(`OverflowToPager`). 갱신 결과가 넘김 직후 오면 페이저는 마지막으로 멈춘 상위에 맞춘다. 목록에서 편집이 저장되면 앱 전역 `CategoryChanges` 카운터가 올라 첫 화면이 돌아올 때 `refresh()`한다(목록이 덮는 동안 첫 화면 composition이 없기 때문).
+- **목록:** `Masonry2Col` + `PhotoPagePlanner`(페이지 단위 skeleton, 3초, 디코드 상자 열 폭 × 열 폭×3 FIT, 동시 6개 semaphore). 비율은 Coil이 그 상자로 디코드한 결과 크기에서 얻는다(비율 오차 1px 이내). 화면 밖 카드의 개별 취소는 없고 화면을 떠나면 함께 취소된다.
+- **입력:** `WLInput(limitUnit = InputLimitUnit.CodePoint)`. IME 조합 중에는 자르지 않는 기존 경로를 그대로 쓴다([QA-CLI-017](../../learning/client/q-and-a/QA-CLI-017-code-point-input-limit.md)).
+- **시트:** `OverlayHost.showSheet(dismissGuard = { SheetDismiss.Allow | Block | Confirm }, onConfirmDismiss, selfLaidOut)`. guard는 막 누르기·끌기·뒤로에 모두 적용된다. 폼은 `selfLaidOut` + `WLSheetBody`로 머리 고정·본문 스크롤·버튼 줄 하단 고정(내비게이션 막대·IME 위). 제출 중 주 버튼은 `WLButton(loading = true)`(20dp 진행 표시, 눌리지 않음, TalkBack은 글자를 읽음).
+- **DEBUG:** `DebugSeedImages`(`seed.wishlist.invalid` `/tall/` 1:4, `/slow/` 5초), launch extras `wl.fake.longCategory`(120개), `wl.fake.delayCategoryCreate`(ms), `wl.fake.editCategory`(`<id>|<name>`), 목적 탭 데모 끝의 "카테고리 선택 시트 열기".
+- **남은 점:** 실기기(Flip6) 확인은 하지 않았다(에뮬레이터만). 409 재조회 중 진행 표시는 기기에서 따로 찍지 않았다. Compose 제스처·IME 조합은 단위 테스트가 없다(Robolectric 없음).

@@ -83,7 +83,9 @@ private struct AppRoute: View {
             switch tab {
             case .home:
                 HomeScreen()
-            case .category, .purpose:
+            case .category:
+                CategoryHomeScreen()
+            case .purpose:
                 #if DEBUG
                 DemoTabRoot(tab: tab)
                 #else
@@ -98,6 +100,7 @@ private struct AppRoute: View {
             case .item(let itemId): ItemDetailScreen(itemId: itemId)
             case .local(let submissionId): LocalSubmissionScreen(submissionId: submissionId)
             case .web(let page): WebViewScreen(page: page)
+            case .categoryList(let target): CategoryListScreen(target: target)
             }
         }
         #if DEBUG
@@ -114,15 +117,14 @@ private struct DemoTabRoot: View {
 
     var body: some View {
         switch tab {
-        case .home: EmptyView() // unreachable: the home tab is the real HomeScreen (C3)
-        case .category: DemoCategoryScreen()
+        case .home, .category: EmptyView() // unreachable: real screens (C3 home, C5 category)
         case .purpose: DemoPurposeScreen()
         }
     }
 }
 #endif
 
-/// release 빌드의 카테고리·목적 탭 첫 화면(아직 기능 화면이 없다).
+/// release 빌드의 목적 탭 첫 화면(아직 기능 화면이 없다, C6).
 private struct PlainTabRoot: View {
     let tab: WLTab
 

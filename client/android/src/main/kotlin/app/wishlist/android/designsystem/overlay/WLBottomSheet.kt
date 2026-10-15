@@ -215,7 +215,8 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
                             onDragStopped = { velocity ->
                                 val distance = (1f - p.value + dragFraction) * heightPx
                                 when (sheetDragEndPx(entry.phase, distance, heightPx, velocity, density.density)) {
-                                    SheetDragEnd.Dismiss -> if (!state.requestDismiss(entry.id)) scope.launch {
+                                    // The guard may refuse (saving) or ask first (unsaved edits): the sheet then snaps back.
+                                    SheetDragEnd.Dismiss -> if (state.entries.lastOrNull()?.id != entry.id || !state.userDismiss()) scope.launch {
                                         p.snapTo((p.value - dragFraction).coerceIn(0f, 1f))
                                         dragFraction = 0f
                                         snapBack(p)
@@ -236,6 +237,10 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
             } else {
                 Box(Modifier.height(WishlistTokens.Space.s20))
             }
+            if (entry.selfLaidOut) {
+                // The content scrolls its own body and keeps its footer above the nav bar (see [WLSheetBody]).
+                Box(Modifier.weight(1f, fill = false)) { WLOnSheet { entry.content() } }
+            } else
             // 상한보다 긴 내용(큰 글자·키보드)은 시트 안에서 스크롤한다. 짧으면 내용 높이만큼만 차지한다.
             Box(
                 Modifier
@@ -253,4 +258,39 @@ internal fun SheetLayer(entry: SheetEntry, state: OverlayHostState) {
 
 private suspend fun snapBack(p: Animatable<Float, *>) {
     p.animateTo(1f, tween(WishlistTokens.Motion.sheetDragDismissSnapBack, easing = WishlistTokens.Curve.springSheet))
+}
+
+/**
+ * Body of a `selfLaidOut` sheet (FCategoryAddSheet·EditSheet): [header] stays at the top, [body] scrolls
+ * in between, and [footer] (취소 · 만들기) is pinned at the sheet bottom above the navigation bar (and
+ * above the keyboard: the sheet itself sits on the IME inset). [sidePadding] is the content's own margin.
+ */
+@Composable
+fun WLSheetBody(
+    header: @Composable () -> Unit,
+    footer: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    sidePadding: Dp = WishlistTokens.Space.screenMargin,
+    headerDivider: Boolean = false,
+    body: @Composable () -> Unit,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Box(Modifier.padding(horizontal = sidePadding)) { header() }
+        // Full sheet width 1dp line under the header (FProductCategoryCreate border-top).
+        if (headerDivider) Box(Modifier.padding(top = WishlistTokens.Space.s16).fillMaxWidth().height(1.dp).background(LocalWLColors.current.line))
+        Box(
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = sidePadding)
+                .padding(top = WishlistTokens.Space.s20, bottom = WishlistTokens.Space.s16),
+        ) { body() }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(LocalWLColors.current.sheet)
+                .navigationBarsPadding()
+                .padding(start = sidePadding, end = sidePadding, top = WishlistTokens.Space.s12, bottom = WishlistTokens.Space.s16),
+        ) { footer() }
+    }
 }

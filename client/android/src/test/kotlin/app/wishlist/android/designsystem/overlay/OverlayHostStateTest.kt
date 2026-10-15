@@ -225,4 +225,66 @@ class OverlayHostStateTest {
             assertEquals(1, dropped)
         }
     }
+
+    // C5: the category form sheets guard user dismisses (scrim, back, drag).
+    @Test fun blockedSheetIgnoresScrimTap() {
+        val state = OverlayHostState()
+        state.showSheet(dismissGuard = { SheetDismiss.Block }) {}
+        state.settleOpen()
+        assertFalse(state.userDismiss())
+        assertEquals(OverlayPhase.Open, state.entries.single().phase)
+        assertTrue(state.dismiss()) // the sheet's own code may still close it
+    }
+
+    @Test fun confirmGuardAsksInsteadOfClosing() {
+        val state = OverlayHostState()
+        var asked = 0
+        state.showSheet(dismissGuard = { SheetDismiss.Confirm }, onConfirmDismiss = { asked++ }) {}
+        state.settleOpen()
+        assertFalse(state.userDismiss())
+        assertEquals(1, asked)
+        assertEquals(OverlayPhase.Open, state.entries.single().phase)
+    }
+
+    @Test fun allowGuardClosesAndDialogsAboveStillCloseOnBack() {
+        val state = OverlayHostState()
+        var guard = SheetDismiss.Block
+        state.showSheet(dismissGuard = { guard }) {}
+        state.settleOpen()
+        state.showDialog(WLDialogSpec("t", emptyList(), "c", "ok", app.wishlist.android.designsystem.WLButtonKind.Primary) {})
+        state.settleOpen()
+        assertTrue(state.userDismiss()) // the dialog on top is not guarded
+        state.settleClose()
+        guard = SheetDismiss.Allow
+        assertTrue(state.userDismiss())
+    }
+
+    // C5: leaving the account closes the category sheets (and a dialog above them) without their guard.
+    @Test fun leavingTheAccountClosesAccountScopedSheetsAndDialogsAbove() {
+        val state = OverlayHostState()
+        state.showSheet(accountScoped = true, dismissGuard = { SheetDismiss.Block }) {}
+        state.settleOpen()
+        state.showDialog(spec)
+        state.settleOpen()
+        assertTrue(state.dismissAccountScoped())
+        state.settleClose() // the dialog
+        state.settleClose() // then the sheet
+        assertTrue(state.entries.isEmpty())
+    }
+
+    @Test fun leavingTheAccountLeavesOtherOverlays() {
+        val state = OverlayHostState()
+        state.showSheet {}
+        state.settleOpen()
+        assertFalse(state.dismissAccountScoped())
+        assertEquals(OverlayPhase.Open, state.entries.single().phase)
+    }
+
+    @Test fun anOpeningAccountScopedSheetClosesOnceOpen() {
+        val state = OverlayHostState()
+        state.showSheet(accountScoped = true) {}
+        assertTrue(state.dismissAccountScoped())
+        state.settleOpen()
+        assertEquals(OverlayPhase.Closing, state.entries.single().phase)
+    }
 }

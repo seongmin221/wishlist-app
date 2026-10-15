@@ -88,9 +88,9 @@ class SharedModulesTest {
     @Test fun unimplemented_api_cannot_be_bound_to_remote_or_fake() {
         val remote = RemoteConfig(TEST_BASE_URL, FakeTokenSource())
         assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.HOME_01 to Backend.REMOTE), remote) }
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.CAT_01 to Backend.FAKE)) }
-        // The seed catalog does not make ITEM-02/CAT-01/PUR-01 Fake wire APIs.
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.ITEM_02 to Backend.FAKE)) }
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.CAT_05 to Backend.FAKE)) }
+        // The seed catalog does not make PUR-01 a Fake wire API (C6).
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.PUR_01 to Backend.FAKE)) }
     }
 
     @Test fun remote_config_is_required_if_and_only_if_some_api_is_remote() {
@@ -121,6 +121,15 @@ class SharedModulesTest {
         ApiId.entries.filter { it != ApiId.ITEM_01 && it != ApiId.ITEM_03 }
             .forEach { assertEquals(Backend.UNAVAILABLE, debug.resolvedBackend(it), it.wireId) }
         debug.close()
+
+        // C5: CAT-01~04 and ITEM-02 each follow their own binding.
+        val categories = createRuntime(
+            debugBindings(ApiId.CAT_01 to Backend.FAKE, ApiId.CAT_02 to Backend.REMOTE, ApiId.CAT_03 to Backend.FAKE, ApiId.ITEM_02 to Backend.REMOTE),
+            RemoteConfig(TEST_BASE_URL, FakeTokenSource()),
+        )
+        assertEquals(listOf(Backend.FAKE, Backend.REMOTE, Backend.FAKE, Backend.UNAVAILABLE, Backend.REMOTE),
+            listOf(ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04, ApiId.ITEM_02).map { categories.resolvedBackend(it) })
+        categories.close()
     }
 
     // --- RELEASE graph --------------------------------------------------------------------------
@@ -183,7 +192,8 @@ class SharedModulesTest {
         // Signing in seeds that account's namespace.
         runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val items = runtime.catalogRepository().items(null, null).successValue()
-        assertEquals(boardOrder, items.map { it.product.name })
+        assertEquals(boardOrder, items.take(8).map { it.product.name })
+        assertEquals(69, items.size)
         assertEquals(7, runtime.catalogRepository().purposes().successValue().size)
         runtime.close()
     }
@@ -199,7 +209,7 @@ class SharedModulesTest {
         runtime.startDebugSession()
         advanceUntilIdle()
 
-        assertEquals(listOf<Pair<String?, Int>>("fake-apple-0001" to boardOrder.size), seenWhenReady)
+        assertEquals(listOf<Pair<String?, Int>>("fake-apple-0001" to 69), seenWhenReady)
         assertEquals(AuthProvider.APPLE, runtime.auth().account.value?.provider)
         assertNull(runtime.bootstrapFailure.value)
         runtime.close()
@@ -356,6 +366,45 @@ class SharedModulesTest {
         advanceUntilIdle()
         assertEquals(RUNTIME_NOT_READY, late.state.value.error?.code)
         late.close()
+    }
+
+    @Test fun runtime_category_presenters_run_on_the_seeded_fake() = runTest {
+        val bindings = debugBindings(*listOf(ApiId.ITEM_02, ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04).map { it to Backend.FAKE }.toTypedArray())
+        val runtime = createRuntime(bindings, dispatcher = StandardTestDispatcher(testScheduler))
+        runtime.startDebugSession()
+        advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
+        advanceUntilIdle()
+
+        val home = runtime.categoryHomePresenter()
+        home.load(); advanceUntilIdle()
+        assertEquals(69, home.state.value.totalCount)
+        assertEquals(8, home.state.value.groups.size)
+
+        val list = runtime.categoryListPresenter()
+        list.load(app.wishlist.shared.presentation.CategoryListHint("C026", "헤드폰", "G003", "디지털·IT", app.wishlist.shared.model.CategoryKind.PUBLIC))
+        advanceUntilIdle()
+        assertEquals(8, list.state.value.items.size)
+        assertEquals(8, list.state.value.header?.count)
+        // The list cards went through the card cache decorator.
+        val first = list.state.value.items.first()
+        assertEquals(first.version, runtime.localStore().cachedItem(runtime.session.state.value, first.id).successValue()?.version)
+
+        val form = runtime.categoryFormPresenter()
+        form.startCreate("G003", app.wishlist.shared.presentation.FormSource.TAB, null); advanceUntilIdle()
+        assertEquals(11, form.state.value.parents.size)
+        assertEquals(3, form.state.value.usedCount)
+        form.setName("책상 장비"); advanceUntilIdle()
+        form.submit(); advanceUntilIdle()
+        assertIs<app.wishlist.shared.presentation.FormResult.Created>(form.state.value.result)
+
+        val picker = runtime.categoryPickerPresenter()
+        picker.open("C026"); advanceUntilIdle()
+        assertEquals("G003", picker.state.value.currentGroupId)
+        assertEquals(87 + 4, picker.state.value.catalog?.groups?.sumOf { it.categories.size })
+
+        listOf(home, list, form, picker).forEach { it.close() }
+        runtime.close()
     }
 
     @Test fun runtime_detail_load_republishes_the_submission_view() = runTest {

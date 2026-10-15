@@ -25,7 +25,7 @@ iOS(SwiftUI)·Android(Compose) 앱에서 MVP 화면 52개(라이트·다크 보�
 | --- | --- | --- |
 | 서버 의존 | 계약 우선 + KMP fake | 서버 순서만 따르면 대기 시간이 길다. 로컬 우선 데모는 서버가 계산하는 상태(`requiredAction`, version 충돌)와 맞지 않는다. |
 | 플랫폼 순서 | 기능마다 KMP → Android → iOS를 같은 단계 안에서 끝냄 | 한 플랫폼을 먼저 하면 Swift 연결 문제를 늦게 발견한다. |
-| KMP 스택 | Ktor client, kotlinx.serialization, SQLDelight, Koin, SKIE, multiplatform-settings, kotlin.test·Turbine·Ktor MockEngine | Room KMP + KMP-NativeCoroutines는 Swift 쪽 연결 코드가 더 길다. |
+| KMP 스택 | Ktor client, kotlinx.serialization, SQLDelight, Koin, SKIE, multiplatform-settings(C5에서 도입하지 않음: 기기 상태는 SQLDelight `app_state`), kotlin.test·Turbine·Ktor MockEngine | Room KMP + KMP-NativeCoroutines는 Swift 쪽 연결 코드가 더 길다. |
 | 인증 | 플랫폼별 Firebase 공식 SDK → KMP `AuthTokenProvider` 인터페이스 | 공식 SDK를 그대로 쓰고 KMP는 token만 받는다. |
 | 이미지 | Android Coil 3, iOS는 C4에서 자체 로더와 Nuke 중 선택 | — |
 | 화면 상태 | KMP Presenter가 비즈니스 상태를 소유하고 플랫폼은 얇은 래퍼 | 플랫폼 ViewModel마다 구현하면 제품 규칙이 두 번 생긴다. |
@@ -107,8 +107,8 @@ client/ios/      DesignSystem/, Navigation/, Features/<화면>/, ShareExtension/
 | C1 | 완료(2026-10-06, 목적 아이콘 key 초안은 C1 계획에 없어 남김). 토큰 생성기·서체·공통 컴포넌트, 탭 셸, 시트·확인창·push 전환 데모, iOS 라우터 spike, 목적 색·아이콘 key 초안 | 모션 보드 4종, 탭 바 | — |
 | C2 | 구현·로컬 검증 완료(2026-10-07, draft PR 2026-10-09; 실서버·Android Context SQLite 실기기·Darwin redirect는 C3/C12 인계). KMP 핵심: 모델·상태 축, repository 인터페이스, fake·시드, SQLDelight, Ktor client 뼈대·오류 매핑, `AuthTokenProvider`, Koin, SKIE 연결 확인, Presenter 기반 | — | — |
 | C3 | 완료(2026-10-07 구현, 2026-10-09 PR #12 merge; fake 인증만, 공유 확장 C안 중 확장 전송은 끔([ADR-030](../../history/architecture/client/ADR-030-share-receipt-mode.md)). 인계: 가입 뒤 "인증 연결"(Firebase·Apple/Google을 `AuthFacade` 뒤에, iOS 확장 background 전송, ITEM-01 실서버, 실기기·팀 서명), C4 원본 웹뷰·대기 항목 삭제 UI, C5 Android 모듈 분리 재검토, C7 FHome 나머지 카드, C12 라이선스 화면). 저장: 공유 수신, LocalSubmission, 로그인 안내·건너뛰기, 로그인 전 홈·분석 대기, 전송·재전송, 설정(로그아웃·웹뷰 데이터 삭제) | FLogin, FHomeLoggedOut, FShareSaved*, FSettings* | ITEM-01 |
-| C4 | PR A #15 · PR B 구현·로컬 검증 완료(2026-10-10, [spec](2026-10-09-client-c4-product-detail-design.md)·[plan](../plans/2026-10-09-client-c4-product-detail.md), [PR A 기록](../../history/architecture/client/c4-pr-a-implementation-2026-10-10.md)·[PR B 기록](../../history/architecture/client/c4-pr-b-implementation-2026-10-10.md)). 상품 상세(보기)·분석 중·원본 링크 웹뷰 | FProductDetail, FProductProcessing, FWebView* | B1 |
-| C5 | 카테고리 탭·세부 유형 목록(fake 목록)·선택 시트·생성·편집 | FCategoryHome/AddSheet/List/ListCustom/ListCustomEmpty/EditSheet, FProductCategoryPicker/Create | B2 |
+| C4 | 완료(PR #15 merge e5339ba, PR #16 merge e2653f6, 2026-10-13; [spec](2026-10-09-client-c4-product-detail-design.md)·[plan](../plans/2026-10-09-client-c4-product-detail.md), [PR A 기록](../../history/architecture/client/c4-pr-a-implementation-2026-10-10.md)·[PR B 기록](../../history/architecture/client/c4-pr-b-implementation-2026-10-10.md)). 상품 상세(보기)·분석 중·원본 링크 웹뷰 | FProductDetail, FProductProcessing, FWebView* | B1 |
+| C5 | PR A 구현·로컬 검증 완료(2026-10-15, draft PR #21, [spec](2026-10-14-client-c5-category-design.md)·[plan](../plans/2026-10-14-client-c5-category.md)·[PR A 기록](../../history/architecture/client/c5-pr-a-implementation-2026-10-15.md); PR B 사진 공유 요소 전환 남음, Android 실기기 확인 남음). 카테고리 탭·세부 유형 목록·선택 시트·생성·편집 | FCategoryHome/AddSheet/List/ListCustom/ListCustomEmpty/EditSheet, FProductCategoryPicker/Create | B2 |
 | C6 | 목적 탭·상세(머리 접기)·생성·편집 | FPurposeHome/Create/Detail/DetailEmpty/EditInPlace | B3 |
 | C7 | 카테고리·목적 목록의 window·anchor 복원, 홈 할 일·목적 요약, 연속 처리 조회와 카드 모션 | FHome, FHomeReviewFlow, FHomeFillFlow | B4 |
 | C8 | 상품 편집·직접 보완·검토 결정·삭제·재분석·사진 업로드 | FProductEdit/PurposeSheet/Fill/FillEdit/DeleteConfirm | B6~B7 |

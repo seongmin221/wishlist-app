@@ -10,9 +10,11 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
-/** Image-comparison fixture only. Repository counts are derived from stored membership. */
+/**
+ * Image-comparison fixture only; repository counts are derived from stored membership. Category
+ * chip numbers need no fixture since C5: the seed holds that many items (see [BoardSeeds]).
+ */
 internal data class BoardDisplayMetadata(
-    val categoryChipCounts: Map<String, Int>,
     val purposeCandidateCounts: Map<String, Int>,
     val cards: List<BoardCardFixture> = emptyList(),
 )
@@ -37,8 +39,19 @@ internal data class BoardSeedData(
     val commuteId: String,
 )
 
-/** Board snapshots, not a full SELECT taxonomy or a wire catalog implementation. */
+/**
+ * Board snapshots, not a full SELECT taxonomy or a wire catalog implementation. Every category chip
+ * of FCategoryHome has as many READY items as its number (69 in all), so CAT-01 BROWSE counts match
+ * the board: the eight headphones and the two DAC items carry the board's names and prices, the
+ * rest are plain "<category> <n>" items, older than the headphones.
+ */
 internal object BoardSeeds {
+    /** FCategoryEditSheet text of the custom categories (gen_category.py `MINE`); others have none. */
+    val customText: Map<String, Pair<String?, List<String>>> = mapOf(
+        "오디오 케이블·DAC" to ("헤드폰에 연결하는 DAC와 교체용 케이블" to listOf("포터블 DAC", "이어폰 케이블")),
+        "레고" to ("테크닉, 아이디어 시리즈" to listOf("테크닉")),
+    )
+
     fun create(clock: Clock, ids: IdGenerator): BoardSeedData {
         val now = clock.now()
         // Platform generators may emit uppercase UUIDs (NSUUID); seeds use the canonical lowercase form.
@@ -124,7 +137,7 @@ internal object BoardSeeds {
         }
         // createdAt is staggered by one minute in board order so the newest-first list is l1..l8,
         // independent of the random item IDs used as the tie-breaker.
-        val items = listOf(
+        val headphoneItems = listOf(
             item("l1", "소니", "WH-1000XM6", "549000", "무신사", 2, commute = true),
             item("l2", "보스", "QuietComfort Ultra", "499000", "보스 공식몰", 2, commute = true),
             item("l3", "젠하이저", "MOMENTUM 4", "389000", "젠하이저", 5),
@@ -134,6 +147,32 @@ internal object BoardSeeds {
             item("l7", "소니", "ULT WEAR", "279000", "11번가", 14, commute = true),
             item("l8", "오디오테크니카", "ATH-M50x", "219000", "오디오테크니카", 21),
         ).mapIndexed { index, item -> (now - index.minutes).let { item.copy(createdAt = it, updatedAt = it) } }
+        val dac = categories.single { it.name == "오디오 케이블·DAC" }
+        fun plain(category: Category, name: String, price: String, merchant: String?, daysSinceCheck: Int, minutesAgo: Int): WishlistItem {
+            val at = now - minutesAgo.minutes
+            val snapshot = WishlistItem(
+                id = newId(), clientSubmissionId = newId(), version = 1,
+                sourceUrl = "https://seed.wishlist.invalid/${category.id}/${minutesAgo}",
+                product = ProductSnapshot(name = name, price = requireNotNull(DecimalAmount.parseOrNull(price)), currency = "KRW",
+                    merchant = merchant, metadataCheckedAt = now - daysSinceCheck.days, nameSource = ValueSource.AI),
+                category = ItemCategory(category.id, ValueSource.AI, name = category.name, parentId = category.parentId, kind = category.kind),
+                purpose = ItemPurpose(), analysis = ItemAnalysis(AnalysisStatus.READY), reviewStatus = ReviewStatus.CONFIRMED,
+                lifecycleStatus = LifecycleStatus.ACTIVE, requiredAction = RequiredAction.NONE, createdAt = at, updatedAt = at,
+            )
+            val policy = evaluateItem(snapshot)
+            return snapshot.copy(requiredAction = policy.requiredAction, allowedActions = policy.allowedActions)
+        }
+        var minutesAgo = headphoneItems.size
+        val dacItems = listOf(
+            plain(dac, "FiiO BTR7", "259000", "fiio.com", 3, minutesAgo++),
+            plain(dac, "오디오퀘스트 DragonFly Red", "299000", "29CM", 7, minutesAgo++),
+        )
+        val covered = mapOf(headphones.id to headphoneItems.size, dac.id to dacItems.size)
+        val fillers = categories.filter { it.parentId != null }.flatMap { category ->
+            val missing = (categoryCounts.getValue(category.id) - (covered[category.id] ?: 0)).coerceAtLeast(0)
+            (1..missing).map { n -> plain(category, "${category.name} $n", "39000", null, 3, minutesAgo++) }
+        }
+        val items = headphoneItems + dacItems + fillers
         val cards = listOf(
             BoardCardFixture("l1", items[0].id, "#FFFFFF", "#9A9A96", "#D8D8D4", 1.0 / 1.0, "출퇴근 헤드폰 · 2일 전 확인"),
             BoardCardFixture("l2", items[1].id, "#7A6B5B", "#E9DFD2", "#A99683", 5.0 / 4.0, "출퇴근 헤드폰 · 2일 전 확인"),
@@ -151,7 +190,7 @@ internal object BoardSeeds {
         )
         return BoardSeedData(
             categories, purposes, items,
-            BoardDisplayMetadata(categoryCounts, purposes.mapIndexed { index, purpose ->
+            BoardDisplayMetadata(purposes.mapIndexed { index, purpose ->
                 purpose.id to listOf(5, 3, 2, 4, 3, 2, 0)[index]
             }.toMap(), cards),
             carrierId = purposes.last().id, commuteId = commuteId,
