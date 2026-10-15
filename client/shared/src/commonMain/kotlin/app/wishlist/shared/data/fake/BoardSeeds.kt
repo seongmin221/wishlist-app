@@ -46,6 +46,12 @@ internal data class BoardSeedData(
  * rest are plain "<category> <n>" items, older than the headphones.
  */
 internal object BoardSeeds {
+    /** FCategoryEditSheet text of the custom categories (gen_category.py `MINE`); others have none. */
+    val customText: Map<String, Pair<String?, List<String>>> = mapOf(
+        "오디오 케이블·DAC" to ("헤드폰에 연결하는 DAC와 교체용 케이블" to listOf("포터블 DAC", "이어폰 케이블")),
+        "레고" to ("테크닉, 아이디어 시리즈" to listOf("테크닉")),
+    )
+
     fun create(clock: Clock, ids: IdGenerator): BoardSeedData {
         val now = clock.now()
         // Platform generators may emit uppercase UUIDs (NSUUID); seeds use the canonical lowercase form.

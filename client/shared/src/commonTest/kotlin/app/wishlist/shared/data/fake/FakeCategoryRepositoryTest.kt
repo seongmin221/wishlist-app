@@ -61,6 +61,10 @@ class FakeCategorySeedTest {
         kotlin.test.assertEquals(CategoryKind.CUSTOM, digital.last().kind) // customs after the public leaves
         kotlin.test.assertEquals(0, browse.groups.single { it.id == "G007" }.categories.single { it.name == "레고" }.itemCount)
         kotlin.test.assertEquals(3, browse.customUsedCount)
+        val dac = digital.single { it.name == "오디오 케이블·DAC" }
+        val detail = f.categories.custom(dac.id).successValue()
+        kotlin.test.assertEquals("헤드폰에 연결하는 DAC와 교체용 케이블", detail.description)
+        kotlin.test.assertEquals(listOf("포터블 DAC", "이어폰 케이블"), detail.examples)
     }
 
     @kotlin.test.Test fun longCategoryFixturePagesBy40() = kotlinx.coroutines.test.runTest {
