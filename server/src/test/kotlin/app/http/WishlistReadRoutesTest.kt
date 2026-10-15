@@ -54,8 +54,10 @@ class WishlistReadRoutesTest {
             assertEquals(2L,body.getValue("totalCount").jsonPrimitive.long)
             assertEquals(JsonNull,body.getValue("requestedAnchorItemId"));assertEquals(JsonNull,body.getValue("anchorResolved"))
             val card=body.getValue("items").jsonArray.single().jsonObject
-            val detail=Json.parseToJsonElement(client.get("/v1/wishlist-items/${first.position.id}").bodyAsText())
-            assertEquals(detail,card.getValue("item"))
+            val detail=Json.parseToJsonElement(client.get("/v1/wishlist-items/${first.position.id}").bodyAsText()).jsonObject
+            // B7: only the single-item response carries deletionImpact; the card has no such key.
+            assertTrue("deletionImpact" in detail); assertFalse("deletionImpact" in card.getValue("item").jsonObject)
+            assertEquals(JsonObject(detail-"deletionImpact"),card.getValue("item"))
             val product=card.getValue("item").jsonObject.getValue("product").jsonObject
             for (field in listOf("brand","price","currency","merchant","metadataCheckedAt")) assertEquals(JsonNull,product.getValue(field))
             val anchor=card.getValue("anchorCursor").jsonPrimitive.content

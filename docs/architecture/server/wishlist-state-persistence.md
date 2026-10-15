@@ -166,3 +166,15 @@ V14는 입력 상한 2,500에 맞춰 기본값으로 만들어진 기존 `llm_bu
 
 사용자가 확정한 목적 미지정의 저장 표현은 `purpose_source=USER, purpose_id=null` 하나다.
 CONFIRMED/DEFERRED + UNASSIGNED는 별도 의미가 아니라 AI가 목적을 쓰지 않는 보호 조건이다.
+
+## B7 사용자 변경과 잠금
+
+ITEM-04·05·06·07·08은 `ItemMutationService`·`ReanalysisService`가 transaction 하나로 처리한다. 계약은 [상품 사용자 변경 API](wishlist-item-mutation-api.md)다.
+
+- **잠금 순서:** owner(`OwnerStructureLock`, FOR UPDATE 유지) → 목적(lifecycle 무관, ID순 `for update`) → 상품 `for update` → media(ID순 `for update`) → job(ID순 `for update`). 상품은 owner 잠금 아래 잠금 없이 먼저 읽어 목적 ID를 찾는다. owner 잠금을 쥔 동안 다른 구조 변경과 Worker 반영이 상품을 바꿀 수 없기 때문이다. 판정(version → 상태 → 바뀐 텍스트 → 바뀐 참조)은 모든 잠금 뒤에 하고, 실패는 rollback이다.
+- **media:** 연결 전 media를 잠근 뒤 별도 문장으로 다른 상품 참조를 확인한다(B6 정리와 같은 원칙). 연결은 `unreferenced_since=null`·`updated_at`, 해제·교체·상품 삭제는 READY일 때 `unreferenced_since=now`·`updated_at`. partial unique index 위반은 `MEDIA_NOT_AVAILABLE`로 바꾼다.
+- **값 출처:** 바뀐 이름은 `name_source=USER`+override NAME, 브랜드는 override BRAND, category는 `category_source=USER`(public·custom 중 하나만, 누락 사유 null), 목적은 `purpose_source=USER`(null은 명시적 해제), 사진은 `image_source=USER`(override 없음). 해제하면 외부 이미지 유무로 AI/null, override IMAGE 제거. Worker 반영의 기존 보호(USER/override, CONFIRMED/DEFERRED)가 이 값을 지킨다.
+- **삭제:** lifecycle DELETED·`media_asset_id=null`·version+1. 진행 중 job만 `transitionAnalysisJob(CANCELLED)`로 실행 identity를 해제하고 끝난 job은 그대로 둔다. 이후 claim·finish·복구는 기존 guard로 무시된다.
+- **재분석:** `current_generation+1`·PROCESSING·`analysis_failure_code=null`·version+1, 진행 중 이전 job 취소, 새 GENERAL_PENDING job과 outbox(`analysis-{job}-{generation}`, `WishlistItemRepository.insertAnalysis`)·receipt를 같은 transaction에 저장한다.
+- **V19:** `wishlist_items(owner_id,id)` unique, `mutation_receipts.wishlist_item_id` owner 복합 FK, receipt 대상 category·목적·상품 중 정확히 하나. 상품 행은 tombstone으로 남으므로 FK가 깨지지 않는다.
+- **읽기:** ITEM-03은 B7부터 `inTransaction(readOnly=true)`(REPEATABLE READ) 한 snapshot에서 상품과 `deletionImpact`를 읽는다.
