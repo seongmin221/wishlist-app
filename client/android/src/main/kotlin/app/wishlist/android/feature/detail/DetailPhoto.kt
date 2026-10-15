@@ -37,15 +37,19 @@ import kotlinx.coroutines.flow.first
 /** 사진 픽셀 크기. */
 internal data class PhotoPixels(val width: Int, val height: Int)
 
-/**
- * 상세 사진 요청의 자리표시(C5 spec §4): handoff로 받은 카드 이미지(`placeholder`)와 카드 요청의 memory cache key
- * (`placeholderMemoryCacheKey`, 보조 경로). key는 route 인자가 아니라 handoff(화면 사이 전환 상태)로 온다. handoff가
- * 없으면(홈 진입·프로세스 복원) 둘 다 없고 기본 placeholder 뒤에 일반 로드다.
- */
-internal data class DetailPhotoStart<I, K>(val placeholder: I?, val placeholderMemoryCacheKey: K?)
+/** 상세 크기 사진 아래에 그리는 것. */
+internal enum class DetailPhotoUnder { Held, Placeholder, Nothing }
 
-internal fun <I : Any, K : Any> detailPhotoStart(held: PhotoHandoff.Held<I, K>?): DetailPhotoStart<I, K> =
-    DetailPhotoStart(held?.image, held?.memoryCacheKey)
+/**
+ * 상세 크기 사진이 그려지기 전(받는 중·실패)에는 handoff로 받은 카드 사진, 그것도 없으면 자리표시(C5 spec §4). 상세가
+ * 직접 그린다: 요청의 `placeholder`로 넘기면 상세가 떠 있는 동안 요청이 카드 bitmap을 계속 붙잡아 handoff를 놓아도
+ * 풀리지 않고, 실패하면 Coil이 아무것도 그리지 않아 칸이 빈다.
+ */
+internal fun detailPhotoUnder(hasHeld: Boolean, drawn: Boolean): DetailPhotoUnder = when {
+    drawn -> DetailPhotoUnder.Nothing
+    hasHeld -> DetailPhotoUnder.Held
+    else -> DetailPhotoUnder.Placeholder
+}
 
 /**
  * 상세 사진 공유 요소 상자의 비율(높이/폭). 1:1 칸 안 여백 56에 원래 비율로 맞춘 사진 사각형이 공유 요소다(카드 사진이
@@ -60,8 +64,8 @@ private fun Image.pixels() = PhotoPixels(width, height)
 /**
  * 카드에서 사진 공유 요소로 연 상세의 사진 자리(C5 spec §4). 1:1 칸 안 여백 56에 원래 비율로 맞춘 사진 사각형이
  * [sourceKey] 공유 요소다(모서리는 카드 20 → 상세 0으로 날아가며 바뀌고, 멈추면 C4 모습).
- * - 그리는 순서: handoff 카드 이미지(요청의 `placeholder`) → 카드 요청의 memory cache key(`placeholderMemoryCacheKey`) →
- *   기본 placeholder. 상세 크기 사진이 오면 바꾼다. 카드 이미지가 없으면(아직 로딩 중이던 카드) 칸 전체 자리표시가 같은
+ * - 그리는 순서: 상세 크기 사진 → handoff 카드 이미지([detailPhotoUnder]) → 카드 요청의 memory cache key(요청의
+ *   `placeholderMemoryCacheKey`, 보조 경로) → 기본 placeholder. 카드 이미지가 없으면(아직 로딩 중이던 카드) 칸 전체 자리표시가 같은
  *   공유 요소로 커진다.
  * - 상세 크기 사진이 그려지고 push 모션이 끝나면 handoff를 놓는다. 지금 그리는 이미지는 [PhotoHandoff.showing]으로 알려
  *   뒤로 갈 때 카드 쪽이 그것을 그린다.
@@ -98,15 +102,17 @@ internal fun DetailSharedPhoto(imageUrl: String?, sourceKey: String) {
         // Corner 20 (the card's) while flying, 0 at rest like the board's detail photo.
         val corner = photoCorner(atRest = 0.dp, entering = WishlistTokens.Radius.m, millis = Motion.pushPhotoOpen)
         Box(box.wlSharedPhoto(sourceKey, corner)) {
-            if (held == null && drawn == null) PhotoPlaceholder(Modifier.fillMaxSize())
+            when (detailPhotoUnder(hasHeld = held != null, drawn = drawn != null)) {
+                DetailPhotoUnder.Held -> held?.let {
+                    androidx.compose.foundation.Image(remember(it.image) { it.image.asPainter(context) }, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                }
+                DetailPhotoUnder.Placeholder -> PhotoPlaceholder(Modifier.fillMaxSize())
+                DetailPhotoUnder.Nothing -> Unit
+            }
             if (url != null) {
-                // Built once per address with the photo held at the push: letting go of it later must not reload.
+                // Built once per address (letting go of the handoff must not reload); holds the key, not the bitmap.
                 val request = remember(url) {
-                    val start = detailPhotoStart(held)
-                    ImageRequest.Builder(context).data(url)
-                        .placeholder(start.placeholder)
-                        .placeholderMemoryCacheKey(start.placeholderMemoryCacheKey)
-                        .build()
+                    ImageRequest.Builder(context).data(url).placeholderMemoryCacheKey(held?.memoryCacheKey).build()
                 }
                 AsyncImage(
                     model = request,
@@ -118,8 +124,6 @@ internal fun DetailSharedPhoto(imageUrl: String?, sourceKey: String) {
                         entry?.let { e -> handoff.detailDrawn(e.id) }
                     },
                 )
-            } else if (held != null) {
-                androidx.compose.foundation.Image(remember(held.image) { held.image.asPainter(context) }, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             }
         }
     }

@@ -1,26 +1,22 @@
 package app.wishlist.android.feature.detail
 
-import app.wishlist.android.navigation.PhotoHandoff
 import app.wishlist.shared.domain.DetailKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DetailPhotoTest {
+    /**
+     * Under the detail-size photo: the held card photo until that photo is drawn — also when it fails to
+     * load (not an empty frame) — else the placeholder. The detail draws it itself rather than through the
+     * request's `placeholder`, which would keep the card bitmap for as long as the detail is shown.
+     */
     @Test
-    fun heldCardPhotoAndCacheKeyBecomeTheDetailRequestPlaceholder() {
-        val start = detailPhotoStart(PhotoHandoff.Held("card", "card-key"))
-
-        assertEquals("card", start.placeholder)
-        assertEquals("card-key", start.placeholderMemoryCacheKey)
-    }
-
-    @Test
-    fun withoutHandoffTheDetailLoadsPlainly() {
-        val start = detailPhotoStart<String, String>(null)
-
-        assertNull(start.placeholder)
-        assertNull(start.placeholderMemoryCacheKey)
+    fun underTheDetailPhotoIsTheHeldPhotoUntilDrawnElseThePlaceholder() {
+        assertEquals(DetailPhotoUnder.Held, detailPhotoUnder(hasHeld = true, drawn = false))
+        assertEquals(DetailPhotoUnder.Placeholder, detailPhotoUnder(hasHeld = false, drawn = false))
+        assertEquals(DetailPhotoUnder.Nothing, detailPhotoUnder(hasHeld = true, drawn = true))
+        assertEquals(DetailPhotoUnder.Nothing, detailPhotoUnder(hasHeld = false, drawn = true))
     }
 
     @Test

@@ -33,7 +33,6 @@ internal val LocalWLSharedScope = staticCompositionLocalOf<SharedTransitionScope
 /** 지금 그리는 스택 칸의 전환 범위(push·pop 쪽). `WLNavHost`가 칸마다 넣는다. */
 internal val LocalWLStackScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
-private val PhotoShape = RoundedCornerShape(WishlistTokens.Radius.m)
 
 /** 사진 사각형: 열 때 420, 뒤로 360 `emphasized`. 커지는 쪽이면 열기다. */
 private val PhotoBounds = BoundsTransform { initial, target ->
@@ -47,7 +46,8 @@ private val PhotoBounds = BoundsTransform { initial, target ->
  */
 @Composable
 fun Modifier.wlSharedPhoto(sourceKey: String, corner: Dp = WishlistTokens.Radius.m): Modifier {
-    val rest = Modifier.clip(RoundedCornerShape(corner))
+    val shape = RoundedCornerShape(corner)
+    val rest = Modifier.clip(shape)
     val shared = LocalWLSharedScope.current ?: return this.then(rest)
     val scope = LocalWLStackScope.current ?: return this.then(rest)
     return with(shared) {
@@ -56,7 +56,8 @@ fun Modifier.wlSharedPhoto(sourceKey: String, corner: Dp = WishlistTokens.Radius
                 rememberSharedContentState(SharedTransitionKeys.photo(sourceKey)),
                 animatedVisibilityScope = scope,
                 boundsTransform = PhotoBounds,
-                clipInOverlayDuringTransition = OverlayClip(PhotoShape),
+                // The overlay clips the flying photo too: the same (animated) corner, or it stays 20 and snaps at the end.
+                clipInOverlayDuringTransition = OverlayClip(shape),
             )
             .then(rest)
     }
