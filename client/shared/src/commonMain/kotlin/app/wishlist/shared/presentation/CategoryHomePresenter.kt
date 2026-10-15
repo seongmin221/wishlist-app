@@ -66,15 +66,18 @@ class CategoryHomePresenter internal constructor(
     private var started = false
     private var inFlight: Job? = null
     private var savedGroup: String? = null
+    private var savedGroupRead = false
+    /** A session change already queued this account's load; an intent that synced it must not fetch again. */
+    private var sessionFetchQueued = false
 
     fun load() { intent { started = true; fetch(keepShown = false) } }
-    fun refresh() { intent { if (started) fetch(keepShown = true) } }
-    fun retry() { intent { if (started) fetch(keepShown = mutableState.value.groups.isNotEmpty()) } }
+    fun refresh() { intent { if (started && !sessionFetchQueued) fetch(keepShown = true) } }
+    fun retry() { intent { if (started && !sessionFetchQueued) fetch(keepShown = mutableState.value.groups.isNotEmpty()) } }
 
     /** [refresh], awaited until that request ended (returns at once before the first load or after close). */
     suspend fun refreshNow() {
         var job: Job? = null
-        intent { if (started) { fetch(keepShown = true); job = inFlight } }.join()
+        intent { if (started && !sessionFetchQueued) { fetch(keepShown = true); job = inFlight } }.join()
         job?.join()
     }
 
@@ -85,6 +88,7 @@ class CategoryHomePresenter internal constructor(
         mutableState.value = current.copy(currentGroupId = groupId)
         val account = observed.accountId ?: return@intent
         savedGroup = groupId
+        savedGroupRead = true
         withContext(dispatcher) { store.writeAppState(lastCategoryGroupKey(account), groupId) }
     } }
 
@@ -92,8 +96,12 @@ class CategoryHomePresenter internal constructor(
         inFlight?.cancel()
         inFlight = null
         savedGroup = null
+        savedGroupRead = false
         mutableState.value = CategoryHomeState.Initial.copy(signedIn = current.accountId != null)
-        if (started && current.accountId != null) scope.launch { fetch(keepShown = false) }
+        if (started && current.accountId != null) {
+            sessionFetchQueued = true
+            scope.launch { sessionFetchQueued = false; fetch(keepShown = false) }
+        }
     }
 
     private suspend fun fetch(keepShown: Boolean) {
@@ -102,12 +110,13 @@ class CategoryHomePresenter internal constructor(
             mutableState.value = CategoryHomeState.Initial.copy(loaded = true)
             return
         }
-        if (savedGroup == null) {
+        if (!savedGroupRead) {
             val snapshot = observed
             val read = (withContext(dispatcher) { store.readAppState(lastCategoryGroupKey(account)) } as? ClientResult.Success)?.value
             // The lane was free while reading: a session change since then already restarted the load.
             if (observed != snapshot) return
             savedGroup = read
+            savedGroupRead = true
         }
         inFlight?.cancel() // after the read: the newest fetch is the one that requests last
         val before = mutableState.value
