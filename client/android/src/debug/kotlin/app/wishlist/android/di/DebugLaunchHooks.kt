@@ -2,6 +2,7 @@ package app.wishlist.android.di
 
 import android.content.Intent
 import android.util.Log
+import app.wishlist.android.navigation.PhotoTransitionDebug
 import app.wishlist.shared.core.ClientResult
 import app.wishlist.shared.di.SharedRuntime
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,10 @@ import kotlinx.coroutines.launch
  * - C5 `wl.fake.editCategory` (`<custom id>|<name>`): renames it as another device would (version + 1).
  * - C5 `wl.fake.signOutAfterMs` (ms): signs out that long after ready, to check what closes when the app
  *   leaves the account while a screen or sheet is open (the UI cannot sign out with a sheet on top).
+ * - C5 PR B `wl.debug.clearImageMemory` (`--ez … true`): clears Coil's memory cache whenever a photo
+ *   transition starts (card tap, detail back start), so push · pop · cancelled drag back are seen with
+ *   only the held images ([app.wishlist.android.navigation.PhotoHandoff]). Logcat `WishlistImages` counts
+ *   loader requests and fetches (network downloads) apart.
  */
 internal object DebugLaunchHooks {
     const val DELAY_ITEM_01 = "wl.fake.delayItem01"
@@ -33,6 +38,7 @@ internal object DebugLaunchHooks {
     const val DELAY_CATEGORY_CREATE = "wl.fake.delayCategoryCreate"
     const val EDIT_CATEGORY = "wl.fake.editCategory"
     const val SIGN_OUT_AFTER = "wl.fake.signOutAfterMs"
+    const val CLEAR_IMAGE_MEMORY = "wl.debug.clearImageMemory"
     private const val TAG = "WishlistDebug"
 
     fun apply(runtime: SharedRuntime, intent: Intent, scope: CoroutineScope) {
@@ -42,6 +48,8 @@ internal object DebugLaunchHooks {
         val delayCreate = intent.numberExtra(DELAY_CATEGORY_CREATE)?.toLong()
         val editCategory = intent.getStringExtra(EDIT_CATEGORY)
         val signOutAfter = intent.numberExtra(SIGN_OUT_AFTER)?.toLong()
+        PhotoTransitionDebug.clearImageMemory = intent.getBooleanExtra(CLEAR_IMAGE_MEMORY, false)
+        if (PhotoTransitionDebug.clearImageMemory) Log.i(TAG, "image memory cache cleared at each photo transition")
         if (signOutAfter != null) scope.launch {
             runtime.ready.first { it }
             kotlinx.coroutines.delay(signOutAfter)

@@ -5,7 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.util.Log
+import coil3.EventListener
 import coil3.ImageLoader
+import coil3.request.ImageRequest
 import coil3.SingletonImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
@@ -29,9 +32,25 @@ internal object DebugSeedImages {
 
     fun install(context: Context) {
         SingletonImageLoader.setSafe {
-            ImageLoader.Builder(context).components { add(Factory()) }.build()
+            ImageLoader.Builder(context).components { add(Factory()) }.eventListener(ImageEvents).build()
         }
     }
+
+    /**
+     * C5 PR B device check: a loader request (`start`) and a fetch (`fetch`: the photo was not in the memory
+     * cache and is downloaded or, for the seed host, made) are logged apart, with the request's size.
+     */
+    private object ImageEvents : EventListener() {
+        override fun onStart(request: ImageRequest) {
+            Log.i(IMAGE_TAG, "start ${request.data} ${request.sizeResolver}")
+        }
+
+        override fun fetchStart(request: ImageRequest, fetcher: Fetcher, options: Options) {
+            Log.i(IMAGE_TAG, "fetch ${request.data} ${options.size}")
+        }
+    }
+
+    private const val IMAGE_TAG = "WishlistImages"
 
     private class Factory : Fetcher.Factory<Uri> {
         override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? =
