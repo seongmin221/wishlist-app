@@ -13,6 +13,7 @@ struct CategoryListScreen: View {
     let target: CategoryListTarget
 
     @Environment(\.wlEntryOwners) private var owners
+    @Environment(\.wlRuntime) private var runtime
     @Environment(\.wlEntryID) private var entryID
     @Environment(\.wlNavigator) private var nav
     @Environment(\.overlayHostState) private var overlay
@@ -108,9 +109,14 @@ struct CategoryListScreen: View {
         let parentName = owner.state.header?.parentName ?? target.parentName
         let categoryId = target.categoryId
         let homeEntry = nav.entries(.category).first?.id
+        #if DEBUG
+        let beforeSubmit = DebugLaunchHooks.editOnSave(runtime: runtime, customId: categoryId)
+        #else
+        let beforeSubmit: (() async -> Void)? = nil
+        #endif
         showCategoryFormSheet(overlay: overlay, owners: owners, start: { form in
             form.startEdit(customId: categoryId, parentName: parentName)
-        }, onResult: { result in
+        }, beforeSubmit: beforeSubmit, onResult: { result in
             if let saved = result as? FormResultSaved {
                 owner.applyEdited(saved.detail)
                 if let homeEntry { owners.categoryHome(homeEntry).refresh() }

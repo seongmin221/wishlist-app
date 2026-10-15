@@ -67,6 +67,11 @@ private struct SheetContentHeightKey: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
+private struct SheetFooterHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 private struct SheetHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
@@ -81,6 +86,7 @@ struct SheetLayer: View {
     let state: OverlayHostState
     let draggable: Bool
     let content: () -> AnyView
+    var footer: (() -> AnyView)?
 
     @Environment(\.wlColors) private var c
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -88,6 +94,7 @@ struct SheetLayer: View {
     @State private var dragOffset: CGFloat = 0
     @State private var height: CGFloat = 0
     @State private var contentHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
 
     private var handleHeight: CGFloat { draggable ? 28 : WishlistTokens.Space.s20 }
 
@@ -99,7 +106,7 @@ struct SheetLayer: View {
         GeometryReader { outer in
         GeometryReader { geo in
             let homeInset = max(0, outer.safeAreaInsets.bottom - geo.safeAreaInsets.bottom)
-            let maxContent = max(0, sheetMaxHeight(available: geo.size.height) - handleHeight)
+            let maxContent = max(0, sheetMaxHeight(available: geo.size.height) - handleHeight - (footer == nil ? 0 : footerHeight))
             VStack(spacing: 0) {
                 handleRow
                 // 내용이 상한보다 길면(큰 글자·키보드) 시트 안에서 스크롤한다. 짧으면 내용 높이만큼만 차지한다.
@@ -107,12 +114,22 @@ struct SheetLayer: View {
                     content()
                         .wlOnSheet()
                         .padding(.horizontal, WishlistTokens.Space.screenMargin)
-                        .padding(.bottom, WishlistTokens.Space.s16 + homeInset)
+                        .padding(.bottom, WishlistTokens.Space.s16 + (footer == nil ? homeInset : 0))
                         .background(GeometryReader { Color.clear.preference(key: SheetContentHeightKey.self, value: $0.size.height) })
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(height: min(contentHeight, maxContent))
+                if let footer {
+                    // Board: 12 above, 20 sides, the home indicator (or the keyboard) below; it never scrolls.
+                    footer()
+                        .wlOnSheet()
+                        .padding(.horizontal, WishlistTokens.Space.screenMargin)
+                        .padding(.top, WishlistTokens.Space.s12)
+                        .padding(.bottom, WishlistTokens.Space.s12 + homeInset)
+                        .background(GeometryReader { Color.clear.preference(key: SheetFooterHeightKey.self, value: $0.size.height) })
+                }
             }
+            .onPreferenceChange(SheetFooterHeightKey.self) { footerHeight = $0 }
             .onPreferenceChange(SheetContentHeightKey.self) { contentHeight = $0 }
             .frame(maxWidth: .infinity)
             .background(alignment: .bottom) {

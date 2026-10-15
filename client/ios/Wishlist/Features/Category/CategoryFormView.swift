@@ -44,7 +44,6 @@ struct CategoryFormView: View {
                 WLText(DetailLine("category.form.usage", [.int(used), .int(limit)]).resolve(), WLTextStyle.label.resized(13), color: c.textSecondary)
             }
             message
-            buttons
         }
         .padding(.top, WishlistTokens.Space.s4)
         .onChange(of: syncKey, initial: true) { _, key in sync(key) }
@@ -178,30 +177,6 @@ struct CategoryFormView: View {
                 }
             }
         }
-    }
-
-    /// 취소 1 : 주 동작 1.4 (the `WLButtonPair` ratio); only the primary dims when it cannot submit.
-    private var buttons: some View {
-        GeometryReader { geo in
-            let gap = WishlistTokens.Space.s12
-            let unit = max(0, geo.size.width - gap) / 2.4
-            HStack(spacing: gap) {
-                WLButton(String(localized: "dialog.cancel"), kind: .secondary) {
-                    if !state.submitting { (onBack ?? onClose)() }
-                }
-                .frame(width: unit)
-                WLButton(String(localized: editing ? "category.form.save" : "category.form.create"), kind: .primary,
-                         enabled: state.canSubmit || state.submitting) {
-                    owner.presenter.submit()
-                }
-                .frame(width: unit * 1.4)
-                .overlay(alignment: .trailing) {
-                    if state.submitting { ProgressView().tint(c.onInverse).padding(.trailing, WishlistTokens.Space.s20) }
-                }
-            }
-        }
-        .frame(height: 52)
-        .allowsHitTesting(!state.submitting)
     }
 
     private func note(_ text: String) -> some View {

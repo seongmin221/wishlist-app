@@ -30,7 +30,24 @@ enum DebugLaunchHooks {
     static let longCategory = "wl.fake.longCategory"
     /// C5: `-wl.fake.delayCategoryCreate <ms>` delays the next Fake CAT-03 (a lost answer when the network drops meanwhile).
     static let delayCategoryCreate = "wl.fake.delayCategoryCreate"
+    /// C5: `-wl.fake.editCategoryOnSave <name>` — the first edit-sheet save of the session first renames that
+    /// category to `<name>` in the Fake ("another device" saved, version + 1), so the save meets
+    /// CATEGORY_VERSION_CONFLICT and the form shows "다른 곳에서 바뀐 내용을 불러왔어요".
+    static let editCategoryOnSave = "wl.fake.editCategoryOnSave"
+    @MainActor private static var editOnSaveUsed = false
     private static let log = Logger(subsystem: "app.wishlist.ios", category: "debug")
+
+    /// The edit sheet's `beforeSubmit` for `-wl.fake.editCategoryOnSave` (nil without the argument or once used).
+    @MainActor
+    static func editOnSave(runtime: SharedRuntime?, customId: String, arguments: [String] = ProcessInfo.processInfo.arguments) -> (() async -> Void)? {
+        guard !editOnSaveUsed, let name = string(of: editCategoryOnSave, in: arguments), let controls = runtime?.debugControls() else { return nil }
+        return {
+            guard !editOnSaveUsed else { return }
+            editOnSaveUsed = true
+            let result = try? await controls.editCategoryElsewhere(customId: customId, name: name)
+            log.info("edit category elsewhere \(customId): \(String(describing: result))")
+        }
+    }
 
     static func apply(_ runtime: SharedRuntime, arguments: [String]) {
         let delay = value(of: delayItem01, in: arguments)
