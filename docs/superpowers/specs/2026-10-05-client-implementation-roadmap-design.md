@@ -25,7 +25,7 @@ iOS(SwiftUI)·Android(Compose) 앱에서 MVP 화면 52개(라이트·다크 보�
 | --- | --- | --- |
 | 서버 의존 | 계약 우선 + KMP fake | 서버 순서만 따르면 대기 시간이 길다. 로컬 우선 데모는 서버가 계산하는 상태(`requiredAction`, version 충돌)와 맞지 않는다. |
 | 플랫폼 순서 | 기능마다 KMP → Android → iOS를 같은 단계 안에서 끝냄 | 한 플랫폼을 먼저 하면 Swift 연결 문제를 늦게 발견한다. |
-| KMP 스택 | Ktor client, kotlinx.serialization, SQLDelight, Koin, SKIE, multiplatform-settings, kotlin.test·Turbine·Ktor MockEngine | Room KMP + KMP-NativeCoroutines는 Swift 쪽 연결 코드가 더 길다. |
+| KMP 스택 | Ktor client, kotlinx.serialization, SQLDelight, Koin, SKIE, multiplatform-settings(C5에서 도입하지 않음: 기기 상태는 SQLDelight `app_state`), kotlin.test·Turbine·Ktor MockEngine | Room KMP + KMP-NativeCoroutines는 Swift 쪽 연결 코드가 더 길다. |
 | 인증 | 플랫폼별 Firebase 공식 SDK → KMP `AuthTokenProvider` 인터페이스 | 공식 SDK를 그대로 쓰고 KMP는 token만 받는다. |
 | 이미지 | Android Coil 3, iOS는 C4에서 자체 로더와 Nuke 중 선택 | — |
 | 화면 상태 | KMP Presenter가 비즈니스 상태를 소유하고 플랫폼은 얇은 래퍼 | 플랫폼 ViewModel마다 구현하면 제품 규칙이 두 번 생긴다. |
