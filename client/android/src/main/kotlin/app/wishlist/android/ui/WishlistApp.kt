@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import app.wishlist.android.designsystem.WLTheme
 import app.wishlist.android.designsystem.WishlistTokens
@@ -23,6 +24,7 @@ import app.wishlist.android.feature.login.LoginMode
 import app.wishlist.android.feature.login.LoginScreen
 import app.wishlist.android.feature.session.AccountPresenterOwner
 import app.wishlist.android.feature.session.LocalAccountOwner
+import app.wishlist.android.navigation.AppPhotoHandoff
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLEntryViewModelStores
 import app.wishlist.android.navigation.WLNavHost
@@ -43,13 +45,16 @@ internal fun WishlistApp(account: AccountPresenterOwner, home: HomePresenterOwne
     WLTheme {
         val navigator = rememberWLNavigator(AppRouteCodec)
         val overlay = rememberOverlayHostState()
+        val photoHandoff = remember { AppPhotoHandoff() }
         LaunchedEffect(account, navigator, entryStores, overlay) {
             var previous: String? = null
             account.state.map { it.account?.accountId }.distinctUntilChanged().collect { next ->
                 if (shouldDropAccountScoped(previous, next)) {
                     // Account-scoped sheets (C5 category add/edit/picker) go with the account-scoped routes.
                     overlay.dismissAccountScoped()
-                    navigator.dropAccountScoped().forEach(entryStores::clear)
+                    val dropped = navigator.dropAccountScoped()
+                    dropped.forEach(entryStores::clear)
+                    photoHandoff.drop(dropped)
                 }
                 previous = next
             }
@@ -64,7 +69,7 @@ internal fun WishlistApp(account: AccountPresenterOwner, home: HomePresenterOwne
             Box(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxSize().wlAccessibilityCovered(firstRun)) {
                     OverlayHost(overlay) {
-                        WLNavHost(navigator = navigator, entryStores = entryStores) { route, sourceKey -> AppRoute(route, sourceKey) }
+                        WLNavHost(navigator = navigator, entryStores = entryStores, photoHandoff = photoHandoff) { route, sourceKey -> AppRoute(route, sourceKey) }
                     }
                 }
                 // 처음 그릴 때부터 떠 있다(나타남 모션 없음). 사라짐은 구현 기본값: opacity 260 `accelerate`.

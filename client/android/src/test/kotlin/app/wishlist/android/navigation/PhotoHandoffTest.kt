@@ -40,30 +40,31 @@ class PhotoHandoffTest {
     @Test
     fun removedEntriesReleaseBothDirections() {
         handoff.hold(7, "card", null)
-        handoff.beginReverse(7, "category/c/i", "detail")
+        handoff.showing(7, "category/c/i", "detail")
 
         handoff.drop(listOf(7L))
 
         assertNull(handoff.forward(7))
-        assertNull(handoff.reverseFor("category/c/i"))
+        assertNull(handoff.reverseFor("category/c/i") { true })
     }
 
     @Test
-    fun reverseShowsTheDetailPhotoOnTheCardUntilTheBackEnds() {
-        handoff.beginReverse(7, "category/c/i", "detail")
+    fun theCardDrawsTheDetailPhotoOnlyWhileThatDetailIsLeaving() {
+        handoff.showing(7, "category/c/i", "detail")
 
-        assertEquals("detail", handoff.reverseFor("category/c/i"))
-        assertNull(handoff.reverseFor("category/c/other"))
-        handoff.endReverse(7)
-        assertNull(handoff.reverseFor("category/c/i"))
+        assertNull(handoff.reverseFor("category/c/i") { false }) // detail shown, nothing going back
+        assertEquals("detail", handoff.reverseFor("category/c/i") { it == 7L })
+        assertNull(handoff.reverseFor("category/c/other") { true })
     }
 
     @Test
-    fun reverseFollowsTheDetailPhotoChangingDuringTheBack() {
-        handoff.beginReverse(7, "category/c/i", "card-size")
-        handoff.beginReverse(7, "category/c/i", "detail-size")
+    fun reverseFollowsTheDetailPhotoAndEndsWhenTheDetailStopsShowingIt() {
+        handoff.showing(7, "category/c/i", "card-size")
+        handoff.showing(7, "category/c/i", "detail-size")
+        assertEquals("detail-size", handoff.reverseFor("category/c/i") { true })
 
-        assertEquals("detail-size", handoff.reverseFor("category/c/i"))
+        handoff.notShowing(7)
+        assertNull(handoff.reverseFor("category/c/i") { true })
     }
 
     @Test

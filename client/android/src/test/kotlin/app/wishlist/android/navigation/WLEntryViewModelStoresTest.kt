@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
@@ -41,11 +42,12 @@ class WLEntryViewModelStoresTest {
         assertSame(stores.storeFor(entryId), stores.storeFor(entryId))
 
         nav.pop()
-        stores.clearRemoved(nav) // still animating: keep the leaving screen's ViewModels
+        assertEquals(emptyList<Long>(), stores.clearRemoved(nav)) // still animating: keep the leaving screen's ViewModels
         assertFalse(detail.cleared)
 
         nav.finishTransition()
-        stores.clearRemoved(nav)
+        // The cleared ids come back so the shell also lets go of their held photos (PhotoHandoff).
+        assertEquals(listOf(entryId), stores.clearRemoved(nav))
         assertTrue(detail.cleared)
         assertFalse(root.cleared)
         assertNotSame(detail, probe(stores.storeFor(entryId)))

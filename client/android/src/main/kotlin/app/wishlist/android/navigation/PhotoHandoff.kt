@@ -10,9 +10,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * - **정방향(push):** 카드를 누르는 순간 카드가 그리고 있는 이미지와 그 memory cache key를 새 칸 id로 [hold]한다.
  *   상세 사진 자리는 이것 → cache 자리표시(`placeholderMemoryCacheKey`) → 기본 placeholder 순으로 쓴다.
  *   상세 크기 사진이 그려지고([detailDrawn]) push 모션이 끝나면([motionEnded]) 놓는다.
- * - **역방향(pop·끌어서 뒤로):** Compose 공유 요소는 뒤로 갈 때 카드 쪽 내용을 overlay에 그린다. 상세가 떠나는 동안
- *   ([isLeaving]) 자기 현재 이미지를 [beginReverse]하고, 카드 사진 칸은 [reverseFor]가 있으면 그것을 먼저 그린다.
- *   끌기를 취소해 상세로 돌아오면 [endReverse].
+ * - **역방향(pop·끌어서 뒤로):** Compose 공유 요소는 뒤로 갈 때 카드 쪽 내용을 overlay에 그린다. 상세는 지금 그리는
+ *   이미지를 [showing]으로 알리고(상세 화면이 이미 든 객체라 메모리가 늘지 않는다), 카드 사진 칸은 그 상세가 떠나는 동안
+ *   ([isLeaving])만 [reverseFor]로 그것을 먼저 그린다. 떠남 판정은 navigator snapshot 상태를 같은 composition에서 읽어
+ *   뒤로 첫 프레임부터 상세 사진이다(effect로 넣으면 한 프레임 늦는다). 끌기를 취소하면 떠남이 끝나 카드는 자기 사진으로
+ *   돌아가고, 상세가 사라지면 [notShowing]·[drop].
  * - 칸이 스택에서 빠지면(pop 모션 뒤, 계정 떠남) [drop]이 양쪽을 놓는다. 프로세스 복원에는 handoff가 없다(일반 로드).
  *
  * snapshot 상태라 읽는 composable이 바뀔 때 다시 그린다. 이미지·key 종류는 앱이 정한다(앱은 `coil3.Image`·`MemoryCache.Key`).
@@ -41,15 +43,17 @@ class PhotoHandoff<I : Any, K : Any> {
         if (next.drawn && next.motionEnded) forward.remove(entryId) else forward[entryId] = next
     }
 
-    fun beginReverse(entryId: Long, sourceKey: String, image: I) {
+    fun showing(entryId: Long, sourceKey: String, image: I) {
         reverse[entryId] = Reverse(sourceKey, image)
     }
 
-    fun reverseFor(sourceKey: String): I? = reverse.values.firstOrNull { it.sourceKey == sourceKey }?.image
-
-    fun endReverse(entryId: Long) {
+    fun notShowing(entryId: Long) {
         reverse.remove(entryId)
     }
+
+    /** 카드 [sourceKey]가 연 상세 중 지금 떠나는 칸([leaving])이 그리는 이미지. */
+    fun reverseFor(sourceKey: String, leaving: (entryId: Long) -> Boolean): I? =
+        reverse.entries.firstOrNull { (id, r) -> r.sourceKey == sourceKey && leaving(id) }?.value?.image
 
     fun drop(entryIds: Collection<Long>) {
         entryIds.forEach {
@@ -59,6 +63,7 @@ class PhotoHandoff<I : Any, K : Any> {
     }
 
     companion object {
+
         /**
          * 칸 [entryId]가 지금 뒤로 떠나는 중인지. 끌어서 뒤로는 스택이 아직 그대로라 이 칸이 맨 위이고, pop은 이미
          * 스택에서 빠져 떠나는 칸으로 그려진다.

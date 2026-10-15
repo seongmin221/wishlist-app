@@ -61,7 +61,9 @@ import app.wishlist.android.feature.detail.deviceUtcOffsetSeconds
 import app.wishlist.android.feature.detail.photoSourceFor
 import app.wishlist.android.feature.detail.rememberBriefNotice
 import app.wishlist.android.feature.detail.rememberMinuteClock
+import app.wishlist.android.navigation.LocalPhotoHandoff
 import app.wishlist.android.navigation.LocalWLEntryViewModelStoreOwner
+import app.wishlist.android.navigation.PhotoTransitionDebug
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLScrollToTopEffect
 import app.wishlist.android.navigation.WLTab
@@ -80,6 +82,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+/** The card's key (tab-unique): the detail's photo shared element and its held photo follow it. */
+internal fun cardSourceKey(categoryId: String, itemId: String) = "category/$categoryId/$itemId"
 
 /** How close to the end (px of scroll) the next page is asked for. */
 private const val LOAD_MORE_DISTANCE_PX = 1500
@@ -110,6 +115,7 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
     val owner = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "category.list") { runtime.categoryListPresenter() } }
     val formSlot = remember(storeOwner) { CategoryFormSlot.of(storeOwner, "category.list.form") { runtime.categoryFormPresenter() } }
     val list: CategoryListPresenter = owner.presenter
+    val photoHandoff = LocalPhotoHandoff.current
     val state by list.state.collectAsState()
 
     LaunchedEffect(owner) {
@@ -194,7 +200,14 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
                         CategoryGrid(
                             items = state.items,
                             loading = state.loading && state.items.isEmpty(),
-                            onOpen = { item -> nav.push(ItemDetailRoute(item.id), "category/${route.hint.categoryId}/${item.id}") },
+                            sourceKeyOf = { item -> cardSourceKey(route.hint.categoryId, item.id) },
+                            onOpen = { item, shown ->
+                                // Card photo → detail photo (C5 PR B): the image the card draws travels with the push.
+                                PhotoTransitionDebug.onPhotoTransitionStart(context)
+                                if (nav.push(ItemDetailRoute(item.id, viaPhoto = true), cardSourceKey(route.hint.categoryId, item.id)) && shown != null) {
+                                    photoHandoff.hold(nav.entries(nav.currentTab).last().id, shown.image, shown.memoryCacheKey)
+                                }
+                            },
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = WishlistTokens.Space.s8),
                         )
                         if (state.appendFailed) {
@@ -230,26 +243,24 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
  * it out; laid-out cards keep their height. A refresh (the list restarts) forgets the pages.
  */
 @Composable
-private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (WishlistItem) -> Unit, modifier: Modifier) {
+private fun CategoryGrid(
+    items: List<WishlistItem>,
+    loading: Boolean,
+    sourceKeyOf: (WishlistItem) -> String,
+    onOpen: (WishlistItem, ShownPhoto?) -> Unit,
+    modifier: Modifier,
+) {
     val context = LocalContext.current
-    val book = remember { CategoryPhotoBook(context) }
-    val planner = remember { PhotoPagePlanner() }
-    val pages = remember { mutableStateListOf<List<String>>() }
-    // Laid-out ratios as state, so a settled page recomposes the grid (the planner itself is plain).
-    val ratios = remember { mutableStateMapOf<String, Float>() }
+    // The layout outlives this composition (the list leaves it while its detail is shown).
+    val layout = CategoryGridHolder.of(LocalWLEntryViewModelStoreOwner.current)
+    val book = remember(layout) { CategoryPhotoBook(context.applicationContext, layout.photos) }
+    val pages = layout.pages
+    val ratios = layout.ratios
     val now = rememberMinuteClock()
 
     // Pages: each new tail of ids is a page; a list that no longer starts the same way is a restart.
-    LaunchedEffect(items) {
-        val known = pages.flatten()
-        val ids = items.map { it.id }
-        if (known.isNotEmpty() && (ids.size < known.size || ids.take(known.size) != known)) {
-            pages.clear(); planner.reset(); ratios.clear()
-        }
-        val laid = pages.flatten().toSet()
-        val fresh = ids.filter { it !in laid }
-        if (fresh.isNotEmpty()) pages.add(fresh)
-    }
+    // Composed again with the same items (back from the detail), nothing changes.
+    LaunchedEffect(items) { layout.onItems(items.map { it.id }) }
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val columnPx = with(LocalDensity.current) { ((maxWidth - WishlistTokens.Space.s12) / 2).roundToPx() }
@@ -263,10 +274,9 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
                     coroutineScope { page.mapNotNull { byId[it] }.map { item -> async { book.measure(item, columnPx) } }.awaitAll() }
                 }
                 // In list order: a later page waits for the earlier ones even when its photos came first.
-                while (!planner.settle(index, cards, book.photos.toMap(), System.currentTimeMillis() - started)) {
+                while (!layout.settle(index, cards, System.currentTimeMillis() - started)) {
                     delay(100)
                 }
-                page.forEach { id -> planner.ratioOf(id)?.let { ratios[id] = it } }
             }
         } }
         Masonry2Col(Modifier.fillMaxWidth(), gap = WishlistTokens.Space.s12, verticalGap = WishlistTokens.Space.s20) {
@@ -283,7 +293,8 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
                         meta = cardMetaLine(item, now, ::deviceUtcOffsetSeconds),
                         unconfirmed = isUnconfirmed(item),
                         photoRequest = url?.let { remember(it, columnPx) { book.request(it, columnPx) } },
-                        onClick = { onOpen(item) },
+                        sourceKey = sourceKeyOf(item),
+                        onClick = { shown -> onOpen(item, shown) },
                     )
                 }
             } }

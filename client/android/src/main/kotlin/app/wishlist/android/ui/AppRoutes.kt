@@ -18,10 +18,13 @@ internal data object LoginRoute : WLRoute {
     override val pushStyle = WLPushStyle.Slide
 }
 
-/** 저장된 상품 상세(서버 항목). 홈 행에서 가로 밀기로 열린다. 탭 바 없음, 계정 범위. */
-internal data class ItemDetailRoute(val itemId: String) : WLRoute {
+/**
+ * 저장된 상품 상세(서버 항목). 탭 바 없음, 계정 범위. 홈 행에서는 가로 밀기, 카테고리 목록 카드에서는 카드 사진이 상세
+ * 사진 자리로 커지는 공유 요소 전환(`viaPhoto`, C5 PR B)이다.
+ */
+internal data class ItemDetailRoute(val itemId: String, val viaPhoto: Boolean = false) : WLRoute {
     override val showsTabBar = false
-    override val pushStyle = WLPushStyle.Slide
+    override val pushStyle = if (viaPhoto) WLPushStyle.Photo else WLPushStyle.Slide
     override val accountScoped = true
 }
 
@@ -37,7 +40,7 @@ internal object ProductionRouteCodec : WLRouteCodec {
     override fun encode(route: WLRoute): List<String>? = when (route) {
         SettingsRoute -> listOf("settings")
         LoginRoute -> listOf("login")
-        is ItemDetailRoute -> listOf("item", route.itemId)
+        is ItemDetailRoute -> listOfNotNull("item", route.itemId, "photo".takeIf { route.viaPhoto })
         is LocalSubmissionRoute -> listOf("local", route.submissionId)
         is WebViewRoute -> listOf("web", WebViewRoute.encodeToken(route.url))
         is CategoryListRoute -> CategoryListRoute.encode(route)
@@ -48,6 +51,7 @@ internal object ProductionRouteCodec : WLRouteCodec {
         tokens == listOf("settings") -> SettingsRoute
         tokens == listOf("login") -> LoginRoute
         tokens.size == 2 && tokens[0] == "item" -> ItemDetailRoute(tokens[1])
+        tokens.size == 3 && tokens[0] == "item" && tokens[2] == "photo" -> ItemDetailRoute(tokens[1], viaPhoto = true)
         tokens.size == 2 && tokens[0] == "local" -> LocalSubmissionRoute(tokens[1])
         tokens.size == 2 && tokens[0] == "web" -> WebViewRoute.decodeToken(tokens[1])
         tokens.firstOrNull() == "category" -> CategoryListRoute.decode(tokens)
