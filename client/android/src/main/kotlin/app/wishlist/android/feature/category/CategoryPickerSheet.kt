@@ -56,43 +56,57 @@ import app.wishlist.shared.presentation.FormSource
 /** Picker page: the chips, or the in-sheet create form (`+ 카테고리`). */
 internal class PickerPage {
     var creating by mutableStateOf(false)
+    /** The create page's form, fresh for each `+ 카테고리`. */
+    var form by mutableStateOf<CategoryFormPresenter?>(null)
 }
 
 /**
  * FProductCategoryPicker / Create (D1, D14): a rail + chips sheet over CAT-01 SELECT. A chip picks and
- * closes; `+ 카테고리` turns the same sheet into the create form (back returns to the chips, discarding
- * after a check if edited); a create picks the new category. The pick arrives in [picker]'s `result`.
+ * closes; `+ 카테고리` turns the same sheet into the create form (back and 취소 return to the chips, X and
+ * the sheet gestures close the sheet; either asks first with unsaved input via [discardToChips] or
+ * [discardAndClose]); a create picks the new category. The pick arrives in [picker]'s `result`.
  * C5 opens it from the DEBUG demo only; C8 opens it from the product edit draft.
  */
 internal fun OverlayHostState.showCategoryPicker(
     picker: CategoryPickerPresenter,
-    form: CategoryFormPresenter,
+    forms: CategoryFormSlot<CategoryFormPresenter>,
     selectedId: String?,
     page: PickerPage,
     discardToChips: WLDialogSpec,
+    discardAndClose: WLDialogSpec,
 ): Boolean {
     picker.open(selectedId)
     page.creating = false
     return showSheet(
         draggable = true,
-        dismissGuard = { if (page.creating) formDismiss(form.state.value) else SheetDismiss.Allow },
-        onConfirmDismiss = { showDialog(discardToChips) },
+        dismissGuard = { page.form?.takeIf { page.creating }?.let { formDismiss(it.state.value) } ?: SheetDismiss.Allow },
+        // Scrim, drag and system back close the sheet like the X (C5 review 2026-10-15).
+        onConfirmDismiss = { showDialog(discardAndClose) },
         selfLaidOut = true,
-    ) { CategoryPickerContent(picker, form, page, discardToChips) }
+        accountScoped = true,
+    ) { CategoryPickerContent(picker, forms, page, discardToChips, discardAndClose) }
 }
 
 @Composable
-private fun CategoryPickerContent(picker: CategoryPickerPresenter, form: CategoryFormPresenter, page: PickerPage, discard: WLDialogSpec) {
+private fun CategoryPickerContent(
+    picker: CategoryPickerPresenter,
+    forms: CategoryFormSlot<CategoryFormPresenter>,
+    page: PickerPage,
+    discard: WLDialogSpec,
+    discardAndClose: WLDialogSpec,
+) {
     val overlay = LocalOverlayHostState.current
     val c = LocalWLColors.current
     val state by picker.state.collectAsState()
     // Height changes between the two pages: 300 `emphasized` (motion.md, same-sheet step).
     Column(Modifier.fillMaxWidth().animateContentSize(tween(WishlistTokens.Motion.headerCollapseScroll, easing = WishlistTokens.Curve.emphasized))) {
-        if (page.creating) {
+        val form = page.form
+        if (page.creating && form != null) {
             CategoryFormContent(
                 form, discard,
                 onResult = { if (it is FormResult.Created) picker.onCreated(it.detail) },
-                header = { requestClose -> PickerCreateHeader(onBack = requestClose, onClose = requestClose) },
+                header = { requestBack, requestCloseSheet -> PickerCreateHeader(onBack = requestBack, onClose = requestCloseSheet) },
+                closeDiscard = discardAndClose,
                 onCancel = { page.creating = false },
             )
             return@Column
@@ -150,7 +164,7 @@ private fun CategoryPickerContent(picker: CategoryPickerPresenter, form: Categor
                                 })
                             }
                             WLAddChip(stringResource(R.string.category_picker_add_chip), onClick = {
-                                form.startCreate(g.id, FormSource.PICKER, catalog)
+                                page.form = forms.fresh().also { it.startCreate(g.id, FormSource.PICKER, catalog) }
                                 page.creating = true
                             })
                         }

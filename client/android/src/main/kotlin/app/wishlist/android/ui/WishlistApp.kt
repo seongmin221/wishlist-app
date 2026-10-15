@@ -42,10 +42,15 @@ import kotlinx.coroutines.flow.map
 internal fun WishlistApp(account: AccountPresenterOwner, home: HomePresenterOwner, entryStores: WLEntryViewModelStores) {
     WLTheme {
         val navigator = rememberWLNavigator(AppRouteCodec)
-        LaunchedEffect(account, navigator, entryStores) {
+        val overlay = rememberOverlayHostState()
+        LaunchedEffect(account, navigator, entryStores, overlay) {
             var previous: String? = null
             account.state.map { it.account?.accountId }.distinctUntilChanged().collect { next ->
-                if (shouldDropAccountScoped(previous, next)) navigator.dropAccountScoped().forEach(entryStores::clear)
+                if (shouldDropAccountScoped(previous, next)) {
+                    // Account-scoped sheets (C5 category add/edit/picker) go with the account-scoped routes.
+                    overlay.dismissAccountScoped()
+                    navigator.dropAccountScoped().forEach(entryStores::clear)
+                }
                 previous = next
             }
         }
@@ -58,7 +63,7 @@ internal fun WishlistApp(account: AccountPresenterOwner, home: HomePresenterOwne
         ) {
             Box(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxSize().wlAccessibilityCovered(firstRun)) {
-                    OverlayHost(rememberOverlayHostState()) {
+                    OverlayHost(overlay) {
                         WLNavHost(navigator = navigator, entryStores = entryStores) { route, sourceKey -> AppRoute(route, sourceKey) }
                     }
                 }

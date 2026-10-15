@@ -15,9 +15,9 @@ class PhotoPagePlannerTest {
 
     @Test fun pageWaitsUntilEverySizeIsKnown() {
         val planner = PhotoPagePlanner()
-        assertFalse(planner.settle(page, mapOf("a" to Photo.Sized(400, 500)), 100))
+        assertFalse(planner.settle(0, page, mapOf("a" to Photo.Sized(400, 500)), 100))
         assertNull(planner.ratioOf("a"))
-        assertTrue(planner.settle(page, mapOf("a" to Photo.Sized(400, 500), "b" to Photo.Failed), 200))
+        assertTrue(planner.settle(0, page, mapOf("a" to Photo.Sized(400, 500), "b" to Photo.Failed), 200))
         assertEquals(1.25f, planner.ratioOf("a"))
         assertEquals(1f, planner.ratioOf("b")) // failed → 1:1
         assertEquals(1f, planner.ratioOf("c")) // no photo → 1:1 at once
@@ -25,7 +25,7 @@ class PhotoPagePlannerTest {
 
     @Test fun naturalRatioIsNotClamped() {
         val planner = PhotoPagePlanner()
-        planner.settle(listOf(Card("tall", true), Card("wide", true)),
+        planner.settle(0, listOf(Card("tall", true), Card("wide", true)),
             mapOf("tall" to Photo.Sized(100, 2000), "wide" to Photo.Sized(1000, 100)), 0)
         assertEquals(20f, planner.ratioOf("tall"))
         assertEquals(0.1f, planner.ratioOf("wide"))
@@ -33,21 +33,40 @@ class PhotoPagePlannerTest {
 
     @Test fun timeoutLaysOutUnknownsAsSquares() {
         val planner = PhotoPagePlanner(timeoutMs = 3_000)
-        assertFalse(planner.settle(page, mapOf("a" to Photo.Sized(300, 600)), 2_999))
-        assertTrue(planner.settle(page, mapOf("a" to Photo.Sized(300, 600)), 3_000))
+        assertFalse(planner.settle(0, page, mapOf("a" to Photo.Sized(300, 600)), 2_999))
+        assertTrue(planner.settle(0, page, mapOf("a" to Photo.Sized(300, 600)), 3_000))
         assertEquals(2f, planner.ratioOf("a"))
         assertEquals(1f, planner.ratioOf("b"))
     }
 
     @Test fun laidOutHeightsNeverChange() {
         val planner = PhotoPagePlanner()
-        planner.settle(page, emptyMap(), 5_000)
+        planner.settle(0, page, emptyMap(), 5_000)
         assertEquals(1f, planner.ratioOf("a"))
         // The photo arrives late: the square stays (the photo fills it).
-        planner.settle(page, mapOf("a" to Photo.Sized(100, 400)), 6_000)
+        planner.settle(0, page, mapOf("a" to Photo.Sized(100, 400)), 6_000)
         assertEquals(1f, planner.ratioOf("a"))
         planner.reset()
         assertNull(planner.ratioOf("a"))
+    }
+
+    @Test fun pagesAreLaidOutInOrder() {
+        val planner = PhotoPagePlanner()
+        val first = listOf(Card("a", true))
+        val second = listOf(Card("b", true), Card("c", false))
+        // The second page has every size first; it still waits for the first page.
+        assertFalse(planner.settle(1, second, mapOf("b" to Photo.Sized(100, 200)), 5_000))
+        assertNull(planner.ratioOf("b"))
+        assertEquals(0, planner.laidOutPages)
+        assertFalse(planner.settle(0, first, emptyMap(), 100))
+        assertTrue(planner.settle(0, first, mapOf("a" to Photo.Sized(100, 100)), 200))
+        assertTrue(planner.settle(1, second, mapOf("b" to Photo.Sized(100, 200)), 5_000))
+        assertEquals(2f, planner.ratioOf("b"))
+        assertEquals(2, planner.laidOutPages)
+        assertTrue(planner.settle(0, first, emptyMap(), 0)) // an earlier page stays laid out
+        planner.reset()
+        assertEquals(0, planner.laidOutPages)
+        assertFalse(planner.settle(1, second, emptyMap(), 10_000))
     }
 
     @Test fun decodeSizeIsCapped() {
@@ -85,5 +104,14 @@ class PhotoPagePlannerTest {
         runCurrent()
         assertEquals(6, peak)
         assertEquals(7, started) // the 7th ran after a permit freed; the cancelled 8th never started
+    }
+
+    @Test fun loadMoreRules() {
+        assertTrue(shouldLoadMore(0, 0, hasMore = true, busy = false, appendFailed = false)) // page 1 shorter than the screen
+        assertTrue(shouldLoadMore(4000, 5000, hasMore = true, busy = false, appendFailed = false)) // near the end
+        assertFalse(shouldLoadMore(0, 5000, hasMore = true, busy = false, appendFailed = false)) // far from it
+        assertFalse(shouldLoadMore(5000, 5000, hasMore = true, busy = true, appendFailed = false)) // in flight: asked again when free
+        assertFalse(shouldLoadMore(5000, 5000, hasMore = false, busy = false, appendFailed = false))
+        assertFalse(shouldLoadMore(5000, 5000, hasMore = true, busy = false, appendFailed = true)) // waits for 다시 시도
     }
 }

@@ -85,6 +85,8 @@ internal class SheetEntry(
     val onConfirmDismiss: () -> Unit = {},
     /** The content lays itself out (own side margins, own scroll area, a fixed footer over the nav bar inset). */
     val selfLaidOut: Boolean = false,
+    /** Shows the signed-in account's data: closed (with whatever is above it) when the app leaves the account. */
+    val accountScoped: Boolean = false,
     val content: @Composable () -> Unit,
 ) : OverlayEntry(id) {
     override val needsScrim get() = true
@@ -119,7 +121,7 @@ class OverlayHostState {
     // The one overlay waiting for the closing one; a dialog's onDropped runs when it is discarded.
     private var pending: Pending? = null
 
-    private class Pending(val add: () -> Unit, val dialog: WLDialogSpec?)
+    private class Pending(val add: () -> Unit, val dialog: WLDialogSpec?, val accountScoped: Boolean = false)
     private var dismissingAll = false
 
     val isAnimating: Boolean get() = entries.any { it.phase != OverlayPhase.Open }
@@ -137,8 +139,28 @@ class OverlayHostState {
         dismissGuard: () -> SheetDismiss = { SheetDismiss.Allow },
         onConfirmDismiss: () -> Unit = {},
         selfLaidOut: Boolean = false,
+        accountScoped: Boolean = false,
         content: @Composable () -> Unit,
-    ): Boolean = push { SheetEntry(it, draggable, title, dismissGuard, onConfirmDismiss, selfLaidOut, content) }
+    ): Boolean = push(accountScoped = accountScoped) { SheetEntry(it, draggable, title, dismissGuard, onConfirmDismiss, selfLaidOut, accountScoped, content) }
+
+    /**
+     * Leaving the account (C5 spec §3): when an account-scoped sheet is open or waiting to open, closes
+     * every overlay top-down (dialogs above it too), without asking its guard. An overlay still opening
+     * closes as soon as it is open. True when something was (or will be) closed.
+     */
+    fun dismissAccountScoped(): Boolean {
+        if (pending?.accountScoped == true) dropPending()
+        if (entries.none { it is SheetEntry && it.accountScoped }) return false
+        dismissingAll = true
+        dropPending()
+        val top = entries.last()
+        when (top.phase) {
+            OverlayPhase.Open -> top.phase = OverlayPhase.Closing
+            OverlayPhase.Opening -> top.closeWhenOpened = true
+            OverlayPhase.Closing -> Unit
+        }
+        return true
+    }
 
     /**
      * A user dismiss (scrim tap, system back, drag): the top sheet's guard decides; other overlays close
@@ -238,12 +260,12 @@ class OverlayHostState {
         }
     }
 
-    private fun push(dialog: WLDialogSpec? = null, make: (Long) -> OverlayEntry): Boolean {
+    private fun push(dialog: WLDialogSpec? = null, accountScoped: Boolean = false, make: (Long) -> OverlayEntry): Boolean {
         if (entries.any { it.phase == OverlayPhase.Opening }) return false
         val add = { entries.add(make(nextId++)); Unit }
         if (entries.any { it.phase == OverlayPhase.Closing }) {
             dropPending()
-            pending = Pending(add, dialog)
+            pending = Pending(add, dialog, accountScoped)
         } else {
             add()
         }

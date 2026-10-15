@@ -97,6 +97,7 @@ internal fun OverlayHostState.showCategoryForm(
         dismissGuard = { formDismiss(form.state.value) },
         onConfirmDismiss = { showDialog(discard) },
         selfLaidOut = true,
+        accountScoped = true,
     ) { CategoryFormContent(form, discard, onResult, header = null) }
 }
 
@@ -109,24 +110,30 @@ internal fun CategoryFormContent(
     form: CategoryFormPresenter,
     discard: WLDialogSpec,
     onResult: (FormResult) -> Unit,
-    header: (@Composable (requestClose: () -> Unit) -> Unit)?,
+    header: (@Composable (requestBack: () -> Unit, requestCloseSheet: () -> Unit) -> Unit)?,
     onCancel: (() -> Unit)? = null,
+    /** Asked before closing the whole sheet with unsaved input (the picker's X); null = [discard]. */
+    closeDiscard: WLDialogSpec? = null,
 ) {
     val overlay = LocalOverlayHostState.current
     val c = LocalWLColors.current
     val state by form.state.collectAsState()
-    val name = remember(form) { TextFieldState(state.name) }
-    val description = remember(form) { TextFieldState(state.description) }
-    val example = remember(form) { TextFieldState(state.pendingExample) }
+    // The opening's Presenter is fresh (CategoryFormSlot): the fields start empty like it.
+    val name = remember(form) { TextFieldState() }
+    val description = remember(form) { TextFieldState() }
+    val example = remember(form) { TextFieldState() }
 
-    // Presenter → fields only when the Presenter replaced the form (baseline loaded, conflict reload, new start):
-    // pushing on every state would fight fast typing (the Presenter lags the field by one lane hop).
-    val epoch = Triple(state.mode, state.phase, state.message == app.wishlist.shared.presentation.FormMessage.CONFLICT_LOADED)
-    LaunchedEffect(form, epoch) {
-        val s = form.state.value
-        if (name.text.toString() != s.name) name.setTextAndPlaceCursorAtEnd(s.name)
-        if (description.text.toString() != s.description) description.setTextAndPlaceCursorAtEnd(s.description)
-        if (example.text.toString() != s.pendingExample) example.setTextAndPlaceCursorAtEnd(s.pendingExample)
+    // Presenter → fields only for the edit baseline and a 409 reload ([FormFieldSync]); never while the
+    // user types (a create's SELECT LOADING → READY must not drop input the Presenter has not seen yet).
+    LaunchedEffect(form) {
+        val sync = FormFieldSync()
+        form.state.collect { s ->
+            if (sync.shouldReplace(s)) {
+                if (name.text.toString() != s.name) name.setTextAndPlaceCursorAtEnd(s.name)
+                if (description.text.toString() != s.description) description.setTextAndPlaceCursorAtEnd(s.description)
+                if (example.text.toString() != s.pendingExample) example.setTextAndPlaceCursorAtEnd(s.pendingExample)
+            }
+        }
     }
     // Fields → Presenter (the first value is the pushed one, skipped).
     LaunchedEffect(form) { snapshotFlow { name.text.toString() }.drop(1).collect { form.setName(it) } }
@@ -149,11 +156,20 @@ internal fun CategoryFormContent(
         }
         Unit
     }
+    // The whole sheet (the picker page's X): unsaved input asks first, a save in flight blocks it.
+    val requestCloseSheet = {
+        when (formDismiss(form.state.value)) {
+            SheetDismiss.Allow -> overlay.dismiss()
+            SheetDismiss.Confirm -> overlay.showDialog(closeDiscard ?: discard)
+            SheetDismiss.Block -> Unit
+        }
+        Unit
+    }
     val editable = !state.submitting && !(state.mode == FormMode.EDIT && state.phase != FormPhase.READY && state.phase != FormPhase.CONFLICT_UNRESOLVED)
 
     WLSheetBody(
         header = {
-            if (header != null) header(requestClose) else {
+            if (header != null) header(requestClose, requestCloseSheet) else {
                 val title = stringResource(if (state.mode == FormMode.EDIT) R.string.category_form_edit_title else R.string.category_form_create_title)
                 WLSheetHeader(title, onClose = requestClose)
             }
