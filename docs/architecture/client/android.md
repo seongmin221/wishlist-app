@@ -127,3 +127,16 @@
 - **시트:** `OverlayHost.showSheet(dismissGuard = { SheetDismiss.Allow | Block | Confirm }, onConfirmDismiss, selfLaidOut)`. guard는 막 누르기·끌기·뒤로에 모두 적용된다. 폼은 `selfLaidOut` + `WLSheetBody`로 머리 고정·본문 스크롤·버튼 줄 하단 고정(내비게이션 막대·IME 위). 제출 중 주 버튼은 `WLButton(loading = true)`(20dp 진행 표시, 눌리지 않음, TalkBack은 글자를 읽음).
 - **DEBUG:** `DebugSeedImages`(`seed.wishlist.invalid` `/tall/` 1:4, `/slow/` 5초), launch extras `wl.fake.longCategory`(120개), `wl.fake.delayCategoryCreate`(ms), `wl.fake.editCategory`(`<id>|<name>`), 목적 탭 데모 끝의 "카테고리 선택 시트 열기".
 - **남은 점:** 실기기(Flip6) 확인은 하지 않았다(에뮬레이터만). 409 재조회 중 진행 표시는 기기에서 따로 찍지 않았다. Compose 제스처·IME 조합은 단위 테스트가 없다(Robolectric 없음).
+
+## 카드 사진 → 상세 사진 전환 (C5 PR B)
+
+> 2026-10-15 C5 Task 20·21. 규칙은 [C5 설계](../../superpowers/specs/2026-10-14-client-c5-category-design.md) §4·D4, 기록은 [PR B 구현 기록](../../history/architecture/client/c5-pr-b-implementation-2026-10-15.md), iOS 쪽은 [ios.md](ios.md#카드-사진--상세-사진-전환-c5-pr-b).
+
+- **진입:** 카테고리 목록 카드만 `ItemDetailRoute(itemId, viaPhoto = true)`(`WLPushStyle.Photo`, codec `["item", id, "photo"]`)로 연다. 홈 줄은 그대로 slide다. 카드 사진 칸과 상세 사진 자리가 `wlSharedPhoto(sourceKey)`로 이어지고 sourceKey는 `category/<categoryId>/<itemId>`(`cardSourceKey`)다. 화면은 이것과 진입 방식 인자 말고 바뀌지 않았다.
+- **전환 중 사진 보유(`navigation/PhotoHandoff`):** 셸(`WishlistApp`)이 하나 갖고 `LocalPhotoHandoff`로 준다. 카드는 Coil 성공 결과의 `Image`·`MemoryCache.Key`를 기억해 두었다가 누를 때 push가 성공하면 새 맨 위 칸 id로 `hold`한다. 상세(`DetailSharedPhoto`)는 요청의 `placeholder(카드 이미지)`·`placeholderMemoryCacheKey(카드 key)`로 첫 프레임부터 카드 사진을 그리고 상세 크기 사진이 오면 바꾼다. 상세 사진이 그려지고(`detailDrawn`) push 전환이 끝나면(`motionEnded`) 놓는다. 칸이 빠지면 `WLNavHost`(전환 뒤 `clearRemoved`가 돌려준 id)와 계정 떠남(`dropAccountScoped`)이 `drop`한다. 칸 id·탭은 `LocalWLEntry`로 받는다.
+- **뒤로(역방향):** Compose 공유 요소는 overlay에 들어오는 쪽(pop이면 카드) 내용을 그린다. 상세는 지금 그리는 이미지를 `showing`으로 알리고(화면이 이미 든 객체라 메모리가 늘지 않는다), 카드 사진 칸은 그 상세가 떠나는 동안(`PhotoHandoff.isLeaving`: 끌기는 스택 맨 위, pop은 스택에서 빠진 칸)만 `reverseFor`로 그 이미지를 그린다. 판정을 같은 composition에서 navigator snapshot으로 읽어 뒤로 첫 프레임부터 상세 사진이다(effect로 넣으면 한 프레임 늦다).
+- **상세 사진 자리:** 1:1 칸(카드색, 모서리 20) 안 여백 56에 사진 비율 상자가 공유 요소다. 비율은 handoff 사진 크기 → 그린 상세 사진 크기 순(`detailPhotoRatio`, 날아가는 도중 상세 크기 사진이 와도 목표가 튀지 않게)이고, 둘 다 없으면 칸 전체 자리표시가 같은 모션으로 커진다. 사진 자리는 항목을 받는 첫 프레임부터 상품 표시까지 한 노드다(`keepsSharedPhotoSlot`). 목표 노드가 날아가는 도중 바뀌면 사진이 카드 자리에 머물다 튀었다.
+- **모서리:** overlay에는 들어오는 쪽 내용이 그려지므로 들어오는 쪽만 전환을 따라 모서리를 바꾼다(`photoCorner`): push는 상세가 20 → 0(보드 FProductDetail 칸 안 사진은 모서리 없음), pop은 카드가 0 → 20. 떠나는 쪽은 그대로라 모서리가 한 방향으로만 바뀐다. **사용자 확인 대기**(PR B 기록).
+- **목록 사진 배치 보존(`CategoryGridLayout`):** 페이지·사진 크기·배치 비율(숫자만)을 목록 칸의 ViewModelStore(`CategoryGridHolder`)에 둔다. 상세가 열린 동안 목록은 composition을 떠나므로 `remember`에 두면 돌아올 때 memory cache가 비어 있으면 skeleton부터 다시 배치해 스크롤 위치(D3)와 사진이 돌아갈 카드를 잃었다(PR B 기기 확인에서 발견).
+- **DEBUG:** launch extra `--ez wl.debug.clearImageMemory true`는 카드를 누를 때·상세가 뒤로 떠나기 시작할 때 Coil memory cache를 비운다(`PhotoTransitionDebug`). logcat `WishlistImages`가 로더 요청(`start`)과 fetch(`fetch`, cache에 없어 받거나 만듦)를 따로 적는다.
+- **남은 점:** 에뮬레이터 API 30에는 predictive back이 없어 끌어서 뒤로·취소는 기기에서 보지 못했다(`PredictiveBackHandler` seek 경로는 slide와 같다). 120개 목록에서 돌아올 때(사진·slide 모두) 목록 재구성으로 에뮬레이터 DEBUG 빌드 프레임이 느리다(PR A부터, 성능 기록).
