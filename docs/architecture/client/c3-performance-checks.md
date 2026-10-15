@@ -118,3 +118,15 @@ C4에서 새로 생긴 깊이는 홈 → 상세 한 단계다. 상세에는 다�
   Views·Activities는 늘지 않았다. 직후 값은 GC 전이라 Java heap이 일시적으로 커졌고 trim 뒤 시작 수준(25MB)으로 돌아왔다. Native heap·PSS는 trim 뒤에도 반복 전보다 높다(+2.4MB·+8.5MB). SQLite 캐시·할당자 보유분으로 추정하며 원인은 확인하지 않았다. 화면 수·ViewModel 해제는 `WLNavigatorTests`·`WLEntryViewModelStoresTest`로 단위 검증한다.
 - **깊이 3/5·이미지 있음:** 측정하지 않음(위 이유). C5 목록과 PR B 웹뷰 때 다시 측정한다.
 - **iOS:** 측정하지 않았다. Instruments Allocations는 CLI 자동 실행이 어렵고, `simctl`로는 상세 반복 조작 harness가 없어 의미 있는 값을 얻지 못한다. 실기기 측정 때 함께 기록한다.
+
+## C5 측정 결과 (2026-10-15)
+
+기록이며 통과 기준이 아니다. Android emulator Pixel_5 API 30(`emulator-5556`, DEBUG 빌드), `wl.fake.longCategory C024`로 키보드 123개(긴 1:4 사진 12장·5초 늦은 사진 1장 포함), `dumpsys meminfo` TOTAL PSS.
+
+| 시점 | PSS |
+| --- | --- |
+| 카테고리 첫 화면 | 90.6 MB |
+| 키보드 목록 첫 페이지 배치 뒤 | 110.5 MB |
+| 25번 스크롤해 3페이지까지 이어 붙인 뒤 | 122.0 MB |
+
+iOS 목록 메모리는 이번에 재지 않았다(PR B의 상세 push/pop 측정 때 함께 잰다). 실기기 측정은 남았다.
