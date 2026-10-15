@@ -119,9 +119,8 @@ fun CategoryHomeScreen() {
     val storeOwner = LocalWLEntryViewModelStoreOwner.current
     val runtime = (LocalContext.current.applicationContext as WishlistApplication).runtime
     val owner = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "category.home") { runtime.categoryHomePresenter() } }
-    val formOwner = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "category.home.form") { runtime.categoryFormPresenter() } }
+    val formSlot = remember(storeOwner) { CategoryFormSlot.of(storeOwner, "category.home.form") { runtime.categoryFormPresenter() } }
     val home: CategoryHomePresenter = owner.presenter
-    val form: CategoryFormPresenter = formOwner.presenter
     val state by home.state.collectAsState()
 
     LaunchedEffect(owner) {
@@ -139,11 +138,13 @@ fun CategoryHomeScreen() {
     LaunchedEffect(owner) {
         CategoryChanges.revision.collect { revision -> if (owner.markSeen(revision)) home.refresh() }
     }
+    var pulling by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     // A group to show once the list holds it (a category just made under a group that had no page yet).
     var focusGroup by remember { mutableStateOf<String?>(null) }
     val discard = rememberDiscardSpec { overlay.dismissAll() }
     val openCreate: (String?) -> Unit = { parent ->
-        overlay.showCategoryForm(form, discard, start = { it.startCreate(parent, FormSource.TAB, null) }) { result ->
+        overlay.showCategoryForm(formSlot.fresh(), discard, start = { it.startCreate(parent, FormSource.TAB, null) }) { result ->
             if (result is FormResult.Created) {
                 focusGroup = result.detail.parentId // D9: that group's page, the new chip at its end
                 home.refresh()
@@ -179,7 +180,15 @@ fun CategoryHomeScreen() {
             state.groups.isEmpty() -> Box(Modifier.fillMaxSize()) // first load: nothing yet (no flash of the empty state)
             else -> {
                 CategoryDivider()
-                PullToRefreshBox(isRefreshing = state.loading, onRefresh = home::refresh, modifier = Modifier.fillMaxSize()) {
+                // The indicator follows a user pull only (resume, edit and create refresh quietly).
+                PullToRefreshBox(
+                    isRefreshing = pulling,
+                    onRefresh = {
+                        pulling = true
+                        scope.launch { try { home.refreshNow() } finally { pulling = false } }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
                     GroupPager(
                         groups = state.groups,
                         currentGroupId = state.currentGroupId,

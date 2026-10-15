@@ -9,6 +9,9 @@ import kotlinx.coroutines.sync.withPermit
  * then the whole page is laid out at once and its ratios never change again:
  * - known size → its own height/width ratio (no clamp, D10),
  * - no photo, failed, or still unknown at the timeout → 1:1 (a late photo then fills that square).
+ * Pages are laid out in list order: a later page waits while an earlier one is a skeleton (it may have
+ * all its sizes first), so the masonry never places a later card before an earlier one and laid-out
+ * cards never move (like iOS `PhotoPagePlan.layOut`, which stops at the first unfinished page).
  */
 class PhotoPagePlanner(private val timeoutMs: Long = PAGE_TIMEOUT_MS) {
     /** A card of a page: [hasPhoto] false = no usable image URL (drawn as the 1:1 placeholder). */
@@ -21,16 +24,21 @@ class PhotoPagePlanner(private val timeoutMs: Long = PAGE_TIMEOUT_MS) {
     }
 
     private val frozen = mutableMapOf<String, Float>()
+    private var laidPages = 0
+
+    /** How many pages (from the first) are laid out. */
+    val laidOutPages: Int get() = laidPages
 
     /** The laid-out height/width ratio of [id], or null while its page is still a skeleton. */
     fun ratioOf(id: String): Float? = frozen[id]
 
     /**
-     * Lays out [page] if it is ready at [elapsedMs] since it arrived, using [photos]. Returns true when
-     * the page is laid out (now or before). Cards already laid out keep their ratio.
+     * Lays out page [index] (0 = the first page) if every earlier page is laid out and it is ready at
+     * [elapsedMs] since it arrived, using [photos]. Returns true when the page is laid out (now or before).
      */
-    fun settle(page: List<Card>, photos: Map<String, Photo>, elapsedMs: Long): Boolean {
-        if (page.all { it.id in frozen }) return true
+    fun settle(index: Int, page: List<Card>, photos: Map<String, Photo>, elapsedMs: Long): Boolean {
+        if (index < laidPages) return true
+        if (index > laidPages) return false // an earlier page is still a skeleton
         val waiting = page.any { it.hasPhoto && it.id !in frozen && photos[it.id] == null }
         if (waiting && elapsedMs < timeoutMs) return false
         page.forEach { card ->
@@ -40,11 +48,15 @@ class PhotoPagePlanner(private val timeoutMs: Long = PAGE_TIMEOUT_MS) {
                 photo.height.toFloat() / photo.width
             } else 1f
         }
+        laidPages++
         return true
     }
 
     /** Forgets every page (a refresh starts the list again). */
-    fun reset() = frozen.clear()
+    fun reset() {
+        frozen.clear()
+        laidPages = 0
+    }
 
     companion object {
         const val PAGE_TIMEOUT_MS = 3_000L

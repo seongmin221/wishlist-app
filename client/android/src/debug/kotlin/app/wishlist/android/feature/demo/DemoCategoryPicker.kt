@@ -35,7 +35,7 @@ internal fun DemoCategoryPickerEntry() {
     val storeOwner = LocalWLEntryViewModelStoreOwner.current
     val runtime = (LocalContext.current.applicationContext as WishlistApplication).runtime
     val picker = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "demo.picker") { runtime.categoryPickerPresenter() } }.presenter
-    val form = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "demo.picker.form") { runtime.categoryFormPresenter() } }.presenter
+    val forms = remember(storeOwner) { app.wishlist.android.feature.category.CategoryFormSlot.of(storeOwner, "demo.picker.form") { runtime.categoryFormPresenter() } }
     val page = remember { PickerPage() }
     val state by picker.state.collectAsState()
     var picked by remember { mutableStateOf<String?>(null) }
@@ -47,10 +47,11 @@ internal fun DemoCategoryPickerEntry() {
         picker.consumeResult()
     }
     val discardToChips = rememberDiscardSpec { page.creating = false }
+    val discardAndClose = rememberDiscardSpec { overlay.dismissAll() }
     Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         WLText("DEBUG · 카테고리 선택 시트", DemoCaption, color = LocalWLColors.current.textSecondary)
         WLButton("카테고리 선택 시트 열기", WLButtonKind.Secondary, onClick = {
-            overlay.showCategoryPicker(picker, form, selectedId, page, discardToChips)
+            overlay.showCategoryPicker(picker, forms, selectedId, page, discardToChips, discardAndClose)
         })
         picked?.let { WLText("고른 카테고리: $it", DemoCaption) }
     }

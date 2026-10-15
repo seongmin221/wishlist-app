@@ -85,6 +85,13 @@ import kotlinx.coroutines.launch
 private const val LOAD_MORE_DISTANCE_PX = 1500
 
 /**
+ * Whether to ask for the next page (pure): near the end — including a list shorter than the screen
+ * (`maxValue` 0) — with a page left, nothing in flight, and no failed append (that one waits for 다시 시도).
+ */
+internal fun shouldLoadMore(scrollValue: Int, scrollMax: Int, hasMore: Boolean, busy: Boolean, appendFailed: Boolean): Boolean =
+    hasMore && !busy && !appendFailed && scrollValue >= scrollMax - LOAD_MORE_DISTANCE_PX
+
+/**
  * 세부 유형 목록(FCategoryList · ListCustom · ListCustomEmpty, C5 spec §3). 위에 붙은 머리(뒤로 · 이름 + 개수 · 상위 이름,
  * 직접 만든 것은 ⋯ "편집"만, D7) + 2열 엇갈림 카드. 사진은 페이지 단위 skeleton 뒤 원래 비율로 한 번에 놓는다(D10).
  * - 끝 근처에서 다음 페이지, 실패하면 끝에 "더 불러오지 못했어요 · 다시 시도".
@@ -101,9 +108,8 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
     val context = LocalContext.current
     val runtime = (context.applicationContext as WishlistApplication).runtime
     val owner = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "category.list") { runtime.categoryListPresenter() } }
-    val formOwner = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "category.list.form") { runtime.categoryFormPresenter() } }
+    val formSlot = remember(storeOwner) { CategoryFormSlot.of(storeOwner, "category.list.form") { runtime.categoryFormPresenter() } }
     val list: CategoryListPresenter = owner.presenter
-    val form: CategoryFormPresenter = formOwner.presenter
     val state by list.state.collectAsState()
 
     LaunchedEffect(owner) {
@@ -123,7 +129,7 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
     val header = state.header
     val kind = header?.kind ?: route.hint.kind
     val openEdit = {
-        overlay.showCategoryForm(form, discard, start = { it.startEdit(route.hint.categoryId, header?.parentName ?: route.hint.parentName) }) { result ->
+        overlay.showCategoryForm(formSlot.fresh(), discard, start = { it.startEdit(route.hint.categoryId, header?.parentName ?: route.hint.parentName) }) { result ->
             when (result) {
                 is FormResult.Saved -> {
                     list.applyEdited(result.detail)
@@ -203,11 +209,14 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
                         }
                         Spacer(Modifier.height(tabBarClearance()))
                     }
-                    // Near the end: the next page.
+                    // Near the end (or a first page that does not fill the screen): the next page. Re-evaluated on
+                    // every list state change too, so a request the Presenter ignored (busy) comes back once it is free.
+                    val latest by androidx.compose.runtime.rememberUpdatedState(state)
                     LaunchedEffect(scroll) {
-                        snapshotFlow { scroll.maxValue > 0 && scroll.value >= scroll.maxValue - LOAD_MORE_DISTANCE_PX }
-                            .distinctUntilChanged()
-                            .collect { if (it) list.loadMore() }
+                        snapshotFlow {
+                            val s = latest
+                            shouldLoadMore(scroll.value, scroll.maxValue, s.hasMore, s.appending || s.loading, s.appendFailed)
+                        }.distinctUntilChanged().collect { if (it) list.loadMore() }
                     }
                 }
             }
@@ -253,7 +262,8 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
                 launch {
                     coroutineScope { page.mapNotNull { byId[it] }.map { item -> async { book.measure(item, columnPx) } }.awaitAll() }
                 }
-                while (!planner.settle(cards, book.photos.toMap(), System.currentTimeMillis() - started)) {
+                // In list order: a later page waits for the earlier ones even when its photos came first.
+                while (!planner.settle(index, cards, book.photos.toMap(), System.currentTimeMillis() - started)) {
                     delay(100)
                 }
                 page.forEach { id -> planner.ratioOf(id)?.let { ratios[id] = it } }
