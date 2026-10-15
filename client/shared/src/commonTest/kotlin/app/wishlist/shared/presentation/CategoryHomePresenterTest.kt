@@ -148,6 +148,32 @@ class CategoryHomePresenterTest {
         assertEquals(listOf("G003"), h.state.groups.map { it.id })
     }
 
+    @Test fun aNeverSavedGroupIsReadOnce() = scenario { h ->
+        h.session.changeAccount("A")
+        var reads = 0
+        val counting = object : app.wishlist.shared.repository.LocalStore by h.harness.store {
+            override suspend fun readAppState(key: String) = h.harness.store.readAppState(key).also { reads++ }
+        }
+        val p = CategoryHomePresenter(h.categories, counting, h.session, StandardTestDispatcher(testScheduler))
+        p.load(); advanceUntilIdle()
+        p.refresh(); advanceUntilIdle()
+        p.refresh(); advanceUntilIdle()
+        assertEquals(1, reads)
+        p.close()
+    }
+
+    @Test fun anIntentThatFirstSeesTheSessionChangeRequestsOnce() = scenario { h ->
+        h.session.changeAccount("A")
+        h.presenter.load(); advanceUntilIdle()
+        val before = h.categories.catalog.calls.size
+        // The refresh runs before the session collector: its sync starts the new account's load.
+        h.session.changeAccount("B")
+        h.presenter.refresh(); advanceUntilIdle()
+        assertEquals(before + 1, h.categories.catalog.calls.size)
+        assertTrue(h.state.signedIn)
+        assertEquals(2, h.state.groups.size)
+    }
+
     @Test fun closeIgnoresLaterIntents() = scenario { h ->
         h.session.changeAccount("A")
         h.presenter.close()
