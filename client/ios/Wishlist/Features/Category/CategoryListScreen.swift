@@ -185,30 +185,44 @@ private struct CategoryMasonry: View {
                     ForEach(plan.columns[column], id: \.self) { id in
                         if let item = owner.item(id) {
                             CategoryCard(item: item, ratio: plan.ratio(id) ?? 1, owner: owner)
-                                .onAppear { if isNearEnd(id) { owner.loadMore() } }
+                                .onAppear { visible.insert(id) }
+                                .onDisappear { visible.remove(id) }
                         }
                     }
                     ForEach(0..<skeletons(waiting, column: column), id: \.self) { i in
                         CategorySkeletonCard(ratio: [1, 1.25, 1.33][(i + column) % 3])
-                            .onAppear { if i == 0 && !state.items.isEmpty { owner.loadMore() } }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
+        // Re-decided whenever the inputs change, so a request the Presenter ignored (a page in flight) or a
+        // first page shorter than the screen still leads to the next page once the list is idle at its end.
+        .onChange(of: wantsMore, initial: true) { _, wants in if wants { owner.loadMore() } }
+    }
+
+    @State private var visible: Set<String> = []
+
+    private var wantsMore: Bool {
+        CategoryLoadMore.wants(hasMore: state.hasMore, busy: state.loading || state.appending || state.appendFailed,
+                               waiting: owner.plan.waitingCount > 0, laidIds: owner.plan.laidIds, visible: visible)
     }
 
     private func skeletons(_ waiting: Int, column: Int) -> Int {
         let shown = min(waiting, 6) // a page of skeleton never needs more than a screen's worth
         return column == 0 ? (shown + 1) / 2 : shown / 2
     }
+}
 
-    /// The last eight laid-out cards ask for more (ignored by the Presenter while a page is in flight or none is left).
-    private func isNearEnd(_ id: String) -> Bool {
-        guard state.hasMore else { return false }
-        let ids = owner.plan.laidIds
-        guard let index = ids.firstIndex(of: id) else { return false }
-        return index >= ids.count - 8
+/// When the list asks for its next page (pure): more exists, nothing is in flight or failed (a failure
+/// waits for the user's retry), no page is still waiting for its layout, and one of the last eight
+/// laid-out cards is on screen (a short first page has all of them on screen).
+enum CategoryLoadMore {
+    static let tail = 8
+
+    static func wants(hasMore: Bool, busy: Bool, waiting: Bool, laidIds: [String], visible: Set<String>) -> Bool {
+        guard hasMore, !busy, !waiting, !laidIds.isEmpty else { return false }
+        return laidIds.suffix(tail).contains { visible.contains($0) }
     }
 }
 
