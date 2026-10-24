@@ -17,8 +17,12 @@ class CategoryListPresenterTest {
     private val dac = CategoryListHint(customId, "오디오 케이블·DAC", "G003", "디지털·IT", CategoryKind.CUSTOM)
     private val dacDetail = CustomCategoryDetail(customId, "오디오 케이블·DAC", "G003", "설명", listOf("포터블 DAC"), 2, 1)
 
-    private fun items(range: IntRange) = range.map { itemFixture(id = "00000000-0000-4000-8000-" + it.toString().padStart(12, '0'), name = "상품 $it") }
+    private fun id(n: Int) = "00000000-0000-4000-8000-" + n.toString().padStart(12, '0')
+    private fun items(range: IntRange) = range.map { itemFixture(id = id(it), name = "상품 $it") }
     private fun page(range: IntRange, total: Int, next: String?) = ok(ItemPage(items(range), total, next))
+    /** A page or window whose cards carry anchors "a<n>". */
+    private fun anchored(range: IntRange, total: Int, next: String?, previous: String? = null, anchor: ItemAnchor? = null) =
+        ok(ItemPage(items(range), total, next, previous, range.associate { id(it) to "a$it" }, anchor))
 
     private class H(scope: TestScope) {
         val session = MutableAuthSession()
@@ -206,5 +210,103 @@ class CategoryListPresenterTest {
         h.presenter.refreshNow()
         assertEquals(4, h.state.items.size)
         assertFalse(h.state.loading)
+    }
+
+    @Test fun refreshWithAnchorUsesWindow() = scenario { h ->
+        h.list.pages.answer(anchored(1..40, 80, "c1"))
+        h.list.pages.answer(anchored(41..80, 80, null))
+        h.presenter.load(headphones); advanceUntilIdle()
+        h.presenter.loadMore(); advanceUntilIdle()
+        h.list.windows.answer(anchored(10..50, 80, "n50", "p10", ItemAnchor(id(30), id(30), true)))
+        h.presenter.refresh(id(30)); advanceUntilIdle()
+        assertEquals(listOf<Any?>(listOf("C026", "a30", 20, 20)), h.list.windows.calls)
+        assertEquals(2, h.list.pages.calls.size)
+        assertEquals(items(10..50), h.state.items)
+        assertEquals(AnchorRestore(id(30), sameItem = true, token = 1), h.state.restore)
+        assertTrue(h.state.hasNewer)
+        assertTrue(h.state.hasMore)
+        assertFalse(h.state.loading)
+        h.list.pages.answer(anchored(51..60, 80, null))
+        h.presenter.loadMore(); advanceUntilIdle()
+        assertEquals("C026" to "n50", h.list.pages.calls.last()) // the window's own next cursor
+        assertEquals(items(10..60), h.state.items)
+    }
+
+    @Test fun refreshWithRemovedAnchorRestoresFallback() = scenario { h ->
+        h.list.pages.answer(anchored(1..40, 80, "c1"))
+        h.presenter.load(headphones); advanceUntilIdle()
+        // Card 1 was deleted elsewhere: the server falls back to the next older card.
+        h.list.windows.answer(anchored(2..22, 79, "n22", null, ItemAnchor(id(1), id(2), false)))
+        h.presenter.refresh(id(1)); advanceUntilIdle()
+        assertEquals(AnchorRestore(id(2), sameItem = false, token = 1), h.state.restore)
+        assertEquals(items(2..22), h.state.items)
+        assertNull(h.state.itemsError)
+        assertFalse(h.state.hasNewer)
+    }
+
+    @Test fun refreshWithoutAnchorUsesFirstPage() = scenario { h ->
+        h.list.pages.answer(anchored(1..40, 80, "c1"))
+        h.list.pages.answer(anchored(41..80, 80, null))
+        h.presenter.load(headphones); advanceUntilIdle()
+        h.presenter.loadMore(); advanceUntilIdle()
+        assertNull(h.state.restore) // entry is the first page with no restore
+        h.list.pages.answer(anchored(1..40, 80, "c1"))
+        h.presenter.refresh(null); advanceUntilIdle()
+        assertEquals(items(1..40), h.state.items)
+        assertEquals(AnchorRestore(null, sameItem = false, token = 1), h.state.restore)
+        h.list.pages.answer(anchored(1..40, 80, "c1"))
+        h.presenter.refresh("99999999-9999-4999-8999-999999999999"); advanceUntilIdle() // no known anchor
+        assertEquals(AnchorRestore(null, sameItem = false, token = 2), h.state.restore)
+        assertEquals(listOf<Any?>("C026" to null, "C026" to "c1", "C026" to null, "C026" to null), h.list.pages.calls)
+        assertTrue(h.list.windows.calls.isEmpty())
+    }
+
+    @Test fun loadNewerPrepends() = scenario { h ->
+        h.list.pages.answer(anchored(1..40, 80, "c1"))
+        h.presenter.load(headphones); advanceUntilIdle()
+        h.list.windows.answer(anchored(10..50, 80, "n50", "p10", ItemAnchor(id(30), id(30), true)))
+        h.presenter.refresh(id(30)); advanceUntilIdle()
+        val held = h.list.pages.hold()
+        h.presenter.loadNewer(); h.presenter.loadNewer(); advanceUntilIdle()
+        assertTrue(h.state.prepending)
+        assertEquals("C026" to "p10", h.list.pages.calls.last())
+        assertEquals(2, h.list.pages.calls.size) // the second loadNewer was ignored while one was in flight
+        held.complete(anchored(1..10, 80, "n10", null)); advanceUntilIdle()
+        assertEquals(items(1..50), h.state.items)
+        assertFalse(h.state.prepending)
+        assertFalse(h.state.hasNewer)
+        assertTrue(h.state.hasMore)
+        h.presenter.loadNewer(); advanceUntilIdle()
+        assertEquals(2, h.list.pages.calls.size)
+    }
+
+    @Test fun foregroundIgnoredWhileLoading() = scenario { h ->
+        val held = h.list.pages.hold()
+        h.presenter.load(headphones); advanceUntilIdle()
+        h.presenter.foreground(null); advanceUntilIdle()
+        assertEquals(1, h.list.pages.calls.size)
+        assertEquals(1, h.categories.catalog.calls.size)
+        held.complete(anchored(1..40, 80, "c1")); advanceUntilIdle()
+        h.categories.catalog.answer(fail(ErrorKind.NETWORK))
+        h.list.windows.answer(anchored(1..23, 80, "n23", null, ItemAnchor(id(3), id(3), true)))
+        h.presenter.foreground(id(3)); advanceUntilIdle()
+        assertEquals(2, h.categories.catalog.calls.size) // the header is read again, quietly
+        assertFalse(h.state.partialFailed)
+        assertEquals(listOf<Any?>(listOf("C026", "a3", 20, 20)), h.list.windows.calls)
+        assertEquals(AnchorRestore(id(3), sameItem = true, token = 1), h.state.restore)
+        assertFalse(h.state.loading)
+    }
+
+    @Test fun staleSessionWindowDropped() = scenario { h ->
+        h.list.pages.answer(anchored(1..40, 80, "c1"))
+        h.presenter.load(headphones); advanceUntilIdle()
+        val held = h.list.windows.hold()
+        h.presenter.refresh(id(3)); advanceUntilIdle()
+        h.session.changeAccount("B"); advanceUntilIdle()
+        held.complete(anchored(1..23, 80, "n23", null, ItemAnchor(id(3), id(3), true))); advanceUntilIdle()
+        assertEquals(CategoryListState.Initial, h.state)
+        h.presenter.loadNewer(); h.presenter.foreground(id(3)); advanceUntilIdle()
+        assertEquals(CategoryListState.Initial, h.state)
+        assertEquals(1, h.list.windows.calls.size)
     }
 }

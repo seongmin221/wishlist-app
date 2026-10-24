@@ -33,6 +33,8 @@ data class CategoryListHeader(val name: String, val parentName: String, val kind
  *   list keeps what it has and the end of the list offers a retry.
  * - [partialFailed]: a pull-to-refresh got the items but not the header (a short notice).
  * - [gone]: the custom category no longer exists (CATEGORY_NOT_FOUND): "삭제된 카테고리예요".
+ * - [hasNewer]: newer cards exist in front of [items] ([CategoryListPresenter.loadNewer]); [prepending]: they are on the way.
+ * - [restore]: where to put the list after a refresh/foreground window (see [AnchorRestore]); null after entry.
  */
 data class CategoryListState(
     val header: CategoryListHeader?,
@@ -46,6 +48,9 @@ data class CategoryListState(
     val itemsError: ClientError?,
     val partialFailed: Boolean,
     val gone: Boolean,
+    val hasNewer: Boolean = false,
+    val prepending: Boolean = false,
+    val restore: AnchorRestore? = null,
 ) {
     companion object {
         val Initial = CategoryListState(null, null, emptyList(), null, false, false, false, false, null, false, false)
@@ -57,8 +62,11 @@ data class CategoryListState(
  * of the parent; CAT-02 for a custom) and the ITEM-02 pages are separate requests that succeed or
  * fail on their own.
  *
- * Intents: [load], [loadMore] (end of list; ignored while a page is in flight or none is left),
- * [refresh] (header + first page again; appended pages are dropped until C7 anchors), [refreshNow],
+ * Intents: [load] (first page), [loadMore] (end of list; ignored while a page is in flight or none is left),
+ * [loadNewer] (top of the list: the page in front via previousCursor), [refresh] (header + the window
+ * around the first visible card's anchor, or the first page when that card has no known anchor; the
+ * whole list is replaced and [CategoryListState.restore] set), [refreshNow], [foreground] (the same,
+ * quietly, and ignored while any request is in flight),
  * [refreshHeader] (header only: items, cursor and laid-out cards stay), [applyEdited] (the CAT-04
  * answer's name right away, then [refreshHeader]), [retry] (only what failed).
  * A session change cancels everything and resets (the shell closes this account-scoped screen).
@@ -74,12 +82,14 @@ class CategoryListPresenter internal constructor(
 
     // Lane-confined.
     private var hint: CategoryListHint? = null
-    private var cursor: String? = null
+    private var window = ItemWindow.Empty
+    private var restoreToken = 0L
     private var headerCount: Int? = null
     private var headerFailed = false
     private var headerJob: Job? = null
     private var pageJob: Job? = null
     private var moreJob: Job? = null
+    private var newerJob: Job? = null
 
     fun load(hint: CategoryListHint) {
         intent {
@@ -92,13 +102,13 @@ class CategoryListPresenter internal constructor(
                 header = CategoryListHeader(normalized.name, normalized.parentName, normalized.kind, null), loading = true,
             )
             fetchHeader(userRefresh = false)
-            fetchFirstPage()
+            fetchItems(anchorItemId = null, restore = false)
         }
     }
 
     fun loadMore() {
         intent {
-            val next = cursor ?: return@intent
+            val next = window.nextCursor ?: return@intent
             val now = mutableState.value
             if (now.appending || now.loading || pageJob != null || now.gone) return@intent
             val id = hint?.categoryId ?: return@intent
@@ -107,12 +117,8 @@ class CategoryListPresenter internal constructor(
                 moreJob = null
                 when (result) {
                     is ClientResult.Success -> {
-                        val known = mutableState.value.items.mapTo(hashSetOf()) { it.id }
-                        cursor = result.value.nextCursor
-                        mutableState.value = withCount(mutableState.value.copy(
-                            items = mutableState.value.items + result.value.items.filter { it.id !in known },
-                            totalCount = result.value.totalCount, hasMore = cursor != null, appending = false,
-                        ))
+                        window = window.append(result.value)
+                        mutableState.value = withCount(withWindow(mutableState.value.copy(appending = false)))
                     }
                     is ClientResult.Failure -> mutableState.value =
                         if (isGone(result.error)) gone() else mutableState.value.copy(appending = false, appendFailed = true)
@@ -121,13 +127,51 @@ class CategoryListPresenter internal constructor(
         }
     }
 
-    fun refresh() { intent { refreshAll() } }
+    /** Newer cards in front (the list reached its top); ignored while a page is in flight or none is left. */
+    fun loadNewer() {
+        intent {
+            val previous = window.previousCursor ?: return@intent
+            val now = mutableState.value
+            if (now.prepending || now.loading || pageJob != null || now.gone) return@intent
+            val id = hint?.categoryId ?: return@intent
+            mutableState.value = now.copy(prepending = true)
+            newerJob = request({ items.byCategory(id, previous) }) { result ->
+                newerJob = null
+                when (result) {
+                    is ClientResult.Success -> {
+                        window = window.prepend(result.value)
+                        mutableState.value = withCount(withWindow(mutableState.value.copy(prepending = false)))
+                    }
+                    is ClientResult.Failure -> mutableState.value =
+                        if (isGone(result.error)) gone() else mutableState.value.copy(prepending = false)
+                }
+            }
+        }
+    }
+
+    /** No anchor: the first page. */
+    fun refresh() = refresh(null)
+
+    /** [anchorItemId]: the first visible card's id (null when unknown, e.g. not scrolled yet). */
+    fun refresh(anchorItemId: String?) { intent { refreshAll(anchorItemId) } }
 
     /** [refresh], awaited until both requests ended (iOS `.refreshable`). */
-    suspend fun refreshNow() {
+    suspend fun refreshNow() = refreshNow(null)
+
+    suspend fun refreshNow(anchorItemId: String?) {
         var jobs: List<Job?> = emptyList()
-        intent { refreshAll(); jobs = listOf(headerJob, pageJob) }.join()
+        intent { refreshAll(anchorItemId); jobs = listOf(headerJob, pageJob) }.join()
         jobs.forEach { it?.join() }
+    }
+
+    /** The app came back: [refresh] without the loading state or failure notices; ignored while anything is in flight. */
+    fun foreground(anchorItemId: String?) {
+        intent {
+            if (hint == null || mutableState.value.gone) return@intent
+            if (listOf(headerJob, pageJob, moreJob, newerJob).any { it != null }) return@intent
+            fetchHeader(userRefresh = false, quiet = true)
+            fetchItems(anchorItemId, restore = true, quiet = true)
+        }
     }
 
     fun refreshHeader() { intent { if (hint != null && !mutableState.value.gone) fetchHeader(userRefresh = false, quiet = true) } }
@@ -152,7 +196,7 @@ class CategoryListPresenter internal constructor(
             when {
                 mutableState.value.itemsError != null && pageJob == null -> {
                     mutableState.value = mutableState.value.copy(itemsError = null, loading = true)
-                    fetchFirstPage()
+                    fetchItems(anchorItemId = null, restore = false)
                 }
                 mutableState.value.appendFailed -> {
                     mutableState.value = mutableState.value.copy(appendFailed = false)
@@ -168,36 +212,47 @@ class CategoryListPresenter internal constructor(
         mutableState.value = CategoryListState.Initial
     }
 
-    private fun refreshAll() {
+    private fun refreshAll(anchorItemId: String?) {
         if (hint == null || mutableState.value.gone) return
         moreJob?.cancel(); moreJob = null
-        mutableState.value = mutableState.value.copy(loading = true, appending = false, appendFailed = false, partialFailed = false, itemsError = null)
+        newerJob?.cancel(); newerJob = null
+        mutableState.value = mutableState.value.copy(
+            loading = true, appending = false, appendFailed = false, prepending = false, partialFailed = false, itemsError = null,
+        )
         fetchHeader(userRefresh = true)
-        fetchFirstPage()
+        fetchItems(anchorItemId, restore = true)
     }
 
     private fun cancelAll() {
-        listOf(headerJob, pageJob, moreJob).forEach { it?.cancel() }
-        headerJob = null; pageJob = null; moreJob = null
-        cursor = null
+        listOf(headerJob, pageJob, moreJob, newerJob).forEach { it?.cancel() }
+        headerJob = null; pageJob = null; moreJob = null; newerJob = null
+        window = ItemWindow.Empty
         headerFailed = false
     }
 
-    private fun fetchFirstPage() {
+    /**
+     * Replaces the list: the window around [anchorItemId]'s anchor, else the first page. [restore]: publish
+     * an [AnchorRestore] (refresh/foreground; not on entry). [quiet]: a failure keeps what is shown.
+     */
+    private fun fetchItems(anchorItemId: String?, restore: Boolean, quiet: Boolean = false) {
         val id = hint?.categoryId ?: return
+        val anchor = anchorItemId?.let(window::anchorOf)
         pageJob?.cancel()
-        pageJob = request({ items.byCategory(id) }) { result ->
+        pageJob = request({ if (anchor != null) items.byCategoryAround(id, anchor) else items.byCategory(id) }) { result ->
             pageJob = null
             when (result) {
                 is ClientResult.Success -> {
-                    cursor = result.value.nextCursor
-                    mutableState.value = withCount(mutableState.value.copy(
-                        items = result.value.items, totalCount = result.value.totalCount, hasMore = cursor != null,
+                    window = window.replace(result.value)
+                    mutableState.value = withCount(withWindow(mutableState.value.copy(
                         loading = false, itemsError = null, appendFailed = false,
-                    ))
+                        restore = if (restore) anchorRestore(result.value, anchored = anchor != null) else mutableState.value.restore,
+                    )))
                 }
-                is ClientResult.Failure -> mutableState.value =
-                    if (isGone(result.error)) gone() else mutableState.value.copy(loading = false, itemsError = result.error)
+                is ClientResult.Failure -> mutableState.value = when {
+                    isGone(result.error) -> gone()
+                    quiet -> mutableState.value.copy(loading = false)
+                    else -> mutableState.value.copy(loading = false, itemsError = result.error)
+                }
             }
         }
     }
@@ -249,6 +304,17 @@ class CategoryListPresenter internal constructor(
         headerFailed = true
         if (userRefresh) mutableState.value = mutableState.value.copy(partialFailed = true)
     }
+
+    private fun anchorRestore(page: ItemPage, anchored: Boolean) = AnchorRestore(
+        resolvedItemId = if (anchored) page.anchor?.resolvedItemId else null,
+        sameItem = anchored && page.anchor?.resolved == true,
+        token = ++restoreToken,
+    )
+
+    private fun withWindow(state: CategoryListState) = state.copy(
+        items = window.items, totalCount = window.totalCount,
+        hasMore = window.nextCursor != null, hasNewer = window.previousCursor != null,
+    )
 
     private fun withCount(state: CategoryListState): CategoryListState =
         state.copy(header = state.header?.copy(count = headerCount ?: state.totalCount))
