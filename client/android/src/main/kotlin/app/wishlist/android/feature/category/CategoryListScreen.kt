@@ -241,16 +241,21 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
     var generation by remember { mutableIntStateOf(0) }
     val now = rememberMinuteClock()
 
-    // Pages: each new tail of ids is a page; a list that no longer starts the same way is a restart.
+    // The photo URL each paged card was laid out with.
+    val pagedPhotos = remember { mutableMapOf<String, String?>() }
+
+    // Pages: each new tail of ids is a page; a list that no longer starts the same way (or whose photo changed) is a restart.
     LaunchedEffect(items) {
-        val known = pages.flatten()
         val ids = items.map { it.id }
-        if (known.isNotEmpty() && (ids.size < known.size || ids.take(known.size) != known)) {
-            pages.clear(); planner.reset(); ratios.clear(); generation++
+        val photoUrls = items.associate { it.id to categoryPhotoUrl(it) }
+        book.forgetChanged(items)
+        if (restartsLayout(pages.flatten(), pagedPhotos, ids, photoUrls)) {
+            pages.clear(); planner.reset(); ratios.clear(); pagedPhotos.clear(); generation++
         }
         val laid = pages.flatten().toSet()
         val fresh = ids.filter { it !in laid }
         if (fresh.isNotEmpty()) pages.add(fresh)
+        fresh.forEach { pagedPhotos[it] = photoUrls[it] }
     }
 
     BoxWithConstraints(modifier.fillMaxWidth()) {

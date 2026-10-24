@@ -61,6 +61,8 @@ import coil3.size.Scale
  */
 internal class CategoryPhotoBook(private val context: Context) {
     val photos = mutableStateMapOf<String, PhotoPagePlanner.Photo>()
+    /** The URL each [photos] entry was read from: a changed photo is measured again. */
+    private val measuredUrls = mutableMapOf<String, String?>()
     private val gate = PhotoRequestGate()
 
     fun request(url: String, columnWidthPx: Int): ImageRequest {
@@ -68,18 +70,38 @@ internal class CategoryPhotoBook(private val context: Context) {
         return ImageRequest.Builder(context).data(url).size(w, h).scale(Scale.FIT).precision(Precision.EXACT).build()
     }
 
-    /** Reads [item]'s photo size (once). Runs in the caller's scope: leaving the screen cancels it. */
+    /** Drops the sizes read from a photo URL [items] no longer show (before a layout reads [photos]). */
+    fun forgetChanged(items: List<WishlistItem>) {
+        items.forEach { item -> if (item.id in measuredUrls && measuredUrls[item.id] != categoryPhotoUrl(item)) photos.remove(item.id) }
+    }
+
+    /** Reads [item]'s photo size (once per photo URL). Runs in the caller's scope: leaving the screen cancels it. */
     suspend fun measure(item: WishlistItem, columnWidthPx: Int) {
-        if (item.id in photos) return
-        val url = (photoSourceFor(item.product.imageUrl) as? PhotoSource.Remote)?.url
+        val url = categoryPhotoUrl(item)
+        if (item.id in photos && measuredUrls[item.id] == url) return
         if (url == null) {
+            measuredUrls[item.id] = null
             photos[item.id] = PhotoPagePlanner.Photo.Failed
             return
         }
         val result = gate.run { SingletonImageLoader.get(context).execute(request(url, columnWidthPx)) }
+        measuredUrls[item.id] = url
         photos[item.id] = (result as? SuccessResult)?.image?.let { PhotoPagePlanner.Photo.Sized(it.width, it.height) }
             ?: PhotoPagePlanner.Photo.Failed
     }
+}
+
+/** The card's remote photo URL (null: drawn as the placeholder). */
+internal fun categoryPhotoUrl(item: WishlistItem): String? = (photoSourceFor(item.product.imageUrl) as? PhotoSource.Remote)?.url
+
+/**
+ * Whether the grid starts its layout over for [ids]/[photoUrls] after laying out [known] with [knownPhotos]:
+ * the list no longer starts with the known ids (a refresh, another category) or a known card's photo changed.
+ */
+internal fun restartsLayout(known: List<String>, knownPhotos: Map<String, String?>, ids: List<String>, photoUrls: Map<String, String?>): Boolean {
+    if (known.isEmpty()) return false
+    if (ids.size < known.size || ids.take(known.size) != known) return true
+    return known.any { knownPhotos[it] != photoUrls[it] }
 }
 
 private val PhotoShape = RoundedCornerShape(WishlistTokens.Radius.m)

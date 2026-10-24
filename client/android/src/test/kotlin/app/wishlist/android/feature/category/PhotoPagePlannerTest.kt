@@ -23,6 +23,17 @@ class PhotoPagePlannerTest {
         assertEquals(1f, planner.ratioOf("c")) // no photo → 1:1 at once
     }
 
+    @Test fun aChangedPhotoOrAnotherListStartsTheLayoutOver() {
+        val known = listOf("a", "b")
+        val photos = mapOf("a" to "https://a/tall.jpg", "b" to null)
+        assertFalse(restartsLayout(emptyList(), emptyMap(), known, photos))
+        assertFalse(restartsLayout(known, photos, known + "c", photos + ("c" to "https://a/c.jpg"))) // grew
+        assertTrue(restartsLayout(known, photos, known, photos + ("a" to "https://a/wide.jpg"))) // photo changed
+        assertTrue(restartsLayout(known, photos, known, photos + ("a" to null))) // photo removed
+        assertTrue(restartsLayout(known, photos, listOf("b", "a"), photos)) // reordered
+        assertTrue(restartsLayout(known, photos, listOf("a"), photos)) // shrank
+    }
+
     @Test fun naturalRatioIsNotClamped() {
         val planner = PhotoPagePlanner()
         planner.settle(0, listOf(Card("tall", true), Card("wide", true)),
