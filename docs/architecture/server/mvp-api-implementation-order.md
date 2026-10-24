@@ -194,6 +194,8 @@ CAT-01~04·V11·owner별 AI 후보·stale 재검증과 예산 승계 replacement
 
 하위 묶음마다 별도 통과·커밋한다. 재사용하는 연결 변경 transaction은 item·purpose 잠금 순서를 고정한다.
 
+**구현 상태:** B8 PUR-07·08(B8a), CAT-05·06(B8b), PUR-05·06(B8c)을 하위 묶음별 커밋으로 구현했다. [제품 정책](../../history/product-planning/mvp/decisions/b8-candidate-move-deletion-policy-2026-10-24.md), [spec](../../superpowers/specs/2026-10-24-b8-candidate-move-deletions-design.md), [계획](../../superpowers/plans/2026-10-24-b8-candidate-move-deletions.md), [계약](candidate-move-deletion-api.md), [구현 이력](../../history/architecture/server/b8-candidate-move-deletions-implementation-2026-10-24.md)에 통과 조건별 테스트와 C5/B10/B11 인계를 기록했다. 후보 추가 화면의 초기 filter·선택 유지(C5), archive snapshot 통합 검증(B10), 부하 하의 owner 잠금 관측(B11)의 완료를 뜻하지 않는다.
+
 ### B8a: 목적 후보 추가
 
 PUR-07 → PUR-08. 현재 목적 item을 제외하고, 전체 추가 가능 pool의 category facets를 제공한다. 다른 목적 소속·이동 영향을 표시하고 선택한 item 전체를 한 transaction으로 옮긴다.
