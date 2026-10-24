@@ -37,6 +37,7 @@ internal data class BoardSeedData(
     val displayMetadata: BoardDisplayMetadata,
     val carrierId: String,
     val commuteId: String,
+    val purposeActivities: Map<String, PurposeActivity>,
 )
 
 /**
@@ -102,14 +103,17 @@ internal object BoardSeeds {
         group("G011", "건강·웰빙")
         leaf("C086", "수면·회복 용품", "G011", 1)
 
+        // Purpose activity is a board snapshot, independent of category card save/check timestamps.
+        val purposeCreatedAt = now - 45.days
+        val emptyCreatedAt = now - 30.days - 1.minutes // stable last card after the 30-day gift activity
         val purposes = listOf(
-            Purpose(newId(), "출퇴근 헤드폰", "지하철에서 쓸 노이즈 캔슬링 헤드폰", "coral", "music", 1, now, now),
-            Purpose(newId(), "가을 트레일 러닝", null, "mustard", "star", 1, now, now),
-            Purpose(newId(), "홈오피스 의자", null, "periwinkle", "book", 1, now, now),
-            Purpose(newId(), "캠핑 첫 장비", null, "cyan", "tent", 1, now, now),
-            Purpose(newId(), "거실 조명 바꾸기", null, "mint", "home", 1, now, now),
-            Purpose(newId(), "엄마 생신 선물", null, "pink", "gift", 1, now, now),
-            Purpose(newId(), "여행 캐리어", "다음 달 출장 때 쓸 기내용 캐리어", "mustard", "plane", 1, now, now),
+            Purpose(newId(), "출퇴근 헤드폰", "지하철에서 쓸 노이즈 캔슬링 헤드폰", "coral", "music", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "가을 트레일 러닝", null, "mustard", "star", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "홈오피스 의자", null, "periwinkle", "book", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "캠핑 첫 장비", null, "cyan", "tent", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "거실 조명 바꾸기", null, "mint", "home", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "엄마 생신 선물", null, "pink", "gift", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "여행 캐리어", "다음 달 출장 때 쓸 기내용 캐리어", "mustard", "plane", 1, emptyCreatedAt, emptyCreatedAt),
         )
         val commuteId = purposes.first().id
         val headphones = categories.single { it.id == "C026" }
@@ -172,7 +176,27 @@ internal object BoardSeeds {
             val missing = (categoryCounts.getValue(category.id) - (covered[category.id] ?: 0)).coerceAtLeast(0)
             (1..missing).map { n -> plain(category, "${category.name} $n", "39000", null, 3, minutesAgo++) }
         }
-        val items = headphoneItems + dacItems + fillers
+        val purposesByName = purposes.associateBy { it.name }
+        fun assigned(item: WishlistItem, name: String) = item.copy(purpose = ItemPurpose(purposesByName.getValue(name).id, ValueSource.USER))
+        var assignedShoe = false
+        val items = (headphoneItems + dacItems + fillers).map { item ->
+            when {
+                // Preserve the original headphone membership, Marshall review and every named card.
+                item.product.name == "FiiO BTR7" -> assigned(item, "출퇴근 헤드폰")
+                item.category.id == "C053" -> assigned(item, "가을 트레일 러닝")
+                item.category.id == "C006" && !assignedShoe -> { assignedShoe = true; assigned(item, "가을 트레일 러닝") }
+                item.category.id == "C034" -> assigned(item, "홈오피스 의자")
+                item.category.id == "C056" -> assigned(item, "캠핑 첫 장비")
+                item.category.id == "C039" -> assigned(item, "거실 조명 바꾸기")
+                item.category.id == "C014" -> assigned(item, "엄마 생신 선물")
+                else -> item
+            }
+        }
+        val activityDays = listOf(1, 3, 7, 14, 21, 30)
+        val purposeActivities = purposes.mapIndexed { index, purpose ->
+            purpose.id to if (index < activityDays.size) PurposeActivity(now - activityDays[index].days, "CANDIDATE_ADDED")
+                else PurposeActivity(purpose.createdAt, "CREATED")
+        }.toMap()
         val cards = listOf(
             BoardCardFixture("l1", items[0].id, "#FFFFFF", "#9A9A96", "#D8D8D4", 1.0 / 1.0, "출퇴근 헤드폰 · 2일 전 확인"),
             BoardCardFixture("l2", items[1].id, "#7A6B5B", "#E9DFD2", "#A99683", 5.0 / 4.0, "출퇴근 헤드폰 · 2일 전 확인"),
@@ -190,10 +214,8 @@ internal object BoardSeeds {
         )
         return BoardSeedData(
             categories, purposes, items,
-            BoardDisplayMetadata(purposes.mapIndexed { index, purpose ->
-                purpose.id to listOf(5, 3, 2, 4, 3, 2, 0)[index]
-            }.toMap(), cards),
-            carrierId = purposes.last().id, commuteId = commuteId,
+            BoardDisplayMetadata(purposes.associate { purpose -> purpose.id to items.count { it.purpose.id == purpose.id } }, cards),
+            carrierId = purposes.last().id, commuteId = commuteId, purposeActivities = purposeActivities,
         )
     }
 }

@@ -16,5 +16,6 @@ internal class FakeCategoryRepository(private val store: FakeStore) : CategoryRe
 
 /** B4 ITEM-02 category scope on the Fake store. */
 internal class FakeItemListRepository(private val store: FakeStore) : ItemListRepository {
+    override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int) = store.itemsByPurpose(purposeId, cursor, limit)
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int) = store.itemsByCategory(categoryId, cursor, limit)
 }

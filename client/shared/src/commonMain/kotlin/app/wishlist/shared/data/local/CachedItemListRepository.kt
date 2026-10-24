@@ -17,6 +17,13 @@ internal class CachedItemListRepository(
     private val store: LocalStore,
     private val session: AuthSession,
 ) : ItemListRepository {
+    override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> {
+        val snapshot = session.state.value
+        val result = delegate.byPurpose(purposeId, cursor, limit)
+        if (result is ClientResult.Success && result.value.items.isNotEmpty()) store.upsertItems(snapshot, result.value.items)
+        return result
+    }
+
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> {
         val snapshot = session.state.value
         val result = delegate.byCategory(categoryId, cursor, limit)

@@ -24,9 +24,13 @@ interface CategoryRepository {
     suspend fun update(id: String, expectedVersion: Int, patch: CategoryPatch): ClientResult<CustomCategoryDetail>
 }
 
-/** B4 ITEM-02, category scope only (purpose scopes are C6). Newest first; [cursor] from the previous page. */
+/** B4 ITEM-02, category and purpose scopes. Newest first; [cursor] from the previous page. */
 interface ItemListRepository {
     suspend fun byCategory(categoryId: String, cursor: String? = null, limit: Int = DEFAULT_LIMIT): ClientResult<ItemPage>
+
+    /** All ACTIVE candidates, including unnamed items. Default keeps older category-only consumers compatible. */
+    suspend fun byPurpose(purposeId: String, cursor: String? = null, limit: Int = DEFAULT_LIMIT): ClientResult<ItemPage> =
+        ClientResult.Failure(app.wishlist.shared.core.ClientError(app.wishlist.shared.core.ErrorKind.UNAVAILABLE))
 
     companion object {
         const val DEFAULT_LIMIT = 40
