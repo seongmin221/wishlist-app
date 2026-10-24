@@ -248,7 +248,6 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
     LaunchedEffect(items) {
         val ids = items.map { it.id }
         val photoUrls = items.associate { it.id to categoryPhotoUrl(it) }
-        book.forgetChanged(items)
         if (restartsLayout(pages.flatten(), pagedPhotos, ids, photoUrls)) {
             pages.clear(); planner.reset(); ratios.clear(); pagedPhotos.clear(); generation++
         }
@@ -264,13 +263,14 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
         // Measure every page's photos (six at a time) and lay the page out when ready or after 3 s.
         pages.forEachIndexed { index, page -> key(generation, index, page.firstOrNull()) {
             LaunchedEffect(generation, page, columnPx) {
-                val cards = page.mapNotNull { byId[it] }.map { PhotoPagePlanner.Card(it.id, photoSourceFor(it.product.imageUrl) is PhotoSource.Remote) }
+                val pageItems = page.mapNotNull { byId[it] }
+                val cards = pageItems.map { PhotoPagePlanner.Card(it.id, photoSourceFor(it.product.imageUrl) is PhotoSource.Remote) }
                 val started = System.currentTimeMillis()
                 launch {
-                    coroutineScope { page.mapNotNull { byId[it] }.map { item -> async { book.measure(item, columnPx) } }.awaitAll() }
+                    coroutineScope { pageItems.map { item -> async { book.measure(item, columnPx) } }.awaitAll() }
                 }
                 // In list order: a later page waits for the earlier ones even when its photos came first.
-                while (!planner.settle(index, cards, book.photos.toMap(), System.currentTimeMillis() - started)) {
+                while (!planner.settle(index, cards, book.photosFor(pageItems), System.currentTimeMillis() - started)) {
                     delay(100)
                 }
                 page.forEach { id -> planner.ratioOf(id)?.let { ratios[id] = it } }

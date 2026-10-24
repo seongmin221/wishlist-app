@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,9 +59,7 @@ import coil3.size.Scale
  * reads it from Coil's memory cache. A failed or missing photo is [PhotoPagePlanner.Photo.Failed].
  */
 internal class CategoryPhotoBook(private val context: Context) {
-    val photos = mutableStateMapOf<String, PhotoPagePlanner.Photo>()
-    /** The URL each [photos] entry was read from: a changed photo is measured again. */
-    private val measuredUrls = mutableMapOf<String, String?>()
+    private val sizes = PhotoMeasurements()
     private val gate = PhotoRequestGate()
 
     fun request(url: String, columnWidthPx: Int): ImageRequest {
@@ -70,24 +67,21 @@ internal class CategoryPhotoBook(private val context: Context) {
         return ImageRequest.Builder(context).data(url).size(w, h).scale(Scale.FIT).precision(Precision.EXACT).build()
     }
 
-    /** Drops the sizes read from a photo URL [items] no longer show (before a layout reads [photos]). */
-    fun forgetChanged(items: List<WishlistItem>) {
-        items.forEach { item -> if (item.id in measuredUrls && measuredUrls[item.id] != categoryPhotoUrl(item)) photos.remove(item.id) }
-    }
+    /** The known sizes of [items]' current photos (a size read from a replaced photo URL is left out). */
+    fun photosFor(items: List<WishlistItem>): Map<String, PhotoPagePlanner.Photo> =
+        sizes.photosFor(items.associate { it.id to categoryPhotoUrl(it) })
 
     /** Reads [item]'s photo size (once per photo URL). Runs in the caller's scope: leaving the screen cancels it. */
     suspend fun measure(item: WishlistItem, columnWidthPx: Int) {
         val url = categoryPhotoUrl(item)
-        if (item.id in photos && measuredUrls[item.id] == url) return
+        val token = sizes.begin(item.id, url) ?: return
         if (url == null) {
-            measuredUrls[item.id] = null
-            photos[item.id] = PhotoPagePlanner.Photo.Failed
+            sizes.finish(item.id, token, PhotoPagePlanner.Photo.Failed)
             return
         }
         val result = gate.run { SingletonImageLoader.get(context).execute(request(url, columnWidthPx)) }
-        measuredUrls[item.id] = url
-        photos[item.id] = (result as? SuccessResult)?.image?.let { PhotoPagePlanner.Photo.Sized(it.width, it.height) }
-            ?: PhotoPagePlanner.Photo.Failed
+        sizes.finish(item.id, token, (result as? SuccessResult)?.image?.let { PhotoPagePlanner.Photo.Sized(it.width, it.height) }
+            ?: PhotoPagePlanner.Photo.Failed)
     }
 }
 
