@@ -167,6 +167,14 @@ class SharedRuntime internal constructor(
     fun getItemRepository(): GetItemRepository =
         GatedGetItemRepository(ready, resolveOr<GetItemRepository>(UnavailableItemRepository) { get() })
 
+    /** CAT-01~04 facade over each API's explicitly bound backend. */
+    fun categoryRepository(): app.wishlist.shared.repository.CategoryRepository =
+        GatedCategoryRepository(ready, resolveOr<app.wishlist.shared.repository.CategoryRepository>(UnavailableCategoryRepository) { get() })
+
+    /** ITEM-02 (category scope) facade over the bound backend. */
+    fun itemListRepository(): app.wishlist.shared.repository.ItemListRepository =
+        GatedItemListRepository(ready, resolveOr<app.wishlist.shared.repository.ItemListRepository>(UnavailableItemListRepository) { get() })
+
     /** Debug seed catalog (DEBUG); UNAVAILABLE in RELEASE. Not a CAT/PUR/ITEM-02 wire backend. */
     fun catalogRepository(): CatalogRepository =
         GatedCatalogRepository(ready, resolveOr<CatalogRepository>(UnavailableCatalogRepository) { get() })
@@ -286,6 +294,22 @@ class SharedRuntime internal constructor(
         )
     }
 
+    /** C5 category tab first screen (CAT-01 BROWSE, last group in app state); the owner calls close. */
+    fun categoryHomePresenter(): app.wishlist.shared.presentation.CategoryHomePresenter =
+        app.wishlist.shared.presentation.CategoryHomePresenter(categoryRepository(), localStore(), session, env.dispatchers.io)
+
+    /** C5 one category's item list (CAT-01/02 header, ITEM-02 pages with the card cache); the owner calls close. */
+    fun categoryListPresenter(): app.wishlist.shared.presentation.CategoryListPresenter =
+        app.wishlist.shared.presentation.CategoryListPresenter(categoryRepository(), itemListRepository(), session, env.dispatchers.io)
+
+    /** C5 custom category create/edit form (CAT-01 SELECT, CAT-02~04; idempotency keys from the runtime IDs). */
+    fun categoryFormPresenter(): app.wishlist.shared.presentation.CategoryFormPresenter =
+        app.wishlist.shared.presentation.CategoryFormPresenter(categoryRepository(), env.ids, session, env.dispatchers.io)
+
+    /** C5 category picker sheet (CAT-01 SELECT); C8 hands its pick to the edit draft. */
+    fun categoryPickerPresenter(): app.wishlist.shared.presentation.CategoryPickerPresenter =
+        app.wishlist.shared.presentation.CategoryPickerPresenter(categoryRepository(), localStore(), session, env.dispatchers.io)
+
     /**
      * **DEBUG only** (null in RELEASE and after [close]): demo hooks for on-device checks — delaying
      * the next Fake ITEM-01 and creating unbound pending rows. Apps call it only from debug code paths.
@@ -330,6 +354,16 @@ class SharedRuntime internal constructor(
     internal fun resolvedBackend(apiId: ApiId): Backend = when (apiId) {
         ApiId.ITEM_01 -> backendOf(koin.get<SnapshotCreateItemRepository>(ITEM_01_DELEGATE))
         ApiId.ITEM_03 -> backendOf(koin.get<GetItemRepository>(ITEM_03_DELEGATE))
+        ApiId.ITEM_02 -> backendOf(koin.get<app.wishlist.shared.repository.ItemListRepository>(ITEM_02_DELEGATE))
+        ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04 -> {
+            val routed = koin.get<app.wishlist.shared.repository.CategoryRepository>() as RoutedCategoryRepository
+            backendOf(when (apiId) {
+                ApiId.CAT_01 -> routed.catalog
+                ApiId.CAT_02 -> routed.custom
+                ApiId.CAT_03 -> routed.create
+                else -> routed.update
+            })
+        }
         else -> Backend.UNAVAILABLE
     }
 

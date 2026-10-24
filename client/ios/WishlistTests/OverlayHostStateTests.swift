@@ -257,4 +257,52 @@ final class OverlayHostStateTests: XCTestCase {
         XCTAssertTrue(s.entries.isEmpty)
         XCTAssertEqual(dismissed, 1)
     }
+
+    // MARK: C5 sheet close guard
+
+    func testGuardBlockKeepsTheSheetOnUserAttempts() {
+        let s = OverlayHostState()
+        var decision = SheetDismiss.block
+        s.showSheet(guard: SheetGuard(decide: { decision }, onConfirm: {})) {}
+        settleOpen(s)
+        XCTAssertFalse(s.userDismiss())
+        XCTAssertFalse(s.userDismiss(s.entries[0].id))
+        XCTAssertEqual(s.entries[0].phase, .open)
+        decision = .allow
+        XCTAssertTrue(s.userDismiss())
+        XCTAssertEqual(s.entries[0].phase, .closing)
+    }
+
+    func testGuardConfirmAsksInsteadOfClosing() {
+        let s = OverlayHostState()
+        var asked = 0
+        s.showSheet(guard: SheetGuard(decide: { .confirm }, onConfirm: { asked += 1 })) {}
+        settleOpen(s)
+        XCTAssertFalse(s.userDismiss())
+        XCTAssertEqual(asked, 1)
+        XCTAssertEqual(s.entries[0].phase, .open)
+    }
+
+    func testProgrammaticClosesIgnoreTheGuard() {
+        let s = OverlayHostState()
+        var decided = 0
+        s.showSheet(guard: SheetGuard(decide: { decided += 1; return .block }, onConfirm: {})) {}
+        settleOpen(s)
+        XCTAssertTrue(s.dismiss())
+        XCTAssertEqual(decided, 0)
+        settleClose(s)
+        s.showSheet(guard: SheetGuard(decide: { .block }, onConfirm: {})) {}
+        settleOpen(s)
+        XCTAssertTrue(s.dismissAll())
+    }
+
+    func testUserDismissIsIgnoredWhileAnimatingAndForOtherIds() {
+        let s = OverlayHostState()
+        var decided = 0
+        s.showSheet(guard: SheetGuard(decide: { decided += 1; return .allow }, onConfirm: {})) {}
+        XCTAssertFalse(s.userDismiss()) // still opening
+        settleOpen(s)
+        XCTAssertFalse(s.userDismiss(s.entries[0].id + 1))
+        XCTAssertEqual(decided, 0)
+    }
 }

@@ -17,6 +17,12 @@ struct SettingsScreen: View {
     @Environment(\.overlayHostState) private var overlay
     @Environment(\.wlColors) private var c
     @State private var webViewCleared = false
+    #if DEBUG
+    @Environment(\.wlEntryOwners) private var owners
+    @Environment(\.wlRuntime) private var runtime
+    @State private var debugPick: String?
+    @State private var debugEdit: String?
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +44,9 @@ struct SettingsScreen: View {
                             action: { overlay?.showDialog(webViewDialog) }
                         ) { WLIcon(.chevronRight, size: 16) }
                     }
+                    #if DEBUG
+                    debugSection
+                    #endif
                     SettingsSection(label: String(localized: "settings.app.info")) {
                         SettingsRow(title: String(localized: "settings.version"), action: nil) {
                             WLText(Self.version, versionStyle, color: c.textSecondary, maxLines: 1)
@@ -95,6 +104,32 @@ struct SettingsScreen: View {
             onConfirm: { WebViewDataCleaner.clear { webViewCleared = true } }
         )
     }
+
+#if DEBUG
+    /// DEBUG only (C5 D1): the category picker sheet has no product entry before C8, so it opens here;
+    /// and a stand-in for "another device renamed it" to meet CATEGORY_VERSION_CONFLICT in the edit sheet.
+    private var debugSection: some View {
+        SettingsSection(label: "개발용") {
+            SettingsRow(title: "카테고리 선택 시트", subtitle: debugPick ?? "고른 카테고리가 여기에 보여요", action: {
+                guard let overlay else { return }
+                showCategoryPicker(overlay: overlay, owners: owners, selectedId: nil) { entry in debugPick = "\(entry.name) (\(entry.id))" }
+            }) { WLIcon(.chevronRight, size: 16) }
+            SettingsRow(title: "직접 만든 카테고리 이름 바꾸기(다른 기기)", subtitle: debugEdit ?? "첫 직접 만든 카테고리의 version을 올려요", action: {
+                Task { debugEdit = await renameFirstCustomElsewhere() }
+            }) { WLIcon(.chevronRight, size: 16) }
+        }
+    }
+
+    private func renameFirstCustomElsewhere() async -> String {
+        guard let runtime, let controls = runtime.debugControls() else { return "DEBUG controls 없음" }
+        let result = try? await runtime.categoryRepository().catalog(scope: .select, parentId: nil)
+        guard let catalog = (result as? ClientResultSuccess<CategoryCatalog>)?.value,
+              let custom = catalog.groups.flatMap(\.categories).first(where: { $0.kind == .custom }) else { return "직접 만든 카테고리 없음" }
+        let renamed = custom.name + " (다른 기기)"
+        _ = try? await controls.editCategoryElsewhere(customId: custom.id, name: renamed)
+        return "‘\(renamed)’로 바꿨어요"
+    }
+    #endif
 
     private static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 }

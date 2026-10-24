@@ -9,18 +9,25 @@ import app.wishlist.shared.core.MutableAuthSession
 import app.wishlist.shared.core.RuntimeDispatchers
 import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.data.fake.FakeCatalogRepository
+import app.wishlist.shared.data.fake.FakeCategoryRepository
+import app.wishlist.shared.data.fake.FakeItemListRepository
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.data.local.CachedGetItemRepository
+import app.wishlist.shared.data.local.CachedItemListRepository
 import app.wishlist.shared.data.local.LazyDriver
 import app.wishlist.shared.data.local.SqlLocalStore
 import app.wishlist.shared.data.local.StoreLease
 import app.wishlist.shared.data.remote.AuthTokenProvider
 import app.wishlist.shared.data.remote.AuthenticatedTransport
 import app.wishlist.shared.data.remote.CallbackAuthTokenProvider
+import app.wishlist.shared.data.remote.RemoteCategoryRepository
+import app.wishlist.shared.data.remote.RemoteItemListRepository
 import app.wishlist.shared.data.remote.RemoteItemRepository
 import app.wishlist.shared.data.remote.createWishlistHttpClient
 import app.wishlist.shared.repository.CatalogRepository
+import app.wishlist.shared.repository.CategoryRepository
+import app.wishlist.shared.repository.ItemListRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
 import app.wishlist.shared.repository.LocalStore
@@ -146,6 +153,7 @@ internal class CloseGuard(private val onClosed: () -> Unit) : StoreLease {
 /** Delegate qualifiers: the selected backend for one API, before any facade decoration. */
 internal val ITEM_01_DELEGATE = named("ITEM_01")
 internal val ITEM_03_DELEGATE = named("ITEM_03")
+internal val ITEM_02_DELEGATE = named("ITEM_02")
 
 /**
  * The runtime graph. Every component gets the one [MutableAuthSession] of this graph. Fake parts
@@ -186,6 +194,31 @@ private fun coreModule(env: RuntimeEnvironment, storeLease: StoreLease) = module
     single<CatalogRepository> {
         if (env.bindings.buildMode == ClientBuildMode.DEBUG) get<FakeCatalogRepository>() else UnavailableCatalogRepository
     }
+    // CAT-01~04 are bound one by one: each method goes to its own API's backend.
+    single<CategoryRepository> {
+        val b = env.bindings
+        RoutedCategoryRepository(
+            catalog = categoryBackend(b.backendOf(ApiId.CAT_01)),
+            custom = categoryBackend(b.backendOf(ApiId.CAT_02)),
+            create = categoryBackend(b.backendOf(ApiId.CAT_03)),
+            update = categoryBackend(b.backendOf(ApiId.CAT_04)),
+        )
+    }
+    single<ItemListRepository>(ITEM_02_DELEGATE) {
+        when (env.bindings.backendOf(ApiId.ITEM_02)) {
+            Backend.FAKE -> get<FakeItemListRepository>()
+            Backend.REMOTE -> get<RemoteItemListRepository>()
+            Backend.UNAVAILABLE -> UnavailableItemListRepository
+        }
+    }
+    // Like the Get facade: the selected ITEM-02 delegate is wrapped once by the card cache decorator.
+    single<ItemListRepository> { CachedItemListRepository(get(ITEM_02_DELEGATE), get(), get()) }
+}
+
+private fun Scope.categoryBackend(backend: Backend): CategoryRepository = when (backend) {
+    Backend.FAKE -> get<FakeCategoryRepository>()
+    Backend.REMOTE -> get<RemoteCategoryRepository>()
+    Backend.UNAVAILABLE -> UnavailableCategoryRepository
 }
 
 private fun fakeModule() = module {
@@ -193,6 +226,8 @@ private fun fakeModule() = module {
     single { DebugAnalysisDriver(get(), get()) }
     single { FakeItemRepository(get()) }
     single { FakeCatalogRepository(get()) }
+    single { FakeCategoryRepository(get()) }
+    single { FakeItemListRepository(get()) }
 }
 
 private fun remoteModule(env: RuntimeEnvironment, remote: RemoteConfig) = module {
@@ -202,6 +237,8 @@ private fun remoteModule(env: RuntimeEnvironment, remote: RemoteConfig) = module
     single<AuthTokenProvider> { CallbackAuthTokenProvider(get(), remote.tokenSource) }
     single { AuthenticatedTransport(get(), get(), get(), remote.baseUrl) }
     single { RemoteItemRepository(get(), get()) }
+    single { RemoteCategoryRepository(get(), get()) }
+    single { RemoteItemListRepository(get(), get()) }
 }
 
 /** Item API implementation for one explicit binding (FakeItemRepository/RemoteItemRepository implement both). */
@@ -213,7 +250,7 @@ private inline fun <reified T : Any> Scope.itemBackend(backend: Backend): T = wh
 
 /** The backend a resolved item delegate actually is (the verification target, not the bindings). */
 internal fun backendOf(delegate: Any): Backend = when (delegate) {
-    is FakeItemRepository -> Backend.FAKE
-    is RemoteItemRepository -> Backend.REMOTE
+    is FakeItemRepository, is FakeCategoryRepository, is FakeItemListRepository -> Backend.FAKE
+    is RemoteItemRepository, is RemoteCategoryRepository, is RemoteItemListRepository -> Backend.REMOTE
     else -> Backend.UNAVAILABLE
 }

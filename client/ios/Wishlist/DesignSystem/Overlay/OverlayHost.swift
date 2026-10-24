@@ -60,14 +60,32 @@ struct WLMenuItem {
 
 enum OverlayPhase { case opening, open, closing }
 
+/// What a user's attempt to close a sheet (scrim tap, drag down, VoiceOver escape) does (C5).
+/// Programmatic closes (`dismiss`, `requestDismiss`, `dismissAll`) never ask.
+enum SheetDismiss { case allow, block, confirm }
+
+/// A sheet's close guard: `decide` answers each user attempt; `.confirm` calls `onConfirm` instead of
+/// closing (the sheet shows "변경 사항을 버릴까요?" and closes itself when the user discards).
+struct SheetGuard {
+    let decide: () -> SheetDismiss
+    let onConfirm: () -> Void
+}
+
+/// A sheet's scrolling content and its optional footer pinned at the sheet's bottom (C5 form buttons:
+/// above the home indicator, and above the keyboard while it is up).
+struct SheetBody {
+    let content: () -> AnyView
+    var footer: (() -> AnyView)?
+}
+
 enum OverlayKind {
-    case sheet(title: String, draggable: Bool, content: () -> AnyView)
+    case sheet(title: String, draggable: Bool, guard: SheetGuard?, body: SheetBody)
     case dialog(WLDialogSpec)
     case menu(anchor: CGRect, items: [WLMenuItem])
 
     var accessibilityTitle: String {
         switch self {
-        case .sheet(let title, _, _): title
+        case .sheet(let title, _, _, _): title
         case .dialog(let spec): spec.title
         case .menu: String(localized: "wl.menu")
         }
@@ -118,8 +136,35 @@ final class OverlayHostState {
     var isAnimating: Bool { entries.contains { $0.phase != .open } }
 
     @discardableResult
-    func showSheet<V: View>(title: String = String(localized: "wl.sheet"), draggable: Bool = true, @ViewBuilder _ content: @escaping () -> V) -> Bool {
-        push { .sheet(title: title, draggable: draggable, content: { AnyView(content()) }) }
+    func showSheet<V: View>(title: String = String(localized: "wl.sheet"), draggable: Bool = true, guard sheetGuard: SheetGuard? = nil,
+                            @ViewBuilder _ content: @escaping () -> V) -> Bool {
+        push { .sheet(title: title, draggable: draggable, guard: sheetGuard, body: SheetBody(content: { AnyView(content()) })) }
+    }
+
+    /// A sheet whose `footer` stays at the bottom while `content` scrolls above it.
+    @discardableResult
+    func showSheet<V: View, F: View>(title: String = String(localized: "wl.sheet"), draggable: Bool = true, guard sheetGuard: SheetGuard? = nil,
+                                     @ViewBuilder content: @escaping () -> V, @ViewBuilder footer: @escaping () -> F) -> Bool {
+        push { .sheet(title: title, draggable: draggable, guard: sheetGuard,
+                      body: SheetBody(content: { AnyView(content()) }, footer: { AnyView(footer()) })) }
+    }
+
+    /// A user's attempt to close the top overlay (scrim tap, sheet drag, VoiceOver escape). A guarded
+    /// sheet decides: allow closes, block does nothing, confirm calls its `onConfirm`. `id` limits it to that overlay.
+    @discardableResult
+    func userDismiss(_ id: Int? = nil) -> Bool {
+        guard let top = entries.last, id == nil || top.id == id else { return false }
+        if isAnimating { return false }
+        if case .sheet(_, _, let sheetGuard?, _) = top.kind {
+            switch sheetGuard.decide() {
+            case .allow: break
+            case .block: return false
+            case .confirm:
+                sheetGuard.onConfirm()
+                return false
+            }
+        }
+        return requestDismiss(top.id)
     }
 
     @discardableResult
@@ -225,6 +270,16 @@ final class OverlayHostState {
     }
 }
 
+extension OverlayHostState {
+    /// `dismissAll`, waiting a frame at a time while an overlay is still opening (`dismissAll` refuses then).
+    @MainActor
+    func dismissAllWhenSettled() async {
+        while !entries.isEmpty, !dismissAll(), !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 16_000_000)
+        }
+    }
+}
+
 private struct OverlayHostStateKey: EnvironmentKey {
     static let defaultValue: OverlayHostState? = nil
 }
@@ -315,7 +370,7 @@ struct OverlayHost<Content: View>: View {
             if scrimMounted {
                 WLScrim(progress: scrimProgress, color: colors.scrimDim) {
                     // 막 누르기는 시트만 닫는다. 확인창은 취소·확인 버튼으로만 닫힌다. 전환 중에는 dismiss가 무시한다.
-                    if case .sheet = state.entries.last?.kind { state.dismiss() }
+                    if case .sheet = state.entries.last?.kind { state.userDismiss() }
                 }
                 .accessibilityHidden(true)
             }
@@ -333,8 +388,8 @@ struct OverlayHost<Content: View>: View {
     private func layer(_ entry: OverlayEntry, isTop: Bool, hasBelow: Bool) -> some View {
         Group {
             switch entry.kind {
-            case .sheet(_, let draggable, let content):
-                SheetLayer(entry: entry, state: state, draggable: draggable, content: content)
+            case .sheet(_, let draggable, _, let body):
+                SheetLayer(entry: entry, state: state, draggable: draggable, content: body.content, footer: body.footer)
             case .dialog(let spec):
                 DialogLayer(entry: entry, state: state, spec: spec, dimBelow: hasBelow)
             case .menu(let anchor, let items):
@@ -345,7 +400,7 @@ struct OverlayHost<Content: View>: View {
         // escape는 층 컨테이너에 건다(VoiceOver는 초점 요소에서 컨테이너를 따라 올라가며 escape를 보낸다). 가장 위 층만 닫는다.
         .wlAccessibilityCovered(!isTop || entry.phase != .open)
         .accessibilityLabel(entry.kind.accessibilityTitle)
-        .accessibilityAction(.escape) { if isTop { state.dismiss() } }
+        .accessibilityAction(.escape) { if isTop { state.userDismiss(entry.id) } }
     }
 
     /// 막: 열 때 400 ease-out, 닫을 때 260 ease-in. 닫기 모션이 끝날 때까지 막(과 입력 차단)을 남긴다.

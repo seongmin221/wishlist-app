@@ -12,8 +12,6 @@ struct DemoDetailScreen: View {
         switch destination {
         case .product(let id):
             if let p = DemoContent.product(id) { DemoProductDetail(product: p) }
-        case .categoryList(let top, let chip):
-            DemoCategoryList(top: top, chip: DemoContent.chip(top: top, name: chip) ?? DemoChip(name: chip, count: 0))
         case .purpose(let id):
             if let p = DemoContent.purpose(id) { DemoPurposeDetail(purpose: p) }
         }
@@ -181,70 +179,6 @@ private struct DemoInfoRow<Value: View>: View {
         .padding(.horizontal, WishlistTokens.Space.s16)
         .frame(minHeight: 56)
         .accessibilityElement(children: .combine)
-    }
-}
-
-// MARK: - 세부 유형 목록 (FCategoryListL)
-
-/// 칩 → 세부 유형 상품 목록: 스크롤 시 위에 붙는 머리(뒤로 + 제목·개수 + 상위 이름) + 2열 엇갈림 사진 카드. 탭 바 보임.
-/// 사진 카드 → 상품 상세는 사진 공유 요소 이동(스택 깊이 2).
-private struct DemoCategoryList: View {
-    let top: String
-    let chip: DemoChip
-
-    @Environment(\.wlColors) private var c
-    @Environment(\.wlNavigator) private var nav
-    @Environment(\.wlEntryID) private var entryID
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            // 밀기 동안 아래 화면이 비치지 않게 자기 바탕을 칠한다.
-            c.background.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    Section {
-                        Masonry2Col(gap: WishlistTokens.Space.s12, verticalGap: WishlistTokens.Space.s20) {
-                            ForEach(DemoContent.headphones, id: \.id) { p in
-                                DemoProductCard(product: p, sourceKey: "entry\(entryID ?? -1)/product/\(p.id)")
-                            }
-                        }
-                        .padding(.horizontal, WishlistTokens.Space.s16)
-                        .padding(.top, WishlistTokens.Space.s8)
-                        .padding(.bottom, 140)
-                    } header: {
-                        header
-                    }
-                }
-            }
-            .ignoresSafeArea(.container, edges: .bottom)
-            // 붙은 머리 위 상태 바 자리도 바탕색으로 가린다(목록이 상태 바 뒤로 비치지 않게). 스크롤 안의 붙은 머리는
-            // 안전 영역 밖을 칠하지 못하므로 실제 안전 영역 높이만큼 화면 맨 위에 따로 칠한다.
-            DemoSafeTop { safeTop, _ in
-                c.background
-                    .frame(height: safeTop)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .ignoresSafeArea(edges: .top)
-            }
-            .allowsHitTesting(false)
-        }
-    }
-
-    /// 위에 붙는 머리 = `WLTopBar`(바탕색, 상태 바 뒤까지 칠함): 뒤로 44 + 12 + 바 세로 가운데의 제목 덩어리
-    /// [제목 20/700 · 8 · 숫자 18/700 보조색(기준선) / 4 / 상위 이름 13/500]. ⋯ 메뉴는 없다(직접 만든 카테고리만 ⋯).
-    private var header: some View {
-        WLTopBar(background: c.background) {
-            DemoCircleButton(description: "뒤로", action: { nav.pop() }) { BackChevron() }
-        } center: {
-            VStack(alignment: .leading, spacing: WishlistTokens.Space.s4) {
-                HStack(alignment: .firstTextBaseline, spacing: WishlistTokens.Space.s8) {
-                    WLText(chip.name, WLTextStyle.title.resized(20), maxLines: 1).wlArrivalFocus()
-                    WLText(String(chip.count), WLTextStyle.price.resized(18), color: c.textSecondary, maxLines: 1)
-                }
-                WLText(top, .demoCaption, color: c.textSecondary, maxLines: 1)
-            }
-        } trailing: {
-            EmptyView()
-        }
     }
 }
 

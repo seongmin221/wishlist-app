@@ -20,6 +20,10 @@ final class WLEntryOwners {
     private var items: [Int: ItemDetailPresenterOwner] = [:]
     private var locals: [Int: LocalSubmissionPresenterOwner] = [:]
     private var webs: [Int: WebViewModel] = [:]
+    private var categoryHomes: [Int: CategoryHomeOwner] = [:]
+    private var categoryLists: [Int: CategoryListOwner] = [:]
+    /// C5 category Presenters; nil only in owner tests that never open a category screen.
+    let categories: CategoryFactories?
     private var retired: Set<Int> = []
     private lazy var closedItem: ItemDetailPresenterOwner = {
         let owner = ItemDetailPresenterOwner(presenter: makeItem())
@@ -35,16 +39,48 @@ final class WLEntryOwners {
     init(
         makeItem: @escaping () -> ItemDetailPresenter,
         makeLocal: @escaping () -> LocalSubmissionDetailPresenter,
-        makeWeb: @escaping @MainActor (URL) -> WebViewModel = { @MainActor in WebViewModel(url: $0) }
+        makeWeb: @escaping @MainActor (URL) -> WebViewModel = { @MainActor in WebViewModel(url: $0) },
+        categories: CategoryFactories? = nil
     ) {
         self.makeItem = makeItem
         self.makeLocal = makeLocal
         self.makeWeb = makeWeb
+        self.categories = categories
     }
 
     convenience init(runtime: SharedRuntime) {
-        self.init(makeItem: { runtime.itemDetailPresenter() }, makeLocal: { runtime.localSubmissionDetailPresenter() })
+        self.init(makeItem: { runtime.itemDetailPresenter() }, makeLocal: { runtime.localSubmissionDetailPresenter() },
+                  categories: CategoryFactories(runtime: runtime))
     }
+
+    private var factories: CategoryFactories {
+        guard let categories else { preconditionFailure("WLEntryOwners built without category factories") }
+        return categories
+    }
+
+    /// The category tab root's owner (the root entry is never removed, so it lives with the app).
+    func categoryHome(_ entryId: Int) -> CategoryHomeOwner {
+        if let owner = categoryHomes[entryId] { return owner }
+        let owner = CategoryHomeOwner(presenter: factories.home())
+        if retired.contains(entryId) { owner.close(); return owner }
+        categoryHomes[entryId] = owner
+        return owner
+    }
+
+    /// A category list entry's owner; closed with the entry like the detail owners.
+    func categoryList(_ entryId: Int) -> CategoryListOwner {
+        if let owner = categoryLists[entryId] { return owner }
+        let owner = CategoryListOwner(presenter: factories.list())
+        if retired.contains(entryId) { owner.close(); return owner }
+        categoryLists[entryId] = owner
+        return owner
+    }
+
+    /// A new form owner for one sheet; the sheet closes it when it goes away.
+    func categoryForm() -> CategoryFormOwner { CategoryFormOwner(presenter: factories.form()) }
+
+    /// A new picker owner for one sheet; the sheet closes it when it goes away.
+    func categoryPicker() -> CategoryPickerOwner { CategoryPickerOwner(presenter: factories.picker()) }
 
     func itemDetail(_ entryId: Int) -> ItemDetailPresenterOwner {
         if let owner = items[entryId] { return owner }
@@ -81,6 +117,8 @@ final class WLEntryOwners {
             items.removeValue(forKey: id)?.close()
             locals.removeValue(forKey: id)?.close()
             webs.removeValue(forKey: id)?.close()
+            categoryHomes.removeValue(forKey: id)?.close()
+            categoryLists.removeValue(forKey: id)?.close()
         }
     }
 }

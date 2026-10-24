@@ -11,6 +11,20 @@ final class HomeRowTextTests: XCTestCase {
         XCTAssertEqual(HomeRowText.time(RelativeTimeHours(value: 3)), HomeText("time.hours", 3))
         XCTAssertEqual(HomeRowText.time(RelativeTimeYesterday.shared), HomeText("time.yesterday"))
         XCTAssertEqual(HomeRowText.time(RelativeTimeDays(value: 2)), HomeText("time.days", 2))
+        XCTAssertEqual(HomeRowText.time(RelativeTimeWeeks(value: 3)), HomeText("time.weeks", 3))
+        XCTAssertEqual(HomeRowText.time(RelativeTimeOnDate(year: nil, month: 9, day: 9)), HomeText("time.date", args: [9, 9]))
+        XCTAssertEqual(HomeRowText.time(RelativeTimeOnDate(year: KotlinInt(value: 2025), month: 10, day: 7)), HomeText("time.date.year", args: [2025, 10, 7]))
+    }
+
+    /// D15: the week and date keys format in both languages (several arguments in order).
+    func testWeekAndDateWording() throws {
+        let ko = try XCTUnwrap(HomeRowText.bundle(for: "ko"))
+        let en = try XCTUnwrap(HomeRowText.bundle(for: "en"))
+        XCTAssertEqual(HomeText("time.weeks", 2).resolve(ko), "2주 전")
+        XCTAssertEqual(HomeText("time.weeks", 2).resolve(en), "2 wk ago")
+        XCTAssertEqual(HomeText("time.date", args: [9, 9]).resolve(ko), "9월 9일")
+        XCTAssertEqual(HomeText("time.date.year", args: [2025, 10, 7]).resolve(ko), "2025년 10월 7일")
+        XCTAssertEqual(HomeText("time.date.year", args: [2025, 10, 7]).resolve(en), "10/7/2025")
     }
 
     func testEveryRowStatusHasAMetaKey() {
@@ -68,7 +82,7 @@ final class HomeRowTextTests: XCTestCase {
             "home.todo", "home.todo.count", "home.pending.title", "home.pending.subtitle", "home.pending.meta", "home.original",
             "home.processing.title", "home.processing.subtitle", "home.expand", "home.collapse",
             "row.sending", "row.waiting.network", "row.retrying", "row.needs.sign.in", "row.failed", "row.processing",
-            "time.just.now", "time.minutes", "time.hours", "time.yesterday", "time.days",
+            "time.just.now", "time.minutes", "time.hours", "time.yesterday", "time.days", "time.weeks", "time.date", "time.date.year",
             "settings.title", "settings.back", "settings.account", "settings.signed.in.google", "settings.signed.in.apple", "settings.logout",
             "settings.login.hint", "settings.login", "settings.original.links", "settings.webview.clear", "settings.webview.clear.hint",
             "settings.webview.cleared", "settings.app.info", "settings.version",

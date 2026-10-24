@@ -138,3 +138,17 @@
 - **아이콘:** `WLLineIcon.close·lock·reload·share·globe·copy·apps·phone`(Android와 같은 path).
 - **시뮬레이터 확인(2026-10-10, iPhone 17 Pro, `http://127.0.0.1` 시험 페이지, 커밋하지 않은 launch argument push):** 링크 → 제목·뒤로/앞으로, `target=_blank` 같은 웹뷰, `tel:` 탭은 확인창 없음(앱 없음 → 아무 일도 없음), 탭 1.5초 뒤 JS `tel:` → 확인창, 취소 뒤 같은 페이지에서 다시 → 확인창 없음, 광고 iframe의 `itms-apps:` 반복 → 확인창 한 번·취소 뒤 버림·어느 frame도 이동 안 함, 공유 시트·링크 복사(pasteboard 확인 + 안내)·`UIActivityViewController`, 기록 없을 때 가장자리 끌기 → pop, 기록 있을 때 셸 pop 안 됨, 연결 거부 → 실패 덮개, 제목 없는 페이지 → 도메인만. http://localhost(IP)는 ATS 예외 없이 열렸다.
 - **남은 점:** 합성 터치(serve-sim)로는 WKWebView 자체의 기록 스와이프가 동작하지 않아 손가락 확인이 남았다. WebKit 제한 포트(예: `:1`)는 실패 콜백 없이 빈 페이지다. 흰 페이지 위의 "링크를 복사했어요" pill(카드색)은 대비가 약하다(Android와 같은 부품). "외부 브라우저로 열기"는 앱을 떠나므로 시뮬레이터에서 누르지 않았다.
+
+## 카테고리 탭 (C5)
+
+> 2026-10-15 C5 Task 15~18. 규칙은 [C5 설계](../../superpowers/specs/2026-10-14-client-c5-category-design.md), Android 쪽은 [android.md](android.md#카테고리-탭-c5). 화면 확인 사진은 `docs/history/architecture/client/c5-shots/ios/`.
+
+- **화면 위치:** `Features/Category/{CategoryHomeScreen,CategoryPager,CategoryListScreen,CategoryFormView,CategoryFormSheet,CategoryFormButtons,CategoryPickerSheet,CategoryOwners,CategoryText,PhotoPagePlan}`. route는 `AppDestination.categoryList(hint)`(탭 바 유지 slide, 계정 범위). 카테고리 탭 루트가 실제 화면이고 release 빈 화면은 목적 탭만 남았다. `DemoCategoryScreen`은 지웠다.
+- **owner:** `WLEntryOwners`가 칸마다 카테고리 owner(첫 화면·목록·폼·선택)를 만들고 닫는다(C4 패턴).
+- **첫 화면:** 레일 + 직접 만든 세로 페이저(드래그 진행값 + 300ms `emphasized` 스냅, 페이지가 화면보다 길면 페이지 안을 먼저 움직임·관성 없음). 첫 페이지 위 당겨서 새로고침은 직접 그린 ProgressView. 로그인 전·빈 탭은 D5·D6.
+- **목록:** 지연 생성 두 열(120개를 다 그리지 않고 화면 밖 카드의 요청 취소). 열 배정은 고정된 사진 비율 + 글 높이 어림. owner가 그 페이지 사진을 미리 받아 크기를 알면 skeleton을 끝낸다(이미지는 로더 캐시에만, owner는 비율만 보관). `PhotoPagePlan.Item`은 사진 URL을 함께 담아, 배치한 상품의 사진이 바뀌면 배치를 처음부터 다시 한다. 카드도 사진을 받은 URL을 기억해 바뀐 사진을 다시 받는다.
+- **사진 로더(`Platform/RemoteImage.swift`):** `image(for:width:scale:maxPixels:)`가 이미지와 EXIF 적용 원본 크기를 돌려준다. 기다리는 쪽이 모두 취소되면 안쪽 다운로드 Task를 취소한다(`withTaskCancellationHandler`). 로더 전체 허가 6개(`AsyncPermits`)로 실제 받기·디코드를 제한하고, 허가를 기다리다 취소된 요청은 시작하지 않는다. 디코드 픽셀은 열 폭² × 3 이하.
+- **입력:** `WLInput(limitUnit: .codePoint)`. marked text 동안 자르지 않고(`WLInputComposition`), 확정 뒤 상한 안의 마지막 grapheme 경계에서 자른다([QA-CLI-017](../../learning/client/q-and-a/QA-CLI-017-code-point-input-limit.md)).
+- **시트:** `OverlayHost`에 `SheetGuard`(allow/block/confirm)와 footer 영역을 더했다. 폼 시트는 취소·만들기/저장 줄을 footer로 하단에 고정하고 내용만 스크롤한다. 제출 중에는 guard가 막 누르기·끌기·VoiceOver escape를 막고, 주 버튼은 진행 표시("불러오는 중")로 바뀐다(2026-10-15 결정).
+- **DEBUG:** `Debug/SeedImageProtocol.swift`(`seed.wishlist.invalid` `/tall/` 1:4, `/slow/` 5초), launch 인자 `-wl.fake.longCategory <id>`·`-wl.fake.delayCategoryCreate <ms>`·`-wl.fake.editCategoryOnSave <name>`(첫 편집 저장 직전 Fake에서 이름을 바꿔 409 재현), 설정의 개발용 줄(선택 시트 열기, 다른 기기에서 이름 바꾸기).
+- **남은 점:** 소프트웨어 키보드가 올라온 상태의 footer는 시뮬레이터에서 직접 보지 못했다(하드웨어 키보드 연결). VoiceOver로 페이지를 넘기는 길은 레일 버튼뿐이다. IME 조합 중 동작은 기존 `WLInputComposition`에 기대고 자르는 함수만 테스트했다.

@@ -1,5 +1,9 @@
 import SwiftUI
 
+/// 길이 제한을 세는 단위. 기본은 글자 묶음(grapheme, 화면에 보이는 글자)이고, C5 카테고리 폼은 서버 계약대로
+/// Unicode code point를 센다(이모지 하나 = 1, ZWJ 가족 이모지 = 여러 개).
+enum WLInputLimitUnit { case grapheme, codePoint }
+
 /// 입력칸: 테두리 없는 면(카드색, 시트·확인창 위는 sheetField)·모서리 m 20·높이 56(여러 줄이면 `minLines`로 늘어난다).
 /// 위 라벨(13)과 오른쪽 보조 글자(예: "최대 40자")는 `label`·`hint`로 준다.
 struct WLInput: View {
@@ -10,7 +14,10 @@ struct WLInput: View {
     var singleLine = true
     var minLines = 1
     var maxLength = Int.max
+    var limitUnit: WLInputLimitUnit = .grapheme
     var keyboard: UIKeyboardType = .default
+    /// 키보드 완료(↵)에 불린다(한 줄 입력칸). nil이면 기본 동작(키보드 내림).
+    var onSubmit: (() -> Void)?
 
     @Environment(\.wlColors) private var c
     @Environment(\.wlOnSheet) private var onSheet
@@ -19,12 +26,29 @@ struct WLInput: View {
 
     private func reconcile() {
         guard !composition.isComposing else { return }
-        let truncated = WLInput.truncate(value, maxLength: maxLength)
+        let truncated = WLInput.truncate(value, maxLength: maxLength, unit: limitUnit)
         if value != truncated { value = truncated }
     }
 
-    static func truncate(_ text: String, maxLength: Int) -> String {
-        String(text.prefix(max(0, maxLength)))
+    /// IME 조합이 끝난 글자에만 쓴다(조합 중에는 부르지 않는다). code point 단위는 상한 안에 들어가는
+    /// 마지막 글자 묶음 경계에서 자른다: surrogate 쌍·ZWJ 묶음을 반쪽으로 남기지 않는다(상한 근처 이모지는 통째로 빠진다).
+    static func truncate(_ text: String, maxLength: Int, unit: WLInputLimitUnit = .grapheme) -> String {
+        let limit = max(0, maxLength)
+        switch unit {
+        case .grapheme:
+            return String(text.prefix(limit))
+        case .codePoint:
+            if text.unicodeScalars.count <= limit { return text }
+            var used = 0
+            var end = text.startIndex
+            for character in text {
+                let n = character.unicodeScalars.count
+                if used + n > limit { break }
+                used += n
+                end = text.index(after: end)
+            }
+            return String(text[..<end])
+        }
     }
 
     var body: some View {
@@ -57,6 +81,7 @@ struct WLInput: View {
         }
         .onChange(of: value, initial: true) { _, _ in reconcile() }
         .onChange(of: maxLength) { _, _ in reconcile() }
+        .onChange(of: limitUnit) { _, _ in reconcile() }
     }
 
     private var prompt: Text {
@@ -65,7 +90,11 @@ struct WLInput: View {
 
     @ViewBuilder private var field: some View {
         if singleLine {
-            TextField("", text: $value, prompt: prompt)
+            if let onSubmit {
+                TextField("", text: $value, prompt: prompt).submitLabel(.done).onSubmit(onSubmit)
+            } else {
+                TextField("", text: $value, prompt: prompt)
+            }
         } else {
             TextField("", text: $value, prompt: prompt, axis: .vertical).lineLimit(minLines...)
         }

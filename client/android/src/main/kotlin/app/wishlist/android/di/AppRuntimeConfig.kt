@@ -19,7 +19,7 @@ internal object AppRuntimeConfig {
             // C2 Fake wire APIs only; every other API is explicitly unavailable.
             RepositoryBindings(
                 ClientBuildMode.DEBUG,
-                allBackends(Backend.UNAVAILABLE) + mapOf(ApiId.ITEM_01 to Backend.FAKE, ApiId.ITEM_03 to Backend.FAKE),
+                allBackends(Backend.UNAVAILABLE) + DEBUG_FAKE_APIS.associateWith { Backend.FAKE },
             )
         } else {
             // C2 release: all 37 APIs unavailable.
@@ -28,3 +28,8 @@ internal object AppRuntimeConfig {
 
     private fun allBackends(backend: Backend): Map<ApiId, Backend> = ApiId.entries.associateWith { backend }
 }
+
+/** APIs the DEBUG app runs on the Fake backend: C2/C3 ITEM-01·03, C5 CAT-01~04 and ITEM-02. */
+internal val DEBUG_FAKE_APIS: Set<ApiId> = setOf(
+    ApiId.ITEM_01, ApiId.ITEM_03, ApiId.ITEM_02, ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04,
+)

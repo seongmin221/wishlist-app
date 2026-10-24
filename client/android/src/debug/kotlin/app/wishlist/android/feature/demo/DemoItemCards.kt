@@ -36,49 +36,6 @@ import app.wishlist.android.designsystem.WishlistTokens
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.wlSharedPhoto
 
-/**
- * 세부 유형 목록(FCategoryListL): 위에 붙은 머리(`WLTopBar`: 뒤로 + "헤드폰 8" + 상위 이름) + 2열 엇갈림 사진 카드. 탭 바 보임.
- * 머리는 스크롤 밖에 고정되고(보드의 sticky와 같은 모습) 바탕색이 상태 바 뒤까지 덮는다. 목록은 바 아래 8부터.
- */
-@Composable
-internal fun DemoCategoryListScreen(route: DemoRoute.CategoryList, sourceKey: String?) {
-    val c = LocalWLColors.current
-    val nav = LocalWLNavigator.current
-    val count = DemoContent.type(route.top, route.type)?.count ?: 0
-    // 밀기 전환에서 아래 화면이 비치지 않게 바탕을 직접 칠한다.
-    Box(Modifier.fillMaxSize().background(c.background)) {
-        Column(Modifier.fillMaxSize()) {
-            // 위에 붙는 머리 = 위쪽 바(바탕색, 상태 바 뒤까지 칠함). 목록은 그 아래에서만 스크롤해 상태 바 영역에 비치지 않는다.
-            WLTopBar(
-                background = c.background,
-                // 화면의 뒤로 버튼도 시스템 뒤로와 같은 pop 전환을 쓴다(진행값 없는 뒤로).
-                leading = { DemoCircleButton("뒤로", onClick = { nav.pop() }) { DemoIconView(DemoIcon.Back) } },
-                title = {
-                    // 제목 덩어리(제목 20/700 + 개수 18/700, 4, 상위 이름 13/500)를 바 안 세로 가운데에.
-                    Column(verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8)) {
-                            WLText(route.type, WLType.title.copy(fontSize = 20.sp), Modifier.weight(1f, fill = false).alignByBaseline(),
-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            WLText(count.toString(), WLType.price, Modifier.alignByBaseline(), color = c.textSecondary, maxLines = 1)
-                        }
-                        WLText(route.top, DemoCaption, color = c.textSecondary, maxLines = 1)
-                    }
-                },
-            )
-            Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-                DemoItemGrid(
-                    DemoContent.items,
-                    sourceKeyPrefix = "list/${route.top}/${route.type}",
-                    meta = { it.listMeta },
-                    dot = { it.purpose?.color },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = WishlistTokens.Space.s8),
-                )
-                TabBarSpacer()
-            }
-        }
-    }
-}
-
 /** 상품 카드 2열 엇갈림(열 간격 12, 카드 세로 간격 20). 카드 → 상품 상세는 사진 이동. */
 @Composable
 internal fun DemoItemGrid(

@@ -39,14 +39,17 @@ fun WLInput(
     singleLine: Boolean = true,
     minLines: Int = 1,
     maxLength: Int = Int.MAX_VALUE,
+    limitUnit: InputLimitUnit = InputLimitUnit.Grapheme,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    onKeyboardAction: (() -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     require(maxLength >= 0) { "maxLength must be non-negative" }
     // InputTransformation cannot inspect the incoming composing range (buffer API is internal).
     // Observe the single field state after framework edits, and leave every IME composition intact.
-    LaunchedEffect(state, maxLength) {
+    LaunchedEffect(state, maxLength, limitUnit) {
         snapshotFlow { state.text.toString() to state.composition }.collect {
-            enforceCommittedInputLimit(state, maxLength)
+            enforceCommittedInputLimit(state, maxLength, limitUnit)
         }
     }
     val c = LocalWLColors.current
@@ -65,6 +68,8 @@ fun WLInput(
             textStyle = WLType.button.copy(color = c.text),
             cursorBrush = SolidColor(c.text),
             keyboardOptions = keyboardOptions,
+            onKeyboardAction = onKeyboardAction?.let { action -> androidx.compose.foundation.text.input.KeyboardActionHandler { action() } },
+            enabled = enabled,
             // Do not override contentDescription: TalkBack must announce editable text and selection.
             modifier = Modifier.fillMaxWidth(),
             decorator = { inner ->
@@ -109,11 +114,36 @@ internal fun graphemeLimitEnd(text: CharSequence, maxLength: Int): Int {
     return end
 }
 
-/** Programmatic edits, paste, and limit changes share the same committed-state normalization. */
-internal fun enforceCommittedInputLimit(state: TextFieldState, maxLength: Int) {
+/** What [WLInput]'s `maxLength` counts. CodePoint is the server's unit for C5 category fields. */
+enum class InputLimitUnit { Grapheme, CodePoint }
+
+/**
+ * Returns a UTF-16 boundary at the end of the last whole grapheme cluster whose code points still
+ * fit in [maxCodePoints]: a surrogate pair or a ZWJ emoji is never cut in half (it may drop as a whole).
+ */
+internal fun codePointLimitEnd(text: CharSequence, maxCodePoints: Int): Int {
+    require(maxCodePoints >= 0)
+    if (maxCodePoints == Int.MAX_VALUE) return text.length
+    val matcher = GraphemePattern.matcher(text)
+    var end = 0
+    var used = 0
+    while (matcher.find()) {
+        val cluster = Character.codePointCount(text, matcher.start(), matcher.end())
+        if (used + cluster > maxCodePoints) break
+        used += cluster
+        end = matcher.end()
+    }
+    return end
+}
+
+/** Programmatic edits, paste, and limit changes share the same committed-state normalization (never during IME composition). */
+internal fun enforceCommittedInputLimit(state: TextFieldState, maxLength: Int, unit: InputLimitUnit = InputLimitUnit.Grapheme) {
     if (state.composition != null) return
     state.edit {
-        val end = graphemeLimitEnd(asCharSequence(), maxLength)
+        val end = when (unit) {
+            InputLimitUnit.Grapheme -> graphemeLimitEnd(asCharSequence(), maxLength)
+            InputLimitUnit.CodePoint -> codePointLimitEnd(asCharSequence(), maxLength)
+        }
         if (end < length) replace(end, length, "")
     }
 }

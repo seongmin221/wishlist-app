@@ -34,7 +34,7 @@ final class DetailTextTests: XCTestCase {
             case .notFound: "detail.not.found"
             default: "detail.error.server"
             }
-            let error = ClientError(kind: kind, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil)
+            let error = ClientError(kind: kind, code: nil, requestId: nil, currentVersion: nil, retryAfterSeconds: nil, fields: [])
             XCTAssertEqual(DetailText.errorKey(error), expected, kind.name)
         }
     }

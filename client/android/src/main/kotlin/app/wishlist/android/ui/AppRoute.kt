@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Modifier
 import app.wishlist.android.designsystem.*
+import app.wishlist.android.feature.category.CategoryHomeScreen
+import app.wishlist.android.feature.category.CategoryListRoute
+import app.wishlist.android.feature.category.CategoryListScreen
 import app.wishlist.android.feature.detail.ItemDetailScreen
 import app.wishlist.android.feature.detail.LocalSubmissionScreen
 import app.wishlist.android.feature.home.HomeScreen
@@ -20,11 +23,13 @@ import app.wishlist.android.navigation.*
 internal fun AppRoute(route: WLRoute, sourceKey: String?) {
     when (route) {
         WLRoute.TabRoot(WLTab.Home) -> HomeScreen()
+        WLRoute.TabRoot(WLTab.Category) -> CategoryHomeScreen()
         SettingsRoute -> SettingsScreen()
         LoginRoute -> LoginScreen(LoginMode.Pushed)
         is ItemDetailRoute -> ItemDetailScreen(route.itemId)
         is LocalSubmissionRoute -> LocalSubmissionScreen(route.submissionId)
         is WebViewRoute -> WebViewScreen(route)
+        is CategoryListRoute -> CategoryListScreen(route)
         else -> if (!VariantRoutes.Content(route, sourceKey)) {
             when (route) {
                 is WLRoute.TabRoot -> PlainTabRoot(route.tab)
@@ -34,7 +39,7 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
     }
 }
 
-/** release 빌드의 카테고리·목적 탭 첫 화면(아직 기능 화면이 없다). */
+/** release 빌드의 목적 탭 첫 화면(아직 기능 화면이 없다, C6). */
 @Composable
 private fun PlainTabRoot(tab: WLTab) {
     Column(

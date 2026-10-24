@@ -102,12 +102,8 @@ private struct LocalSubmissionContent: View {
         }
     }
 
-    /// Closes every overlay, waiting a frame at a time while one is still opening (dismissAll refuses then).
     private func closeOverlays() async {
-        guard let overlay else { return }
-        while !overlay.entries.isEmpty, !overlay.dismissAll(), !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 16_000_000)
-        }
+        await overlay?.dismissAllWhenSettled()
     }
 
     private var exit: LocalExit {
