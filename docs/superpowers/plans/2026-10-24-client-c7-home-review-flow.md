@@ -91,7 +91,7 @@ Fake 규칙: 그룹 = `homeActionGroup(item.requiredAction)`(ACTIVE만), 정렬 
 - Produces:
   - `data class HomeGroupCard(val group: HomeActionGroup, val count: Int, val previews: List<HomePreview>)`
   - `HomeState.LoggedIn(val pending: List<HomeRow>, val groups: List<HomeGroupCard>, val purposes: List<PurposeSummary>, val todoCount: Int, val summaryLoaded: Boolean, val summaryError: ClientError?, val refreshing: Boolean, val refreshFailed: Boolean)` — `groups`는 count>0만, 고정 순서 `CLASSIFICATION_REVIEW, INFORMATION_COMPLETION, ANALYSIS_IN_PROGRESS`(보드 위→아래). `pending`은 기기 미전송(기존 local 행). `todoCount = pending.size + 세 그룹 count 합`.
-  - intents: `appeared()`(홈이 보일 때 HOME-01 조회), `foreground()`(= coordinator refresh + HOME-01), 기존 `refresh()/refreshNow()`(coordinator refresh 후 HOME-01, 둘 다 끝나야 refreshing=false), `retry()`, `tick()`. coordinator `refreshes` 증가 시 HOME-01 재조회(single-flight, 진행 중이면 한 번 더 예약). 
+  - intents: `appeared()`(홈이 보일 때 HOME-01 조회), `foreground()`(= coordinator refresh + HOME-01), 기존 `refresh()/refreshNow()`(coordinator refresh 후 HOME-01, 둘 다 끝나야 refreshing=false), `retry()`, `tick()`. coordinator `refreshes` 증가 시 HOME-01 재조회(single-flight, 진행 중이면 한 번 더 예약).
   - 계정 전환: summary 초기화, 옛 응답 무시. LoggedOut 그대로.
 
 - [ ] **Step 1: 실패 테스트** — `todoCountSumsPendingAndGroups`(pending 1 + 3/3/1 → 8), `groupsHideZeroAndKeepBoardOrder`, `purposesComeFromSummary`, `refreshRunsCoordinatorThenSummary`, `coordinatorRefreshReloadsSummaryOnce`(refreshes 2번 빠르게 → 조회 ≤2, 동시 1), `summaryFailureKeepsLast`(성공 후 실패 → groups 유지, refreshFailed=true; 첫 실패 → summaryError), `staleSessionSummaryDropped`, `noTimerRequests`(시간만 흘려도 HOME-01 호출 0 — `tick()` 포함).

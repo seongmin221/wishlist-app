@@ -11,5 +11,6 @@
 - [B6 사용자 이미지 업로드](2026-10-12-b6-media-upload-design.md) — 구현 완료 · JPEG 5MiB·signed PUT 직접 업로드·15분 intent·completion 검증·표시 URL·24시간 미참조 정리
 - [B7 상품 사용자 변경](2026-10-14-b7-item-mutations-design.md) — 구현 완료 · 편집·직접 보완·검토·삭제·재분석·deletionImpact·잠금/오류 순서
 
-- [C6 목적 화면 설계 — PUR-01~04·목록 전체 재조회·머리 시트·생성·편집](2026-10-24-client-c6-purpose-design.md)
+- [C6 목적 화면 설계 — PUR-01~04·목록 전체 재조회·머리 시트·생성·편집](2026-10-24-client-c6-purpose-design.md) — #23 MERGED `896fbc2`
 - [B8 후보 이동과 영향 확인 삭제 설계](2026-10-24-b8-candidate-move-deletions-design.md) — B8a/b/c 계약·원자성·삭제 재검증 · 구현 완료
+- [C7 홈·연속 처리·목록 anchor 설계 — HOME-01/02·ITEM-02 window·카드 모션](2026-10-24-client-c7-home-review-flow-design.md) — 구현·로컬 검증 완료, 실서버 미검증 ([기록](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md))
