@@ -354,3 +354,13 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 | 생성 응답을 잃은 뒤 입력을 바꿔 다시 만들면 새 key라서 처음 시도가 실제로 성공했다면 카테고리가 하나 더 생길 수 있다(이름이 같으면 중복 409로 막힘). 폼을 닫았다 다시 열어도 보낸 payload는 잊는다 | 알려진 한계 |
 | code point 상한 근처의 emoji 묶음은 반쪽 대신 통째로 빠진다 | 알려진 한계 |
 | skeleton 제한 시간 3초. 그 뒤 온 사진은 1:1 칸을 채워 자른다 | 알려진 한계 |
+
+## 목적 화면 (C6)
+
+`PurposeRepository`는 PUR-01 SUMMARY 전체 snapshot·PUR-02 생성·PUR-03 상세·PUR-04 변경 필드 PATCH를 제공한다. `PurposeStyleKeys`는 대문자 wire key와 소문자 UI token 경계를 고정한다. 기존 C2 `Purpose`·`CatalogRepository`는 테스트·seed 호환용으로 남고 새 화면은 사용하지 않는다. SELECT는 C8 소비 화면에서 연결한다.
+
+`PurposeHomePresenter`, `PurposeDetailPresenter`, `PurposeFormPresenter`는 `SessionLane`의 단일 실행 lane과 계정 snapshot publication guard를 사용한다. 홈은 기존 목록을 유지하며 갱신 실패를 알린다. 상세 머리와 후보 페이지는 독립 실패·재시도를 제공하고, 편집 응답을 적용하면 오래된 머리 조회를 취소한다. 첫 페이지 교체·이어 붙이기만 제공하며 anchor 복원은 C7이다.
+
+생성 폼은 응답 유실 가능 실패에만 payload와 멱등 key를 보관한다. 편집은 바뀐 필드만 보내며 빈 설명은 명시 null이다. C5의 충돌 복구 정책(최신값이 요청값이면 성공, 아니면 최신 초안 교체·안내, 재조회 실패 시 초안 유지·저장 차단)을 따른다. 제출 중 입력·닫기를 잠그고 계정 변경과 close는 요청을 취소한다. 오프라인 편집 큐는 없다.
+
+[설계](../../superpowers/specs/2026-10-24-client-c6-purpose-design.md) · [실행·검증 기록](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).

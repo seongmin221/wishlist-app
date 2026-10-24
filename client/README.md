@@ -4,7 +4,7 @@ iOS는 SwiftUI, Android는 Jetpack Compose, 공통 비즈니스 계층은 KMP로
 
 ## 현재 범위
 
-C1은 디자인 토큰 생성기, 서체·글자 스타일, 공통 컴포넌트, 시트·확인창·메뉴 overlay, 탭 셸과 자체 라우터(공유 요소 화면 이동, 끌어서 뒤로)를 두 앱에 구현했다. 탭 첫 화면은 debug 빌드에서 이것들을 보여 주는 데모다. C2는 화면 없이 공통 KMP 핵심(상품 모델·상태 정책·가격 표기, Fake/Remote(ITEM-01·03)·계정별 SQLDelight 캐시, API별 backend 조립 `SharedRuntime`, 상품 상세 Presenter 기반)을 구현했다. C3는 첫 실제 기능인 공유 저장을 두 앱에 구현했다: Android 공유 Activity·iOS Share Extension(app group inbox), fake 로그인(실제 Firebase 연결 전), 로그인 전 홈·분석 대기, 로그인 뒤 "분류 중" 카드, 설정(로그아웃·웹뷰 데이터 삭제). 상품 상세·카테고리·목적 등 나머지 기능 화면은 아직 없다. 구조는 [디자인 시스템과 앱 뼈대](../docs/architecture/client/design-system.md)와 [KMP 구조](../docs/architecture/client/kmp.md)를 따른다.
+C1은 디자인 토큰 생성기, 서체·글자 스타일, 공통 컴포넌트, 시트·확인창·메뉴 overlay, 탭 셸과 자체 라우터(공유 요소 화면 이동, 끌어서 뒤로)를 두 앱에 구현했다. 탭 첫 화면은 debug 빌드에서 이것들을 보여 주는 데모다. C2는 화면 없이 공통 KMP 핵심(상품 모델·상태 정책·가격 표기, Fake/Remote(ITEM-01·03)·계정별 SQLDelight 캐시, API별 backend 조립 `SharedRuntime`, 상품 상세 Presenter 기반)을 구현했다. C3는 첫 실제 기능인 공유 저장을 두 앱에 구현했다: Android 공유 Activity·iOS Share Extension(app group inbox), fake 로그인(실제 Firebase 연결 전), 로그인 전 홈·분석 대기, 로그인 뒤 "분류 중" 카드, 설정(로그아웃·웹뷰 데이터 삭제). C4는 상품 상세·원본 웹뷰, C5 PR A #21은 카테고리 탭·목록·생성·편집·선택 시트를 구현했다. C6는 목적 탭·생성·상세 머리 시트·그 자리 편집과 PUR-01 SUMMARY·PUR-02~04, ITEM-02 purposeId Fake/Remote 계약을 구현한다. DEBUG 앱은 Fake이고 RELEASE는 UNAVAILABLE이다. C5 사진 공유 요소 PR B #22는 Draft OPEN·develop 미병합이므로 포함하지 않는다. 구조는 [디자인 시스템과 앱 뼈대](../docs/architecture/client/design-system.md)와 [KMP 구조](../docs/architecture/client/kmp.md)를 따른다.
 
 | 위치 | 역할 |
 | --- | --- |
