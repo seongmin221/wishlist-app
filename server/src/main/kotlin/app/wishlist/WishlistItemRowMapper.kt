@@ -1,5 +1,7 @@
 package app.wishlist
 
+import app.duplicates.DuplicateCounts
+import app.duplicates.DuplicateKinds
 import java.sql.ResultSet
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -15,11 +17,15 @@ object WishlistItemRowMapper {
        coalesce(pc.name, cc.name) category_name, coalesce(pc.parent_id, cc.parent_id) category_parent,
        case when i.custom_category_id is not null then 'CUSTOM' when i.category_id is not null then 'PUBLIC' end category_kind,
        p.name purpose_name, p.color_key purpose_color_key, p.icon_key purpose_icon_key,
-       m.id media_id, m.object_key media_object_key"""
+       m.id media_id, m.object_key media_object_key, dup.dup_match, dup.dup_same_url, dup.dup_awaiting"""
     val joins = """left join public_categories pc on pc.id=i.category_id
 left join custom_categories cc on cc.owner_id=i.owner_id and cc.id=i.custom_category_id and cc.deleted_at is null
 left join purposes p on p.owner_id=i.owner_id and p.id=i.purpose_id
-left join media_assets m on m.owner_id=i.owner_id and m.id=i.media_asset_id and m.status='READY'"""
+left join media_assets m on m.owner_id=i.owner_id and m.id=i.media_asset_id and m.status='READY'
+left join lateral (select count(*) filter (where k='MATCH')::int dup_match, count(*) filter (where k='SAME_URL')::int dup_same_url,
+        count(*) filter (where k='AWAITING_ANALYSIS')::int dup_awaiting
+    from (select ${DuplicateKinds.kindSql("i", "e", "d")} k from duplicate_candidates d join wishlist_items e on e.id=d.existing_item_id
+        where d.new_item_id=i.id and d.status='OPEN' and e.lifecycle_status='ACTIVE' and i.lifecycle_status='ACTIVE') pairs) dup on true"""
 
     fun map(row: ResultSet): WishlistItem {
         val overrides = row.getArray("user_override_fields")
@@ -65,6 +71,8 @@ left join media_assets m on m.owner_id=i.owner_id and m.id=i.media_asset_id and 
             currency = row.getString("product_currency"), merchant = row.getString("merchant_name"),
             metadataCheckedAt = row.getTimestamp("metadata_checked_at")?.toInstant(),
             mediaId = row.getObject("media_id", UUID::class.java), mediaObjectKey = row.getString("media_object_key"),
+            duplicateCounts = DuplicateCounts(row.getInt("dup_match"), row.getInt("dup_same_url"), row.getInt("dup_awaiting"))
+                .takeUnless { it.match == 0 && it.sameUrl == 0 && it.awaitingAnalysis == 0 },
         )
     }
 }

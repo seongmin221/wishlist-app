@@ -1,6 +1,7 @@
 package app.analysis
 
 import app.category.CategoryRef
+import app.duplicates.DuplicateDetector
 import app.purpose.PurposeMembership
 import app.wishlist.AnalysisFailureCode
 import app.wishlist.CategoryMissingReason
@@ -115,6 +116,7 @@ class AnalysisResultRepository(private val dataSource: DataSource) {
             "analysis_failure_code" to failure,
         )
         c.updateAnalyzedItem(claim.itemId, values, metadata.recordCheckedAt, classified = assigned, checkedAt = metadata.checkedAt)
+        DuplicateDetector.refresh(c, claim.itemId)
         if (applyPurpose) PurposeMembership.recordTransition(c, claim.ownerId, item.purpose?.let(UUID::fromString), purpose?.let(UUID::fromString))
         c.transitionAnalysisJob(claim.jobId, when (status) { "READY" -> "COMPLETE"; "PARTIAL" -> "PARTIAL"; else -> "FAILED" })
         return WorkerDisposition.ACKNOWLEDGE

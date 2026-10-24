@@ -69,3 +69,18 @@ class AnalysisPipeline(private val source: DataSource) {
 
 fun itemText(source: DataSource, item: UUID, column: String): String? =
     analysisScalar(source, "select $column::text from wishlist_items where id='$item'")
+
+/** A stored item with a canonical URL, as an analysis finish would leave it. */
+fun seedAnalyzedItem(source: DataSource, owner: UUID, seed: ItemSeed = ItemSeed(), canonical: String = "https://shop.example/p"): UUID =
+    seedItem(source, owner, seed).also { analysisSql(source, "update wishlist_items set canonical_url='$canonical' where id='$it'") }
+
+/** Inserts an OPEN pair directly; detection itself is covered by DuplicateDetectionTest. */
+fun seedPair(source: DataSource, owner: UUID, new: UUID, existing: UUID, bases: String = "CANONICAL_URL,SOURCE_URL"): UUID {
+    val id = UUID.randomUUID()
+    analysisSql(source, """insert into duplicate_candidates(id,owner_id,new_item_id,existing_item_id,bases)
+        values ('$id','$owner','$new','$existing',string_to_array('$bases',','))""")
+    return id
+}
+
+fun pairColumns(source: DataSource, pair: UUID): String? =
+    analysisScalar(source, "select status||' '||coalesce(decision,'-')||' '||version from duplicate_candidates where id='$pair'")

@@ -39,6 +39,8 @@ internal fun Connection.failExhausted(jobId: UUID, itemId: UUID) {
     transitionAnalysisJob(jobId, "FAILED")
     updateAnalyzedItem(itemId, linkedMapOf<String, Any?>("analysis_status" to "FAILED_RETRYABLE") + merged.assignments(),
         merged.recordCheckedAt, classified = false, checkedAt = merged.checkedAt)
+    // The merged page read may have changed identity values.
+    app.duplicates.DuplicateDetector.refresh(this, itemId)
 }
 
 /** One outbox row per analysis task; the task name is the Cloud Tasks dedupe key, a delay becomes its scheduleTime. */
