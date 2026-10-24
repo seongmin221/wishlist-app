@@ -284,6 +284,13 @@ class SharedRuntime internal constructor(
     }
 
     /**
+     * A new continuous-processing Presenter (분류·목적 확인 / 정보 보완) over HOME-02 ([homeRepository])
+     * and this runtime's [session]; one per flow screen. The platform owner calls [HomeFlowPresenter.close].
+     */
+    fun homeFlowPresenter(): app.wishlist.shared.presentation.HomeFlowPresenter =
+        app.wishlist.shared.presentation.HomeFlowPresenter(homeRepository(), session, env.dispatchers.io)
+
+    /**
      * A new local (not yet sent) link detail Presenter over the one [submissions] coordinator's view,
      * this runtime's [session] and the gated local store (accepted-link lookup); deleting goes through
      * the coordinator so the view is republished at once. The platform owner calls

@@ -100,6 +100,21 @@ class SharedModulesTest {
         assertEquals(RUNTIME_NOT_READY, home.group(HomeActionGroup.CLASSIFICATION_REVIEW).error().code)
     }
 
+    @Test fun runtime_home_flow_presenter_reads_the_seeded_review_group() = runTest {
+        val runtime = createRuntime(debugBindings(ApiId.HOME_01 to Backend.FAKE, ApiId.HOME_02 to Backend.FAKE, ApiId.PUR_01 to Backend.FAKE),
+            dispatcher = StandardTestDispatcher(testScheduler))
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        val flow = runtime.homeFlowPresenter()
+        flow.start(HomeActionGroup.CLASSIFICATION_REVIEW, null); advanceUntilIdle()
+        val state = flow.state.value
+        assertEquals("마샬 MAJOR V", state.current?.item?.product?.name)
+        assertEquals(listOf("호카 스피드고트 6", "발뮤다 더 토스터"), state.upcoming.map { it.item.product.name })
+        assertEquals(1 to 3, state.position to state.total)
+        flow.close()
+        runtime.close()
+    }
+
     // --- Explicit bindings -------------------------------------------------------------------
 
     @Test fun bindings_must_list_all_37_apis() {
