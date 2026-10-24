@@ -435,16 +435,17 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
             .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
         val after = cursor?.let { raw ->
             val parts = raw.removePrefix(CURSOR_PREFIX).split('|')
-            val millis = parts.getOrNull(0)?.toLongOrNull()
-            if (!raw.startsWith(CURSOR_PREFIX) || parts.size != 2 || millis == null)
+            // The full instant (not millis): items sharing a millisecond must not fall between pages.
+            val at = parts.getOrNull(0)?.let { runCatching { Instant.parse(it) }.getOrNull() }
+            if (!raw.startsWith(CURSOR_PREFIX) || parts.size != 2 || at == null)
                 return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_CURSOR")
-            Instant.fromEpochMilliseconds(millis) to parts[1]
+            at to parts[1]
         }
         val rest = if (after == null) all else all.filter {
             it.createdAt < after.first || (it.createdAt == after.first && it.id < after.second)
         }
         val page = rest.take(limit)
-        val next = if (rest.size > limit) page.last().let { "$CURSOR_PREFIX${it.createdAt.toEpochMilliseconds()}|${it.id}" } else null
+        val next = if (rest.size > limit) page.last().let { "$CURSOR_PREFIX${it.createdAt}|${it.id}" } else null
         ClientResult.Success(ItemPage(page.map { present(owner, it) }, all.size, next))
     }
 
@@ -476,7 +477,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         const val CUSTOM_LIMIT = 20
         const val CREATE_PER_WINDOW = 5
         val CREATE_WINDOW = 60.seconds
-        const val CURSOR_PREFIX = "fake1:"
+        const val CURSOR_PREFIX = "fake2:"
     }
 }
 

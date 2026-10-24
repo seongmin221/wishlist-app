@@ -76,6 +76,18 @@ class FakeCategorySeedTest {
         kotlin.test.assertEquals(40, first.items.size)
         kotlin.test.assertEquals("https://seed.wishlist.invalid/slow/0.jpg", first.items.first().product.imageUrl)
     }
+
+    @kotlin.test.Test fun cursorKeepsSubMillisecondCreatedAt() = kotlinx.coroutines.test.runTest {
+        val f = FakeCategoryFixture()
+        f.session.changeAccount("A")
+        val at = Instant.parse("2026-01-01T00:00:00.123456Z")
+        repeat(41) { f.store.putItem(contractItem(it, "C024", "상품 $it", LifecycleStatus.ACTIVE).copy(createdAt = at, updatedAt = at)).successValue() }
+        val first = f.items.byCategory("C024").successValue()
+        val second = f.items.byCategory("C024", first.nextCursor).successValue()
+        kotlin.test.assertEquals(41, first.totalCount)
+        kotlin.test.assertEquals(listOf(40, 1), listOf(first.items.size, second.items.size))
+        kotlin.test.assertEquals(41, (first.items + second.items).map { it.id }.toSet().size)
+    }
 }
 
 class FakeCategoryRepositoryContractTest : CategoryRepositoryContractTest() {
