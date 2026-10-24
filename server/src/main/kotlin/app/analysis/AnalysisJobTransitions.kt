@@ -38,7 +38,7 @@ internal fun Connection.failExhausted(jobId: UUID, itemId: UUID) {
     val merged = mergeMetadata(readStoredMetadata(itemId), readPendingMetadata(jobId), complete = false)
     transitionAnalysisJob(jobId, "FAILED")
     updateAnalyzedItem(itemId, linkedMapOf<String, Any?>("analysis_status" to "FAILED_RETRYABLE") + merged.assignments(),
-        merged.recordCheckedAt, classified = false)
+        merged.recordCheckedAt, classified = false, checkedAt = merged.checkedAt)
 }
 
 /** One outbox row per analysis task; the task name is the Cloud Tasks dedupe key, a delay becomes its scheduleTime. */

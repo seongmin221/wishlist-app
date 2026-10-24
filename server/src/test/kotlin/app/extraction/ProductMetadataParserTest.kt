@@ -103,4 +103,21 @@ class ProductMetadataParserTest {
         assertNull(parse("<title>Example Shop</title>", truncated = true).title)
         assertEquals("Example Shop", parse("<title>Example Shop</title>").title)
     }
+
+    @Test fun `product identifiers come from the structured product node`() {
+        val parsed = parse(jsonLd("""{"@type":"Product","name":"Speedgoat 6","brand":{"@type":"Brand","name":"HOKA"},
+            "gtin13":"4006381333931","mpn":"1123190-BBLC"}"""))
+        assertEquals("04006381333931", parsed.gtin)
+        assertEquals("hoka|1123190BBLC", parsed.mpnKey)
+        val numeric = parse(jsonLd("""{"@type":"Product","name":"Speedgoat 6","gtin":4006381333931}"""))
+        assertEquals("04006381333931", numeric.gtin)
+        assertNull(numeric.mpnKey)
+    }
+
+    @Test fun `ambiguous product pages carry no identifiers`() {
+        val parsed = parse(jsonLd("""[{"@type":"Product","name":"A","brand":"HOKA","gtin13":"4006381333931","mpn":"X-100"},
+            {"@type":"Product","name":"B","gtin13":"4006381333931"}]"""))
+        assertNull(parsed.gtin)
+        assertNull(parsed.mpnKey)
+    }
 }

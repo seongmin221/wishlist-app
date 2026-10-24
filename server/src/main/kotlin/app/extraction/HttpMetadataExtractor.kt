@@ -16,6 +16,7 @@ sealed interface ExtractionResult {
 data class Metadata(
     val title: String?, val description: String?, val imageUrl: String?, val canonicalUrl: String,
     val brand: String? = null, val price: BigDecimal? = null, val currency: String? = null, val merchant: String? = null,
+    val gtin: String? = null, val mpnKey: String? = null,
 )
 
 class HttpMetadataExtractor(
@@ -37,7 +38,8 @@ class HttpMetadataExtractor(
                 val parsed = ProductMetadataParser.parse(Jsoup.parse(response.body, current), response.truncated)
                 val title = parsed.title ?: return ExtractionResult.NeedsBrowser
                 return ExtractionResult.Complete(Metadata(title, parsed.description, parsed.imageUrl,
-                    UrlCanonicalizer.choose(parsed.declaredCanonical, current), parsed.brand, parsed.price, parsed.currency, parsed.merchant))
+                    UrlCanonicalizer.choose(parsed.declaredCanonical, current), parsed.brand, parsed.price, parsed.currency, parsed.merchant,
+                    parsed.gtin, parsed.mpnKey))
             }
         }
         return ExtractionResult.Partial

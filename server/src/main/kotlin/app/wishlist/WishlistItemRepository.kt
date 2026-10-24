@@ -45,8 +45,8 @@ class WishlistItemRepository(private val dataSource: DataSource) {
     internal fun insertItem(connection: Connection, itemId: UUID, ownerId: UUID, key: UUID, sourceUrl: String, clientCreatedAt: Instant?): Boolean =
         connection.prepareStatement("""
             insert into wishlist_items (id, owner_id, client_submission_id, source_url, client_created_at,
-                analysis_status, lifecycle_status, current_generation, category_missing_reason)
-            values (?, ?, ?, ?, ?, 'PROCESSING', 'ACTIVE', 1, 'EXTRACTION_UNRESOLVED')
+                analysis_status, lifecycle_status, current_generation, category_missing_reason, normalized_source_url)
+            values (?, ?, ?, ?, ?, 'PROCESSING', 'ACTIVE', 1, 'EXTRACTION_UNRESOLVED', ?)
             on conflict (owner_id, client_submission_id) do nothing
         """.trimIndent()).use { statement ->
             statement.setObject(1, itemId)
@@ -54,6 +54,7 @@ class WishlistItemRepository(private val dataSource: DataSource) {
             statement.setObject(3, key)
             statement.setString(4, sourceUrl)
             statement.setObject(5, clientCreatedAt?.atOffset(ZoneOffset.UTC))
+            statement.setString(6, app.extraction.UrlCanonicalizer.normalize(sourceUrl))
             statement.executeUpdate() == 1
         }
 

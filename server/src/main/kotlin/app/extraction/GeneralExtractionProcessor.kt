@@ -15,6 +15,10 @@ class GeneralExtractionProcessor(
 
     fun process(claim: AnalysisClaim): ProcessingOutcome {
         val sourceUrl = pending.sourceUrl(claim) ?: return ProcessingOutcome.Stale
+        // A READY cache hit replaces the network read only; classification still runs for this owner.
+        pending.cachedProduct(claim)?.let { cached ->
+            return if (!pending.saveMetadata(claim, cached.metadata, cached)) ProcessingOutcome.Stale else classify(claim, cached.metadata)
+        }
         val result = try { extract(sourceUrl) } catch (_: DnsLookupFailed) {
             return ProcessingOutcome.Retryable
         } catch (_: UnsafeUrlException) {
