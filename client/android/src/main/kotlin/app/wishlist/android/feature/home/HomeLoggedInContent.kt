@@ -18,18 +18,18 @@ import app.wishlist.shared.presentation.HomeState
  */
 @Composable
 internal fun HomeLoggedInContent(state: HomeState.LoggedIn) {
-    if (state.processing.isEmpty()) return
+    if (state.pending.isEmpty()) return
     HomeSection(stringResource(R.string.home_todo)) {
         var expanded by rememberExpanded("home/processing")
         HomeTodoCard(
             icon = WLLineIcon.Sorting,
             title = stringResource(R.string.home_processing_title),
             subtitle = stringResource(R.string.home_processing_subtitle),
-            count = state.processing.size,
+            count = state.pending.size,
             expanded = expanded,
             onExpandedChange = { expanded = it },
         ) {
-            state.processing.forEach { row -> key(row.key) { HomeLinkRow(row, WLLineIcon.Sorting, tileSize = 52.dp) } }
+            state.pending.forEach { row -> key(row.key) { HomeLinkRow(row, WLLineIcon.Sorting, tileSize = 52.dp) } }
         }
     }
 }

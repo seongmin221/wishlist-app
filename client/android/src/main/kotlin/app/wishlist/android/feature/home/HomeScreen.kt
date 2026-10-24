@@ -105,7 +105,7 @@ fun HomeScreen() {
                 caption = when (val s = state) {
                     HomeState.Loading -> null
                     is HomeState.LoggedOut -> stringResource(R.string.home_logged_out_caption)
-                    is HomeState.LoggedIn -> HomeRowText.todoCount(s.processing.size).resolve()
+                    is HomeState.LoggedIn -> HomeRowText.todoCount(s.todoCount).resolve()
                 },
             )
             when (val s = state) {

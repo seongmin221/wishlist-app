@@ -17,7 +17,7 @@ struct HomeScreen: View {
                 switch onEnum(of: state) {
                 case .loading: EmptyView()
                 case .loggedOut(let s): HomeLoggedOutView(pending: s.pending)
-                case .loggedIn(let s): HomeLoggedInView(processing: s.processing)
+                case .loggedIn(let s): HomeLoggedInView(processing: s.pending)
                 }
             }
             .padding(.horizontal, WishlistTokens.Space.screenMargin)
@@ -38,7 +38,7 @@ struct HomeScreen: View {
         switch onEnum(of: state) {
         case .loading: nil
         case .loggedOut: String(localized: "home.logged.out.caption")
-        case .loggedIn(let s): HomeRowText.todoCount(s.processing.count)
+        case .loggedIn(let s): HomeRowText.todoCount(Int(s.todoCount))
         }
     }
 }

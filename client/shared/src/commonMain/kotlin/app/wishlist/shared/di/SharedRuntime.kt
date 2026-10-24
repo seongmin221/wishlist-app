@@ -265,9 +265,8 @@ class SharedRuntime internal constructor(
     fun accountPresenter(): AccountPresenter = AccountPresenter(auth = auth(), dispatcher = env.dispatchers.io)
 
     /**
-     * A new home list Presenter over [auth] and the one [submissions] coordinator. Foreground
-     * refresh stays app-wide (the platform calls `submissions().refresh()`). The
-     * platform owner calls [HomePresenter.close].
+     * A new home Presenter over [auth], the one [submissions] coordinator, HOME-01 ([homeRepository])
+     * and this runtime's one [session]. The platform owner calls [HomePresenter.close].
      */
     fun homePresenter(): HomePresenter {
         val submissions = submissions()
@@ -276,6 +275,8 @@ class SharedRuntime internal constructor(
             view = submissions.view,
             refreshes = submissions.refreshes,
             runRefresh = submissions::refresh,
+            home = homeRepository(),
+            session = session,
             clock = env.clock,
             utcOffsetSeconds = env.platform.utcOffsetSeconds,
             dispatcher = env.dispatchers.io,
