@@ -34,3 +34,4 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 ## 구매 결정 마무리
 
 - [아카이브와 삭제 안전장치](archive-delete-safeguards.md) — 확정 · 2026-09-05
+- [B8 후보 이동과 삭제 정책](b8-candidate-move-deletion-policy-2026-10-24.md) — 확정 · 2026-10-24
