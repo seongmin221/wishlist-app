@@ -5,6 +5,8 @@ import SwiftUI
 /// the page still waiting (or the first load). The last cards ask for the next page.
 struct PurposeMasonry: View {
     let owner: PurposeDetailOwner
+    /// C7: cards report their frames for the first-visible anchor.
+    var anchors: ListAnchorBox?
     private var state: PurposeDetailState { owner.state }
 
     @Environment(\.displayScale) private var scale
@@ -23,6 +25,8 @@ struct PurposeMasonry: View {
                     ForEach(plan.columns[column], id: \.self) { id in
                         if let item = owner.item(id) {
                             PurposeCandidateCard(item: item, ratio: plan.ratio(id) ?? 1, owner: owner)
+                                .modifier(PurposeAnchorFrame(id: id, anchors: anchors))
+                                .id(id)
                                 .onAppear { visible.insert(id) }
                                 .onDisappear { visible.remove(id) }
                         }
@@ -138,5 +142,14 @@ private struct PurposeSkeletonCard: View {
         }
         .accessibilityElement()
         .accessibilityLabel(String(localized: "category.loading"))
+    }
+}
+
+private struct PurposeAnchorFrame: ViewModifier {
+    let id: String
+    let anchors: ListAnchorBox?
+
+    func body(content: Content) -> some View {
+        if let anchors { content.listAnchorFrame(id, into: anchors) } else { content }
     }
 }

@@ -1,13 +1,19 @@
 import Shared
 import SwiftUI
 
-/// 홈 탭 첫 화면(C3). 로그인 전은 FHomeLoggedOut(로그인 카드 + 분석 대기), 로그인 뒤는 FHome 틀에 "분류 중" 카드만
-/// (C3-D3: 이 계정의 미전송 + 캐시의 분석 중 항목, 다른 할 일 카드는 C7까지 숨김), 당겨서 새로고침이 재전송+갱신이다.
+/// 홈 탭 첫 화면(C3, C7). 로그인 전은 FHomeLoggedOut(로그인 카드 + 분석 대기), 로그인 뒤는 FHome(할 일: 분석 대기 +
+/// HOME-01 세 그룹, 비교 중인 목적), 당겨서 새로고침이 재전송+HOME-01이다.
+/// HOME-01은 홈이 보일 때(`appeared`: 첫 진입, 다른 탭·쌓인 화면에서 돌아옴)와 홈이 보이는 채 앱이 돌아올 때
+/// (`foreground`)만 읽는다. 앱 전체 foreground 신호(`AppSignals`)는 그대로 둔다(겹침은 전송 조정기가 하나로 합친다).
 /// `Loading`(복원 전·계정 전환 중)은 머리만 그려 이전 계정의 줄이 비치지 않게 한다(Android `HomeScreen`과 같다).
 /// 당겨서 새로고침은 `.refreshable`의 시스템 indicator를 쓴다(보드에 indicator 모양이 없다).
 struct HomeScreen: View {
     @Environment(HomePresenterOwner.self) private var home
     @Environment(\.wlColors) private var c
+    @Environment(\.wlNavigator) private var nav
+    @Environment(\.wlEntryID) private var entryID
+    @Environment(\.scenePhase) private var phase
+    @State private var gate = FlowForegroundGate()
 
     var body: some View {
         let state = home.state
@@ -17,7 +23,7 @@ struct HomeScreen: View {
                 switch onEnum(of: state) {
                 case .loading: EmptyView()
                 case .loggedOut(let s): HomeLoggedOutView(pending: s.pending)
-                case .loggedIn(let s): HomeLoggedInView(processing: s.pending)
+                case .loggedIn(let s): HomeLoggedInView(state: s)
                 }
             }
             .padding(.horizontal, WishlistTokens.Space.screenMargin)
@@ -32,6 +38,15 @@ struct HomeScreen: View {
                 home.tick()
             }
         }
+        .task(id: visible) { if visible { home.appeared() } }
+        .onChange(of: phase) { _, phase in
+            if gate.shouldForeground(phase, visible: visible) { home.foreground() }
+        }
+    }
+
+    /// The home root is the home tab's top entry and that tab is shown.
+    private var visible: Bool {
+        nav.currentTab == .home && entryID != nil && nav.entries(.home).last?.id == entryID
     }
 
     private func caption(_ state: HomeState) -> String? {
@@ -112,63 +127,6 @@ struct HomeSection<Content: View>: View {
     }
 }
 
-/// 할 일 카드(분석 대기·분류 중): 갈 화면이 없어 카드 머리 전체가 펼치기이고, 오른쪽 화살표도 같은 동작이다(보드:
-/// 두 버튼, 화살표 이름 "펼치기"/"접기"). 화살표 200 `ease`, 펼침 내용 높이·opacity 200 `ease`(motion.md 작은 동작).
-struct HomeTodoCard<Rows: View>: View {
-    let icon: WLLineIcon
-    let title: String
-    let subtitle: String
-    let count: Int
-    @Binding var expanded: Bool
-    @ViewBuilder var rows: () -> Rows
-
-    @Environment(\.wlColors) private var c
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        WLCard {
-            VStack(spacing: 0) {
-                HStack(spacing: WishlistTokens.Space.s4) {
-                    Button { expanded.toggle() } label: {
-                        HStack(spacing: 14) {
-                            WLIconTile { WLIcon(icon) }
-                            VStack(alignment: .leading, spacing: 2) {
-                                WLText(title, HomeStyles.cardTitle)
-                                WLText(subtitle, HomeStyles.cardSubtitle, color: c.textSecondary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            WLText("\(count)", HomeStyles.count, maxLines: 1)
-                        }
-                        .frame(minHeight: WishlistTokens.Space.minTouch)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityValue(String(localized: expanded ? "wl.expanded" : "wl.collapsed"))
-                    Button { expanded.toggle() } label: {
-                        WLChevron(expanded: expanded)
-                            .frame(width: WishlistTokens.Space.minTouch, height: WishlistTokens.Space.minTouch)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(String(localized: expanded ? "home.collapse" : "home.expand"))
-                }
-                .padding(.init(top: 16, leading: 16, bottom: 16, trailing: 6))
-                WLDisclosureLayout(progress: expanded ? 1 : 0) {
-                    VStack(spacing: WishlistTokens.Space.s8) { rows() }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-                }
-                .clipped()
-                .opacity(expanded ? 1 : 0)
-                .allowsHitTesting(expanded)
-                .accessibilityHidden(!expanded)
-            }
-            .animation(reduceMotion ? nil : WishlistTokens.Curve.ease.animation(ms: WishlistTokens.Motion.disclosureContent), value: expanded)
-        }
-    }
-}
-
 /// 펼친 카드 안의 링크 한 줄: 묶음 면(`sheetField`, 모서리 20, 패딩 10) 위 아이콘 타일(카드색)·host·상태 줄.
 /// `original`이 있으면 오른쪽에 "원본"(로그인 전 분석 대기만, Ruling 15: 로그인 뒤 분류 중 줄은 오른쪽 동작이 없다).
 /// 줄을 누르면 상세로 간다(C4, `HomeRow.target`): 서버 상품은 `.item`, 이 기기의 링크는 `.local`(가로 밀기).
@@ -216,7 +174,7 @@ struct HomeLinkRow: View {
 }
 
 /// "원본": C4 PR B — 앱 안 웹뷰(`.web`)로 연다. `http`/`https`가 아니면 흐리게 두고 누를 수 없다. VoiceOver 이름은 "원본 열기".
-private struct OriginalLink: View {
+struct OriginalLink: View {
     let url: String
     let sourceKey: String
 

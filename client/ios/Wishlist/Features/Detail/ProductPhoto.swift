@@ -18,6 +18,8 @@ struct ProductPhoto: View {
     let imageUrl: String?
     var fill = true
     var inset: CGFloat = 0
+    /// The placeholder face (default card color; C7 tiles drawn on a card use a field color to stay visible).
+    var placeholderColor: Color?
 
     @Environment(\.wlColors) private var c
     @Environment(\.displayScale) private var scale
@@ -33,7 +35,7 @@ struct ProductPhoto: View {
 
     private var placeholder: some View {
         ZStack {
-            c.card
+            placeholderColor ?? c.card
             Canvas { ctx, sz in
                 let k = sz.width / 24
                 ctx.scaleBy(x: k, y: k)

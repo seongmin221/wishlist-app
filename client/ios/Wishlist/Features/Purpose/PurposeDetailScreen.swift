@@ -20,6 +20,8 @@ struct PurposeDetailScreen: View {
     @State private var name = ""
     @State private var description = ""
     @State private var menuAnchor = WLAnchor()
+    @State private var anchors = ListAnchorBox()
+    @State private var atTop = true
 
     var body: some View {
         let owner = owners.purposeDetail(entryID ?? -1)
@@ -38,7 +40,7 @@ struct PurposeDetailScreen: View {
                     } content: {
                         candidateContent(owner: owner, detail: detail)
                     }
-                    .refreshable { await owner.refreshAndWait() }
+                    .refreshable { await owner.refreshAndWait(anchor: firstVisible) }
                 } else {
                     VStack {
                         WLTopBar { WLCircleButton(.back, label: String(localized: "purpose.back")) { nav.pop() } } center: { EmptyView() } trailing: { EmptyView() }
@@ -51,6 +53,11 @@ struct PurposeDetailScreen: View {
                         Spacer()
                     }
                 }
+            }
+            .task(id: geometry.size.height) {
+                // C7 restore: a card goes right under the expanded sheet's top band (the sheet scrolls the whole screen).
+                anchors.topInset = WLTopBarMetrics.bottom(safeTop: safeTop) + 28 + 8
+                anchors.viewportHeight = geometry.size.height + safeTop + geometry.safeAreaInsets.bottom
             }
         }
         .toolbar {
@@ -65,7 +72,7 @@ struct PurposeDetailScreen: View {
         .task(id: visible) {
             if visible { await runtime?.purposeUntilReady() }
             guard !Task.isCancelled else { return }
-            owner.navigationChanged(id: purposeID, entryID: entryID, navigator: nav, phase: phase)
+            owner.navigationChanged(id: purposeID, entryID: entryID, navigator: nav, phase: phase, anchor: firstVisible)
         }
         #if DEBUG
         .onChange(of: detail?.id, initial: true) { _, id in
@@ -222,7 +229,33 @@ struct PurposeDetailScreen: View {
         if let id = nav.entries(.purpose).first?.id { owners.purposeHome(id).refresh() }
     }
 
-    @ViewBuilder private func candidateContent(owner: PurposeDetailOwner, detail: PurposeDetail) -> some View {
+    /// The first candidate below the sheet's top band (C7 anchor for refresh and foreground).
+    private var firstVisible: String? { anchors.firstVisible(top: sheet.sheetTop + 28) }
+
+    /// C7 list anchor inside the sheet: restore a refreshed window's card under the expanded band (a restore to
+    /// the list's first card or to the top keeps the sheet where it is), and `loadNewer` at the list's top edge.
+    private func candidateContent(owner: PurposeDetailOwner, detail: PurposeDetail) -> some View {
+        let state = owner.state
+        return ScrollViewReader { proxy in
+            VStack(alignment: .leading, spacing: WishlistTokens.Space.s12) {
+                Color.clear.frame(height: 0)
+                    .onGeometryChange(for: Bool.self) { [sheet] in $0.frame(in: .global).minY >= sheet.sheetTop - 1 } action: { atTop = $0 }
+                candidateList(owner: owner, detail: detail)
+            }
+            .modifier(ListAnchorWiring(box: anchors, restore: state.restore, laidIds: owner.plan.laidIds,
+                                       firstItemId: state.items.first?.id, prepending: state.prepending) { target in
+                guard case .item(let id) = target, id != owner.state.items.first?.id else { return }
+                ListAnchorMath.scroll(proxy, to: id, box: anchors)
+            })
+            .onChange(of: atTop && state.hasNewer && !state.prepending && !state.itemsLoading) { _, wants in
+                guard wants else { return }
+                anchors.beginPrepend(top: sheet.sheetTop + 28, firstItemId: owner.state.items.first?.id)
+                owner.loadNewer()
+            }
+        }
+    }
+
+    @ViewBuilder private func candidateList(owner: PurposeDetailOwner, detail: PurposeDetail) -> some View {
         HStack {
             WLText(HomeText("purpose.candidate.count", detail.candidateCount).resolve(), .button).accessibilityAddTraits(.isHeader)
             Spacer()
@@ -238,7 +271,7 @@ struct PurposeDetailScreen: View {
         } else if owner.state.items.isEmpty && !owner.state.itemsLoading {
             EmptyState(title: String(localized: "purpose.candidates.empty.title"), description: String(localized: "purpose.candidates.empty.body")) { WLIcon(.plus) }.padding(.top, 100)
         } else {
-            PurposeMasonry(owner: owner)
+            PurposeMasonry(owner: owner, anchors: anchors)
         }
         if owner.state.appendFailed {
             Button(String(localized: "purpose.more.failed")) { owner.retry() }.padding(.vertical, 20)

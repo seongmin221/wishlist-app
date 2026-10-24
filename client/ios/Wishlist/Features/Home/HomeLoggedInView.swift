@@ -1,29 +1,85 @@
 import Shared
 import SwiftUI
 
-/// FHome(C3-D3): "분류 중" 카드 하나. 이 계정의 미전송(보내는 중·연결되면 보내요·보낼 수 없는 링크)과 서버에서 분석 중인
-/// 항목을 한 목록으로 보여 주고, 줄이 없으면 할 일 섹션을 숨긴다. 줄에는 오른쪽 동작이 없다(Ruling 15: 보드의 삭제는
-/// C4/C8). 줄을 누르면 분석 중 항목은 상품 상세, 미전송 줄은 로컬 대기 화면으로 간다(C4, `HomeRow.target`). 줄 key는 전송이 끝나면 `local-…` → `item-…`로 바뀌는 불투명 값이라 목록 정체성으로만 쓴다.
+/// FHome 로그인 뒤(C7). 할 일: 이 기기의 미전송 "분석 대기" 카드(로그인 전 카드와 같은 모양, 줄을 누르면 로컬 대기 화면,
+/// Ruling 15로 오른쪽 동작 없음) 뒤에 HOME-01 그룹 카드(보드 순서, count > 0만). 모든 카드는 접혀 시작한다.
+/// 첫 HOME-01이 실패하면 그룹 자리에 재시도, 그 뒤 실패는 마지막 요약을 두고 짧은 안내만 보인다. 할 일이 하나도 없으면
+/// 할 일 섹션을 숨긴다. 비교 중인 목적은 HOME-01 `recentPurposes` 그대로(최대 3). 줄 key는 불투명 값이라 정체성으로만 쓴다.
 struct HomeLoggedInView: View {
-    let processing: [HomeRow]
+    let state: HomeStateLoggedIn
 
-    @State private var expanded = false
+    @Environment(HomePresenterOwner.self) private var home
+    @Environment(\.wlColors) private var c
+    #if DEBUG
+    @State private var expanded: Set<String> = C7DebugScreens.expandsHome
+        ? ["pending", "CLASSIFICATION_REVIEW", "INFORMATION_COMPLETION", "ANALYSIS_IN_PROGRESS"] : []
+    #else
+    @State private var expanded: Set<String> = []
+    #endif
 
     var body: some View {
-        if !processing.isEmpty {
+        let showsTodo = !state.pending.isEmpty || !state.groups.isEmpty || !state.summaryLoaded
+        if showsTodo {
             HomeSection(label: String(localized: "home.todo")) {
-                HomeTodoCard(
-                    icon: .sorting,
-                    title: String(localized: "home.processing.title"),
-                    subtitle: String(localized: "home.processing.subtitle"),
-                    count: processing.count,
-                    expanded: $expanded
-                ) {
-                    ForEach(processing, id: \.key) { row in
-                        HomeLinkRow(row: row, icon: .sorting, tileSize: 52)
+                if state.refreshFailed {
+                    WLText(String(localized: "home.refresh.failed"), WLTextStyle.label.resized(13), color: c.textSecondary)
+                }
+                if !state.pending.isEmpty {
+                    HomeTodoCard(
+                        icon: .clock,
+                        title: String(localized: "home.pending.title"),
+                        subtitle: String(localized: "home.pending.subtitle.signed.in"),
+                        count: state.pending.count,
+                        expanded: binding("pending")
+                    ) {
+                        ForEach(state.pending, id: \.key) { row in
+                            HomeLinkRow(row: row, icon: .clock, tileSize: 44)
+                        }
+                    }
+                }
+                ForEach(state.groups, id: \.group) { card in
+                    HomeGroupTodoCard(card: card, expanded: binding(card.group.name))
+                }
+                if !state.summaryLoaded {
+                    if state.summaryError != nil {
+                        SummaryRetry { home.retry() }
+                    } else {
+                        ProgressView().frame(maxWidth: .infinity, minHeight: 76)
                     }
                 }
             }
+        }
+        if !state.purposes.isEmpty {
+            HomePurposeSummary(purposes: state.purposes)
+        }
+    }
+
+    private func binding(_ key: String) -> Binding<Bool> {
+        Binding(get: { expanded.contains(key) }, set: { if $0 { expanded.insert(key) } else { expanded.remove(key) } })
+    }
+}
+
+/// The first HOME-01 failed: a card-colored line with 다시 시도 instead of the group cards.
+private struct SummaryRetry: View {
+    let retry: () -> Void
+
+    @Environment(\.wlColors) private var c
+
+    var body: some View {
+        WLCard {
+            HStack(spacing: WishlistTokens.Space.s12) {
+                WLIconTile { WLIcon(.warning, color: c.textSecondary) }
+                WLText(String(localized: "home.summary.failed"), HomeStyles.cardSubtitle.resized(14))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(action: retry) {
+                    WLText(String(localized: "detail.retry"), WLTextStyle.bodyBold, maxLines: 1)
+                        .padding(.horizontal, WishlistTokens.Space.s16)
+                        .frame(minHeight: WishlistTokens.Space.minTouch)
+                        .background(c.sheetField, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(WishlistTokens.Space.s16)
         }
     }
 }

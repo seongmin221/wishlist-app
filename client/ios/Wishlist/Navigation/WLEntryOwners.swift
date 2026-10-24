@@ -27,6 +27,9 @@ final class WLEntryOwners {
     private var purposeHomes: [Int: PurposeHomeOwner] = [:]
     private var purposeDetails: [Int: PurposeDetailOwner] = [:]
     let purposes: PurposeFactories?
+    /// C7 continuous-processing flows; nil only in owner tests that never open one.
+    private let makeFlow: (() -> HomeFlowPresenter)?
+    private var flows: [Int: HomeFlowOwner] = [:]
     private var retired: Set<Int> = []
     private lazy var closedItem: ItemDetailPresenterOwner = {
         let owner = ItemDetailPresenterOwner(presenter: makeItem())
@@ -44,18 +47,21 @@ final class WLEntryOwners {
         makeLocal: @escaping () -> LocalSubmissionDetailPresenter,
         makeWeb: @escaping @MainActor (URL) -> WebViewModel = { @MainActor in WebViewModel(url: $0) },
         categories: CategoryFactories? = nil,
-        purposes: PurposeFactories? = nil
+        purposes: PurposeFactories? = nil,
+        makeFlow: (() -> HomeFlowPresenter)? = nil
     ) {
         self.makeItem = makeItem
         self.makeLocal = makeLocal
         self.makeWeb = makeWeb
         self.categories = categories
         self.purposes = purposes
+        self.makeFlow = makeFlow
     }
 
     convenience init(runtime: SharedRuntime) {
         self.init(makeItem: { runtime.itemDetailPresenter() }, makeLocal: { runtime.localSubmissionDetailPresenter() },
-                  categories: CategoryFactories(runtime: runtime), purposes: PurposeFactories(runtime: runtime))
+                  categories: CategoryFactories(runtime: runtime), purposes: PurposeFactories(runtime: runtime),
+                  makeFlow: { runtime.homeFlowPresenter() })
     }
 
     private var factories: CategoryFactories {
@@ -81,6 +87,16 @@ final class WLEntryOwners {
         let owner = PurposeDetailOwner(presenter: purposeFactories.detail())
         if retired.contains(id) { owner.close(); return owner }
         purposeDetails[id] = owner
+        return owner
+    }
+
+    /// A home flow entry's owner (C7); closed with the entry like the detail owners.
+    func homeFlow(_ id: Int) -> HomeFlowOwner {
+        if let owner = flows[id] { return owner }
+        guard let makeFlow else { preconditionFailure("WLEntryOwners built without a flow factory") }
+        let owner = HomeFlowOwner(presenter: makeFlow())
+        if retired.contains(id) { owner.close(); return owner }
+        flows[id] = owner
         return owner
     }
 
@@ -149,6 +165,7 @@ final class WLEntryOwners {
             categoryLists.removeValue(forKey: id)?.close()
             purposeHomes.removeValue(forKey: id)?.close()
             purposeDetails.removeValue(forKey: id)?.close()
+            flows.removeValue(forKey: id)?.close()
         }
     }
 }

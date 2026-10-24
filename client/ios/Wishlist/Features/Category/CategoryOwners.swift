@@ -211,6 +211,16 @@ final class CategoryListOwner: CategoryStateOwner<CategoryListState> {
     func refreshHeader() { presenter.refreshHeader() }
     func applyEdited(_ detail: CustomCategoryDetail) { presenter.applyEdited(detail: detail) }
     func refreshAndWait() async { try? await presenter.refreshNow() }
+
+    // MARK: C7 anchor window
+
+    /// Pull to refresh around the first visible card (nil: the first page); sets `state.restore`.
+    func refreshAndWait(anchor: String?) async { try? await presenter.refreshNow(anchorItemId: anchor) }
+    /// A foreground return while the list is shown: the same window read, quietly.
+    func foreground(anchor: String?) { presenter.foreground(anchorItemId: anchor) }
+    /// The list reached its top edge with newer cards in front.
+    func loadNewer() { presenter.loadNewer() }
+    @ObservationIgnored var foregroundGate = FlowForegroundGate()
 }
 
 /// A create/edit form's Presenter, owned by the sheet that shows it (closed when the sheet closes).
