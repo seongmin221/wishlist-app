@@ -119,7 +119,7 @@ final class WLInputComposition {
     }
 }
 
-private struct WLInputCompositionProbe: UIViewRepresentable {
+struct WLInputCompositionProbe: UIViewRepresentable {
     let composition: WLInputComposition
     let onCommitted: () -> Void
 
