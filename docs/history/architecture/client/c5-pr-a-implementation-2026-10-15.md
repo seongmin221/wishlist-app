@@ -83,3 +83,17 @@ Android는 사용자 지시로 실기기 대신 에뮬레이터(Pixel_5 API 30, 
 고치지 않은 것: **목록 페이지가 캐시 쓰기를 기다림.** 40개를 한 transaction에 쓰는 짧은 작업이고, 기다리지 않으면 캐시 쓰기와 다음 상세 GET 쓰기의 순서가 보장되지 않는다.
 
 검증: shared Android host 635 · iOS simulator 632, Android unit debug·release 212, iOS XCTest 244(실패·skip 0), assemble·lint(0 errors, 경고 27)·`linkReleaseFrameworkIosArm64`·iOS Release simulator build·`gen_tokens --check` 통과.
+
+## PR 리뷰 반영(2026-10-24, PR #21)
+
+5건 모두 고쳤다.
+
+- **Android 여러 페이지를 읽은 뒤 새로고침하면 skeleton이 남음:** 목록이 다시 시작될 때 세대 값을 올리고, 페이지 배치 작업의 `key`·`LaunchedEffect` 인자에 넣는다. 첫 페이지의 id·순서가 같아도 배치 작업을 다시 시작한다.
+- **iOS 계정 복원이 늦으면 첫 조회 오류가 남음:** 카테고리 첫 화면은 `runtime.ready`가 true가 된 뒤 `loadOnce()`한다(Android와 같은 규칙).
+- **iOS 시트가 열리는 중 계정을 떠나면 시트가 남음:** `OverlayHostState.dismissAllWhenSettled()`로 열리는 중이면 한 프레임씩 기다렸다 모두 닫는다. 같은 로직을 쓰던 로컬 제출 상세도 이 함수를 쓴다.
+- **iOS 사진 URL이 바뀌어도 이전 사진을 표시함:** 카드가 사진을 받은 URL을 기억하고, URL이 바뀌면 새 사진을 받고 없어지면 사진을 지운다.
+- **Fake ITEM-02 cursor가 밀리초로 잘려 다음 페이지 상품이 빠짐:** cursor에 `createdAt`의 전체 Instant 문자열을 담는다(`fake2:`). 같은 `.123456Z` 시각의 상품 41개가 40·1로 나뉘는 테스트를 더했고, 고치기 전 코드에서는 40·0으로 실패하는 것을 확인했다.
+
+Android 세대 값 수정은 Compose UI 테스트 기반이 없어 테스트를 더하지 않았다.
+
+검증: shared Android host 636, Android unit debug 212(실패 0), `:android:compileDebugKotlin`·iOS Debug build 통과. iOS XCTest는 `WLTypographyTests.testMultilineTextReadsAsOneStaticText` 1건이 실패하며, 이번 변경 전 커밋에서도 같은 시뮬레이터에서 같은 결과라 이번 수정과 무관하다.
