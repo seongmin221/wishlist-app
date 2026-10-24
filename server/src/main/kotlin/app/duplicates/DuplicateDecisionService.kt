@@ -65,7 +65,8 @@ class DuplicateDecisionService(
             throw DuplicateException("DUPLICATE_CANDIDATE_NOT_FOUND")
         }
         if (pair.version != request.expectedCandidateVersion) throw DuplicateException("DUPLICATE_CANDIDATE_VERSION_CONFLICT", pair.version)
-        val kind = DuplicateKinds.kindOf(newItem.state.analysisStatus.name, canonical(c, itemId), existingItem.state.analysisStatus.name, pair.bases)
+        val kind = DuplicateKinds.kindOf(newItem.state.analysisStatus.name, canonical(c, itemId), existingItem.state.analysisStatus.name,
+            canonical(c, pair.existingItem), pair.bases)
         if (pair.status != "OPEN" || request.decision !in DuplicateKinds.allowedDecisions(kind)) {
             throw DuplicateException("DUPLICATE_DECISION_NOT_ALLOWED", pair.version)
         }

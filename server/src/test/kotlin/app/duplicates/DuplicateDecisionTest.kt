@@ -200,14 +200,17 @@ class DuplicateDecisionTest {
         val statuses = listOf("PROCESSING", "READY", "PARTIAL", "FAILED_RETRYABLE", "FAILED_TERMINAL")
         val subsets = (1 until (1 shl DuplicateBasis.entries.size)).map { mask -> DuplicateBasis.entries.filterIndexed { i, _ -> mask and (1 shl i) != 0 } }
         source.connection.use { c ->
-            for (n in statuses) for (canonical in listOf("https://shop.example/p", null)) for (e in statuses) for (bases in subsets) {
+            val canonicals = listOf("https://shop.example/p", null)
+            for (n in statuses) for (canonical in canonicals) for (e in statuses) for (existingCanonical in canonicals) for (bases in subsets) {
                 val sql = "select ${DuplicateKinds.kindSql("n", "e", "d")} from (select ?::text analysis_status, ?::text canonical_url) n, " +
-                    "(select ?::text analysis_status) e, (select string_to_array(?, ',') bases) d"
+                    "(select ?::text analysis_status, ?::text canonical_url) e, (select string_to_array(?, ',') bases) d"
                 val fromSql = c.prepareStatement(sql).use { s ->
-                    s.setString(1, n); s.setString(2, canonical); s.setString(3, e); s.setString(4, bases.joinToString(",") { it.name })
+                    s.setString(1, n); s.setString(2, canonical); s.setString(3, e); s.setString(4, existingCanonical)
+                    s.setString(5, bases.joinToString(",") { it.name })
                     s.executeQuery().use { r -> r.next(); r.getString(1) }
                 }
-                assertEquals(DuplicateKinds.kindOf(n, canonical, e, bases.toSet())?.name, fromSql, "$n $canonical $e $bases")
+                assertEquals(DuplicateKinds.kindOf(n, canonical, e, existingCanonical, bases.toSet())?.name, fromSql,
+                    "$n $canonical $e $existingCanonical $bases")
             }
         }
     }

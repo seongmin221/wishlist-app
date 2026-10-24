@@ -236,4 +236,15 @@ class DuplicateDetectionTest {
         assertTrue(""""matchCount":1""" in json(cards.getValue(second)))
         assertNull(cards.getValue(first).duplicateCounts)
     }
+
+    @Test fun `an existing item that never read its page gets a url notice for an exact re-save`() = withAnalysisDatabase { source ->
+        val pipeline = AnalysisPipeline(source)
+        val existing = pipeline.saveAndRun(owner, shop1)                        // 404: PARTIAL without a canonical
+        assertEquals("PARTIAL", itemText(source, existing, "analysis_status"))
+        assertNull(itemText(source, existing, "canonical_url"))
+        pipeline.pages[shop1] = identifiedPage("Speedgoat 6")
+        val new = pipeline.saveAndRun(owner, shop1)
+        assertEquals(listOf(pair(new, existing, "OPEN", "SOURCE_URL")), pairs(source))
+        assertEquals(DuplicateCounts(0, 1, 0), counts(source, new))
+    }
 }

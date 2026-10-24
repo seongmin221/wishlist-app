@@ -120,4 +120,15 @@ class ProductMetadataParserTest {
         assertNull(parsed.gtin)
         assertNull(parsed.mpnKey)
     }
+
+    @Test fun `variant nodes with one name share identifiers only when they agree`() {
+        val variants = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"0036000291452","mpn":"1123190-10"}]"""))
+        assertNull(variants.gtin, "the first variant's code must not stand for the page")
+        assertNull(variants.mpnKey)
+        val agreeing = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190"}]"""))
+        assertEquals("04006381333931", agreeing.gtin)
+        assertEquals("hoka|1123190", agreeing.mpnKey)
+    }
 }
