@@ -10,6 +10,7 @@ import SwiftUI
 /// - 첫 페이지 위에서 아래로 당기면 새로고침, foreground 복귀도 새로고침. 현재 탭을 다시 누르면 첫 페이지로.
 struct CategoryHomeScreen: View {
     @Environment(\.wlEntryOwners) private var owners
+    @Environment(\.wlRuntime) private var runtime
     @Environment(\.wlEntryID) private var entryID
     @Environment(\.wlNavigator) private var navigator
     @Environment(\.overlayHostState) private var overlay
@@ -52,11 +53,17 @@ struct CategoryHomeScreen: View {
             DetailNoticeLine(notice: owner.refreshNotice)
                 .padding(.top, WLTopBarMetrics.height + WishlistTokens.Space.s32)
         }
-        .onAppear { owner.loadOnce() }
+        // The first load waits for the runtime (a saved account may still be restoring and seeding).
+        .task {
+            await runtime?.untilReady()
+            if !Task.isCancelled { owner.loadOnce() }
+        }
         .onChange(of: scenePhase) { _, phase in owner.scenePhaseChanged(phase) }
         .onChange(of: account.state.account?.accountId) { previous, next in
             // Leaving the account closes any open category sheet (spec §3 계정).
-            if ContentView.shouldDropAccountScoped(previous: previous, next: next) { overlay?.dismissAll() }
+            if ContentView.shouldDropAccountScoped(previous: previous, next: next), let overlay {
+                Task { await overlay.dismissAllWhenSettled() }
+            }
         }
     }
 
@@ -127,6 +134,13 @@ private struct CategoryEmptyTab: View {
             WLButton(String(localized: "category.empty.action"), kind: .secondary, action: onCreate)
                 .frame(maxWidth: 240)
         }
+    }
+}
+
+private extension SharedRuntime {
+    /// Returns once `ready` is true (at once when it already is, or when the wait is cancelled).
+    func untilReady() async {
+        for await value in ready where value.boolValue { return }
     }
 }
 

@@ -236,6 +236,8 @@ private struct CategoryCard: View {
     @Environment(\.wlNavigator) private var nav
     @Environment(\.wlColors) private var c
     @State private var image: UIImage?
+    /// The URL `image` was loaded from: a refresh that changes or removes the product photo replaces it.
+    @State private var imageURL: URL?
 
     var body: some View {
         Button {
@@ -276,8 +278,13 @@ private struct CategoryCard: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .task(id: item.product.imageUrl) {
-            guard image == nil, let url = remotePhotoURL(item.product.imageUrl) else { return }
-            if let loaded = await owner.photo(url), !Task.isCancelled { image = loaded.image }
+            let url = remotePhotoURL(item.product.imageUrl)
+            guard image == nil || url != imageURL else { return }
+            guard let url else { image = nil; imageURL = nil; return }
+            let loaded = await owner.photo(url)
+            guard !Task.isCancelled else { return }
+            image = loaded?.image
+            imageURL = url
         }
     }
 
