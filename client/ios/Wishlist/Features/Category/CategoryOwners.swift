@@ -148,11 +148,14 @@ final class CategoryListOwner: CategoryStateOwner<CategoryListState> {
     override func applied(_ state: CategoryListState) {
         // Built once per state: the masonry looks cards up by id in every body (a linear search there is O(n²)).
         itemsById = Dictionary(state.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let items = state.items.map { PhotoPagePlan.Item(id: $0.id, hasPhoto: remotePhotoURL($0.product.imageUrl) != nil) }
-        if items.map(\.id) != plan.knownIds {
-            let before = plan.knownIds
+        let items = state.items.map { item in
+            let url = remotePhotoURL(item.product.imageUrl)
+            return PhotoPagePlan.Item(id: item.id, hasPhoto: url != nil, photo: url?.absoluteString)
+        }
+        if items != plan.knownItems {
+            let before = plan.knownItems
             plan.sync(items, now: now())
-            if !plan.knownIds.starts(with: before) {
+            if !plan.knownItems.starts(with: before) {
                 sizeTasks.values.forEach { $0.cancel() }
                 sizeTasks = [:]
             }

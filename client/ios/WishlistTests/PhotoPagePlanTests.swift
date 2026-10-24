@@ -22,6 +22,18 @@ final class PhotoPagePlanTests: XCTestCase {
         XCTAssertEqual(plan.ratio("i3")!, 2.0 / 3.0, accuracy: 0.0001)
     }
 
+    func testAChangedPhotoStartsTheLayoutOverWithItsNewRatio() {
+        var plan = PhotoPagePlan()
+        plan.sync([PhotoPagePlan.Item(id: "i1", hasPhoto: true, photo: "https://a/tall.jpg")], now: t0)
+        plan.report("i1", size: CGSize(width: 100, height: 400), now: t0)
+        XCTAssertEqual(plan.ratio("i1"), 4)
+        plan.sync([PhotoPagePlan.Item(id: "i1", hasPhoto: true, photo: "https://a/wide.jpg")], now: t0)
+        XCTAssertNil(plan.ratio("i1"))
+        XCTAssertEqual(plan.sizesNeeded, ["i1"])
+        plan.report("i1", size: CGSize(width: 400, height: 100), now: t0)
+        XCTAssertEqual(plan.ratio("i1"), 0.25)
+    }
+
     func testCardsWithoutAPhotoNeedNoWait() {
         var plan = PhotoPagePlan()
         plan.sync(items(1...2, photo: false), now: t0)
@@ -47,9 +59,9 @@ final class PhotoPagePlanTests: XCTestCase {
     func testAppendedPagesLayOutInOrder() {
         var plan = PhotoPagePlan()
         plan.sync(items(1...2, photo: false), now: t0)
-        plan.sync(items(1...4), now: t0)
+        plan.sync(items(1...2, photo: false) + items(3...4), now: t0)
         XCTAssertEqual(plan.waitingCount, 2)
-        plan.sync(items(1...6, photo: false).enumerated().map { i, item in i < 4 ? items(1...4)[i] : item }, now: t0)
+        plan.sync(items(1...2, photo: false) + items(3...4) + items(5...6, photo: false), now: t0)
         // The third page has no photos but waits for the second.
         XCTAssertEqual(plan.laidIds, ["i1", "i2"])
         plan.report("i3", size: nil, now: t0)
