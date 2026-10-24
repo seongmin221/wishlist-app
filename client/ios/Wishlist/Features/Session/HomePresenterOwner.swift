@@ -44,7 +44,6 @@ final class HomePresenterOwner {
 
     /// Pull to refresh (`.refreshable`): returns once the Presenter's refresh finished (at once while
     /// another one runs or after close). Cancelling the pull ends only the wait (CancellationError).
-
     func refresh() async {
         try? await presenter.refreshNow()
     }

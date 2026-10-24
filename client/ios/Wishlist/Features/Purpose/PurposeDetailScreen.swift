@@ -247,8 +247,8 @@ struct PurposeDetailScreen: View {
                 guard case .item(let id) = target, id != owner.state.items.first?.id else { return }
                 ListAnchorMath.scroll(proxy, to: id, box: anchors)
             })
-            .onChange(of: atTop && state.hasNewer && !state.prepending && !state.itemsLoading) { _, wants in
-                guard wants else { return }
+            .onChange(of: [atTop, state.hasNewer, state.prepending || state.itemsLoading], initial: true) { _, key in
+                guard anchors.shouldLoadNewer(atTop: key[0], hasNewer: key[1], busy: key[2]) else { return }
                 anchors.beginPrepend(top: sheet.sheetTop + 28, firstItemId: owner.state.items.first?.id)
                 owner.loadNewer()
             }

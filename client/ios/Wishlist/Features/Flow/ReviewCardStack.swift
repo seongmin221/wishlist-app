@@ -24,6 +24,10 @@ struct ReviewCardStack: View {
     #endif
     @State private var leaving: Leaving?
     @State private var width: CGFloat = 0
+    /// The current card id read when a throw ends (the closure outlives the render that made it).
+    @State private var shown = ShownCard()
+
+    @MainActor final class ShownCard { var id: String? }
 
     struct Leaving: Equatable {
         let card: HomeFlowCard
@@ -43,7 +47,10 @@ struct ReviewCardStack: View {
                         .transition(.asymmetric(insertion: .modifier(active: NextStackEffect(rising: true), identity: NextStackEffect(rising: false)), removal: .identity))
                 }
                 if let leaving {
-                    LeavingCard(leaving: leaving, width: width, done: onPass)
+                    LeavingCard(leaving: leaving, width: width) {
+                        // A foreground rebuild may have replaced the card meanwhile: pass only the thrown one.
+                        if ReviewStackModel.shouldPass(currentID: shown.id, leavingID: leaving.id) { onPass() }
+                    }
                         .transition(.identity)
                         .zIndex(10)
                 }
@@ -55,7 +62,8 @@ struct ReviewCardStack: View {
             buttons
         }
         .padding(.init(top: WishlistTokens.Space.s12, leading: WishlistTokens.Space.s20, bottom: 36, trailing: WishlistTokens.Space.s20))
-        .onChange(of: state.current?.item.id) { _, id in
+        .onChange(of: state.current?.item.id, initial: true) { _, id in
+            shown.id = id
             if let leaving, id != leaving.id { self.leaving = nil }
         }
     }
@@ -76,8 +84,9 @@ struct ReviewCardStack: View {
                     .rotationEffect(.degrees(-2.5))
             }
             ReviewCard(item: front.item)
-                .offset(x: dragX)
+                // Board `translateX(dx) rotate(θ)` with origin 50% 90%: rotate about the card, then move it.
                 .rotationEffect(.degrees(CardThrowMath.rotation(dx: dragX, width: width)), anchor: ReviewStackModel.pivot)
+                .offset(x: dragX)
                 .gesture(drag)
         }
         .accessibilityElement(children: .contain)
@@ -147,6 +156,9 @@ enum ReviewStackModel {
         return current.item.id == leavingID ? upcoming.first : current
     }
 
+    /// The throw ended: pass only if the card shown is still the one thrown.
+    static func shouldPass(currentID: String?, leavingID: String) -> Bool { currentID == leavingID }
+
     /// Back cards behind the front: the cards left after it, at most 2.
     static func backs(position: Int, total: Int, frontIsNext: Bool) -> Int {
         let after = total - position - (frontIsNext ? 1 : 0)
@@ -177,8 +189,8 @@ private struct LeavingCard: View {
     var body: some View {
         let startRotation = CardThrowMath.rotation(dx: leaving.startDx, width: width)
         ReviewCard(item: leaving.card.item)
-            .offset(x: x ?? leaving.startDx)
             .rotationEffect(.degrees(rotation ?? startRotation), anchor: ReviewStackModel.pivot)
+            .offset(x: x ?? leaving.startDx)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
             .onAppear {

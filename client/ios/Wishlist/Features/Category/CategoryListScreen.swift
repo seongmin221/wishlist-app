@@ -78,8 +78,8 @@ struct CategoryListScreen: View {
             DetailNoticeLine(notice: owner.partialNotice).padding(.top, WLTopBarMetrics.height + WishlistTokens.Space.s32)
         }
         .onAppear { owner.loadOnce(target) }
-        .onChange(of: atTop && state.hasNewer && !state.prepending && !state.loading) { _, wants in
-            guard wants else { return }
+        .onChange(of: [atTop, state.hasNewer, state.prepending || state.loading], initial: true) { _, key in
+            guard anchors.shouldLoadNewer(atTop: key[0], hasNewer: key[1], busy: key[2]) else { return }
             anchors.beginPrepend(top: anchors.coveredTop, firstItemId: state.items.first?.id)
             owner.loadNewer()
         }

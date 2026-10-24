@@ -18,6 +18,7 @@ struct ListAnchorTracker {
     private var pending: Target?
     private var prependAnchor: String?
     private var prepending = false
+    private var newerArmed = true
 
     mutating func report(_ id: String, _ frame: CGRect) { frames[id] = frame }
     mutating func remove(_ id: String) { frames.removeValue(forKey: id) }
@@ -45,10 +46,19 @@ struct ListAnchorTracker {
         prepending = prependAnchor != nil
     }
 
-    /// The newer cards landed in front.
+    /// Whether to call `loadNewer` now: at the top edge with newer cards and nothing in flight, once per
+    /// visit to the top (a failed prepend waits until the list has left the top and come back, Ruling 9).
+    mutating func shouldLoadNewer(atTop: Bool, hasNewer: Bool, busy: Bool) -> Bool {
+        guard atTop else { newerArmed = true; return false }
+        guard newerArmed, hasNewer, !busy else { return false }
+        newerArmed = false
+        return true
+    }
+
+    /// The newer cards landed in front (a Presenter restore still waiting wins over it).
     mutating func prependLanded() {
         guard prepending, let anchor = prependAnchor else { return }
-        pending = .item(anchor)
+        if pending == nil { pending = .item(anchor) }
         prepending = false
         prependAnchor = nil
     }
@@ -105,6 +115,10 @@ final class ListAnchorBox {
     var viewportHeight: CGFloat = 0
 
     func firstVisible(top: CGFloat) -> String? { tracker.firstVisible(top: top) }
+
+    func shouldLoadNewer(atTop: Bool, hasNewer: Bool, busy: Bool) -> Bool {
+        tracker.shouldLoadNewer(atTop: atTop, hasNewer: hasNewer, busy: busy)
+    }
 
     func beginPrepend(top: CGFloat, firstItemId: String?) {
         prependFirst = firstItemId

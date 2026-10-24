@@ -19,11 +19,13 @@ struct HomeLoggedInView: View {
 
     var body: some View {
         let showsTodo = !state.pending.isEmpty || !state.groups.isEmpty || !state.summaryLoaded
+        // Above every section: a failed refresh is reported even when no to-do card is left.
+        if state.refreshFailed {
+            WLText(String(localized: "home.refresh.failed"), WLTextStyle.label.resized(13), color: c.textSecondary)
+                .padding(.top, WishlistTokens.Space.s12)
+        }
         if showsTodo {
             HomeSection(label: String(localized: "home.todo")) {
-                if state.refreshFailed {
-                    WLText(String(localized: "home.refresh.failed"), WLTextStyle.label.resized(13), color: c.textSecondary)
-                }
                 if !state.pending.isEmpty {
                     HomeTodoCard(
                         icon: .clock,

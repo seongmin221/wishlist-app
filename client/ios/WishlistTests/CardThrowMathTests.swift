@@ -31,6 +31,21 @@ final class CardThrowMathTests: XCTestCase {
         XCTAssertEqual(CardThrowMath.rotation(dx: 10, width: 0), 0)
     }
 
+    /// A throw ends with a pass only for the card that was thrown: a foreground rebuild that replaced the
+    /// current card meanwhile (or emptied it) does not pass the new one.
+    func testOnlyTheThrownCardIsPassed() {
+        XCTAssertTrue(ReviewStackModel.shouldPass(currentID: "a", leavingID: "a"))
+        XCTAssertFalse(ReviewStackModel.shouldPass(currentID: "b", leavingID: "a"))
+        XCTAssertFalse(ReviewStackModel.shouldPass(currentID: nil, leavingID: "a"))
+    }
+
+    /// While a card leaves, the next one is already in front with one back card fewer.
+    func testStackFrontAndBacksDuringAThrow() {
+        XCTAssertEqual(ReviewStackModel.backs(position: 1, total: 5, frontIsNext: false), 2)
+        XCTAssertEqual(ReviewStackModel.backs(position: 1, total: 3, frontIsNext: true), 1)
+        XCTAssertEqual(ReviewStackModel.backs(position: 3, total: 3, frontIsNext: false), 0)
+    }
+
     /// A released drag continues the 340 throw for the distance left to ±480.
     func testExitTimeIsTheRemainingPartOfTheThrow() {
         XCTAssertEqual(CardThrowMath.exitMillis(fromDx: 0), 340)

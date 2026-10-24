@@ -44,6 +44,29 @@ final class ListAnchorTests: XCTestCase {
         XCTAssertNil(tracker.take(laidIds: ["c"]))
     }
 
+    /// Ruling 9: one `loadNewer` per visit to the top edge; a failed prepend (hasNewer stays) waits until the
+    /// list has left the top and come back, and nothing fires while a read is in flight.
+    func testLoadNewerFiresOncePerVisitToTheTop() {
+        var tracker = ListAnchorTracker()
+        XCTAssertFalse(tracker.shouldLoadNewer(atTop: true, hasNewer: false, busy: false))
+        XCTAssertTrue(tracker.shouldLoadNewer(atTop: true, hasNewer: true, busy: false))
+        XCTAssertFalse(tracker.shouldLoadNewer(atTop: true, hasNewer: true, busy: true)) // in flight
+        XCTAssertFalse(tracker.shouldLoadNewer(atTop: true, hasNewer: true, busy: false)) // failed: no loop
+        XCTAssertFalse(tracker.shouldLoadNewer(atTop: false, hasNewer: true, busy: false)) // left the top: re-armed
+        XCTAssertTrue(tracker.shouldLoadNewer(atTop: true, hasNewer: true, busy: false))
+    }
+
+    /// A Presenter restore waiting for its card wins over a prepend that lands meanwhile.
+    func testAPrependDoesNotOverrideAPendingRestore() {
+        var tracker = ListAnchorTracker()
+        tracker.report("c", CGRect(x: 16, y: 120, width: 170, height: 200))
+        tracker.beginPrepend(top: 100)
+        XCTAssertTrue(tracker.accept(token: 7, resolvedItemId: "r"))
+        tracker.prependLanded()
+        XCTAssertNil(tracker.take(laidIds: ["c"]))
+        XCTAssertEqual(tracker.take(laidIds: ["c", "r"]), .item("r"))
+    }
+
     func testScrollAnchorPutsTheCardTopUnderTheCoveredTop() {
         let anchor = ListAnchorMath.anchor(topInset: 100, viewportHeight: 700, itemHeight: 200)
         // scrollTo aligns the item's point at y-fraction f with the viewport's: item top = f × (700 − 200).

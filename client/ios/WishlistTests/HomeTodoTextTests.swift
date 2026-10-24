@@ -33,6 +33,18 @@ final class HomeTodoTextTests: XCTestCase {
         XCTAssertNil(HomeTodoText.aiLineKey(category: nil, purpose: .unassigned))
     }
 
+    /// Ruling 7 wording, the same on Android.
+    func testAILineWording() throws {
+        let bundle = try ko()
+        func line(_ c: ValueSource?, _ p: ValueSource) -> String? {
+            HomeTodoText.aiLineKey(category: c, purpose: p).map { bundle.localizedString(forKey: $0, value: nil, table: nil) }
+        }
+        XCTAssertEqual(line(.ai, .ai), "AI가 카테고리와 목적을 연결했어요")
+        XCTAssertEqual(line(.ai, .unassigned), "AI가 카테고리를 정했어요")
+        XCTAssertEqual(line(.user, .ai), "AI가 목적을 연결했어요")
+        XCTAssertNil(line(.unknown, .unknown))
+    }
+
     func testFillReasonFollowsTheRequiredAction() throws {
         let bundle = try ko()
         func reason(_ action: RequiredAction) -> String {

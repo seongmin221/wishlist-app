@@ -17,7 +17,8 @@ enum HomeTodoText {
         HomeText("flow.summary.skipped", Int32(clamping: count)).resolve(bundle)
     }
 
-    /// The review card's bottom line: what AI set (category / purpose source). Nil: no AI line.
+    /// The review card's bottom line from the category / purpose sources (Ruling 7, same on Android): both
+    /// AI → 카테고리와 목적을 연결, category only → 카테고리를 정함, purpose only → 목적을 연결, else nil (no line).
     static func aiLineKey(category: ValueSource?, purpose: ValueSource) -> String? {
         switch (category == .ai, purpose == .ai) {
         case (true, true): "flow.review.ai.both"
@@ -59,6 +60,7 @@ enum HomeTodoText {
     /// A link's site for display (the shared rule: host without `www.`, else the text's start).
     static func host(_ url: String) -> String { DisplayFormat.shared.host(url: url) }
 
+    /// A HOME-01 group card's title (분류 중 reuses the C3 card's keys).
     static func groupTitleKey(_ group: HomeActionGroup) -> String {
         switch group {
         case .classificationReview: "home.group.review.title"
@@ -67,6 +69,7 @@ enum HomeTodoText {
         }
     }
 
+    /// A HOME-01 group card's one-line subtitle.
     static func groupSubtitleKey(_ group: HomeActionGroup) -> String {
         switch group {
         case .classificationReview: "home.group.review.subtitle"
