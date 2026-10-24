@@ -237,6 +237,8 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
     val pages = remember { mutableStateListOf<List<String>>() }
     // Laid-out ratios as state, so a settled page recomposes the grid (the planner itself is plain).
     val ratios = remember { mutableStateMapOf<String, Float>() }
+    // Bumped on each restart: a first page with the same ids as before must still be laid out again.
+    var generation by remember { mutableIntStateOf(0) }
     val now = rememberMinuteClock()
 
     // Pages: each new tail of ids is a page; a list that no longer starts the same way is a restart.
@@ -244,7 +246,7 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
         val known = pages.flatten()
         val ids = items.map { it.id }
         if (known.isNotEmpty() && (ids.size < known.size || ids.take(known.size) != known)) {
-            pages.clear(); planner.reset(); ratios.clear()
+            pages.clear(); planner.reset(); ratios.clear(); generation++
         }
         val laid = pages.flatten().toSet()
         val fresh = ids.filter { it !in laid }
@@ -255,8 +257,8 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
         val columnPx = with(LocalDensity.current) { ((maxWidth - WishlistTokens.Space.s12) / 2).roundToPx() }
         val byId = items.associateBy { it.id }
         // Measure every page's photos (six at a time) and lay the page out when ready or after 3 s.
-        pages.forEachIndexed { index, page -> key(index, page.firstOrNull()) {
-            LaunchedEffect(page, columnPx) {
+        pages.forEachIndexed { index, page -> key(generation, index, page.firstOrNull()) {
+            LaunchedEffect(generation, page, columnPx) {
                 val cards = page.mapNotNull { byId[it] }.map { PhotoPagePlanner.Card(it.id, photoSourceFor(it.product.imageUrl) is PhotoSource.Remote) }
                 val started = System.currentTimeMillis()
                 launch {
