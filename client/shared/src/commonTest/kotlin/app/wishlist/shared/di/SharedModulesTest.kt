@@ -28,6 +28,7 @@ import app.wishlist.shared.presentation.LocalDetailOutcome
 import app.wishlist.shared.presentation.RowStatus
 import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.model.AnalysisStatus
+import app.wishlist.shared.model.HomeActionGroup
 import app.wishlist.shared.submission.ShareCardKind
 import kotlin.time.Duration.Companion.seconds
 import app.wishlist.shared.di.ClientBuildMode.DEBUG
@@ -64,6 +65,41 @@ class SharedModulesTest {
         assertTrue(REMOTE_IMPLEMENTED_APIS.containsAll(purposes))
     }
 
+    @Test fun homeApisHaveExplicitImplementedBackends() {
+        val home = setOf(ApiId.HOME_01, ApiId.HOME_02)
+        assertTrue(FAKE_IMPLEMENTED_APIS.containsAll(home))
+        assertTrue(REMOTE_IMPLEMENTED_APIS.containsAll(home))
+        // RELEASE never binds the Fake home; DEBUG may.
+        home.forEach { api ->
+            assertFailsWith<IllegalArgumentException> { createRuntime(RepositoryBindings(RELEASE, allBackends(Backend.UNAVAILABLE) + (api to Backend.FAKE))) }
+        }
+        val debug = createRuntime(debugBindings(ApiId.HOME_01 to Backend.FAKE, ApiId.HOME_02 to Backend.FAKE))
+        assertEquals(listOf(Backend.FAKE, Backend.FAKE), home.map { debug.resolvedBackend(it) })
+        debug.close()
+        val mixed = createRuntime(debugBindings(ApiId.HOME_01 to Backend.REMOTE), RemoteConfig(TEST_BASE_URL, FakeTokenSource()))
+        assertEquals(listOf(Backend.REMOTE, Backend.UNAVAILABLE), home.map { mixed.resolvedBackend(it) })
+        mixed.close()
+    }
+
+    @Test fun runtime_home_repository_reads_the_seeded_fake_and_gates_before_start_and_after_close() = runTest {
+        val runtime = createRuntime(debugBindings(ApiId.HOME_01 to Backend.FAKE, ApiId.HOME_02 to Backend.FAKE, ApiId.PUR_01 to Backend.FAKE),
+            dispatcher = StandardTestDispatcher(testScheduler))
+        val home = runtime.homeRepository()
+        assertEquals(RUNTIME_NOT_READY, home.summary().error().code)
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        val summary = home.summary().successValue()
+        // The FHome board: analysis 1, information 3, review 3, and the three most recent purposes.
+        assertEquals(listOf(1, 3, 3), summary.groups.map { it.count })
+        assertEquals(listOf("마샬 MAJOR V", "호카 스피드고트 6", "발뮤다 더 토스터"), summary.groups.last().previews.map { it.item.product.name })
+        assertEquals(listOf(null, "오크 원목 사이드 테이블", "FiiO BTR7"), summary.groups[1].previews.map { it.item.product.name })
+        assertEquals(listOf("출퇴근 헤드폰", "가을 트레일 러닝", "홈오피스 의자"), summary.recentPurposes.map { it.name })
+        val review = home.group(HomeActionGroup.CLASSIFICATION_REVIEW).successValue()
+        assertEquals(summary.groups.last().previews.map { it.item.id }, review.items.map { it.id })
+        runtime.close()
+        assertEquals(RUNTIME_NOT_READY, home.group(HomeActionGroup.CLASSIFICATION_REVIEW).error().code)
+    }
+
     // --- Explicit bindings -------------------------------------------------------------------
 
     @Test fun bindings_must_list_all_37_apis() {
@@ -93,7 +129,7 @@ class SharedModulesTest {
 
     @Test fun unimplemented_api_cannot_be_bound_to_remote_or_fake() {
         val remote = RemoteConfig(TEST_BASE_URL, FakeTokenSource())
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.HOME_01 to Backend.REMOTE), remote) }
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.DUP_01 to Backend.REMOTE), remote) }
         assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.CAT_05 to Backend.FAKE)) }
         // The seed catalog does not make PUR-01 a Fake wire API (C6).
         assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.PUR_05 to Backend.FAKE)) }

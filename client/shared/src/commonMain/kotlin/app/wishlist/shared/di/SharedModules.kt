@@ -11,10 +11,12 @@ import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.data.fake.FakeCatalogRepository
 import app.wishlist.shared.data.fake.FakePurposeRepository
 import app.wishlist.shared.data.fake.FakeCategoryRepository
+import app.wishlist.shared.data.fake.FakeHomeRepository
 import app.wishlist.shared.data.fake.FakeItemListRepository
 import app.wishlist.shared.data.fake.FakeItemRepository
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.data.local.CachedGetItemRepository
+import app.wishlist.shared.data.local.CachedHomeRepository
 import app.wishlist.shared.data.local.CachedItemListRepository
 import app.wishlist.shared.data.local.LazyDriver
 import app.wishlist.shared.data.local.SqlLocalStore
@@ -24,6 +26,7 @@ import app.wishlist.shared.data.remote.AuthenticatedTransport
 import app.wishlist.shared.data.remote.CallbackAuthTokenProvider
 import app.wishlist.shared.data.remote.RemotePurposeRepository
 import app.wishlist.shared.data.remote.RemoteCategoryRepository
+import app.wishlist.shared.data.remote.RemoteHomeRepository
 import app.wishlist.shared.data.remote.RemoteItemListRepository
 import app.wishlist.shared.data.remote.RemoteItemRepository
 import app.wishlist.shared.data.remote.createWishlistHttpClient
@@ -33,6 +36,7 @@ import app.wishlist.shared.repository.CategoryRepository
 import app.wishlist.shared.repository.ItemListRepository
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
+import app.wishlist.shared.repository.HomeRepository
 import app.wishlist.shared.repository.LocalStore
 import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import io.ktor.client.HttpClient
@@ -157,6 +161,7 @@ internal class CloseGuard(private val onClosed: () -> Unit) : StoreLease {
 internal val ITEM_01_DELEGATE = named("ITEM_01")
 internal val ITEM_03_DELEGATE = named("ITEM_03")
 internal val ITEM_02_DELEGATE = named("ITEM_02")
+internal val HOME_DELEGATE = named("HOME")
 
 /**
  * The runtime graph. Every component gets the one [MutableAuthSession] of this graph. Fake parts
@@ -221,6 +226,17 @@ private fun coreModule(env: RuntimeEnvironment, storeLease: StoreLease) = module
     }
     // Like the Get facade: the selected ITEM-02 delegate is wrapped once by the card cache decorator.
     single<ItemListRepository> { CachedItemListRepository(get(ITEM_02_DELEGATE), get(), get()) }
+    // HOME-01/02 each follow their own binding; the routed pair is wrapped once by the card cache.
+    single<HomeRepository>(HOME_DELEGATE) {
+        RoutedHomeRepository(homeBackend(env.bindings.backendOf(ApiId.HOME_01)), homeBackend(env.bindings.backendOf(ApiId.HOME_02)))
+    }
+    single<HomeRepository> { CachedHomeRepository(get(HOME_DELEGATE), get(), get()) }
+}
+
+private fun Scope.homeBackend(backend: Backend): HomeRepository = when (backend) {
+    Backend.FAKE -> get<FakeHomeRepository>()
+    Backend.REMOTE -> get<RemoteHomeRepository>()
+    Backend.UNAVAILABLE -> UnavailableHomeRepository
 }
 
 private fun Scope.purposeBackend(backend: Backend): PurposeRepository = when (backend) {
@@ -243,6 +259,7 @@ private fun fakeModule() = module {
     single { FakeCategoryRepository(get()) }
     single { FakePurposeRepository(get()) }
     single { FakeItemListRepository(get()) }
+    single { FakeHomeRepository(get()) }
 }
 
 private fun remoteModule(env: RuntimeEnvironment, remote: RemoteConfig) = module {
@@ -255,6 +272,7 @@ private fun remoteModule(env: RuntimeEnvironment, remote: RemoteConfig) = module
     single { RemoteCategoryRepository(get(), get()) }
     single { RemotePurposeRepository(get(), get()) }
     single { RemoteItemListRepository(get(), get()) }
+    single { RemoteHomeRepository(get(), get()) }
 }
 
 /** Item API implementation for one explicit binding (FakeItemRepository/RemoteItemRepository implement both). */
@@ -266,7 +284,7 @@ private inline fun <reified T : Any> Scope.itemBackend(backend: Backend): T = wh
 
 /** The backend a resolved item delegate actually is (the verification target, not the bindings). */
 internal fun backendOf(delegate: Any): Backend = when (delegate) {
-    is FakePurposeRepository, is FakeItemRepository, is FakeCategoryRepository, is FakeItemListRepository -> Backend.FAKE
-    is RemotePurposeRepository, is RemoteItemRepository, is RemoteCategoryRepository, is RemoteItemListRepository -> Backend.REMOTE
+    is FakePurposeRepository, is FakeItemRepository, is FakeCategoryRepository, is FakeItemListRepository, is FakeHomeRepository -> Backend.FAKE
+    is RemotePurposeRepository, is RemoteItemRepository, is RemoteCategoryRepository, is RemoteItemListRepository, is RemoteHomeRepository -> Backend.REMOTE
     else -> Backend.UNAVAILABLE
 }

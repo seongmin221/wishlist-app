@@ -179,6 +179,10 @@ class SharedRuntime internal constructor(
     fun itemListRepository(): app.wishlist.shared.repository.ItemListRepository =
         GatedItemListRepository(ready, resolveOr<app.wishlist.shared.repository.ItemListRepository>(UnavailableItemListRepository) { get() })
 
+    /** HOME-01/02 behind the ready gate (cards refresh the item cache). */
+    fun homeRepository(): app.wishlist.shared.repository.HomeRepository =
+        GatedHomeRepository(ready, resolveOr<app.wishlist.shared.repository.HomeRepository>(UnavailableHomeRepository) { get() })
+
     /** Debug seed catalog (DEBUG); UNAVAILABLE in RELEASE. Not a CAT/PUR/ITEM-02 wire backend. */
     fun catalogRepository(): CatalogRepository =
         GatedCatalogRepository(ready, resolveOr<CatalogRepository>(UnavailableCatalogRepository) { get() })
@@ -380,6 +384,10 @@ class SharedRuntime internal constructor(
         ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04 -> {
             val routed = koin.get<app.wishlist.shared.repository.PurposeRepository>() as RoutedPurposeRepository
             backendOf(when (apiId) { ApiId.PUR_01 -> routed.summary; ApiId.PUR_02 -> routed.create; ApiId.PUR_03 -> routed.detail; else -> routed.update })
+        }
+        ApiId.HOME_01, ApiId.HOME_02 -> {
+            val routed = koin.get<app.wishlist.shared.repository.HomeRepository>(HOME_DELEGATE) as RoutedHomeRepository
+            backendOf(if (apiId == ApiId.HOME_01) routed.summary else routed.group)
         }
         else -> Backend.UNAVAILABLE
     }

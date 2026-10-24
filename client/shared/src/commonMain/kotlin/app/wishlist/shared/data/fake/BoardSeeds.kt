@@ -38,6 +38,8 @@ internal data class BoardSeedData(
     val carrierId: String,
     val commuteId: String,
     val purposeActivities: Map<String, PurposeActivity>,
+    /** FHome-only cards (정보 보완 필요, 분류 중): no category or purpose, so no board count above moves. */
+    val homeItems: List<WishlistItem> = emptyList(),
 )
 
 /**
@@ -46,6 +48,9 @@ internal data class BoardSeedData(
  * the board: the eight headphones and the two DAC items carry the board's names and prices, the
  * rest are plain "<category> <n>" items, older than the headphones.
  */
+private fun withPolicy(item: WishlistItem): WishlistItem =
+    evaluateItem(item).let { item.copy(requiredAction = it.requiredAction, allowedActions = it.allowedActions) }
+
 internal object BoardSeeds {
     /** FCategoryEditSheet text of the custom categories (gen_category.py `MINE`); others have none. */
     val customText: Map<String, Pair<String?, List<String>>> = mapOf(
@@ -192,6 +197,38 @@ internal object BoardSeeds {
                 else -> item
             }
         }
+        // FHome 분류·목적 확인 3: the Marshall card plus the first shoe and kitchen fillers, renamed to
+        // the board's items and waiting for review (same categories and purposes, so no count moves).
+        val boardReviews = mapOf("C006" to ("호카 스피드고트 6" to "209000"), "C043" to ("발뮤다 더 토스터" to "349000"))
+        val reviewed = mutableSetOf<String>()
+        val boardItems = items.map { item ->
+            val category = item.category.id ?: return@map item
+            val (name, price) = boardReviews[category]?.takeIf { reviewed.add(category) } ?: return@map item
+            withPolicy(item.copy(
+                product = item.product.copy(name = name, price = DecimalAmount.parseOrNull(price)),
+                purpose = if (item.purpose.id == null) item.purpose else item.purpose.copy(source = ValueSource.AI),
+                reviewStatus = ReviewStatus.PENDING,
+            ))
+        }
+        // FHome 정보 보완 필요 3 (name, category, deleted custom) and 분류 중 1, in board order.
+        fun homeOnly(url: String, name: String?, category: ItemCategory, status: AnalysisStatus, minutesAgo: Int): WishlistItem {
+            val at = now - minutesAgo.minutes
+            return withPolicy(WishlistItem(
+                id = newId(), clientSubmissionId = newId(), version = 1, sourceUrl = url,
+                product = ProductSnapshot(name = name, nameSource = name?.let { ValueSource.AI }), category = category,
+                purpose = ItemPurpose(), analysis = ItemAnalysis(status), reviewStatus = ReviewStatus.NOT_REQUIRED,
+                lifecycleStatus = LifecycleStatus.ACTIVE, requiredAction = RequiredAction.NONE, createdAt = at, updatedAt = at,
+            ))
+        }
+        val homeItems = listOf(
+            homeOnly("https://29cm.co.kr/product/seed", null, ItemCategory(), AnalysisStatus.PROCESSING, 1),
+            homeOnly("https://coupang.com/vp/products/seed", null,
+                ItemCategory(missingReason = CategoryMissingReason.EXTRACTION_UNRESOLVED), AnalysisStatus.PARTIAL, 2),
+            homeOnly("https://seed.wishlist.invalid/fill/oak-side-table", "오크 원목 사이드 테이블",
+                ItemCategory(source = ValueSource.AI, missingReason = CategoryMissingReason.AI_ABSTAINED), AnalysisStatus.PARTIAL, 3),
+            homeOnly("https://seed.wishlist.invalid/fill/fiio-btr7", "FiiO BTR7",
+                ItemCategory(source = ValueSource.USER, missingReason = CategoryMissingReason.CUSTOM_CATEGORY_DELETED), AnalysisStatus.READY, 4),
+        )
         val activityDays = listOf(1, 3, 7, 14, 21, 30)
         val purposeActivities = purposes.mapIndexed { index, purpose ->
             purpose.id to if (index < activityDays.size) PurposeActivity(now - activityDays[index].days, "CANDIDATE_ADDED")
@@ -213,9 +250,9 @@ internal object BoardSeeds {
             BoardCardFixture("c5", items[4].id, "#3F4B44", "#C9D3CB", "#7F8E84", 5.0 / 4.0, "29CM · 1주 전 확인"),
         )
         return BoardSeedData(
-            categories, purposes, items,
-            BoardDisplayMetadata(purposes.associate { purpose -> purpose.id to items.count { it.purpose.id == purpose.id } }, cards),
-            carrierId = purposes.last().id, commuteId = commuteId, purposeActivities = purposeActivities,
+            categories, purposes, boardItems,
+            BoardDisplayMetadata(purposes.associate { purpose -> purpose.id to boardItems.count { it.purpose.id == purpose.id } }, cards),
+            carrierId = purposes.last().id, commuteId = commuteId, purposeActivities = purposeActivities, homeItems = homeItems,
         )
     }
 }

@@ -106,5 +106,12 @@ internal fun <T> fakeWindow(
     }
 }
 
+/**
+ * ITEM-02/HOME-02 bounds, checked before any scope lookup (a bad limit is 400 even for a missing
+ * scope), like the server: page [limit] 1~100, anchor [before]/[after] 0~20.
+ */
+internal fun validWindowQuery(limit: Int?, anchor: String?, before: Int, after: Int): Boolean =
+    if (anchor == null) limit != null && limit in 1..MAX_LIMIT else before in 0..MAX_SPAN && after in 0..MAX_SPAN
+
 private const val MAX_SPAN = 20
 private const val MAX_LIMIT = 100

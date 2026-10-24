@@ -136,26 +136,39 @@ internal fun parseItemPage(body: String): ClientResult<ItemPage> {
     }
     val anchors = mutableMapOf<String, String>()
     val items = frame.rows.map { row ->
-        val card = row as? JsonObject ?: return invalid
-        val item = card["item"] as? JsonObject ?: return invalid
-        val dto = try {
-            pageJson.decodeFromJsonElement(WishlistItemDto.serializer(), item)
-        } catch (e: IllegalArgumentException) {
-            return invalid
+        val (item, anchor) = when (val card = readCard(row)) {
+            is ClientResult.Failure -> return card
+            is ClientResult.Success -> card.value
         }
-        val mapped = when (val result = mapItem(dto)) {
-            is ClientResult.Failure -> return result
-            is ClientResult.Success -> result.value
-        }
-        // Older test servers omit anchorCursor; a present one must be a string.
-        when (val cursor = card["anchorCursor"]) {
-            null, JsonNull -> Unit
-            is JsonPrimitive -> if (cursor.isString) anchors[mapped.id] = cursor.content else return invalid
-            else -> return invalid
-        }
-        mapped
+        anchor?.let { anchors[item.id] = it }
+        item
     }
     return ClientResult.Success(ItemPage(items, frame.total, frame.next, frame.previous, anchors, frame.anchor))
+}
+
+/**
+ * One B4 `{item, anchorCursor}` card (ITEM-02/HOME-02 rows, HOME-01 previews): the item through the
+ * shared item mapper and its anchor token. Older test servers omit anchorCursor (null); a present one
+ * must be a string.
+ */
+internal fun readCard(row: JsonElement): ClientResult<Pair<WishlistItem, String?>> {
+    val card = row as? JsonObject ?: return invalid
+    val item = card["item"] as? JsonObject ?: return invalid
+    val dto = try {
+        pageJson.decodeFromJsonElement(WishlistItemDto.serializer(), item)
+    } catch (e: IllegalArgumentException) {
+        return invalid
+    }
+    val mapped = when (val result = mapItem(dto)) {
+        is ClientResult.Failure -> return result
+        is ClientResult.Success -> result.value
+    }
+    val anchor = when (val cursor = card["anchorCursor"]) {
+        null, JsonNull -> null
+        is JsonPrimitive -> if (cursor.isString) cursor.content else return invalid
+        else -> return invalid
+    }
+    return ClientResult.Success(mapped to anchor)
 }
 
 /** CAT-03 body (description omitted when null, examples always sent). */
