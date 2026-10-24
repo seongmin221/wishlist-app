@@ -99,15 +99,11 @@ class ItemMutationService(
         if (peek.lifecycle == LifecycleStatus.DELETED) return@inTransaction DeleteResult.ALREADY_DELETED
         ItemMutationRepository.lockPurposes(c, owner, listOfNotNull(peek.row.purposeId))
         val item = checkNotNull(ItemMutationRepository.find(c, owner, itemId, lock = true))
-        ItemMutationRepository.lockMedia(c, owner, listOfNotNull(item.row.mediaId))
-        val jobs = ItemMutationRepository.lockJobs(c, itemId)
+        val jobs = lockForDelete(c, owner, item)
         if (ItemAction.DELETE !in WishlistItemPolicy.evaluate(item.state).allowedActions) {
             throw ItemMutationException("WISHLIST_ITEM_STATE_CONFLICT", item.version)
         }
-        ItemMutationRepository.markDeleted(c, itemId)
-        jobs.filter { (_, stage) -> stage in IN_PROGRESS_STAGES }.forEach { (job, _) -> ItemMutationRepository.cancelJob(c, job) }
-        item.row.purposeId?.let { PurposeMembership.recordTransition(c, owner, it, null) }
-        item.row.mediaId?.let { ItemMutationRepository.releaseMedia(c, it) }
+        deleteLocked(c, owner, item, jobs)
         DeleteResult.DELETED
     }
 
@@ -116,5 +112,19 @@ class ItemMutationService(
 
     internal companion object {
         val IN_PROGRESS_STAGES = setOf("GENERAL_PENDING", "GENERAL_RUNNING", "BROWSER_PENDING", "BROWSER_RUNNING")
+
+        /** After owner -> purpose -> item locks: the item's media, then its jobs (B7 order). Shared with DUP-02. */
+        fun lockForDelete(c: Connection, owner: UUID, item: MutableItem): List<Pair<UUID, String>> {
+            ItemMutationRepository.lockMedia(c, owner, listOfNotNull(item.row.mediaId))
+            return ItemMutationRepository.lockJobs(c, item.id)
+        }
+
+        /** The ITEM-05 writes on a fully locked item: tombstone, in-progress jobs cancelled, membership and media released. */
+        fun deleteLocked(c: Connection, owner: UUID, item: MutableItem, jobs: List<Pair<UUID, String>>) {
+            ItemMutationRepository.markDeleted(c, item.id)
+            jobs.filter { (_, stage) -> stage in IN_PROGRESS_STAGES }.forEach { (job, _) -> ItemMutationRepository.cancelJob(c, job) }
+            item.row.purposeId?.let { PurposeMembership.recordTransition(c, owner, it, null) }
+            item.row.mediaId?.let { ItemMutationRepository.releaseMedia(c, it) }
+        }
     }
 }

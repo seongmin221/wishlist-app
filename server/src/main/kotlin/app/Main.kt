@@ -147,6 +147,7 @@ fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, med
     categoryRoutes(CategoryService(source), resolve)
     purposeRoutes(PurposeService(source), media.signer, resolve)
     candidateRoutes(CandidateHandlers.of(source), media.signer, resolve)
+    duplicateRoutes(DuplicateHandlers.of(source), media.signer, resolve)
 }
 
 private fun openMediaStorage(config: MediaStorageConfig, resources: RuntimeResources): MediaStorage = when (config) {
