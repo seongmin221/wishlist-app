@@ -184,4 +184,17 @@ class ProductCacheTest {
         assertEquals("hoka|1123190BBLC", itemText(source, hit, "product_mpn_key"))
         assertNotEquals(item, hit)
     }
+
+    @Test fun `reanalysis always reads the page again instead of the cache`() = withAnalysisDatabase { source ->
+        val pipeline = AnalysisPipeline(source).apply { pages[url] = identifiedPage("Speedgoat 6") }
+        pipeline.saveAndRun(ownerA, url)
+        val item = pipeline.saveAndRun(ownerB, url)
+        assertEquals(1, pipeline.fetched.size)
+        analysisSql(source, "update wishlist_items set analysis_status='FAILED_RETRYABLE' where id='$item'")
+        assertIs<app.wishlist.ReanalysisResult.Started>(app.wishlist.ReanalysisService(source).reanalyze(ownerB, item, UUID.randomUUID()))
+        pipeline.run(item)
+        assertEquals(2, pipeline.fetched.size, "only new saves reuse the cache")
+        assertEquals("READY", itemText(source, item, "analysis_status"))
+        assertNull(itemText(source, item, "product_cache_id"), "the fresh read replaces the cache provenance")
+    }
 }
