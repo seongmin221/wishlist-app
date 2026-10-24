@@ -1,6 +1,6 @@
 # B8 후보 이동과 영향 확인 삭제 설계
 
-> 2026-10-24 · 정책 Q1~Q3 확정 · builder·사용자 계약 검토 반영 · 설계 검토용
+> 2026-10-24 · 정책 Q1~Q3 확정 · builder·사용자 계약 검토 반영 · 구현 완료([구현 이력](../../history/architecture/server/b8-candidate-move-deletions-implementation-2026-10-24.md))
 
 ## 의도와 범위
 

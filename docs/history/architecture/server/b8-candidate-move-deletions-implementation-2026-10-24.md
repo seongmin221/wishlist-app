@@ -39,6 +39,28 @@
   - 경합: 목적 삭제와 PUR-08 추가 경주는 하나만 성공(삭제 승리 시 이동 404·membership 2·후보 0, 이동 승리 시 삭제 409·후보 2·CANDIDATE_ADDED). 목적 삭제와 B7 편집 경주도 하나만 성공하고 membership이 결과와 일치.
 - 테스트 강도 확인(변형 후 원복): 삭제 상품의 목적 출처를 USER 대신 UNASSIGNED로 바꾸면 삭제·PENDING claim·RUNNING/lease 테스트 3개가 실패했다(AI가 대체 목적을 채움).
 
+### Task 4: 전체 회귀·독립 리뷰·인계
+
+- 회귀 전후 시각 확인: host와 `postgres:16-alpine` container `date -u`가 같은 초(시작 12:05:43, 종료 12:15:25 UTC).
+- 전체 회귀(`6247be5`, `caffeinate -i ./gradlew test`): **608 tests, 606 통과, 2 opt-in skip**(PlaywrightRealBrowser, RealUrlPilot), 실패·오류 0, 9분 32초. B7 기준 569개에서 B8 테스트 39개가 늘었다. 실제 PostgreSQL Testcontainers를 사용했고 container 시작 실패는 없었다. 외부 브라우저·실제 URL 검증은 opt-in이라 실행하지 않았다.
+- 독립 코드 리뷰(읽기 전용, gradle 미실행): Critical 0, Important 0, Minor 5. Review Focus 다섯 항목(page 밖 변경 409, owner 비노출, replay, Worker 세 단계 × 두 lane, SQL UUID 잠금 순서)을 코드와 대조해 문제없음으로 판정했다.
+
+| Minor 지적 | 처리 |
+| --- | --- |
+| 목적 삭제가 제거 상품마다 membership UPDATE를 한 번씩 실행해 큰 목적에서 owner 잠금 시간이 길어짐 | 보류. 결과는 정확하다. B11 부하 관측 때 `+n` 한 문장으로 바꿀지 판단 |
+| `candidateErrors`가 서비스의 모든 `INVALID_*` code를 422로 매핑 | 보류. 현재 서비스가 던지는 `INVALID_*`가 없다 |
+| `CandidateMoveService(afterItemLock)` test seam이 공개 생성자에 있음 | 보류. B7 seam과 같은 방식이고 기본값은 no-op |
+| `find` 뒤 `checkNotNull(live)`는 두 조건식이 달라지면 500 | 보류. 두 조건식은 현재 같다 |
+| category 삭제가 바꾸지 않는 목적도 잠금 | 보류. spec의 잠금 순서를 따른 것 |
+
+- 리뷰의 미판정 항목 중 read-only transaction 뒤 pool connection 격리 수준 잔존은, 운영 pool이 HikariCP라 반납 시 readOnly·isolation을 기본값으로 되돌리므로 문제로 보지 않았다.
+
+## C5·B10·B11 인계
+
+- **C5:** 후보 추가 화면의 초기 filter와 filter 전환 시 선택 유지는 C5에서 정한다. 서버는 명시 filter만 적용하고 선택을 저장하지 않는다. 화면은 PUR-08 409의 `itemId`·`currentVersion`으로 충돌 상품을 표시하고 PUR-07을 다시 조회한다. 삭제 409 뒤에는 CAT-05/PUR-05를 처음부터 다시 읽는다(이전 cursor도 409). PUR-08 replay body는 이동 당시 결과이므로 현재 상태는 별도 조회한다.
+- **B10:** ARCHIVED 상품은 삭제된 custom category와 DELETED 목적의 참조를 그대로 유지한다. archive snapshot 표시와 B8 명령 차단의 종합 검증은 B10에서 한다. category 상세 표시 join은 살아 있는 custom category만 이름을 붙인다.
+- **B11:** B8 쓰기는 owner 잠금으로 직렬화된다. 목적 삭제의 상품별 membership UPDATE(최대 영향 상품 수만큼)와 100개 이동의 잠금 시간을 부하 시험에서 관측한다. receipt 두 표(V20/V21)는 계정 수명 동안 보존되므로 증가량도 함께 본다.
+
 ## 계획 대비 결정
 
 - 이동 body의 원소 오류(원소가 object가 아님·알 수 없는/누락된 원소 key·ID/version/expectedPurposeId 값)는 계약의 "원소의 필드 오류는 `items`"에 따라 `fields:["items"]`로 묶는다. 구조 오류로 비우는 것은 최상위 body(object 아님·최상위 key 불일치)뿐이다.
