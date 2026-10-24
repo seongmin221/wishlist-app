@@ -44,10 +44,30 @@ class ListAnchorTest {
         assertEquals(500, ListAnchor.scrollTarget(cardTop = 500, kept = null, resolvedItemId = "a", sameItem = true))
     }
 
-    @Test fun newer_cards_are_asked_for_only_at_the_top_edge() {
-        assertTrue(ListAnchor.reachedTop(scrollValue = 0, hasNewer = true, busy = false))
-        assertFalse(ListAnchor.reachedTop(scrollValue = 1, hasNewer = true, busy = false))
-        assertFalse(ListAnchor.reachedTop(scrollValue = 0, hasNewer = false, busy = false))
-        assertFalse(ListAnchor.reachedTop(scrollValue = 0, hasNewer = true, busy = true))
+    @Test fun newer_cards_are_asked_for_once_per_visit_to_the_top_edge() {
+        val top = ListAnchor.TopEdgeTrigger()
+        // A user scroll reaching the top with newer cards: once.
+        assertTrue(top.update(scrollValue = 0, userAtEdge = true, hasNewer = true, busy = false))
+        // In flight, then the read failed (prepending false, hasNewer still true, still at the top): not again (Ruling 9).
+        assertFalse(top.update(scrollValue = 0, userAtEdge = true, hasNewer = true, busy = true))
+        assertFalse(top.update(scrollValue = 0, userAtEdge = true, hasNewer = true, busy = false))
+        // Leaving the top re-arms; coming back asks again.
+        assertFalse(top.update(scrollValue = 40, userAtEdge = true, hasNewer = true, busy = false))
+        assertTrue(top.update(scrollValue = 0, userAtEdge = true, hasNewer = true, busy = false))
+    }
+
+    @Test fun the_top_edge_does_not_ask_without_newer_cards_busy_or_a_programmatic_scroll() {
+        val top = ListAnchor.TopEdgeTrigger()
+        assertFalse(top.update(scrollValue = 0, userAtEdge = true, hasNewer = false, busy = false))
+        assertFalse(top.update(scrollValue = 0, userAtEdge = true, hasNewer = true, busy = true))
+        // A restore or a shrinking layout putting the scroll at 0 is not the user reaching the top.
+        assertFalse(top.update(scrollValue = 0, userAtEdge = false, hasNewer = true, busy = false))
+        assertTrue(top.update(scrollValue = 0, userAtEdge = true, hasNewer = true, busy = false))
+    }
+
+    @Test fun a_restore_that_resolved_nothing_goes_to_the_top_only_where_asked() {
+        // Category list: the top. Purpose detail (Ruling 8): stays where it is (null = no scroll).
+        assertEquals(0, ListAnchor.nullRestoreTarget(keepPosition = false))
+        assertNull(ListAnchor.nullRestoreTarget(keepPosition = true))
     }
 }

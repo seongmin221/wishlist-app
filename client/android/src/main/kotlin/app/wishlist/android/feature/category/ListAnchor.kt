@@ -46,8 +46,28 @@ object ListAnchor {
     fun scrollTarget(cardTop: Int, kept: Position?, resolvedItemId: String, sameItem: Boolean): Int =
         cardTop + if (sameItem && kept?.itemId == resolvedItemId) kept.offset else 0
 
-    /** The list reached its top edge with newer cards in front and nothing in flight: ask for them. */
-    fun reachedTop(scrollValue: Int, hasNewer: Boolean, busy: Boolean): Boolean = scrollValue <= 0 && hasNewer && !busy
+    /**
+     * Asks for newer cards once per visit to the top edge (Ruling 9, same as iOS): it fires when the user is at
+     * the top ([userAtEdge]: a user scroll, or a list that cannot scroll) with newer cards and nothing in flight,
+     * and re-arms only after the list left the top. A failed read therefore waits for the next visit, not a loop.
+     */
+    class TopEdgeTrigger {
+        private var armed = true
+
+        /** True when [ListAnchorEffects] should call loadNewer now. */
+        fun update(scrollValue: Int, userAtEdge: Boolean, hasNewer: Boolean, busy: Boolean): Boolean {
+            if (scrollValue > 0) {
+                armed = true
+                return false
+            }
+            if (!armed || !userAtEdge || !hasNewer || busy) return false
+            armed = false
+            return true
+        }
+    }
+
+    /** A restore that resolved no card: the top (category list), or no scroll at all ([keepPosition], purpose detail — Ruling 8). */
+    fun nullRestoreTarget(keepPosition: Boolean): Int? = if (keepPosition) null else 0
 }
 
 /**
@@ -139,8 +159,9 @@ internal class ListAnchorController(val tracker: ListAnchorTracker, val scroll: 
  * - Applies each new [restore] token once ([applied]/[onApplied] live in the screen's owner, so a screen
  *   coming back does not apply an old token again): the resolved card first (its kept offset when it is
  *   the same card), or the top when nothing resolved.
- * - At the top edge (a user scroll reaching it, or a list that does not scroll) with [hasNewer]: [loadNewer],
- *   then keeps the card that was first in place once the newer page landed (the masonry lays out again).
+ * - At the top edge (a user scroll reaching it, or a list that does not scroll) with [hasNewer]: [loadNewer] once
+ *   per visit ([ListAnchor.TopEdgeTrigger]), then keeps the card that was first in place once the newer page landed.
+ * - [keepPositionOnNullRestore]: a restore that resolved no card leaves the scroll as it is (purpose detail).
  */
 @Composable
 internal fun ListAnchorEffects(
@@ -152,6 +173,7 @@ internal fun ListAnchorEffects(
     applied: Long,
     onApplied: (Long) -> Unit,
     loadNewer: () -> Unit,
+    keepPositionOnNullRestore: Boolean = false,
 ) {
     val scroll = controller.scroll
     LaunchedEffect(restore?.token) {
@@ -160,7 +182,7 @@ internal fun ListAnchorEffects(
         onApplied(r.token)
         val id = r.resolvedItemId
         if (id == null) {
-            scroll.scrollTo(0)
+            ListAnchor.nullRestoreTarget(keepPositionOnNullRestore)?.let { scroll.scrollTo(it) }
             return@LaunchedEffect
         }
         controller.scrollToCard(id) { top -> ListAnchor.scrollTarget(top, controller.kept, id, r.sameItem) }
@@ -168,12 +190,12 @@ internal fun ListAnchorEffects(
     val latestHasNewer by rememberUpdatedState(hasNewer)
     val latestBusy by rememberUpdatedState(busy)
     val latestLoadNewer by rememberUpdatedState(loadNewer)
+    val topEdge = remember(controller) { ListAnchor.TopEdgeTrigger() }
     LaunchedEffect(controller) {
         snapshotFlow {
-            val atTop = ListAnchor.reachedTop(scroll.value, latestHasNewer, latestBusy)
-            atTop && (scroll.isScrollInProgress || scroll.maxValue == 0)
-        }.distinctUntilChanged().collect { reached ->
-            if (reached) {
+            TopEdgeInput(scroll.value, scroll.isScrollInProgress || scroll.maxValue == 0, latestHasNewer, latestBusy)
+        }.distinctUntilChanged().collect { (value, userAtEdge, newer, busy) ->
+            if (topEdge.update(value, userAtEdge, newer, busy)) {
                 controller.capture()
                 latestLoadNewer()
             }
@@ -191,3 +213,5 @@ internal fun ListAnchorEffects(
         controller.scrollToCard(kept.itemId) { top -> top + kept.offset }
     }
 }
+
+private data class TopEdgeInput(val scrollValue: Int, val userAtEdge: Boolean, val hasNewer: Boolean, val busy: Boolean)

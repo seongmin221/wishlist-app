@@ -28,7 +28,6 @@
     <string name="flow_unavailable">사용할 수 없음</string>
     <string name="flow_ai_both">AI가 카테고리와 목적을 연결했어요</string>
     <string name="flow_ai_category">AI가 카테고리를 정했어요</string>
-    <string name="flow_ai_category_no_purpose">AI가 카테고리를 정했어요. 맞는 목적은 찾지 못했어요</string>
     <string name="flow_ai_purpose">AI가 목적을 연결했어요</string>
     <string name="flow_review_done">다 확인했어요</string>
     <string name="flow_review_summary">넘김 %1$d</string>

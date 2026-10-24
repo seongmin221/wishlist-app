@@ -28,7 +28,6 @@
     <string name="flow_unavailable">Unavailable</string>
     <string name="flow_ai_both">AI linked the category and purpose</string>
     <string name="flow_ai_category">AI chose the category</string>
-    <string name="flow_ai_category_no_purpose">AI chose the category but found no matching purpose</string>
     <string name="flow_ai_purpose">AI linked the purpose</string>
     <string name="flow_review_done">All reviewed</string>
     <string name="flow_review_summary">Passed %1$d</string>

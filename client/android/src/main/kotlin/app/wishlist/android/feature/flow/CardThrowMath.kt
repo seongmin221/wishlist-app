@@ -37,12 +37,12 @@ object CardThrowMath {
     const val NEXT_START_OFFSET = 14f
 
     /**
-     * Past the distance threshold the side of the drag decides; under it a fast enough flick decides by
-     * its direction; otherwise the card returns.
+     * Ruling 6 (same as iOS): a fast enough fling decides by its direction (even back across the drag);
+     * otherwise a drag past the distance threshold decides by its side; otherwise the card returns.
      */
     fun decide(dx: Float, velocityX: Float, width: Float): ThrowDecision = when {
-        width > 0f && abs(dx) >= width * DISTANCE_RATIO -> if (dx > 0f) ThrowDecision.Right else ThrowDecision.Left
         abs(velocityX) >= VELOCITY -> if (velocityX > 0f) ThrowDecision.Right else ThrowDecision.Left
+        width > 0f && abs(dx) >= width * DISTANCE_RATIO -> if (dx > 0f) ThrowDecision.Right else ThrowDecision.Left
         else -> ThrowDecision.Return
     }
 

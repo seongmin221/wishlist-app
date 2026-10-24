@@ -83,6 +83,7 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
     ListAnchorEffects(
         anchors, state.restore, state.hasNewer, busy = state.loading || state.itemsLoading || state.prepending, prepending = state.prepending,
         applied = owner.appliedRestore, onApplied = { owner.appliedRestore = it }, loadNewer = presenter::loadNewer,
+        keepPositionOnNullRestore = true, // Ruling 8: the header sheet and list stay put
     )
     val detail = state.detail
     when {

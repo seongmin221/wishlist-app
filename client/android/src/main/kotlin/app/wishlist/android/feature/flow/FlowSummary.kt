@@ -63,11 +63,10 @@ object HomeFlowText {
     /** Fill summary: only 건너뜀 (저장하고 다음 is C8). */
     fun skippedSummary(skipped: Int): ResText = ResText(R.string.flow_fill_summary, skipped)
 
-    /** The review card's last line, from who set the category and purpose; null: no AI line. */
+    /** The review card's last line, from who set the category and purpose (Ruling 7, same as iOS); null: no AI line. */
     @StringRes
     fun aiLine(category: ValueSource?, purpose: ValueSource): Int? = when {
         category == ValueSource.AI && purpose == ValueSource.AI -> R.string.flow_ai_both
-        category == ValueSource.AI && purpose == ValueSource.UNASSIGNED -> R.string.flow_ai_category_no_purpose
         category == ValueSource.AI -> R.string.flow_ai_category
         purpose == ValueSource.AI -> R.string.flow_ai_purpose
         else -> null

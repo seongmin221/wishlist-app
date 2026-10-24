@@ -28,12 +28,17 @@ class FlowTextTest {
 
     @Test fun ai_line_follows_the_category_and_purpose_sources() {
         assertEquals(R.string.flow_ai_both, HomeFlowText.aiLine(ValueSource.AI, ValueSource.AI))
-        assertEquals(R.string.flow_ai_category_no_purpose, HomeFlowText.aiLine(ValueSource.AI, ValueSource.UNASSIGNED))
+        // Ruling 7: category AI without an AI purpose (unassigned, user, unknown) is one line.
+        assertEquals(R.string.flow_ai_category, HomeFlowText.aiLine(ValueSource.AI, ValueSource.UNASSIGNED))
         assertEquals(R.string.flow_ai_category, HomeFlowText.aiLine(ValueSource.AI, ValueSource.USER))
+        assertEquals(R.string.flow_ai_category, HomeFlowText.aiLine(ValueSource.AI, ValueSource.UNKNOWN))
+        assertEquals(R.string.flow_ai_purpose, HomeFlowText.aiLine(ValueSource.UNASSIGNED, ValueSource.AI))
         assertEquals(R.string.flow_ai_purpose, HomeFlowText.aiLine(ValueSource.USER, ValueSource.AI))
         assertNull(HomeFlowText.aiLine(ValueSource.USER, ValueSource.USER))
         assertNull(HomeFlowText.aiLine(null, ValueSource.UNASSIGNED))
         assertEquals("AI가 카테고리와 목적을 연결했어요", ko.format("flow_ai_both"))
+        assertEquals("AI가 카테고리를 정했어요", ko.format("flow_ai_category"))
+        assertEquals("AI가 목적을 연결했어요", ko.format("flow_ai_purpose"))
     }
 
     @Test fun fill_reason_follows_the_required_action() {

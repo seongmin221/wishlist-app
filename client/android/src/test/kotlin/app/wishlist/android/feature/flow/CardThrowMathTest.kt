@@ -24,9 +24,12 @@ class CardThrowMathTest {
         assertEquals(ThrowDecision.Right, CardThrowMath.decide(dx = -0.1f * w, velocityX = 800f, width = w))
     }
 
-    @Test fun a_far_drag_wins_over_a_velocity_the_other_way() {
-        // Past the distance threshold the finger's side decides (the flick back did not bring it under 30%).
-        assertEquals(ThrowDecision.Right, CardThrowMath.decide(dx = 0.5f * w, velocityX = -900f, width = w))
+    @Test fun a_fling_wins_over_the_drag_side() {
+        // Ruling 6 (same as iOS): |vx| ≥ 800/s decides by the fling's direction even past the distance threshold.
+        assertEquals(ThrowDecision.Left, CardThrowMath.decide(dx = 0.4f * w, velocityX = -900f, width = w))
+        assertEquals(ThrowDecision.Right, CardThrowMath.decide(dx = -0.4f * w, velocityX = 800f, width = w))
+        // A slower flick back does not override the drag side.
+        assertEquals(ThrowDecision.Right, CardThrowMath.decide(dx = 0.4f * w, velocityX = -799f, width = w))
     }
 
     @Test fun rotation_follows_the_drag_up_to_sixteen_degrees_at_full_width() {
