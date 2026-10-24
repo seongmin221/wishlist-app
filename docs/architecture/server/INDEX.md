@@ -34,3 +34,4 @@
 
 - [B4 상품 목록·홈 조회 설계](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 조회3개·공통 판정·snapshot·V15 구현·320 통과/1 skip
 - [B8 후보 이동과 영향 확인 삭제 API](candidate-move-deletion-api.md) — PUR-07/08·CAT-05/06·PUR-05/06 계약
+- [B8 구현 전 계약 검토](b8-contract-review-2026-10-24.md) — 반영 완료 · 삭제 replay 순서·분석 단계별 검증·영향 페이지·공개 응답
