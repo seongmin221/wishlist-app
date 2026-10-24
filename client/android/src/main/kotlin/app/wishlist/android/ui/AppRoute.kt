@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Modifier
 import app.wishlist.android.designsystem.*
+import app.wishlist.android.feature.purpose.PurposeHomeScreen
+import app.wishlist.android.feature.purpose.PurposeDetailScreen
+import app.wishlist.android.feature.purpose.PurposeDetailRoute
 import app.wishlist.android.feature.category.CategoryHomeScreen
 import app.wishlist.android.feature.category.CategoryListRoute
 import app.wishlist.android.feature.category.CategoryListScreen
@@ -24,12 +27,14 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
     when (route) {
         WLRoute.TabRoot(WLTab.Home) -> HomeScreen()
         WLRoute.TabRoot(WLTab.Category) -> CategoryHomeScreen()
+        WLRoute.TabRoot(WLTab.Purpose) -> PurposeHomeScreen()
         SettingsRoute -> SettingsScreen()
         LoginRoute -> LoginScreen(LoginMode.Pushed)
         is ItemDetailRoute -> ItemDetailScreen(route.itemId)
         is LocalSubmissionRoute -> LocalSubmissionScreen(route.submissionId)
         is WebViewRoute -> WebViewScreen(route)
         is CategoryListRoute -> CategoryListScreen(route)
+        is PurposeDetailRoute -> PurposeDetailScreen(route)
         else -> if (!VariantRoutes.Content(route, sourceKey)) {
             when (route) {
                 is WLRoute.TabRoot -> PlainTabRoot(route.tab)

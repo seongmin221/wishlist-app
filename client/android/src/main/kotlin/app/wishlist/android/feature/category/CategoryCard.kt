@@ -112,6 +112,8 @@ internal fun CategoryCard(
     unconfirmed: Boolean,
     photoRequest: ImageRequest?,
     onClick: () -> Unit,
+    merchantMeta: Boolean = false,
+    title: String = item.product.name.orEmpty(),
 ) {
     val c = LocalWLColors.current
     val unconfirmedLabel = stringResource(R.string.category_card_unconfirmed)
@@ -138,16 +140,16 @@ internal fun CategoryCard(
             }
         }
         Column(Modifier.padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4)) {
-            WLText(keepAllBreaks(item.product.name.orEmpty()), WLType.body)
+            WLText(keepAllBreaks(title), WLType.body)
             PriceText(item.product.price?.canonical, item.product.currency)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val purpose = meta.purpose
-                if (purpose is PurposeLabel.Named) {
+                if (!merchantMeta && purpose is PurposeLabel.Named) {
                     val color = DetailText.purposeColor(purpose.colorKey)
                     if (color != null) PurposeDot(color) else Box(Modifier.size(10.dp).background(c.textSecondary, CircleShape))
                 }
-                val purposeText = CategoryText.purposePart(meta)?.let { stringResource(it) } ?: (purpose as PurposeLabel.Named).name
-                val text = CategoryText.checkedPart(meta)?.let { "$purposeText · ${it.resolve()}" } ?: purposeText
+                val purposeText = if (merchantMeta) item.product.merchant.orEmpty() else CategoryText.purposePart(meta)?.let { stringResource(it) } ?: (purpose as PurposeLabel.Named).name
+                val text = CategoryText.checkedPart(meta)?.let { listOf(purposeText, it.resolve()).filter(String::isNotEmpty).joinToString(" · ") } ?: purposeText
                 WLText(text, WLType.label, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

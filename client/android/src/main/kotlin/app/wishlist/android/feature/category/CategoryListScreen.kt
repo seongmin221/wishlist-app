@@ -227,7 +227,7 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
  * it out; laid-out cards keep their height. A refresh (the list restarts) forgets the pages.
  */
 @Composable
-private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (WishlistItem) -> Unit, modifier: Modifier) {
+internal fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (WishlistItem) -> Unit, modifier: Modifier, merchantMeta: Boolean = false, cardTitle: @Composable (WishlistItem) -> String? = { null }) {
     val context = LocalContext.current
     val book = remember { CategoryPhotoBook(context) }
     // A restart replaces the whole layout (a job of the old one can no longer touch the one on screen).
@@ -278,6 +278,8 @@ private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (W
                         unconfirmed = isUnconfirmed(item),
                         photoRequest = url?.let { remember(it, columnPx) { book.request(it, columnPx) } },
                         onClick = { onOpen(item) },
+                        merchantMeta = merchantMeta,
+                        title = cardTitle(item) ?: item.product.name.orEmpty(),
                     )
                 }
             } }
