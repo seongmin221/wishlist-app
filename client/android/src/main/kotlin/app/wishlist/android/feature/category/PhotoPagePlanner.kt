@@ -1,5 +1,8 @@
 package app.wishlist.android.feature.category
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
@@ -79,6 +82,28 @@ class PhotoPagePlanner(private val timeoutMs: Long = PAGE_TIMEOUT_MS) {
             val scale = minOf(1.0, bw.toDouble() / width, bh.toDouble() / height)
             return (width * scale).toInt().coerceAtLeast(1) to (height * scale).toInt().coerceAtLeast(1)
         }
+    }
+}
+
+/**
+ * One layout of a category list: its pages, planner and laid-out ratios. A restart (refresh, another
+ * category, a laid-out card's photo changed) makes a new one, so a page job still running for an older
+ * layout settles and publishes only into that one and never into the layout on screen.
+ */
+internal class PhotoGridLayout(timeoutMs: Long = PhotoPagePlanner.PAGE_TIMEOUT_MS) {
+    private val planner = PhotoPagePlanner(timeoutMs)
+    /** Item ids per page (one ITEM-02 answer each), in list order. */
+    val pages = mutableStateListOf<List<String>>()
+    /** The photo URL each paged card was laid out with. */
+    val photos = mutableMapOf<String, String?>()
+    /** Laid-out ratios as state, so a settled page recomposes the grid (the planner itself is plain). */
+    val ratios = mutableStateMapOf<String, Float>()
+
+    /** Polls page [index] every 100 ms until the planner lays it out, then publishes its ratios. */
+    suspend fun settlePage(index: Int, cards: List<PhotoPagePlanner.Card>, photosNow: () -> Map<String, PhotoPagePlanner.Photo>, elapsedMs: () -> Long) {
+        // In list order: a later page waits for the earlier ones even when its photos came first.
+        while (!planner.settle(index, cards, photosNow(), elapsedMs())) delay(100)
+        cards.forEach { card -> planner.ratioOf(card.id)?.let { ratios[card.id] = it } }
     }
 }
 

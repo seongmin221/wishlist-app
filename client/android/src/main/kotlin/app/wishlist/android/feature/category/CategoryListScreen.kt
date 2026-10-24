@@ -21,8 +21,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,7 +74,6 @@ import app.wishlist.shared.presentation.FormResult
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -233,47 +230,37 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
 private fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (WishlistItem) -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     val book = remember { CategoryPhotoBook(context) }
-    val planner = remember { PhotoPagePlanner() }
-    val pages = remember { mutableStateListOf<List<String>>() }
-    // Laid-out ratios as state, so a settled page recomposes the grid (the planner itself is plain).
-    val ratios = remember { mutableStateMapOf<String, Float>() }
-    // Bumped on each restart: a first page with the same ids as before must still be laid out again.
-    var generation by remember { mutableIntStateOf(0) }
+    // A restart replaces the whole layout (a job of the old one can no longer touch the one on screen).
+    var layout by remember { mutableStateOf(PhotoGridLayout()) }
     val now = rememberMinuteClock()
-
-    // The photo URL each paged card was laid out with.
-    val pagedPhotos = remember { mutableMapOf<String, String?>() }
 
     // Pages: each new tail of ids is a page; a list that no longer starts the same way (or whose photo changed) is a restart.
     LaunchedEffect(items) {
         val ids = items.map { it.id }
         val photoUrls = items.associate { it.id to categoryPhotoUrl(it) }
-        if (restartsLayout(pages.flatten(), pagedPhotos, ids, photoUrls)) {
-            pages.clear(); planner.reset(); ratios.clear(); pagedPhotos.clear(); generation++
-        }
-        val laid = pages.flatten().toSet()
+        if (restartsLayout(layout.pages.flatten(), layout.photos, ids, photoUrls)) layout = PhotoGridLayout()
+        val current = layout
+        val laid = current.pages.flatten().toSet()
         val fresh = ids.filter { it !in laid }
-        if (fresh.isNotEmpty()) pages.add(fresh)
-        fresh.forEach { pagedPhotos[it] = photoUrls[it] }
+        if (fresh.isNotEmpty()) current.pages.add(fresh)
+        fresh.forEach { current.photos[it] = photoUrls[it] }
     }
 
+    val shown = layout
+    val ratios = shown.ratios
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val columnPx = with(LocalDensity.current) { ((maxWidth - WishlistTokens.Space.s12) / 2).roundToPx() }
         val byId = items.associateBy { it.id }
         // Measure every page's photos (six at a time) and lay the page out when ready or after 3 s.
-        pages.forEachIndexed { index, page -> key(generation, index, page.firstOrNull()) {
-            LaunchedEffect(generation, page, columnPx) {
+        shown.pages.forEachIndexed { index, page -> key(shown, index, page.firstOrNull()) {
+            LaunchedEffect(shown, page, columnPx) {
                 val pageItems = page.mapNotNull { byId[it] }
                 val cards = pageItems.map { PhotoPagePlanner.Card(it.id, photoSourceFor(it.product.imageUrl) is PhotoSource.Remote) }
                 val started = System.currentTimeMillis()
                 launch {
                     coroutineScope { pageItems.map { item -> async { book.measure(item, columnPx) } }.awaitAll() }
                 }
-                // In list order: a later page waits for the earlier ones even when its photos came first.
-                while (!planner.settle(index, cards, book.photosFor(pageItems), System.currentTimeMillis() - started)) {
-                    delay(100)
-                }
-                page.forEach { id -> planner.ratioOf(id)?.let { ratios[id] = it } }
+                shown.settlePage(index, cards, { book.photosFor(pageItems) }, { System.currentTimeMillis() - started })
             }
         } }
         Masonry2Col(Modifier.fillMaxWidth(), gap = WishlistTokens.Space.s12, verticalGap = WishlistTokens.Space.s20) {

@@ -58,6 +58,21 @@ class PhotoPagePlannerTest {
         assertNotNull(sizes.begin("b", "https://a/b.jpg"))
     }
 
+    @Test fun aPageJobOfAReplacedLayoutNeverTouchesTheNewOne() = runTest {
+        val tall = mapOf("a" to Photo.Sized(100, 400))
+        val wide = mapOf("a" to Photo.Sized(400, 100))
+        val cards = listOf(Card("a", true))
+        val old = PhotoGridLayout()
+        val replaced = PhotoGridLayout() // a photo change restarted the layout while the old job still runs
+        val newJob = launch { replaced.settlePage(0, cards, { emptyMap() }, { 0 }) }
+        old.settlePage(0, cards, { tall }, { 0 }) // the old job's photo and poll finish first
+        assertEquals(4f, old.ratios["a"])
+        assertNull(replaced.ratios["a"])
+        newJob.cancel()
+        replaced.settlePage(0, cards, { wide }, { 0 })
+        assertEquals(0.25f, replaced.ratios["a"])
+    }
+
     @Test fun naturalRatioIsNotClamped() {
         val planner = PhotoPagePlanner()
         planner.settle(0, listOf(Card("tall", true), Card("wide", true)),
