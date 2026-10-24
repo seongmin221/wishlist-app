@@ -127,3 +127,13 @@
 - **시트:** `OverlayHost.showSheet(dismissGuard = { SheetDismiss.Allow | Block | Confirm }, onConfirmDismiss, selfLaidOut)`. guard는 막 누르기·끌기·뒤로에 모두 적용된다. 폼은 `selfLaidOut` + `WLSheetBody`로 머리 고정·본문 스크롤·버튼 줄 하단 고정(내비게이션 막대·IME 위). 제출 중 주 버튼은 `WLButton(loading = true)`(20dp 진행 표시, 눌리지 않음, TalkBack은 글자를 읽음).
 - **DEBUG:** `DebugSeedImages`(`seed.wishlist.invalid` `/tall/` 1:4, `/slow/` 5초), launch extras `wl.fake.longCategory`(120개), `wl.fake.delayCategoryCreate`(ms), `wl.fake.editCategory`(`<id>|<name>`), 목적 탭 데모 끝의 "카테고리 선택 시트 열기".
 - **남은 점:** 실기기(Flip6) 확인은 하지 않았다(에뮬레이터만). 409 재조회 중 진행 표시는 기기에서 따로 찍지 않았다. Compose 제스처·IME 조합은 단위 테스트가 없다(Robolectric 없음).
+
+## 목적 화면 (C6)
+
+실제 목적 탭은 `feature/purpose`에서 KMP Purpose Presenter에 연결한다. -22dp 카드 겹침과 펼친 ID를 유지하며 생성은 custom overlay sheet의 고정 footer·IME code point 입력을 사용한다. 상세는 계정 범위 route이며 기존 `WLHeaderSheet`의 드래그·nested scroll·실측 기본 높이를 사용해 색 면을 고정하고 머리를 연속 변형한다. 폼과 상세 Presenter는 entry ViewModelStore에 묶인다.
+
+후보 목록은 C5 사진 배치·loader를 재사용하며 판매처·마지막 확인 시각을 표시한다. #22는 미병합이므로 사진 공유 요소 전환을 포함하지 않는다. 후보 추가·삭제·종료·끝난 비교는 사용자 답변에 따라 비활성 진입점을 유지한다. 후보 0개에는 비교 끝내기를 숨긴다.
+
+[검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
+
+C6 PR #23 후속에서 목적 편집 취소·버리기는 폼의 `recoveredDetail`이 있으면 상세에 먼저 적용한다. 사용자가 복구 후 다시 수정한 초안은 버리고, 서버에서 읽은 이름·색·version을 유지하여 재편집 시 같은 오래된 version으로 저장하지 않는다.

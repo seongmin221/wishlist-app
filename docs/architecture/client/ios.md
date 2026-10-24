@@ -152,3 +152,13 @@
 - **시트:** `OverlayHost`에 `SheetGuard`(allow/block/confirm)와 footer 영역을 더했다. 폼 시트는 취소·만들기/저장 줄을 footer로 하단에 고정하고 내용만 스크롤한다. 제출 중에는 guard가 막 누르기·끌기·VoiceOver escape를 막고, 주 버튼은 진행 표시("불러오는 중")로 바뀐다(2026-10-15 결정).
 - **DEBUG:** `Debug/SeedImageProtocol.swift`(`seed.wishlist.invalid` `/tall/` 1:4, `/slow/` 5초), launch 인자 `-wl.fake.longCategory <id>`·`-wl.fake.delayCategoryCreate <ms>`·`-wl.fake.editCategoryOnSave <name>`(첫 편집 저장 직전 Fake에서 이름을 바꿔 409 재현), 설정의 개발용 줄(선택 시트 열기, 다른 기기에서 이름 바꾸기).
 - **남은 점:** 소프트웨어 키보드가 올라온 상태의 footer는 시뮬레이터에서 직접 보지 못했다(하드웨어 키보드 연결). VoiceOver로 페이지를 넘기는 길은 레일 버튼뿐이다. IME 조합 중 동작은 기존 `WLInputComposition`에 기대고 자르는 함수만 테스트했다.
+
+## 목적 화면 (C6)
+
+`Features/Purpose`가 KMP Purpose Presenter의 SKIE flow를 구독한다. entry owner가 상세와 편집 폼을 보유하므로 탭 전환·상품 상세 왕복으로 편집 초안이 닫히지 않는다. 그 자리 편집의 뒤로 버튼·가장자리 제스처는 같은 dirty/submitting guard를 사용하고 계정 이탈은 stack과 owner를 해제한다.
+
+`WLHeaderSheet`의 실측 머리 높이·시트 끌기·목록 스크롤을 재사용하며 연속 진행값으로 제목·아이콘 크기와 위치, 설명·버튼 opacity를 바꾼다. 만들기 시트 footer·그 자리 밑줄 입력에 40/200 code point와 IME 조합 보호를 적용한다. C5 사진 배치를 재사용하고 #22의 사진 공유 요소 전환은 포함하지 않는다. 후속 기능의 비활성 진입점은 사용자 답변에 따른다.
+
+[검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
+
+C6 PR #23 후속에서 상세 owner는 목적 탭 선택·entry 최상단·활성 scene 여부를 함께 보고 가려짐→표시 전환에만 머리와 후보를 갱신한다. 처음 로드와 재등장을 구분하며, 동일한 최상단의 재렌더는 갱신하지 않는다. 편집 폼은 갱신 중에도 유지된다. 충돌 후 취소·버리기에서는 복구한 서버 snapshot을 상세에 적용하고 폼을 닫는다.

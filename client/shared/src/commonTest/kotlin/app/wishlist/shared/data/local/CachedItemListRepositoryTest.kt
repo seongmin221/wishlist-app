@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 private class PageDelegate(var page: ClientResult<ItemPage>, val during: suspend () -> Unit = {}) : ItemListRepository {
+    override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> { during(); return page }
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> { during(); return page }
 }
 
@@ -19,6 +20,31 @@ private class WriteFailingStore(inner: LocalStore) : LocalStore by inner {
 }
 
 class CachedItemListRepositoryTest {
+    @Test fun purposePageRefreshesSameVersionPurposeAndCategoryDisplay() = runTest {
+        withHarness { h ->
+            h.login("A"); val a = h.snapshot()
+            val old = item(3).copy(purpose = app.wishlist.shared.model.ItemPurpose("purpose", app.wishlist.shared.model.ValueSource.USER, "old", "CORAL", "HEART"))
+            h.store.upsertItem(a, old).successValue()
+            val fresh = old.copy(purpose = old.purpose.copy(name = "new", colorKey = "MINT"))
+            val page = ItemPage(listOf(fresh), 1, null)
+            val repo = CachedItemListRepository(PageDelegate(ClientResult.Success(page)), h.store, h.session)
+            assertEquals(page, repo.byPurpose("purpose").successValue())
+            assertEquals(fresh.purpose, h.store.cachedItem(a, itemId).successValue()!!.purpose)
+        }
+    }
+
+    @Test fun purposePageNeverCachesUnderSwitchedAccountAndCacheFailureKeepsPage() = runTest {
+        withHarness { h ->
+            h.login("A")
+            val page = ItemPage(listOf(item(1)), 1, null)
+            val switched = CachedItemListRepository(PageDelegate(ClientResult.Success(page)) { h.login("B") }, h.store, h.session)
+            switched.byPurpose("purpose")
+            assertNull(h.store.cachedItem(h.session.state.value, itemId).successValue())
+            val failed = CachedItemListRepository(PageDelegate(ClientResult.Success(page)), WriteFailingStore(h.store), h.session)
+            assertEquals(page, failed.byPurpose("purpose").successValue())
+        }
+    }
+
     @Test fun sameVersionCardRefreshesDisplay() = runTest {
         withHarness { h ->
             h.login("A"); val a = h.snapshot()

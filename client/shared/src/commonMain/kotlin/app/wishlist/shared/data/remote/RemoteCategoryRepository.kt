@@ -28,7 +28,7 @@ import kotlinx.coroutines.ensureActive
  * [RemoteItemRepository]: a session change at any point (before sending, while waiting, before
  * returning) is SESSION_CHANGED, so one account's answer never reaches another's screen.
  */
-private suspend fun <T> AuthenticatedTransport.call(
+internal suspend fun <T> AuthenticatedTransport.call(
     session: AuthSession,
     apiId: ApiId,
     parse: (String) -> ClientResult<T>,
@@ -98,6 +98,15 @@ internal class RemoteItemListRepository(
     private val session: AuthSession,
     private val transport: AuthenticatedTransport,
 ) : ItemListRepository {
+    override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        transport.call(session, ApiId.ITEM_02, ::parseItemPage) {
+            method = HttpMethod.Get
+            url("/v1/wishlist-items")
+            parameter("purposeId", purposeId)
+            cursor?.let { parameter("cursor", it) }
+            parameter("limit", limit)
+        }
+
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
         transport.call(session, ApiId.ITEM_02, ::parseItemPage) {
             method = HttpMethod.Get

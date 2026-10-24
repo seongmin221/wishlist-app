@@ -10,4 +10,6 @@
 - [B5 비동기 분석·운영 복구](2026-10-09-b5-analysis-runtime-recovery-design.md) — 구현 완료 · 합산 재시도 예산·metadata·canonical·egress proxy·maintenance·PENDING 복구
 - [B6 사용자 이미지 업로드](2026-10-12-b6-media-upload-design.md) — 구현 완료 · JPEG 5MiB·signed PUT 직접 업로드·15분 intent·completion 검증·표시 URL·24시간 미참조 정리
 - [B7 상품 사용자 변경](2026-10-14-b7-item-mutations-design.md) — 구현 완료 · 편집·직접 보완·검토·삭제·재분석·deletionImpact·잠금/오류 순서
+
+- [C6 목적 화면 설계 — PUR-01~04·목록 전체 재조회·머리 시트·생성·편집](2026-10-24-client-c6-purpose-design.md)
 - [B8 후보 이동과 영향 확인 삭제 설계](2026-10-24-b8-candidate-move-deletions-design.md) — B8a/b/c 계약·원자성·삭제 재검증 · 구현 완료

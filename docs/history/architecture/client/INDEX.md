@@ -33,3 +33,5 @@
 - [iOS 라우터 spike 결과 (2026-10-05)](ios-router-spike-2026-10-05.md) — `NavigationStack` 없는 자체 라우터 진행 판단, 끌어서 뒤로는 window 수준 UIKit pan
 
 추가 결정은 `ADR-번호-제목.md` 형식으로 이 폴더에 기록한다.
+
+- [C6 목적 화면 구현 (2026-10-24)](c6-purpose-implementation-2026-10-24.md) — PUR 계약·Presenter·양 플랫폼 머리 시트·검증, #21 병합/#22 미병합 경계

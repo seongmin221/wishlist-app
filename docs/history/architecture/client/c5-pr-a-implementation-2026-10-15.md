@@ -1,5 +1,7 @@
 # C5 PR A 구현 기록 (2026-10-15)
 
+> 상태 갱신(2026-10-24): PR A #21 MERGED, merge commit `0b95e90`. PR B #22는 Draft OPEN·develop 미병합이다. C5 전체 완료가 아니며 C6는 #21까지만 포함한 기준에서 진행한다.
+
 > 브랜치 `client/c5-category`(시작 `e2653f6`, origin/develop C4 PR #15·#16 merge 뒤). 설계 [spec](../../../superpowers/specs/2026-10-14-client-c5-category-design.md)(D1~D15)·[plan](../../../superpowers/plans/2026-10-14-client-c5-category.md) Task 0~19, 설계 검토 [기록](c5-category-design-review-2026-10-14.md). PR A는 카테고리 기능 전체이고, 카드 사진 → 상세 공유 요소 전환은 PR B다(D4).
 
 ## 작업 요약

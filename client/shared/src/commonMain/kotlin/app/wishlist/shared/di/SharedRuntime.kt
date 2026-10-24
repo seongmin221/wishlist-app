@@ -171,7 +171,11 @@ class SharedRuntime internal constructor(
     fun categoryRepository(): app.wishlist.shared.repository.CategoryRepository =
         GatedCategoryRepository(ready, resolveOr<app.wishlist.shared.repository.CategoryRepository>(UnavailableCategoryRepository) { get() })
 
-    /** ITEM-02 (category scope) facade over the bound backend. */
+    /** PUR-01~04 facade over independently routed backends. */
+    fun purposeRepository(): app.wishlist.shared.repository.PurposeRepository =
+        GatedPurposeRepository(ready, resolveOr<app.wishlist.shared.repository.PurposeRepository>(UnavailablePurposeRepository) { get() })
+
+    /** ITEM-02 (category and purpose scopes) facade over the bound backend. */
     fun itemListRepository(): app.wishlist.shared.repository.ItemListRepository =
         GatedItemListRepository(ready, resolveOr<app.wishlist.shared.repository.ItemListRepository>(UnavailableItemListRepository) { get() })
 
@@ -294,6 +298,15 @@ class SharedRuntime internal constructor(
         )
     }
 
+    fun purposeHomePresenter(): app.wishlist.shared.presentation.PurposeHomePresenter =
+        app.wishlist.shared.presentation.PurposeHomePresenter(purposeRepository(), session, env.dispatchers.io)
+
+    fun purposeDetailPresenter(): app.wishlist.shared.presentation.PurposeDetailPresenter =
+        app.wishlist.shared.presentation.PurposeDetailPresenter(purposeRepository(), itemListRepository(), session, env.dispatchers.io)
+
+    fun purposeFormPresenter(): app.wishlist.shared.presentation.PurposeFormPresenter =
+        app.wishlist.shared.presentation.PurposeFormPresenter(purposeRepository(), env.ids, session, env.dispatchers.io)
+
     /** C5 category tab first screen (CAT-01 BROWSE, last group in app state); the owner calls close. */
     fun categoryHomePresenter(): app.wishlist.shared.presentation.CategoryHomePresenter =
         app.wishlist.shared.presentation.CategoryHomePresenter(categoryRepository(), localStore(), session, env.dispatchers.io)
@@ -363,6 +376,10 @@ class SharedRuntime internal constructor(
                 ApiId.CAT_03 -> routed.create
                 else -> routed.update
             })
+        }
+        ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04 -> {
+            val routed = koin.get<app.wishlist.shared.repository.PurposeRepository>() as RoutedPurposeRepository
+            backendOf(when (apiId) { ApiId.PUR_01 -> routed.summary; ApiId.PUR_02 -> routed.create; ApiId.PUR_03 -> routed.detail; else -> routed.update })
         }
         else -> Backend.UNAVAILABLE
     }

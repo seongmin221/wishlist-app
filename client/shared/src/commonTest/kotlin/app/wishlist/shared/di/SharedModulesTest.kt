@@ -58,6 +58,12 @@ class SharedModulesTest {
         "마샬 MAJOR V", "뱅앤올룹슨 Beoplay H95", "소니 ULT WEAR", "오디오테크니카 ATH-M50x",
     )
 
+    @Test fun purposeApisHaveExplicitImplementedBackends() {
+        val purposes = setOf(ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04)
+        assertTrue(FAKE_IMPLEMENTED_APIS.containsAll(purposes))
+        assertTrue(REMOTE_IMPLEMENTED_APIS.containsAll(purposes))
+    }
+
     // --- Explicit bindings -------------------------------------------------------------------
 
     @Test fun bindings_must_list_all_37_apis() {
@@ -90,7 +96,7 @@ class SharedModulesTest {
         assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.HOME_01 to Backend.REMOTE), remote) }
         assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.CAT_05 to Backend.FAKE)) }
         // The seed catalog does not make PUR-01 a Fake wire API (C6).
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.PUR_01 to Backend.FAKE)) }
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.PUR_05 to Backend.FAKE)) }
     }
 
     @Test fun remote_config_is_required_if_and_only_if_some_api_is_remote() {
@@ -366,6 +372,46 @@ class SharedModulesTest {
         advanceUntilIdle()
         assertEquals(RUNTIME_NOT_READY, late.state.value.error?.code)
         late.close()
+    }
+
+    @Test fun runtime_purpose_backends_route_independently_and_gate_before_start_and_after_close() = runTest {
+        val runtime = createRuntime(debugBindings(ApiId.PUR_01 to Backend.FAKE, ApiId.PUR_02 to Backend.REMOTE,
+            ApiId.PUR_03 to Backend.FAKE), remote = RemoteConfig(TEST_BASE_URL, FakeTokenSource()), dispatcher = StandardTestDispatcher(testScheduler))
+        assertEquals(listOf(Backend.FAKE, Backend.REMOTE, Backend.FAKE, Backend.UNAVAILABLE),
+            listOf(ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04).map { runtime.resolvedBackend(it) })
+        val purpose = runtime.purposeRepository()
+        val command = app.wishlist.shared.model.PurposeCommand("목적", null, "coral", "heart")
+        suspend fun expectClosed() {
+            assertEquals(RUNTIME_NOT_READY, purpose.summary().error().code)
+            assertEquals(RUNTIME_NOT_READY, purpose.detail(remoteItemId).error().code)
+            assertEquals(RUNTIME_NOT_READY, purpose.create(command, remoteItemId).error().code)
+            assertEquals(RUNTIME_NOT_READY, purpose.update(remoteItemId, 1, app.wishlist.shared.model.PurposePatch(name = "새 이름")).error().code)
+            assertEquals(RUNTIME_NOT_READY, runtime.itemListRepository().byPurpose(remoteItemId).error().code)
+        }
+        expectClosed()
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        assertTrue(purpose.summary().successValue().purposes.isNotEmpty())
+        assertEquals(API_UNAVAILABLE, purpose.update(remoteItemId, 1, app.wishlist.shared.model.PurposePatch(name = "새 이름")).error().code)
+        runtime.close(); expectClosed()
+    }
+
+    @Test fun runtime_purpose_presenters_use_seed_and_new_create_detail() = runTest {
+        val apis = listOf(ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04, ApiId.ITEM_02)
+        val runtime = createRuntime(debugBindings(*apis.map { it to Backend.FAKE }.toTypedArray()), dispatcher = StandardTestDispatcher(testScheduler))
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        val home = runtime.purposeHomePresenter(); home.load(); advanceUntilIdle()
+        assertTrue(home.state.value.purposes.isNotEmpty())
+        val form = runtime.purposeFormPresenter(); form.startCreate(); advanceUntilIdle(); form.changeName("새 목적"); form.submit(); advanceUntilIdle()
+        val created = assertNotNull(form.state.value.result)
+        assertEquals(0, created.candidateCount)
+        val detail = runtime.purposeDetailPresenter(); detail.load(created.id); advanceUntilIdle()
+        assertEquals(created, detail.state.value.detail)
+        assertTrue(detail.state.value.items.isEmpty())
+        home.refresh(); advanceUntilIdle()
+        assertTrue(home.state.value.purposes.any { it.id == created.id && it.candidateCount == 0 })
+        form.close(); detail.close(); home.close(); runtime.close()
     }
 
     @Test fun runtime_category_presenters_run_on_the_seeded_fake() = runTest {

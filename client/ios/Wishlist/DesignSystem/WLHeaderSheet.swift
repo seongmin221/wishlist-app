@@ -222,7 +222,14 @@ struct WLHeaderSheet<Header: View, Bar: View, Content: View>: View {
         // 시트가 resting에 있었다면 빈 자리 높이와 함께 내려간다. 펼쳐 있었다면 expanded를 지킨다
         // (편집 시작은 `animate(to: .resting)` 뒤에 머리를 늘리는 순서를 권한다).
         let wasExpanded = state.progress > 0.01
-        withAnimation(reduceMotion ? nil : restingAnimation) { state.restingTop = height }
+        withAnimation(reduceMotion ? nil : restingAnimation) {
+            state.restingTop = height
+            if !wasExpanded {
+                // A resting header can grow without a scroll-offset callback (in-place edit).
+                // Keep the mask and touch region in sync with the newly measured sheet position.
+                state.sheetTop = WLHeaderSheetMath.sheetTop(offset: state.lastOffset, restingTop: height, expandedTop: expandedTop)
+            }
+        }
         if wasExpanded {
             var t = Transaction()
             t.disablesAnimations = true

@@ -99,9 +99,17 @@ final class WLNavigator {
     }
 
     /// 맨 위 화면을 닫는다. 탭 첫 화면이거나 전환 중이면 false.
+    /// Per-entry edit guard; runs for button and edge-swipe back. Account reset bypasses it.
+    @ObservationIgnored private var backGuards: [Int: () -> Bool] = [:]
+    func setBackGuard(_ entry: Int, _ guardRule: (() -> Bool)?) { backGuards[entry] = guardRule }
+    private func allowsBack() -> Bool {
+        guard let id = entries(currentTab).last?.id else { return true }
+        return backGuards[id]?() ?? true
+    }
+
     @discardableResult
     func pop() -> Bool {
-        if isTransitioning || !canPop { return false }
+        if isTransitioning || !canPop || !allowsBack() { return false }
         begin(.pop, tab: currentTab)
         removeTop(currentTab)
         return true
@@ -150,7 +158,10 @@ final class WLNavigator {
     /// Ids of entries removed by pop/commitBackGesture/replaceTop/dropAccountScoped since the last call.
     func drainRemoved() -> [Int] {
         if removed.isEmpty { return [] }
-        defer { removed = [] }
+        defer {
+            for id in removed { backGuards[id] = nil }
+            removed = []
+        }
         return removed
     }
 
@@ -160,7 +171,7 @@ final class WLNavigator {
     }
 
     func beginBackGesture() -> Bool {
-        if isTransitioning || !canPop { return false }
+        if isTransitioning || !canPop || !allowsBack() { return false }
         begin(.backGesture, tab: currentTab)
         return true
     }

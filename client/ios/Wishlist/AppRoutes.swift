@@ -16,11 +16,12 @@ enum AppDestination: Hashable {
     /// C5 one category's item list (FCategoryList*): tab bar stays, horizontal slide (both screens show the
     /// tab bar, so it does not move), closed when the account is left.
     case categoryList(CategoryListTarget)
+    case purpose(String)
 
     var accountScoped: Bool {
         switch self {
         case .settings, .login: false
-        case .item, .local, .web, .categoryList: true
+        case .item, .local, .web, .categoryList, .purpose: true
         }
     }
 
@@ -30,6 +31,7 @@ enum AppDestination: Hashable {
 
     var showsTabBar: Bool {
         if case .categoryList = self { return true }
+        if case .purpose = self { return true }
         return false
     }
 }
