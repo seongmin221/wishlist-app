@@ -58,4 +58,4 @@
 - `816dbca` — iOS 목적 화면·폼·시트·아이콘
 - `c546c10` — Android 접힘 제목 clipping 회귀 수정
 
-커밋은 로컬 `client/c6-purpose`에 보존한다. push·PR 생성·merge는 수행하지 않았다. 마무리 조회에서도 #22는 OPEN·isDraft=true·base develop이었다. 서버 파일 변경은 없다.
+구현은 `client/c6-purpose`에 커밋했다. 구현 마무리 조회에서도 #22는 OPEN·isDraft=true·base develop이었다. 서버 파일 변경은 없으며 PR 게시와 병합 상태는 GitHub에서 확인한다.
