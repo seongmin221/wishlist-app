@@ -1,6 +1,6 @@
 # B8 후보 이동과 영향 확인 삭제 API
 
-> 2026-10-24 · 정책 확정·사용자 검토 반영 · PUR-07/08 구현(V20 receipt), CAT-05/06·PUR-05/06 구현 전 · [구현 이력](../../history/architecture/server/b8-candidate-move-deletions-implementation-2026-10-24.md) · [제품 정책](../../history/product-planning/mvp/decisions/b8-candidate-move-deletion-policy-2026-10-24.md) · [설계](../../superpowers/specs/2026-10-24-b8-candidate-move-deletions-design.md)
+> 2026-10-24 · 정책 확정·사용자 검토 반영 · PUR-07/08(V20)·CAT-05/06(V21 receipt) 구현, PUR-05/06 구현 전 · [구현 이력](../../history/architecture/server/b8-candidate-move-deletions-implementation-2026-10-24.md) · [제품 정책](../../history/product-planning/mvp/decisions/b8-candidate-move-deletion-policy-2026-10-24.md) · [설계](../../superpowers/specs/2026-10-24-b8-candidate-move-deletions-design.md)
 
 ## 후보 조회 PUR-07
 

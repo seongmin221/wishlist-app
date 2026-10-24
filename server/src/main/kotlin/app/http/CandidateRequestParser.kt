@@ -4,6 +4,7 @@ import app.ai.TaxonomyCatalog
 import app.candidates.CandidateFilter
 import app.candidates.CandidateLimits
 import app.candidates.CandidateMoveRequest
+import app.candidates.DeletionKind
 import app.candidates.MoveSelection
 import app.category.CategoryRef
 import app.category.PublicCategoryRegistry
@@ -29,6 +30,19 @@ sealed interface CandidateMoveParseResult {
     data class Invalid(val fields: Set<String>) : CandidateMoveParseResult
 }
 
+data class DeletionQuery(val limit: Int, val after: ReadPosition?, val fingerprint: String?)
+
+sealed interface DeletionQueryParseResult {
+    data class Valid(val query: DeletionQuery) : DeletionQueryParseResult
+    data object InvalidQuery : DeletionQueryParseResult
+    data object InvalidCursor : DeletionQueryParseResult
+}
+
+sealed interface DeletionParseResult {
+    data class Valid(val expectedVersion: Int, val impactToken: String) : DeletionParseResult
+    data class Invalid(val fields: Set<String>) : DeletionParseResult
+}
+
 object CandidateRequestParser {
     private val queryKeys = setOf("categoryId", "parentId", "cursor", "limit", "includeCategoryFacets")
     private val moveKeys = setOf("expectedVersion", "items")
@@ -43,8 +57,7 @@ object CandidateRequestParser {
             p["parentId"] != null -> p["parentId"]!!.takeIf { it in parents }?.let(CandidateFilter::Parent)
             else -> CandidateFilter.None
         } ?: return CandidateQueryParseResult.InvalidQuery
-        val limit = p["limit"]?.let { value -> value.takeIf { it.matches(Regex("[1-9][0-9]{0,2}")) }?.toInt()?.takeIf { it <= CandidateLimits.MAX_PAGE } }
-            ?: if (p["limit"] == null) CandidateLimits.DEFAULT_PAGE else return CandidateQueryParseResult.InvalidQuery
+        val limit = pageLimit(p["limit"]) ?: return CandidateQueryParseResult.InvalidQuery
         val facets = when (p["includeCategoryFacets"]) {
             null, "false" -> false
             "true" -> true
@@ -53,6 +66,26 @@ object CandidateRequestParser {
         val after = p["cursor"]?.let { CandidateCursorCodec.decode(owner, purpose, filter, it) ?: return CandidateQueryParseResult.InvalidCursor }
         return CandidateQueryParseResult.Valid(CandidateQuery(filter, limit, after, facets))
     }
+
+    fun impactQuery(owner: UUID, kind: DeletionKind, id: UUID, p: Parameters): DeletionQueryParseResult {
+        if (!p.names().all { it in setOf("cursor", "limit") && p.getAll(it)?.size == 1 && !p[it].isNullOrEmpty() }) return DeletionQueryParseResult.InvalidQuery
+        val limit = pageLimit(p["limit"]) ?: return DeletionQueryParseResult.InvalidQuery
+        val cursor = p["cursor"]?.let { CandidateCursorCodec.decodeImpact(owner, kind, id, it) ?: return DeletionQueryParseResult.InvalidCursor }
+        return DeletionQueryParseResult.Valid(DeletionQuery(limit, cursor?.second, cursor?.first))
+    }
+
+    fun deletion(raw: String): DeletionParseResult {
+        val body = parseJsonObject(raw) ?: return DeletionParseResult.Invalid(emptySet())
+        if (body.keys != setOf("expectedVersion", "impactToken")) return DeletionParseResult.Invalid(emptySet())
+        val invalid = sortedSetOf<String>()
+        val version = body.positiveVersion("expectedVersion").also { if (it == null) invalid += "expectedVersion" }
+        val token = body["impactToken"].strictString()?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }.also { if (it == null) invalid += "impactToken" }
+        return if (invalid.isEmpty()) DeletionParseResult.Valid(version!!, token!!) else DeletionParseResult.Invalid(invalid)
+    }
+
+    /** 1..100 without leading zeros; absent means the default page. */
+    private fun pageLimit(value: String?): Int? = if (value == null) CandidateLimits.DEFAULT_PAGE
+        else value.takeIf { it.matches(Regex("[1-9][0-9]{0,2}")) }?.toInt()?.takeIf { it <= CandidateLimits.MAX_PAGE }
 
     fun move(raw: String): CandidateMoveParseResult {
         val body = parseJsonObject(raw) ?: return CandidateMoveParseResult.Invalid(emptySet())

@@ -6,14 +6,20 @@ import app.candidates.CandidateMoveResult
 import app.candidates.CandidateMoveService
 import app.candidates.CandidatePage
 import app.candidates.CandidateReadService
+import app.candidates.DeletionImpactService
+import app.candidates.DeletionKind
+import app.candidates.StructureDeletionService
+import app.candidates.StructureImpact
 import app.common.parseCanonicalUuid
 import app.media.MediaUrlSigner
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receiveText
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.coroutines.Dispatchers
@@ -29,14 +35,20 @@ import javax.sql.DataSource
 data class CandidateHandlers(
     val list: (UUID, UUID, CandidateQuery) -> CandidatePage,
     val move: (UUID, UUID, UUID, CandidateMoveRequest) -> CandidateMoveResult,
+    val impact: (UUID, DeletionKind, UUID, DeletionQuery) -> StructureImpact,
+    val delete: (UUID, DeletionKind, UUID, Int, String) -> Unit,
 ) {
     companion object {
         fun of(source: DataSource): CandidateHandlers {
             val reads = CandidateReadService(source)
             val moves = CandidateMoveService(source)
+            val impacts = DeletionImpactService(source)
+            val deletions = StructureDeletionService(source)
             return CandidateHandlers(
                 list = { owner, purpose, q -> reads.list(owner, purpose, q.filter, q.limit, q.after, q.facets) },
                 move = moves::move,
+                impact = { owner, kind, id, q -> impacts.get(owner, kind, id, q.limit, q.after, q.fingerprint) },
+                delete = deletions::delete,
             )
         }
     }
@@ -83,6 +95,47 @@ fun Route.candidateRoutes(handlers: CandidateHandlers, signer: MediaUrlSigner, o
             val dto = CandidateMoveDto(result.items.map { MovedItemDto(it.id.toString(), it.version, it.purposeId.toString()) },
                 result.purposes.map { MovedPurposeDto(it.id.toString(), it.candidateCount, it.membershipVersion) })
             call.respondText(ApiJson.encodeToString(dto), ContentType.Application.Json)
+        }
+    }
+    deletionRoutes(DeletionKind.CATEGORY, "/v1/custom-categories/{id}", "INVALID_CATEGORY_ID", handlers, signer, ownerResolver)
+}
+
+/** CAT-05/06 and PUR-05/06 share one shape; [base] is the resource path with its `{id}` segment. */
+private fun Route.deletionRoutes(kind: DeletionKind, base: String, invalidId: String, handlers: CandidateHandlers, signer: MediaUrlSigner,
+                                 ownerResolver: suspend (ApplicationCall) -> UUID?) {
+    suspend fun ApplicationCall.target(): Pair<UUID, UUID>? {
+        val owner = ownerResolver(this) ?: return null.also { respondApiError(HttpStatusCode.Unauthorized, "UNAUTHORIZED") }
+        val id = parseCanonicalUuid(parameters["id"]) ?: return null.also { respondApiError(HttpStatusCode.BadRequest, invalidId) }
+        return owner to id
+    }
+
+    get("$base/deletion-impact") {
+        val (owner, id) = call.target() ?: return@get
+        val query = when (val parsed = CandidateRequestParser.impactQuery(owner, kind, id, call.request.queryParameters)) {
+            DeletionQueryParseResult.InvalidQuery -> return@get call.respondApiError(HttpStatusCode.BadRequest, "INVALID_DELETION_QUERY")
+            DeletionQueryParseResult.InvalidCursor -> return@get call.respondApiError(HttpStatusCode.BadRequest, "INVALID_DELETION_CURSOR")
+            is DeletionQueryParseResult.Valid -> parsed.query
+        }
+        candidateErrors(call) {
+            val (impact, urls) = withContext(Dispatchers.IO) {
+                val impact = handlers.impact(owner, kind, id, query)
+                impact to signer.signAll(impact.items.mediaKeys())
+            }
+            val dto = StructureImpactDto(impact.version, impact.impactToken, impact.affectedCount, impact.items.map { WishlistItemViewMapper.map(it, urls) },
+                impact.next?.let { CandidateCursorCodec.encodeImpact(owner, kind, id, impact.impactToken, it) })
+            call.respondText(ApiJson.encodeToString(dto), ContentType.Application.Json)
+        }
+    }
+    delete(base) {
+        val (owner, id) = call.target() ?: return@delete
+        val (version, token) = when (val parsed = CandidateRequestParser.deletion(call.receiveText())) {
+            is DeletionParseResult.Valid -> parsed.expectedVersion to parsed.impactToken
+            is DeletionParseResult.Invalid -> return@delete call.respondApiError(HttpStatusCode.UnprocessableEntity,
+                "INVALID_DELETION_INPUT", candidateFieldDetails(parsed.fields))
+        }
+        candidateErrors(call) {
+            withContext(Dispatchers.IO) { handlers.delete(owner, kind, id, version, token) }
+            call.respond(HttpStatusCode.NoContent)
         }
     }
 }

@@ -155,6 +155,68 @@ class CandidateRoutesTest {
         }
     }
 
+    private fun deletionBody(version: Int, token: String) = """{"expectedVersion":$version,"impactToken":"$token"}"""
+
+    @Test fun `deleted category replays after live repository returns null`() = withAnalysisDatabase { source ->
+        val category = insertCustomCategory(source, owner)
+        val items = List(3) { seedItem(source, owner, ItemSeed(customCategory = category)) }
+        val base = "/v1/custom-categories/$category"
+        withApi(source) {
+            val page = send(HttpMethod.Get, "$base/deletion-impact?limit=2")
+            assertEquals(HttpStatusCode.OK, page.status, page.bodyAsText())
+            val body = page.json()
+            assertEquals(listOf("version", "impactToken", "affectedCount", "items", "nextCursor"), body.keys.toList())
+            assertEquals(3, body.getValue("affectedCount").jsonPrimitive.int)
+            val first = body.getValue("items").jsonArray.map { it.jsonObject }
+            assertEquals(2, first.size)
+            assertTrue(first.none { "anchorCursor" in it || "deletionImpact" in it })
+            val detail = send(HttpMethod.Get, "/v1/wishlist-items/${first[0].getValue("id").jsonPrimitive.content}").json()
+            assertEquals(JsonObject(detail - "deletionImpact"), first[0], "elements are the plain WishlistItemDto")
+            val token = body.getValue("impactToken").jsonPrimitive.content
+            val version = body.getValue("version").jsonPrimitive.int
+            val rest = send(HttpMethod.Get, "$base/deletion-impact?cursor=${body.getValue("nextCursor").jsonPrimitive.content}").json()
+            assertEquals(JsonNull, rest.getValue("nextCursor")); assertEquals(1, rest.getValue("items").jsonArray.size)
+
+            send(HttpMethod.Get, "$base/deletion-impact", as_ = null).assertError(HttpStatusCode.Unauthorized, "UNAUTHORIZED")
+            send(HttpMethod.Get, "/v1/custom-categories/x/deletion-impact").assertError(HttpStatusCode.BadRequest, "INVALID_CATEGORY_ID")
+            send(HttpMethod.Get, "$base/deletion-impact?limit=0").assertError(HttpStatusCode.BadRequest, "INVALID_DELETION_QUERY")
+            send(HttpMethod.Get, "$base/deletion-impact?cursor=nope").assertError(HttpStatusCode.BadRequest, "INVALID_DELETION_CURSOR")
+            send(HttpMethod.Get, "$base/deletion-impact", as_ = UUID.randomUUID()).assertError(HttpStatusCode.NotFound, "CATEGORY_NOT_FOUND")
+            send(HttpMethod.Delete, base, deletionBody(version, token), as_ = null).assertError(HttpStatusCode.Unauthorized, "UNAUTHORIZED")
+            send(HttpMethod.Delete, "/v1/custom-categories/x", deletionBody(version, token)).assertError(HttpStatusCode.BadRequest, "INVALID_CATEGORY_ID")
+            send(HttpMethod.Delete, base, "{}").assertError(HttpStatusCode.UnprocessableEntity, "INVALID_DELETION_INPUT")
+            send(HttpMethod.Delete, base, deletionBody(0, "x")).assertError(HttpStatusCode.UnprocessableEntity, "INVALID_DELETION_INPUT",
+                buildJsonObject { putJsonArray("fields") { add("expectedVersion"); add("impactToken") } })
+            send(HttpMethod.Delete, base, deletionBody(version, "0".repeat(64))).assertError(HttpStatusCode.Conflict, "CATEGORY_DELETION_IMPACT_CONFLICT")
+            send(HttpMethod.Delete, base, deletionBody(version, token), as_ = UUID.randomUUID()).assertError(HttpStatusCode.NotFound, "CATEGORY_NOT_FOUND")
+
+            val deleted = send(HttpMethod.Delete, base, deletionBody(version, token))
+            assertEquals(HttpStatusCode.NoContent, deleted.status, deleted.bodyAsText()); assertEquals("", deleted.bodyAsText())
+            send(HttpMethod.Get, base).assertError(HttpStatusCode.NotFound, "CATEGORY_NOT_FOUND")
+            val snapshot = itemSnapshot(source, items)
+            val replay = send(HttpMethod.Delete, base, deletionBody(version, token))
+            assertEquals(HttpStatusCode.NoContent, replay.status, replay.bodyAsText()); assertEquals("", replay.bodyAsText())
+            assertEquals(snapshot, itemSnapshot(source, items)); assertEquals(1, deletionReceipts(source))
+            send(HttpMethod.Delete, base, deletionBody(version + 1, token)).assertError(HttpStatusCode.NotFound, "CATEGORY_NOT_FOUND")
+            send(HttpMethod.Delete, base, deletionBody(version, "0".repeat(64))).assertError(HttpStatusCode.NotFound, "CATEGORY_NOT_FOUND")
+            send(HttpMethod.Delete, base, deletionBody(version, token), as_ = UUID.randomUUID()).assertError(HttpStatusCode.NotFound, "CATEGORY_NOT_FOUND")
+            send(HttpMethod.Get, "$base/deletion-impact").assertError(HttpStatusCode.NotFound, "CATEGORY_NOT_FOUND")
+            assertEquals(snapshot, itemSnapshot(source, items)); assertEquals(1, deletionReceipts(source))
+        }
+    }
+
+    @Test fun `impact cursor reports a changed impact as a conflict`() = withAnalysisDatabase { source ->
+        val category = insertCustomCategory(source, owner)
+        val items = List(2) { seedItem(source, owner, ItemSeed(customCategory = category)) }
+        withApi(source) {
+            val cursor = send(HttpMethod.Get, "/v1/custom-categories/$category/deletion-impact?limit=1").json().getValue("nextCursor").jsonPrimitive.content
+            seedItem(source, owner, ItemSeed(customCategory = category))
+            send(HttpMethod.Get, "/v1/custom-categories/$category/deletion-impact?limit=1&cursor=$cursor")
+                .assertError(HttpStatusCode.Conflict, "CATEGORY_DELETION_IMPACT_CONFLICT")
+            assertEquals(2, items.size)
+        }
+    }
+
     @Test fun `blocking candidate routes run outside the route executor and cancellation propagates`() {
         val requests: List<suspend HttpClient.() -> HttpResponse> = listOf(
             { get("/v1/purposes/${UUID.randomUUID()}/candidate-items") },
@@ -162,11 +224,14 @@ class CandidateRoutesTest {
                 header("Idempotency-Key", UUID.randomUUID().toString())
                 setBody("""{"expectedVersion":1,"items":[{"id":"${UUID.randomUUID()}","expectedVersion":1,"expectedPurposeId":null}]}""")
             } },
+            { get("/v1/custom-categories/${UUID.randomUUID()}/deletion-impact") },
+            { delete("/v1/custom-categories/${UUID.randomUUID()}") { setBody("""{"expectedVersion":1,"impactToken":"${"a".repeat(64)}"}""") } },
         )
         for (request in requests) {
             val register: io.ktor.server.routing.Route.(() -> Unit) -> Unit = { block ->
                 val fail = { block(); throw CandidateException("PURPOSE_NOT_FOUND") }
-                candidateRoutes(CandidateHandlers(list = { _, _, _ -> fail() }, move = { _, _, _, _ -> fail() }), NO_MEDIA) { UUID.randomUUID() }
+                candidateRoutes(CandidateHandlers(list = { _, _, _ -> fail() }, move = { _, _, _, _ -> fail() },
+                    impact = { _, _, _, _ -> fail() }, delete = { _, _, _, _, _ -> fail() }), NO_MEDIA) { UUID.randomUUID() }
             }
             assertBlockingRouteIo(register, request)
             assertRouteCancellation(register, request)

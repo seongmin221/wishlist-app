@@ -2,6 +2,7 @@ package app.http
 
 import app.candidates.CandidateFilter
 import app.candidates.CandidateMoveRequest
+import app.candidates.DeletionKind
 import app.candidates.MoveSelection
 import app.category.CategoryRef
 import app.wishlist.ReadPosition
@@ -91,5 +92,41 @@ class CandidateRequestParserTest {
             """{"expectedVersion":null,"items":null}""" to setOf("expectedVersion", "items"),
         )
         for ((raw, fields) in byField) assertEquals(CandidateMoveParseResult.Invalid(fields), CandidateRequestParser.move(raw), raw.take(120))
+    }
+
+    @Test fun `impact query accepts limit and a cursor bound to owner kind resource and fingerprint`() {
+        val id = UUID.randomUUID()
+        val token = "a".repeat(64)
+        val position = ReadPosition(Instant.parse("2026-10-24T01:00:00Z"), UUID.randomUUID())
+        fun parse(kind: DeletionKind = DeletionKind.CATEGORY, resource: UUID = id, as_: UUID = owner, vararg pairs: Pair<String, String>) =
+            CandidateRequestParser.impactQuery(as_, kind, resource, parametersOf(pairs.groupBy({ it.first }, { it.second })))
+        assertEquals(DeletionQuery(20, null, null), (parse() as DeletionQueryParseResult.Valid).query)
+        val cursor = CandidateCursorCodec.encodeImpact(owner, DeletionKind.CATEGORY, id, token, position)
+        assertEquals(DeletionQuery(7, position, token), (parse(pairs = arrayOf("limit" to "7", "cursor" to cursor)) as DeletionQueryParseResult.Valid).query)
+        for (pairs in listOf(arrayOf("limit" to "0"), arrayOf("limit" to "101"), arrayOf("x" to "1"), arrayOf("limit" to "1", "limit" to "2"), arrayOf("limit" to ""))) {
+            assertEquals(DeletionQueryParseResult.InvalidQuery, parse(pairs = pairs), pairs.toList().toString())
+        }
+        assertEquals(DeletionQueryParseResult.InvalidCursor, parse(DeletionKind.PURPOSE, pairs = arrayOf("cursor" to cursor)))
+        assertEquals(DeletionQueryParseResult.InvalidCursor, parse(resource = UUID.randomUUID(), pairs = arrayOf("cursor" to cursor)))
+        assertEquals(DeletionQueryParseResult.InvalidCursor, parse(as_ = UUID.randomUUID(), pairs = arrayOf("cursor" to cursor)))
+        assertEquals(DeletionQueryParseResult.InvalidCursor, parse(pairs = arrayOf("cursor" to CandidateCursorCodec.encode(owner, id, CandidateFilter.None, position))))
+        assertEquals(DeletionQueryParseResult.InvalidCursor, parse(pairs = arrayOf("cursor" to "zz")))
+    }
+
+    @Test fun `deletion body needs a positive version and a lowercase sha256 token`() {
+        val token = "0123456789abcdef".repeat(4)
+        assertEquals(DeletionParseResult.Valid(3, token), CandidateRequestParser.deletion("""{"expectedVersion":3,"impactToken":"$token"}"""))
+        for (raw in listOf("", "[]", "{}", """{"expectedVersion":3}""", """{"impactToken":"$token"}""", """{"expectedVersion":3,"impactToken":"$token","x":1}""")) {
+            assertEquals(DeletionParseResult.Invalid(emptySet()), CandidateRequestParser.deletion(raw), raw)
+        }
+        val byField = mapOf(
+            """{"expectedVersion":0,"impactToken":"$token"}""" to setOf("expectedVersion"),
+            """{"expectedVersion":"3","impactToken":"$token"}""" to setOf("expectedVersion"),
+            """{"expectedVersion":3,"impactToken":"${token.uppercase()}"}""" to setOf("impactToken"),
+            """{"expectedVersion":3,"impactToken":"${token.drop(1)}"}""" to setOf("impactToken"),
+            """{"expectedVersion":3,"impactToken":null}""" to setOf("impactToken"),
+            """{"expectedVersion":null,"impactToken":7}""" to setOf("expectedVersion", "impactToken"),
+        )
+        for ((raw, fields) in byField) assertEquals(DeletionParseResult.Invalid(fields), CandidateRequestParser.deletion(raw), raw)
     }
 }

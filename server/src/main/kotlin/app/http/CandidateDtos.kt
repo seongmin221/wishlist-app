@@ -26,3 +26,6 @@ data class MovedItemDto(val id: String, val version: Int, val purposeId: String)
 
 @Serializable
 data class MovedPurposeDto(val id: String, val candidateCount: Long, val membershipVersion: Int)
+
+@Serializable
+data class StructureImpactDto(val version: Int, val impactToken: String, val affectedCount: Long, val items: List<WishlistItemDto>, val nextCursor: String?)

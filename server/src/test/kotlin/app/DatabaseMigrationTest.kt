@@ -51,7 +51,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"), versions)
                     }
                 }
             }
@@ -452,6 +452,39 @@ class DatabaseMigrationTest {
                     assertFailsWith<SQLException>(sql) { exec(sql) }
                 }
                 assertEquals(1, exec(receipt(other, foreignPurpose, key)), "keys are scoped by owner")
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
+    @Test fun `V21 upgrade keeps V20 receipts and adds one owner scoped deletion receipt per resource`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("20").load().migrate()
+            database.createConnection("").use { c ->
+                val owner = UUID.randomUUID(); val purpose = UUID.randomUUID()
+                fun exec(sql: String) = c.createStatement().use { it.executeUpdate(sql) }
+                exec("insert into app_users(id) values ('$owner')")
+                exec("insert into purposes(id,owner_id,name,color_key,icon_key,activity_at) values ('$purpose','$owner','목적','CORAL','HEART',clock_timestamp())")
+                exec("""insert into candidate_mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,purpose_id,result_json)
+                    values ('$owner','MOVE_CANDIDATES','${UUID.randomUUID()}','${"c".repeat(64)}','$purpose','{"schema":1}')""")
+                fun receipts() = c.createStatement().use { s ->
+                    s.executeQuery("select to_jsonb(t)::text from candidate_mutation_receipts t").use { r -> buildList { while (r.next()) add(r.getString(1)) } }
+                }
+                val before = receipts()
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                assertEquals(before, receipts())
+                val resource = UUID.randomUUID()
+                fun receipt(ownerId: Any = owner, kind: String = "CATEGORY", id: UUID = resource, version: Int = 1, token: String = "a".repeat(64)) =
+                    """insert into structure_deletion_receipts(owner_id,kind,resource_id,expected_version,impact_token)
+                        values ('$ownerId','$kind','$id',$version,'$token')"""
+                assertEquals(1, exec(receipt()))
+                assertEquals(1, exec(receipt(kind = "PURPOSE")), "kinds are separate")
+                for (sql in listOf(receipt(), receipt(ownerId = UUID.randomUUID(), id = UUID.randomUUID()), receipt(kind = "ITEM", id = UUID.randomUUID()),
+                    receipt(id = UUID.randomUUID(), version = 0), receipt(id = UUID.randomUUID(), token = "A".repeat(64)),
+                    receipt(id = UUID.randomUUID(), token = "a".repeat(63)))) {
+                    assertFailsWith<SQLException>(sql) { exec(sql) }
+                }
                 DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
             }
         }

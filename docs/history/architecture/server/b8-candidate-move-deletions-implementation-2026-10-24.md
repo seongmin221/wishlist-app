@@ -1,6 +1,6 @@
 # B8 후보 이동과 영향 확인 삭제 구현 이력
 
-> 2026-10-24 · 진행 중(B8a 완료) · [spec](../../../superpowers/specs/2026-10-24-b8-candidate-move-deletions-design.md) · [계획](../../../superpowers/plans/2026-10-24-b8-candidate-move-deletions.md) · [계약](../../../architecture/server/candidate-move-deletion-api.md) · [결정](../../product-planning/mvp/decisions/b8-candidate-move-deletion-policy-2026-10-24.md)
+> 2026-10-24 · 진행 중(B8a·B8b 완료) · [spec](../../../superpowers/specs/2026-10-24-b8-candidate-move-deletions-design.md) · [계획](../../../superpowers/plans/2026-10-24-b8-candidate-move-deletions.md) · [계약](../../../architecture/server/candidate-move-deletion-api.md) · [결정](../../product-planning/mvp/decisions/b8-candidate-move-deletion-policy-2026-10-24.md)
 
 ## 실행 기록
 
@@ -18,10 +18,24 @@
 - 테스트 강도 확인(변형 후 원복): 전체 존재 검사를 item 충돌 뒤로 옮기면 `missing deleted or foreign items…`가, facet pool에서 현재 목적 제외를 빼면 `filters narrow the page…`가 실패했다.
 - 영향 회귀: `ItemMutation*`·`WishlistItemMutationRoutesTest`·`ApiRouteExposureTest` 통과(아래 커밋 전 실행).
 
+### Task 2: B8b 사용자 category 삭제(CAT-05·CAT-06, V21)
+
+- RED: `CategoryDeletionTest`·`StructureDeletionConcurrencyTest`·HTTP·parser·V21 테스트를 먼저 작성해 `DeletionKind`·`DeletionImpactService`·`StructureDeletionService`·`DeletionQueryParseResult` 등 미정의 symbol로 125개 compile 오류를 확인했다.
+- GREEN(실제 PostgreSQL): `CategoryDeletionTest` 5·`StructureDeletionConcurrencyTest` 3·`CandidateRoutesTest` 5·`CandidateRequestParserTest` 7·`DatabaseMigrationTest` 13 통과. 첫 실행에서 경합 테스트 1개가 실패했는데 라운드마다 다른 category 삭제 receipt도 생기는 것을 세지 않은 테스트 산술 오류였다. 해당 category의 receipt만 세도록 고쳤고 구현은 바꾸지 않았다.
+  - 영향 조회: 이름 없는 상품·PROCESSING 상품 포함, ARCHIVED/DELETED 제외, 빈 category 0건, 다른 owner·삭제됨·없음 404. 관계없는 편집은 token 불변, 영향 상품 편집·새 연결은 token 변경. 같은 created_at 5건+1건을 limit 2, 1→3→100, 100으로 순회해 누락·중복 없이 합집합=affectedCount, 끝 cursor null. 첫 page를 읽은 뒤 page 밖 상품을 편집하면 다음 cursor가 409.
+  - 삭제: 영향 상품의 custom 참조·category_source 제거, `CUSTOM_CATEGORY_DELETED`, CATEGORY override, version +1·updated_at 변경. 목적·review·분석 상태·predicted 진단·job 보존, ARCHIVED 상품 전체 JSON 불변, membership 불변, category soft delete·version +1. 삭제 뒤 CATEGORY_REASSIGNMENT·홈 정보 보완 그룹, PATCH 재지정. 잘못된 token/version 409 뒤 변화 없음, page 밖 편집·새 연결 409.
+  - replay: 같은 token·version 재전송은 변화 없이 성공하고 receipt 1개 유지. 다른 token·다른 version·다른 owner 404, 삭제 뒤 영향 조회 404. HTTP에서 실제 DELETE → 상세 404 → 같은 DELETE 204(빈 body)·상품 불변을 확인했다. 같은 삭제 동시 2건은 모두 성공하고 상품 version은 한 번만 오른다. 삭제와 B7 편집 경주는 하나만 성공한다.
+  - Worker(GENERAL/BROWSER 각각): PENDING → 삭제 → 첫 claim이 삭제 후 version 2를 들고 실행, 삭제된 category를 결과로 받아도·공개 C026을 받아도 참조가 돌아오지 않고 PARTIAL(남은 category 없음)·메타데이터 반영·대체 job 없음. RUNNING → 삭제 → 이전 claim finish는 job CANCELLED·상품 FAILED_RETRYABLE·pending 결과 미반영. 반대 순서(USER custom category, Worker READY 먼저)는 이전 token 409 뒤 새 영향으로 삭제되고 분석 상태는 READY 유지. RUNNING → 삭제 → lease 만료 → 실제 `AnalysisJobReconciler.reconcileExpired`는 1건 복구(CANCELLED·FAILED_RETRYABLE·retry outbox 없음), 두 번째 복구 0건, 늦은 finish는 데이터 불변. 이어서 `ReanalysisService`로 새 generation을 claim·finish해도 참조 미복귀·PARTIAL, PATCH 재지정 가능.
+- 테스트 강도 확인(변형 후 원복): receipt 조회를 살아 있는 category 조회 뒤로 옮기면 삭제 서비스 테스트와 HTTP replay 테스트가, CATEGORY override를 빼면 PENDING claim 테스트가 실패했다.
+
 ## 계획 대비 결정
 
 - 이동 body의 원소 오류(원소가 object가 아님·알 수 없는/누락된 원소 key·ID/version/expectedPurposeId 값)는 계약의 "원소의 필드 오류는 `items`"에 따라 `fields:["items"]`로 묶는다. 구조 오류로 비우는 것은 최상위 body(object 아님·최상위 key 불일치)뿐이다.
 - 일괄 상품 잠금은 B7 `ItemMutationRepository.lockAll`(한 문장 `order by id for update`)로 추가했다. 기존 함수는 바꾸지 않았다.
 - 이동 receipt는 `candidate_mutation_receipts`(V20)에 대상 목적 FK와 schema v1 결과 JSON을 둔다. 응답의 `replayed`는 저장하지 않는다.
 - facet은 살아 있는 custom category 또는 공개 category에 연결된 항목만 센다. 삭제된 custom category를 아직 참조하는 ACTIVE 항목은 B8b 이후 생기지 않으므로 별도 facet을 만들지 않았다.
+- 삭제 receipt(`structure_deletion_receipts`, V21)는 owner/kind/resource당 하나이며 resource FK 대신 kind check와 token 형식 check를 둔다. category와 목적 두 종류를 한 표에 두기 때문이다.
+- impactToken canonical은 `v1|owner|kind|id|version|membershipVersion(category는 -)|id:version,…`(ID 오름차순)의 SHA-256 hex다. 영향 cursor는 owner tag·kind·ID·token·위치를 담아 다음 page에서 현재 token과 비교한다.
+- 삭제 서비스는 category 행을 `CategoryRepository.find(lock)`로 잠근 뒤 영향 상품의 목적을 ID순으로, 상품을 `lockAll`로 잠근다. 최종 token은 잠긴 상품 version으로 다시 계산한다.
+- category 삭제는 review를 바꾸지 않는다(설계의 "review 보존"). AI 목적 때문에 PENDING이던 상품은 재지정 뒤에도 검토 대기로 남는다.
 - 경합 재현용 test seam `CandidateMoveService(afterItemLock)`을 추가했다. 기본값은 no-op이다.
