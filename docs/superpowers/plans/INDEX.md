@@ -15,3 +15,4 @@
 - [제품 문서 재구성](2026-09-10-product-documentation-restructure.md) — 완료된 문서 구조 정리 작업
 
 - [C6 목적 화면 구현 계획 — 데이터·Presenter·Android·iOS·통합 검증](2026-10-24-client-c6-purpose.md)
+- [B8 후보 이동과 영향 확인 삭제 계획](2026-10-24-b8-candidate-move-deletions.md) — 하위 묶음별 구현·검증·커밋 · 실행 완료

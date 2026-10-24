@@ -18,6 +18,7 @@
 | AI 목적 후보·snapshot v3·T0~T7 단계·판단/판단 없음 | [purpose-ai-candidates.md](purpose-ai-candidates.md) |
 | MEDIA-01·02 클라이언트 계약·한도·오류·표시 URL·local 저장소·정리 | [media-upload-api.md](media-upload-api.md) |
 | ITEM-04~08 편집·보완·검토·삭제·재분석 계약·오류·deletionImpact | [wishlist-item-mutation-api.md](wishlist-item-mutation-api.md) |
+| B8 구현·RED/GREEN·경합·결정 | [B8 구현 기록](../../history/architecture/server/b8-candidate-move-deletions-implementation-2026-10-24.md) |
 | B7 구현·RED/GREEN·경합·회귀·B8/B10/B11 인계 | [B7 구현 기록](../../history/architecture/server/b7-item-mutations-implementation-2026-10-14.md) |
 | B6 구현·RED/GREEN·리뷰·검증·B7/B10/B11 인계 | [B6 구현 기록](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md) |
 | B3 구현·정책 확인·리뷰·검증 | [B3 구현 기록](../../history/architecture/server/b3-purpose-implementation-2026-10-07.md) |
@@ -33,3 +34,5 @@
 | B0 후속 리뷰의 queue claim·LLM 예산/마감·최종 version 복구·DB 시각 | [후속 기록](../../history/architecture/server/b0-followup-review-2026-10-06.md) |
 
 - [B4 상품 목록·홈 조회 설계](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 조회3개·공통 판정·snapshot·V15 구현·320 통과/1 skip
+- [B8 후보 이동과 영향 확인 삭제 API](candidate-move-deletion-api.md) — PUR-07/08·CAT-05/06·PUR-05/06 계약 · 여섯 API 구현
+- [B8 구현 전 계약 검토](b8-contract-review-2026-10-24.md) — 반영 완료 · 삭제 replay 순서·분석 단계별 검증·영향 페이지·공개 응답

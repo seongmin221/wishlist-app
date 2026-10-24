@@ -27,6 +27,15 @@ internal object ItemMutationRepository {
             s.executeQuery().use { r -> if (r.next()) map(r) else null }
         }
 
+    /** B8 bulk commands: every listed row of the owner in SQL ID order with FOR UPDATE, in one statement. */
+    fun lockAll(c: Connection, owner: UUID, ids: Collection<UUID>): List<MutableItem> {
+        if (ids.isEmpty()) return emptyList()
+        return c.prepareStatement("select $COLUMNS from wishlist_items where owner_id=? and id = any(?) order by id for update").use { s ->
+            s.setObject(1, owner); s.setArray(2, c.createArrayOf("uuid", ids.distinct().toTypedArray()))
+            s.executeQuery().use { r -> buildList { while (r.next()) add(map(r)) } }
+        }
+    }
+
     /** Locks the owner's purposes in ID order whatever their lifecycle; availability is judged after the item lock. */
     fun lockPurposes(c: Connection, owner: UUID, ids: Collection<UUID>) {
         val sorted = ids.distinct().sorted()

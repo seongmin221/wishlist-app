@@ -58,7 +58,7 @@ B0의 공통 DTO와 owner-scoped 상태 repository를 B1에서 공개 GET과 생
 | ITEM-07 | `PUT /v1/wishlist-items/{id}/manual-completion` | 실패/PARTIAL에서 직접 보완 저장·저장하고 다음 · S4/S8 | 이름+category 필수, expectedVersion, 선택 brand/mediaId/purposeId | 수동 완료 시각·CONFIRMED·갱신 item. 진단용 원래 분석 결과 유지, 재분석 제외 | **구현(B7)** |
 | ITEM-08 | `PUT /v1/wishlist-items/{id}/review-decision` | 분류·목적 확정/보류 버튼·스와이프, 검토 중 연결 수정 · S3/S8 | CONFIRM/DEFER, expectedVersion, 선택 categoryId/purposeId | 갱신 item·CONFIRMED/DEFERRED·version. 보류 자동 재노출 없음 | **구현(B7)** |
 
-B7 ITEM-04~08과 ITEM-03 deletionImpact는 [상품 사용자 변경 계약](wishlist-item-mutation-api.md)을 따른다.
+B7 ITEM-04~08과 ITEM-03 deletionImpact는 [상품 사용자 변경 계약](wishlist-item-mutation-api.md)을 따른다. B8 PUR-05~08·CAT-05/06은 [후보 이동과 영향 확인 삭제 계약](candidate-move-deletion-api.md)을 따른다.
 
 ITEM-03의 삭제 영향은 상세에 포함해 별도 item deletion-impact API를 만들지 않는다. 열어 둔 확인창 이후 다른 기기 변경으로 영향이 달라질 수 있다는 점은 ITEM-05의 version 없는 기존 계약과 함께 기록한다. 정확히 확인 당시 영향으로만 삭제해야 한다는 새 요구가 생기면 그 계약을 별도 변경한다.
 
@@ -89,8 +89,8 @@ B2 CAT-01~04와 owner별 AI 후보·stale 보호를 구현·검증했다. [확�
 | CAT-02 | `GET /v1/custom-categories/{id}` | custom 목록 헤더·편집 폼 초기값 · S3 | custom category ID | 이름·고정 parent·설명·예시·itemCount·version. AI 후보 제외 내부 사유는 노출하지 않음 | **구현(B2)**: owner 상세·빈 custom·내부 AI 정보 제외 |
 | CAT-03 | `POST /v1/custom-categories` | 탭 + 추가, 선택 시트 안 새 category 만들기 · S3 | parentId, 이름, 선택 설명/예시, Idempotency-Key | 생성 category ID·표시값·사용 개수. 사용자당20·40/200/5×60 제한·같은 상위 normalized 이름 unique | **구현(B2)**: owner 잠금·receipt/replay·20개·60초5건 |
 | CAT-04 | `PATCH /v1/custom-categories/{id}` | 이름·설명·예시 저장 · S3 | expectedVersion, 변경 필드 | 새 category·version, 활성 표시명 반영. 부모 이동은 현재 문서 요구에 없으므로 받지 않음 | **구현(B2)**: version·no-op·null·parent 고정·현재 표시명 |
-| CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 ACTIVE 전체 item 수(이름 누락 포함, CAT-01/02 표시용 count와 별도)·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | 없음 |
-| CAT-06 | `DELETE /v1/custom-categories/{id}` | 삭제 확정 · S3/S4 | category version·impactToken | category 삭제·참조 해제·CUSTOM_CATEGORY_DELETED 원자 반영. 영향이 바뀌면 재확인 가능한 409 | 없음 |
+| CAT-05 | `GET /v1/custom-categories/{id}/deletion-impact` | 삭제 확인 count·영향 목록 펼침 · S3/S4 | cursor/limit | 영향 ACTIVE 전체 item 수(이름 누락 포함, CAT-01/02 표시용 count와 별도)·이름/이미지·cursor·category version·impactToken. 상품 유지·홈 보완·archive 비영향 | **구현(B8b)**: 전체 ACTIVE 영향 fingerprint token·createdAt DESC 배타 cursor·영향 변경 409 |
+| CAT-06 | `DELETE /v1/custom-categories/{id}` | 삭제 확정 · S3/S4 | category version·impactToken | category 삭제·참조 해제·CUSTOM_CATEGORY_DELETED 원자 반영. 영향이 바뀌면 재확인 가능한 409 | **구현(B8b)**: JSON expectedVersion/impactToken, receipt 우선 replay 204·CATEGORY override(V21) |
 
 CAT-03의 ‘만들고 현재 상품에 선택’은 category 생성 후 반환 ID를 편집 초안에 넣고 ITEM-04/ITEM-07/ITEM-08에서 연결한다. 상품 편집을 취소해도 이미 생성한 category를 삭제하지 않으며, 생성·연결을 하나의 API로 묶지 않는다([B7 결정](../../history/product-planning/mvp/decisions/b7-item-mutation-policy-2026-10-14.md) 2).
 
@@ -104,10 +104,10 @@ B3 PUR-01~04와 owner별 AI 목적 후보·반영 보호를 구현했다. [확�
 | PUR-02 | `POST /v1/purposes` | 목적 탭·상품·검토에서 새 목적 만들기 · S3 | 필수 이름/colorKey/iconKey, 선택 설명, Idempotency-Key | 빈 ACTIVE purpose와 ID·version. 기존 상품 전체 자동 재판단 없음 | **구현(B3)**: owner 잠금·receipt replay·60초10건·ACTIVE30·job 없음 |
 | PUR-03 | `GET /v1/purposes/{id}` | 목적 상세·빈 목적·편집 초기값 · S3/S7 | purpose ID | 목적 정보·후보 count·membershipVersion·allowedActions·version. 후보 0이면 archive 불가 | **구현(B3)**: owner 상세·후보 수·membershipVersion·allowedActions(ARCHIVE는 후보≥1) |
 | PUR-04 | `PATCH /v1/purposes/{id}` | 이름·설명·색·아이콘을 한 번에 저장 · S3/S7 | expectedVersion, 변경 필드 | 새 purpose·version·표시값. 관련 미확정 AI 결과의 재판단은 서버 내부 정책으로 처리 | **구현(B3)**: expectedVersion·no-op·optional null·AI 재판단 없음 |
-| PUR-05 | `GET /v1/purposes/{id}/deletion-impact` | 목적 삭제 확인·목적 미지정이 될 후보 펼침 · S3 | cursor/limit | 영향 count·item 요약·cursor·purpose version·impactToken, 상품 유지·archive 비영향 | 없음 |
-| PUR-06 | `DELETE /v1/purposes/{id}` | 목적만 삭제·상품 purpose 해제 · S3 | purpose version·impactToken | 상품 유지·사용자가 확정한 목적 미지정, 관련 version 갱신. 빈 목적도 허용 | 없음 |
-| PUR-07 | `GET /v1/purposes/{id}/candidate-items` | 후보 추가 시트, 전체/상위/세부 category 필터 · S3/S7 | categoryId 또는 parentId, cursor/limit, includeCategoryFacets | 현재 목적 소속 제외한 선택 가능 item·현재 다른 목적·이동 안내·version·cursor. facets는 **전체 추가 가능 pool**의 category별 count, 현재 필터/page로 제한하지 않음 | 없음 |
-| PUR-08 | `POST /v1/purposes/{id}/candidate-moves` | 여러 후보 ‘n개 추가’, 다른 목적에서 옮기기 · S3/S7 | item IDs와 각 expectedVersion/기존 목적, 대상 purpose version, Idempotency-Key | 전체 이동의 원자적 결과·새 소속/versions·이전/대상 목적 count. 하나라도 충돌하면 전체 거절 | 없음 |
+| PUR-05 | `GET /v1/purposes/{id}/deletion-impact` | 목적 삭제 확인·목적 미지정이 될 후보 펼침 · S3 | cursor/limit | 영향 count·item 요약·cursor·purpose version·impactToken, 상품 유지·archive 비영향 | **구현(B8c)**: membershipVersion 포함 전체 영향 token·배타 cursor |
+| PUR-06 | `DELETE /v1/purposes/{id}` | 목적만 삭제·상품 purpose 해제 · S3 | purpose version·impactToken | 상품 유지·사용자가 확정한 목적 미지정, 관련 version 갱신. 빈 목적도 허용 | **구현(B8c)**: 상품별 USER+null·membership, receipt replay 204 |
+| PUR-07 | `GET /v1/purposes/{id}/candidate-items` | 후보 추가 시트, 전체/상위/세부 category 필터 · S3/S7 | categoryId 또는 parentId, cursor/limit, includeCategoryFacets | 현재 목적 소속 제외한 선택 가능 item·현재 다른 목적·이동 안내·version·cursor. facets는 **전체 추가 가능 pool**의 category별 count, 현재 필터/page로 제한하지 않음 | **구현(B8a)**: ACTIVE non-PROCESSING pool·WishlistItemDto 배열·전체 pool facets |
+| PUR-08 | `POST /v1/purposes/{id}/candidate-moves` | 여러 후보 ‘n개 추가’, 다른 목적에서 옮기기 · S3/S7 | item IDs와 각 expectedVersion/기존 목적, 대상 purpose version, Idempotency-Key | 전체 이동의 원자적 결과·새 소속/versions·이전/대상 목적 count. 하나라도 충돌하면 전체 거절 | **구현(B8a)**: 1~100개 원자 이동·전체 존재 우선 검사·저장 결과 replay(V20) |
 
 현재 목적 후보 목록은 ITEM-02의 purposeId 필터로 조회한다. 별도의 목적별 상품 GET을 중복 추가하지 않는다. 추가 후보 category 레일도 PUR-07의 facets를 사용해 별도 category facet API를 만들지 않는다.
 
@@ -176,9 +176,9 @@ W ID는 manifest 순서다. 각 행의 API는 화면 진입·그 상태에서 �
 | W17 | `PurposeCreate.dc.html` | PUR-02 → 빈 상세 PUR-03 | color/icon 필수는 최신 문서 우선 |
 | W18 | `PurposeDetailEmpty.dc.html` | PUR-03/ITEM-02 empty, PUR-07/PUR-08, PUR-04/PUR-05/PUR-06 | archive 버튼 숨김·요청도 거절 |
 | W19 | `PurposeEditInPlace.dc.html` | PUR-03 초기값, PUR-04 저장 | 이름·설명·color/icon 미리보기, cancel 무호출 |
-| W20 | `PurposeAddCandidates.dc.html` | PUR-07 후보, PUR-08 n개 추가/이동 | 체크·필터 전환 시 선택 상태 유지 정책 미결정 |
+| W20 | `PurposeAddCandidates.dc.html` | PUR-07 후보, PUR-08 n개 추가/이동 | 체크·필터 전환 시 선택 상태 유지는 C5 결정(B8 이관) |
 | W21 | `PurposeDeleteConfirm.dc.html` | PUR-05 count/목록, PUR-06 확정 | 상품 삭제·archive 명령과 구분 |
-| W22 | `PurposeAddCategoryFilter.dc.html` | PUR-07 includeCategoryFacets·parent/category filter | 레일·chip 선택. 초기 filter 규칙 미결정 |
+| W22 | `PurposeAddCategoryFilter.dc.html` | PUR-07 includeCategoryFacets·parent/category filter | 레일·chip 선택. 초기 filter 규칙은 C5 결정(B8 이관) |
 | W23 | `ProductDetail.dc.html` | ITEM-03, ITEM-04 저장, ITEM-05 삭제, CAT-01/CAT-03, PUR-01/PUR-02, MEDIA-01/MEDIA-02 | 원본 URL 웹뷰, 편집 초안·취소 확인·삭제 ? |
 | W24 | `ProductDetailFill.dc.html` | ITEM-03, ITEM-07/ITEM-04, retry ITEM-06, CAT-01/CAT-03, MEDIA-01/MEDIA-02 | 수동 완료 후 retry 제외·원본 보기 |
 | W25 | `ProductDetailProcessing.dc.html` | ITEM-03, ITEM-05만 변경 가능 | 원본 보기·로딩, edit/retry 없음 |
@@ -257,10 +257,10 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 | 목적 활동순·홈 노출 | **B3/B4 해결**: 생성 또는 후보 유입이 활동, `activityAt DESC, id DESC`, AI 후보 10개. 홈은 최대 3개·빈 목적 포함, 이름·색·아이콘·후보 수·최근 활동·최근 저장 후보 최대 4개(이미지 null도 포함·placeholder 표시) 제공 | HOME-01 |
 | category count와 목록 표시 집합 | **B4 해결**: category count는 일반 목록과 같은 owner·ACTIVE·category 일치·비공백 제품명 집합. 공용 BROWSE 노출과 상위 합계도 동일 | CAT-01/CAT-02, ITEM-02 |
 | 서버 할 일 합계 | **B4 해결**: 별도 합계 필드 없음(C안). 그룹별 count만 반환하고 필요하면 client에서 합산 | HOME-01 |
-| 후보 추가 초기 filter·선택 유지 | 한 category 목적·빈 목적·혼합 category의 초기값과 filter 변경 시 선택 유지 | PUR-07/PUR-08 |
+| 후보 추가 초기 filter·선택 유지 | **B8 결정: C5 이관.** 서버는 요청의 명시 filter만 적용하고 선택을 저장하지 않는다. 한 category 목적·빈 목적·혼합 category의 초기값과 filter 변경 시 선택 유지는 C5에서 정한다 | PUR-07/PUR-08 |
 | 연속 처리 재진입/restart | **B4 해결**: 살아 있는 화면은 현재 anchor 재조회, 앱 신규 실행은 최신 첫 구간. restart는 기기 skip 초기화와 현재 미완료 재조회이며 CONFIRMED/DEFERRED 검토 재노출 없음. 별도 restart API 없음 | HOME-02/ITEM-08 |
 | 상품명·브랜드·archive 제목 입력 제한 | 목적은 **B3 해결**(이름40/설명200 code point·중복 허용). 상품명·브랜드·archive 제목은 추가 확인 | ITEM-04/ITEM-07, ARC-06 |
-| 상품 후보 수 상한·bulk 최대 크기 | 목적 수는 **B3 해결**(ACTIVE 30개·60초 10건). 상품 window 규칙은 있음. bulk 요청 크기는 별도 확인 | PUR-07/PUR-08, ARC-01/ARC-02 |
+| 상품 후보 수 상한·bulk 최대 크기 | 목적 수는 **B3 해결**(ACTIVE 30개·60초 10건). 상품 window 규칙은 있음. 후보 이동 bulk는 **B8 해결**(서로 다른 상품 1~100개). archive bulk는 별도 확인 | PUR-07/PUR-08, ARC-01/ARC-02 |
 | 중복 여러 후보·다른 판매처 동일 상품 | 현재 보드는 한 쌍. 여러 후보의 처리 단위·상품 식별 기준과 실패 URL 안내 필요 | DUP-01/DUP-02 |
 | 새 자원 만들기와 편집 취소 | purpose는 **B3 해결**: 취소 뒤에도 생성한 목적 유지(빈 목적 자동 삭제 금지). category의 수명은 별도 확인 | CAT-03 + ITEM-04/ITEM-07/ITEM-08 |
 | archive 목적 snapshot·복원 예외 | 최신 상세는 목적 아이콘 필요. 설명/color/icon의 복원 범위·삭제 custom 참조·archive 제목 수정 후 목적 이름 복원 기준 확인 | ARC-02/ARC-04/ARC-07/ARC-08 |
