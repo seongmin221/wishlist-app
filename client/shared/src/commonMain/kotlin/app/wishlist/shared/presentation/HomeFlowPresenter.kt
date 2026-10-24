@@ -101,6 +101,7 @@ class HomeFlowPresenter internal constructor(
             val g = group ?: return@intent
             val keep = queue.firstOrNull()?.takeIf { phase == HomeFlowPhase.ACTIVE } ?: return@intent
             // A card without an anchor cannot anchor the window: the next one with an anchor, else the first page.
+            // Anchor-less cards between the current card and that anchor stay only if they are in the window.
             val anchor = queue.firstNotNullOfOrNull { it.anchorCursor }
             loadJob?.cancel()
             appendJob?.cancel(); appendJob = null
@@ -117,7 +118,16 @@ class HomeFlowPresenter internal constructor(
 
     /** Repeats the read that left the flow in [HomeFlowPhase.ERROR]. Returns at once. */
     fun retry() {
-        intent { if (phase == HomeFlowPhase.ERROR) retryLast?.invoke() }
+        intent {
+            if (phase != HomeFlowPhase.ERROR) return@intent
+            val again = retryLast ?: return@intent
+            // Back to LOADING first: settle derives the phase again only outside ERROR.
+            phase = HomeFlowPhase.LOADING
+            error = null
+            retryLast = null
+            publish()
+            again()
+        }
     }
 
     override fun onSessionChanged(current: SessionSnapshot) {
@@ -167,7 +177,8 @@ class HomeFlowPresenter internal constructor(
                 }
                 is ClientResult.Failure -> if (queue.isEmpty()) fail(result.error) { append() }
             }
-            settle()
+            // A failed read waits for the next signal (a pass or foreground) instead of looping.
+            settle(readAhead = result is ClientResult.Success)
         }
     }
 
@@ -215,10 +226,10 @@ class HomeFlowPresenter internal constructor(
     }
 
     /** Reads ahead near the end of the queue and derives the phase, then publishes. */
-    private fun settle() {
+    private fun settle(readAhead: Boolean = true) {
         if (phase != HomeFlowPhase.ERROR) {
             // A running window read replaces the queue anyway; the page after it is read once it lands.
-            if (loadJob == null && queue.size <= STACK && next != null && appendJob == null) append()
+            if (readAhead && loadJob == null && queue.size <= STACK && next != null && appendJob == null) append()
             phase = when {
                 queue.isNotEmpty() -> HomeFlowPhase.ACTIVE
                 loadJob != null || appendJob != null -> HomeFlowPhase.LOADING

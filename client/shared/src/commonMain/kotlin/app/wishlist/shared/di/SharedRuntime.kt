@@ -17,6 +17,7 @@ import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.data.fake.FakeAuthFacade
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.presentation.AccountPresenter
+import app.wishlist.shared.presentation.HomeFlowPresenter
 import app.wishlist.shared.presentation.HomePresenter
 import app.wishlist.shared.presentation.ItemDetailPresenter
 import app.wishlist.shared.presentation.LocalSubmissionDetailPresenter
@@ -287,8 +288,7 @@ class SharedRuntime internal constructor(
      * A new continuous-processing Presenter (분류·목적 확인 / 정보 보완) over HOME-02 ([homeRepository])
      * and this runtime's [session]; one per flow screen. The platform owner calls [HomeFlowPresenter.close].
      */
-    fun homeFlowPresenter(): app.wishlist.shared.presentation.HomeFlowPresenter =
-        app.wishlist.shared.presentation.HomeFlowPresenter(homeRepository(), session, env.dispatchers.io)
+    fun homeFlowPresenter(): HomeFlowPresenter = HomeFlowPresenter(homeRepository(), session, env.dispatchers.io)
 
     /**
      * A new local (not yet sent) link detail Presenter over the one [submissions] coordinator's view,

@@ -34,17 +34,23 @@ private const val OWNER_A = "00000000-0000-4000-8000-00000000000a"
 private const val OWNER_B = "00000000-0000-4000-8000-00000000000b"
 private val REVIEW = HomeActionGroup.CLASSIFICATION_REVIEW
 
-/** The Fake HOME-02 behind a recorder: every call is logged, and [hold] keeps an answer back until completed. */
+/**
+ * The Fake HOME-02 behind a recorder: every call is logged. [gate] holds a call before it reaches the
+ * Fake (a failNext set meanwhile still applies); [hold] keeps a ready answer back until completed.
+ */
 private class RecordingHome(private val fake: HomeRepository) : HomeRepository {
     val calls = mutableListOf<String>()
+    var gate: CompletableDeferred<Unit>? = null
     var hold: CompletableDeferred<Unit>? = null
     override suspend fun summary() = error("not used")
     override suspend fun group(group: HomeActionGroup, cursor: String?, limit: Int): ClientResult<ItemPage> {
         calls += "group:${group.name}:${if (cursor == null) "first" else "next"}:$limit"
+        gate?.await()
         return fake.group(group, cursor, limit).also { hold?.await() }
     }
     override suspend fun groupAround(group: HomeActionGroup, anchor: String, before: Int, after: Int): ClientResult<ItemPage> {
         calls += "around:${group.name}:$before:$after"
+        gate?.await()
         return fake.groupAround(group, anchor, before, after).also { hold?.await() }
     }
 }
@@ -241,6 +247,107 @@ class HomeFlowPresenterTest {
         assertEquals(items.subList(21, 23), p.state.value.upcoming.map { it.item.id })
         assertEquals(21 to 25, p.counter)
         assertEquals(2, home.calls.size)
+        p.close()
+    }
+
+    @Test
+    fun foregroundFailureKeepsQueue() = runTest {
+        signIn()
+        val items = placeReview(3)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        p.pass(); advanceUntilIdle()
+        store.failNext(ApiId.HOME_02, ClientError(ErrorKind.NETWORK))
+        val gate = CompletableDeferred<Unit>().also { home.gate = it }
+        p.foreground()
+        advanceUntilIdle()
+        assertEquals(true, p.state.value.refreshing)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        val s = p.state.value
+        assertEquals(HomeFlowPhase.ACTIVE, s.phase)
+        assertEquals(items.drop(1), p.ids)
+        assertEquals(2 to 3, p.counter)
+        assertEquals(1, s.passed)
+        assertNull(s.error)
+        assertEquals(false, s.refreshing)
+        p.close()
+    }
+
+    @Test
+    fun appendFailureKeepsQueueAndRetriesOnNextPass() = runTest {
+        signIn()
+        val items = placeReview(25)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        repeat(17) { p.pass(); advanceUntilIdle() }
+        store.failNext(ApiId.HOME_02, ClientError(ErrorKind.NETWORK))
+        p.pass(); advanceUntilIdle()
+        assertEquals(HomeFlowPhase.ACTIVE, p.state.value.phase)
+        assertNull(p.state.value.error)
+        assertEquals(items.subList(18, 20), p.ids)
+        assertEquals(19 to 25, p.counter)
+        // The next signal (a pass near the end) reads the page again.
+        p.pass(); advanceUntilIdle()
+        assertEquals(items.subList(19, 22), p.ids)
+        assertEquals(20 to 25, p.counter)
+        assertEquals(listOf("group:CLASSIFICATION_REVIEW:first:20", "group:CLASSIFICATION_REVIEW:next:20", "group:CLASSIFICATION_REVIEW:next:20"), home.calls)
+        p.close()
+    }
+
+    @Test
+    fun retryAfterFailedNextPageOnEmptyQueue() = runTest {
+        signIn()
+        val items = placeReview(22)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        repeat(17) { p.pass(); advanceUntilIdle() }
+        val gate = CompletableDeferred<Unit>().also { home.gate = it }
+        p.pass(); advanceUntilIdle() // the next page is read and held
+        p.pass(); advanceUntilIdle()
+        p.pass(); advanceUntilIdle()
+        assertEquals(HomeFlowPhase.LOADING, p.state.value.phase)
+        assertNull(p.state.value.current)
+        store.failNext(ApiId.HOME_02, ClientError(ErrorKind.NETWORK))
+        home.gate = null
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(HomeFlowPhase.ERROR, p.state.value.phase)
+        assertEquals(ClientError(ErrorKind.NETWORK), p.state.value.error)
+        p.retry()
+        advanceUntilIdle()
+        val s = p.state.value
+        assertEquals(HomeFlowPhase.ACTIVE, s.phase)
+        assertNull(s.error)
+        assertEquals(items.drop(20), p.ids)
+        assertEquals(21 to 22, p.counter)
+        assertEquals(20, s.passed)
+        p.close()
+    }
+
+    @Test
+    fun foregroundWindowNextCursorAppendsPage() = runTest {
+        signIn()
+        val items = placeReview(45)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        p.pass(); advanceUntilIdle()
+        // The window around the 2nd card: 1 in front, 20 after, so it ends with a next cursor.
+        p.foreground()
+        advanceUntilIdle()
+        assertEquals(2 to 45, p.counter)
+        repeat(19) { p.pass(); advanceUntilIdle() }
+        assertEquals(listOf("group:CLASSIFICATION_REVIEW:first:20", "around:CLASSIFICATION_REVIEW:20:20", "group:CLASSIFICATION_REVIEW:next:20"), home.calls)
+        assertEquals(items.subList(20, 23), p.ids)
+        repeat(2) { p.pass(); advanceUntilIdle() }
+        assertEquals(items[22], p.state.value.current?.item?.id)
+        assertEquals(items.subList(23, 25), p.state.value.upcoming.map { it.item.id })
+        assertEquals(23 to 45, p.counter)
+        assertEquals(3, home.calls.size)
         p.close()
     }
 
