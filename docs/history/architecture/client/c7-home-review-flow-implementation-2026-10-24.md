@@ -134,4 +134,26 @@ GitHub 조회(2026-10-24): #22 `state=OPEN`, `isDraft=true`, `baseRefName=develo
 - `536f697` feature(kmp): 카테고리·목적 목록 anchor 갱신
 - `46b73a7`, `d0640fd`, `07230f3` feature(android): 홈·연속 처리·목록 anchor 화면, 속도 판정·잠금, Ruling 6~9 정렬
 - `9a01001`, `e34dc6d` feature(ios): 홈·연속 처리·목록 anchor 화면, 회전 기준·위쪽 이어 받기 보완
-- 이 문서 커밋: docs: C7 홈·연속 처리 구현 기록과 연동 상태 갱신
+- `a3b4f1a` docs: C7 홈·연속 처리 구현 기록과 연동 상태 갱신
+- `d38b8b0` bugfix: iOS 홈 준비 전 요약 조회와 플랫폼 동작 정렬
+- 이 문서 커밋: docs: C7 최종 리뷰 후속 기록
+
+## 최종 리뷰 후속 (2026-10-25)
+
+브랜치 전체 리뷰에서 나온 지적을 `d38b8b0`에서 고쳤다.
+
+- **iOS 홈 준비 전 조회:** `HomeScreen`이 runtime 준비 전에 `appeared()`를 불렀다. DEBUG 냉시작에서 저장된 Fake 계정이 복원되면 `onSessionChanged`가 조회하고 `RUNTIME_NOT_READY` 재시도 카드가 잠깐 보였다. 이제 Android처럼 `purposeUntilReady()` 뒤에 부른다. `HomePresenter`는 `started`일 때만 세션 변경에서 조회하므로 Presenter는 바꾸지 않았다. 시뮬레이터 냉시작 녹화(20fps)에서 재시도 카드가 보이지 않았다.
+- **iOS 연속 처리 시작:** `HomeFlowScreen`의 `startOnce`도 준비를 기다린다.
+- **나가기 시간:** iOS `exitMillis`의 80ms 하한을 없애 Android `remainingMillis`와 같게 했다(버림, 0까지).
+- **목록 복원 만료:** iOS `ListAnchorTracker`가 4초 안에 배치되지 않은 카드 복원을 버린다(Android `RESTORE_WAIT_MS`).
+
+추가 판단:
+
+10. **넘김 기록 시점:** 두 플랫폼 모두 던지기 시작에 `pass()`를 부른다. motion.md §4는 `n / 전체`가 바로 바뀐다고 적는다. iOS는 나가는 카드를 `ReviewFlowScreen`이 들고 있어 마지막 카드가 요약 위로 끝까지 날아가고, 요약은 그 아래에서 떠오른다(Android와 같다). 시작 시점에 보이던 카드가 아니면 넘기지 않는다. 틀리면 호출 위치를 완료 콜백으로 되돌리는 비용이다.
+11. **보완 이유 문구:** 정보 보완에서 제품명이 비었고 추출이 실패하지 않았으면 "제품명을 찾지 못했어요", 그 밖의 정보 보완은 "상품 정보를 가져오지 못했어요", CATEGORY_ASSIGNMENT는 "카테고리를 정하지 못했어요", CATEGORY_REASSIGNMENT는 "카테고리가 삭제됐어요"다. iOS에 `flow.fill.reason.name`을 더해 Android와 같은 우선순위로 맞췄다. 비용은 문구 조정이다.
+
+미룬 사소한 차이:
+
+- Android `LifecycleResumeEffect`는 어떤 activity resume도 foreground로 센다. iOS는 background에서 돌아올 때만 센다. 차이는 읽기 한 번이 더 도는 정도다.
+- 로딩·실패 UI가 플랫폼마다 다르다. iOS는 `ProgressView`, Android는 섹션을 숨긴다. 갱신 실패 안내는 iOS가 계속 보이고 Android는 잠깐 보인다. 연속 처리 LOADING 모양도 다르다.
+- 맨 위에서 당겨 새로고침하면 새 상품이 화면 위쪽에 남는다. 스펙의 anchor 유지 갱신을 따른 결과지만 제품 확인이 필요하다.

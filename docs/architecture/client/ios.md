@@ -165,9 +165,9 @@ C6 PR #23 후속에서 상세 owner는 목적 탭 선택·entry 최상단·활�
 
 ## 홈·연속 처리·목록 anchor (C7)
 
-- **홈:** `Features/Home`의 `HomeLoggedInView`(분석 대기 → HOME-01 그룹, 첫 실패 재시도·갱신 실패 안내), `HomeTodoCard`(머리 탭은 연속 처리, 화살표 200ms 180° 펼침, 캐러셀 최대 4), `HomePurposeSummary`, 문구 매핑 `HomeTodoText`. `HomeScreen`은 홈 탭 최상단이 보일 때 `appeared()`, 보이는 중 background 복귀에서 `foreground()`를 부른다.
-- **연속 처리:** `Features/Flow`. route 값 `HomeFlowTarget`·entry owner `HomeFlowOwner`(`WLEntryOwners.homeFlow`), `ReviewFlowScreen`·`ReviewCardStack`(`.rotationEffect(anchor: 0.5,0.9)`를 `.offset` 앞에 적용), `FillFlowScreen`, `FlowSummary`, `CardThrowMath`. 새 파일은 `project.pbxproj`의 `Flow` group에 등록했다(파일 시스템 동기화 group 미사용).
-- **목록 anchor:** `Features/Category/ListAnchor.swift`(`ListAnchorTracker` 순수 로직·`ListAnchorWiring`). 카테고리 목록은 고정 머리 아래, 목적 상세는 `WLHeaderSheet` 안에서 `ScrollViewReader`로 복원한다. 목적 상세 복원은 시뮬레이터에서 확인하지 않았다.
+- **홈:** `Features/Home`의 `HomeLoggedInView`(분석 대기 → HOME-01 그룹, 첫 실패 재시도·갱신 실패 안내), `HomeTodoCard`(머리 탭은 연속 처리, 화살표 200ms 180° 펼침, 캐러셀 최대 4), `HomePurposeSummary`, 문구 매핑 `HomeTodoText`. `HomeScreen`은 홈 탭 최상단이 보이고 runtime이 준비된 뒤(`purposeUntilReady`, Android `runtime.ready.first`) `appeared()`, 보이는 중 background 복귀에서 `foreground()`를 부른다. 연속 처리 `startOnce`도 준비를 기다린다.
+- **연속 처리:** `Features/Flow`. route 값 `HomeFlowTarget`·entry owner `HomeFlowOwner`(`WLEntryOwners.homeFlow`), `ReviewFlowScreen`·`ReviewCardStack`(`.rotationEffect(anchor: 0.5,0.9)`를 `.offset` 앞에 적용), `FillFlowScreen`, `FlowSummary`, `CardThrowMath`. 넘김은 던지기 시작에 기록하고(Ruling 10) 나가는 카드는 `ReviewFlowScreen`이 들고 있어 마지막 카드가 요약 위로 끝까지 날아간다. 새 파일은 `project.pbxproj`의 `Flow` group에 등록했다(파일 시스템 동기화 group 미사용).
+- **목록 anchor:** `Features/Category/ListAnchor.swift`(`ListAnchorTracker` 순수 로직·`ListAnchorWiring`). 카드가 4초 안에 배치되지 않은 복원은 버린다(Android `RESTORE_WAIT_MS`). 카테고리 목록은 고정 머리 아래, 목적 상세는 `WLHeaderSheet` 안에서 `ScrollViewReader`로 복원한다. 목적 상세 복원은 시뮬레이터에서 확인하지 않았다.
 - DEBUG 전용 launch argument `-wl.c7.screen <state>`가 실제 owner를 몰아 화면 확인 상태를 연다(UI 자동 조작 도구가 없어서).
 
 [구현·검증](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).

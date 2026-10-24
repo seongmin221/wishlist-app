@@ -371,7 +371,7 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 
 ## 홈·연속 처리·목록 anchor (C7)
 
-> 2026-10-24 C7 Task 1~5. [설계](../../superpowers/specs/2026-10-24-client-c7-home-review-flow-design.md) · [계획](../../superpowers/plans/2026-10-24-client-c7-home-review-flow.md) · [구현·검증 기록](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).
+> 2026-10-24 C7 Task 1~5(공유 모듈). [설계](../../superpowers/specs/2026-10-24-client-c7-home-review-flow-design.md) · [계획](../../superpowers/plans/2026-10-24-client-c7-home-review-flow.md) · [구현·검증 기록](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).
 
 - **ITEM-02 window:** `ItemPage`에 `previousCursor`·`anchorCursors`(카드 id → anchor token)·`anchor: ItemAnchor?(requestedItemId, resolvedItemId, resolved)`를 더했다(기존 생성자 호환 기본값, page 모드는 anchor=null). `ItemListRepository.byCategoryAround`/`byPurposeAround(id, anchor, before=20, after=20)`. Fake는 공용 `fakeWindow`·`validWindowQuery`(FakeWindow.kt)로 ITEM-02·HOME-02를 같은 규칙으로 만든다.
 - **HomeRepository:** `summary()`(HOME-01), `group(group, cursor?, limit=20)`·`groupAround(group, anchor, before, after)`(HOME-02). `HomeSummary`는 세 그룹을 enum 순서로 늘 채우고 미리보기마다 HOME-02 anchor token을 가진다. runtime은 API별 backend를 고르는 `RoutedHomeRepository`를 `CachedHomeRepository`로 한 번 감싸고 `SharedRuntime.homeRepository()`가 gated facade다.
