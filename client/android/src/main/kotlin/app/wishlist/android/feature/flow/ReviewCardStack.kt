@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -157,14 +159,11 @@ internal fun ReviewCardStack(current: HomeFlowCard?, upcoming: Int, motion: Revi
             val top = current?.takeIf { it.item.id != motion.leaving?.card?.item?.id }
             if (top != null) {
                 val velocity = remember(top.item.id) { VelocityTracker() }
-                ReviewCard(
-                    top.item,
+                // The gesture sits on a stationary box around the moving card: positions (and so the flick
+                // velocity) are in the stack's frame, not in the card's own frame that follows the finger.
+                Box(
                     Modifier
-                        .graphicsLayer {
-                            translationX = motion.dragX.value * density.density
-                            rotationZ = CardThrowMath.rotationFor(motion.dragX.value, widthDp)
-                            transformOrigin = TransformOrigin(0.5f, 0.9f)
-                        }
+                        .fillMaxSize()
                         .pointerInput(top.item.id) {
                             detectHorizontalDragGestures(
                                 onDragStart = { velocity.resetTracking() },
@@ -176,7 +175,16 @@ internal fun ReviewCardStack(current: HomeFlowCard?, upcoming: Int, motion: Revi
                                 motion.drag(amount / density.density)
                             }
                         },
-                )
+                ) {
+                    ReviewCard(
+                        top.item,
+                        Modifier.graphicsLayer {
+                            translationX = motion.dragX.value * density.density
+                            rotationZ = CardThrowMath.rotationFor(motion.dragX.value, widthDp)
+                            transformOrigin = TransformOrigin(0.5f, 0.9f)
+                        },
+                    )
+                }
             }
         }
         motion.leaving?.let { leaving ->
@@ -301,7 +309,14 @@ private fun ReviewFieldRow(label: String, value: @Composable () -> Unit) {
     ) {
         WLText(label, WLType.body.copy(fontSize = 13.sp), Modifier.widthIn(min = 52.dp), color = c.textSecondary, maxLines = 1)
         Box(Modifier.weight(1f)) { value() }
-        Box(Modifier.heightIn(min = WishlistTokens.Space.minTouch).unavailable().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .heightIn(min = WishlistTokens.Space.minTouch)
+                .unavailable()
+                .clickable(enabled = false, role = Role.Button) {}
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             WLText(stringResource(R.string.flow_review_change), WLType.body, color = c.textSecondary, maxLines = 1)
         }
     }

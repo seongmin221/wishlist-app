@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -93,8 +94,10 @@ internal fun FillFlowScreen(title: String, state: HomeFlowState, presenter: Home
         else -> FillPage.Empty
     }
     var locked by remember { mutableStateOf(false) }
-    // Unlocks once the slide that the skip started has run.
-    LaunchedEffect(page) {
+    var skips by remember { mutableIntStateOf(0) }
+    // Unlocks 320 ms after the skip, restarted when the slide actually begins (the page changed); a pass the
+    // Presenter ignored (no page change) still unlocks after 320 ms.
+    LaunchedEffect(page, skips) {
         if (!locked) return@LaunchedEffect
         delay(FILL_SLIDE_MILLIS.toLong())
         locked = false
@@ -127,6 +130,7 @@ internal fun FillFlowScreen(title: String, state: HomeFlowState, presenter: Home
                         onClick = {
                             if (!locked && state.phase == HomeFlowPhase.ACTIVE) {
                                 locked = true
+                                skips++
                                 keyboard?.hide()
                                 focus.clearFocus(force = true)
                                 presenter.pass()
