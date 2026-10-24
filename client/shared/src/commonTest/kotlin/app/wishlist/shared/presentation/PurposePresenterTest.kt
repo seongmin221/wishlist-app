@@ -266,7 +266,7 @@ class PurposePresenterTest {
         assertFalse(h.detail.state.value.appendFailed)
         assertEquals(purposeDetail().id to "next", h.pages.calls.last())
     }
-    @Test fun applyEditedCancelsStaleHeaderResponse() = scenario { h ->
+    @Test fun applyEditedKeepsMetadataWhenOlderHeaderResponseArrives() = scenario { h ->
         h.detail.load(purposeDetail().id); advanceUntilIdle()
         val old = h.repo.details.hold()
         h.detail.refresh(); advanceUntilIdle()
@@ -358,6 +358,64 @@ class PurposePresenterTest {
         assertEquals(listOf(completed.id, added.id), h.detail.state.value.items.map { it.id })
         assertEquals(2, h.repo.details.calls.size)
         assertEquals(2, h.pages.calls.size)
+    }
+
+    @Test fun cancellingRecoveredEditKeepsCandidateAdditionAtSameVersion() = scenario { h ->
+        val recovered = purposeDetail("복구한 목적", 7).copy(candidateCount = 1, membershipVersion = 4)
+        h.repo.details.answer(ok(recovered))
+        h.detail.load(recovered.id); advanceUntilIdle()
+        h.form.startEdit(purposeDetail()); h.form.changeName("충돌할 초안"); advanceUntilIdle()
+        h.repo.updates.answer(fail(ErrorKind.CONFLICT, "PURPOSE_VERSION_CONFLICT", 7))
+        h.repo.details.answer(ok(recovered))
+        h.form.submit(); advanceUntilIdle()
+        val latest = recovered.copy(candidateCount = 2, membershipVersion = 5,
+            activity = PurposeActivity(Instant.parse("2026-10-02T00:00:00Z"), "CANDIDATE_ADDED"),
+            allowedActions = recovered.allowedActions + "ARCHIVE")
+        h.repo.details.answer(ok(latest))
+        h.detail.refreshNow(); advanceUntilIdle()
+        h.detail.applyEdited(assertNotNull(h.form.state.value.recoveredDetail)); advanceUntilIdle()
+        assertEquals(latest, h.detail.state.value.detail)
+    }
+    @Test fun cancellingRecoveredEditKeepsRemovalAndArchiveAvailability() = scenario { h ->
+        val recovered = purposeDetail(version = 7).copy(candidateCount = 1, membershipVersion = 4,
+            allowedActions = setOf("EDIT", "DELETE", "ADD_CANDIDATES", "ARCHIVE"))
+        h.repo.details.answer(ok(recovered)); h.detail.load(recovered.id); advanceUntilIdle()
+        val empty = recovered.copy(candidateCount = 0, membershipVersion = 5, allowedActions = recovered.allowedActions - "ARCHIVE")
+        h.repo.details.answer(ok(empty)); h.detail.refreshNow(); advanceUntilIdle()
+        h.detail.applyEdited(recovered); advanceUntilIdle()
+        assertEquals(empty, h.detail.state.value.detail)
+    }
+    @Test fun newerEditWithOlderMembershipKeepsCurrentCandidates() = scenario { h ->
+        val current = purposeDetail(version = 7).copy(candidateCount = 2, membershipVersion = 5,
+            activity = PurposeActivity(Instant.parse("2026-10-02T00:00:00Z"), "CANDIDATE_ADDED"),
+            allowedActions = setOf("EDIT", "DELETE", "ADD_CANDIDATES", "ARCHIVE"))
+        h.repo.details.answer(ok(current)); h.detail.load(current.id); advanceUntilIdle()
+        val saved = purposeDetail("최신 이름", 8).copy(description = "최신 설명", colorKey = "mint", iconKey = "book",
+            candidateCount = 1, membershipVersion = 4, updatedAt = Instant.parse("2026-10-03T00:00:00Z"))
+        h.detail.applyEdited(saved); advanceUntilIdle()
+        assertEquals(current.copy(name = saved.name, description = saved.description, colorKey = saved.colorKey,
+            iconKey = saved.iconKey, version = 8, updatedAt = saved.updatedAt), h.detail.state.value.detail)
+    }
+    @Test fun olderEditWithNewerMembershipUpdatesCandidatesWithoutRevertingName() = scenario { h ->
+        val saved = purposeDetail("저장한 이름", 8).copy(colorKey = "mint", membershipVersion = 4, candidateCount = 1)
+        h.repo.details.answer(ok(saved)); h.detail.load(saved.id); advanceUntilIdle()
+        val candidates = purposeDetail("과거 이름", 7).copy(membershipVersion = 5, candidateCount = 2,
+            activity = PurposeActivity(Instant.parse("2026-10-02T00:00:00Z"), "CANDIDATE_ADDED"),
+            allowedActions = saved.allowedActions + "ARCHIVE")
+        h.repo.details.answer(ok(candidates)); h.detail.refreshNow(); advanceUntilIdle()
+        assertEquals(saved.copy(membershipVersion = 5, candidateCount = 2, activity = candidates.activity,
+            allowedActions = candidates.allowedActions), h.detail.state.value.detail)
+    }
+    @Test fun recoveredSnapshotDoesNotCancelRefreshThatCanHaveNewerMembership() = scenario { h ->
+        val recovered = purposeDetail(version = 7).copy(membershipVersion = 4, candidateCount = 1)
+        h.repo.details.answer(ok(recovered)); h.detail.load(recovered.id); advanceUntilIdle()
+        val pending = h.repo.details.hold()
+        h.detail.refresh(); advanceUntilIdle()
+        h.detail.applyEdited(recovered); advanceUntilIdle()
+        val latest = recovered.copy(membershipVersion = 5, candidateCount = 2)
+        pending.complete(ok(latest)); advanceUntilIdle()
+        assertEquals(latest, h.detail.state.value.detail)
+        assertFalse(h.detail.state.value.loading)
     }
 
 }

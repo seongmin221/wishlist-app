@@ -359,7 +359,7 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 
 `PurposeRepository`는 PUR-01 SUMMARY 전체 snapshot·PUR-02 생성·PUR-03 상세·PUR-04 변경 필드 PATCH를 제공한다. `PurposeStyleKeys`는 대문자 wire key와 소문자 UI token 경계를 고정한다. 기존 C2 `Purpose`·`CatalogRepository`는 테스트·seed 호환용으로 남고 새 화면은 사용하지 않는다. SELECT는 C8 소비 화면에서 연결한다.
 
-`PurposeHomePresenter`, `PurposeDetailPresenter`, `PurposeFormPresenter`는 `SessionLane`의 단일 실행 lane과 계정 snapshot publication guard를 사용한다. 홈은 기존 목록을 유지하며 갱신 실패를 알린다. 상세 머리와 후보 페이지는 독립 실패·재시도를 제공하고, 편집 응답을 적용하면 오래된 머리 조회를 취소한다. 첫 페이지 교체·이어 붙이기만 제공하며 anchor 복원은 C7이다.
+`PurposeHomePresenter`, `PurposeDetailPresenter`, `PurposeFormPresenter`는 `SessionLane`의 단일 실행 lane과 계정 snapshot publication guard를 사용한다. 홈은 기존 목록을 유지하며 갱신 실패를 알린다. 상세 머리와 후보 페이지는 독립 실패·재시도를 제공한다. 머리 GET·편집·충돌 복구 응답은 version과 membershipVersion을 각각 비교해 최신 정보와 최신 후보 구성을 보존한다. 첫 페이지 교체·이어 붙이기만 제공하며 anchor 복원은 C7이다.
 
 생성 폼은 응답 유실 가능 실패에만 payload와 멱등 key를 보관한다. 편집은 바뀐 필드만 보내며 빈 설명은 명시 null이다. C5의 충돌 복구 정책(최신값이 요청값이면 성공, 아니면 최신 초안 교체·안내, 재조회 실패 시 초안 유지·저장 차단)을 따른다. 제출 중 입력·닫기를 잠그고 계정 변경과 close는 요청을 취소한다. 오프라인 편집 큐는 없다.
 
@@ -367,4 +367,4 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 
 ### C6 PR #23 리뷰 후속
 
-목적 편집 폼은 충돌 재조회로 받은 서버 snapshot을 `PurposeFormState.recoveredDetail`에 보관한다. 이 값은 이후 초안 수정에도 유지되고 새 폼·계정 변경에서는 지운다. 플랫폼의 취소·버리기 경로는 입력 초안 대신 이 snapshot을 상세에 적용하므로 편집을 재개할 때 복구 전 version을 다시 사용하지 않는다. 상세 `applyEdited`는 더 낮은 version의 snapshot을 거절해 저장 성공 후 늦은 복구값이 이름·색을 되돌리지 못하게 한다.
+목적 편집 폼은 충돌 재조회로 받은 서버 snapshot을 `PurposeFormState.recoveredDetail`에 보관한다. 이 값은 이후 초안 수정에도 유지되고 새 폼·계정 변경에서는 지운다. 플랫폼의 취소·버리기 경로는 입력 초안 대신 이 snapshot을 상세에 적용하므로 편집을 재개할 때 복구 전 version을 다시 사용하지 않는다. 상세 `applyEdited`와 머리 GET은 두 독립 카운터로 snapshot을 합친다. 이름·설명·색·아이콘·updatedAt은 더 높은 `version`, 후보 수·activity·allowedActions는 더 높은 `membershipVersion`의 값을 사용한다. 목적 편집은 membershipVersion을, 후보 구성 변경은 version을 올리지 않으므로 두 카운터를 사전식으로 비교하거나 어느 하나가 낮다고 snapshot 전체를 버리지 않는다. 진행 중인 머리 GET은 더 최신 후보 구성을 담을 수 있어 취소하지 않으며, 늦은 응답도 같은 규칙으로 합친다.

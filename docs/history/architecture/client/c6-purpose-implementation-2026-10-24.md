@@ -73,3 +73,15 @@ Android·iOS 모두 충돌 재조회로 복구한 최신 상세를 폼에만 보
 - iOS XCTest **257** 통과. 전체 runtime navigation·409 복구를 포함한다.
 - Release iOS arm64 framework 링크와 iOS Release simulator 빌드 통과.
 - 로그: `/tmp/c6-feedback-red.log`(30개 중 신규 3개 실패), `/tmp/c6-feedback-green.log`, `/tmp/c6-feedback-verify.log`, `/tmp/wishlist-ios-red.log`, `/tmp/wishlist-ios-recovery-red.log`, `/tmp/wishlist-ios-full-test.log`, `/tmp/wishlist-ios-release-build.log`.
+
+## PR #23 추가 P2: 충돌 취소 후 후보 수 회귀 (2026-10-24)
+
+기존 version 단독 비교는 복구 snapshot `(version=7, membershipVersion=4, 후보1)`이 재진입·foreground GET의 `(7,5,후보2)`를 덮는 것을 허용했다. 서버 `PurposeRepository.update`는 metadata version·updatedAt만, `PurposeMembership.recordTransition`은 membershipVersion·activity만 바꾸므로 독립적인 두 축을 비교해야 한다.
+
+상세의 편집·복구 적용과 머리 GET 모두 같은 병합을 사용한다. 이름·설명·색·아이콘·updatedAt은 높은 version, 후보 수·activity·allowedActions는 높은 membershipVersion에서 가져온다. 새 이름과 이전 후보 구성을 담은 저장 응답에서도 최신 후보를 유지하고, 반대로 과거 이름·최신 후보를 담은 GET에서도 저장한 이름을 유지한다. 취소에서 진행 중인 GET을 취소하지 않으므로 아직 도착하지 않은 후보 갱신도 반영한다. 새 플랫폼 분기나 서버 변경은 없다.
+
+회귀 5개: 실제 충돌 복구→동일 version 후보 추가→취소, 후보 제거 뒤 ARCHIVE 제거 유지, 신규 metadata/과거 membership 저장 응답, 과거 metadata/신규 membership GET, 취소 중 진행 중인 갱신 유지. 기존 코드에서 신규 5개가 실패했고 수정 후 목적 Presenter 36개가 통과했다. 전체 검증 결과는 아래에 기록한다.
+
+- 전체 검증: shared host **699** / iOS Native **696**, 실패·오류·skip 0. Android debug/release unit 각각 **225**, assembleDebug/Release·lintDebug 통과(오류0·기존경고27). iOS XCTest **257** 통과.
+- 로그: `/tmp/c6-membership-red.log`(신규5개 실패), `/tmp/c6-membership-green.log`(36개 통과), `/tmp/c6-membership-full.log`, `/tmp/wishlist-membership-test.log`. iOS Release simulator 빌드도 통과했다(`/tmp/wishlist-membership-release.log`).
+- 독립 리뷰 재확인에서 잔여 Critical/Important 지적 없음. 플랫폼 UI·공개 wire 계약·서버는 변경하지 않았다.

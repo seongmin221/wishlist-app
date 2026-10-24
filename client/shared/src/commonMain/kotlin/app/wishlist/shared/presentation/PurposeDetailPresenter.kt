@@ -74,15 +74,27 @@ class PurposeDetailPresenter internal constructor(
         if (mutable.value.appendFailed) loadMore()
     } }
     fun applyEdited(detail: PurposeDetail) { intent {
-        if (detail.id == id && !mutable.value.gone && detail.version >= (mutable.value.detail?.version ?: 0)) {
-            // Superseded header reads cannot put the pre-edit name back on screen.
-            headerJob?.cancel(); headerJob = null
-            mutable.value = mutable.value.copy(detail = detail, error = null, loading = false)
+        if (detail.id == id && !mutable.value.gone) {
+            // Keep an in-flight read: it may know newer membership than this edit/recovery response.
+            mutable.value = mutable.value.copy(detail = reconcile(detail), error = null, loading = headerJob != null)
         }
     } }
     override fun onSessionChanged(current: SessionSnapshot) {
         cancelAll(); id = null
         mutable.value = PurposeDetailState()
+    }
+    /** B3 counters are independent: metadata edits never advance membership, and vice versa. */
+    private fun reconcile(incoming: PurposeDetail): PurposeDetail {
+        val current = mutable.value.detail ?: return incoming
+        val metadata = if (incoming.version >= current.version) incoming else current
+        val membership = if (incoming.membershipVersion >= current.membershipVersion) incoming else current
+        // updatedAt belongs to metadata edits; candidate transitions change activity instead.
+        return metadata.copy(
+            candidateCount = membership.candidateCount,
+            membershipVersion = membership.membershipVersion,
+            activity = membership.activity,
+            allowedActions = membership.allowedActions,
+        )
     }
     private fun fetchHeader() {
         val target = id ?: return
@@ -91,7 +103,7 @@ class PurposeDetailPresenter internal constructor(
         headerJob = request({ purposes.detail(target) }) { result ->
             headerJob = null
             when (result) {
-                is ClientResult.Success -> mutable.value = mutable.value.copy(detail = result.value, loading = false)
+                is ClientResult.Success -> mutable.value = mutable.value.copy(detail = reconcile(result.value), loading = false)
                 is ClientResult.Failure -> if (isGone(result.error)) gone()
                     else { mutable.value = mutable.value.copy(loading = false, error = result.error) }
             }

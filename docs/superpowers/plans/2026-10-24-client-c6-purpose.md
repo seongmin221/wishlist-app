@@ -40,3 +40,5 @@
 - 최종 검증: shared `allTests` host690/Native687, Android unit debug/release225씩·assembleDebug/Release·lint0errors/27warnings, iOS XCTest255·Release simulator build, Release device framework, token생성기8개 통과. 화면29장(L/D·IME·작은 화면·편집 접힘 포함), 독립 리뷰 잔여 중요 지적 없음. 상세 증거는 [구현 기록](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
 
 - PR #23 P2 리뷰 후속: iOS 상세 최상단 재등장 갱신·양 플랫폼 충돌 취소 snapshot 반영. shared 회귀 4개와 iOS runtime 회귀 2개 추가, host694/Native691·Android225씩·iOS257 통과. 구현 기록의 후속 절 참고.
+
+- 추가 P2 후속: 목적 정보 version과 후보 membershipVersion을 독립 비교하여 편집·복구·GET의 최신 필드를 보존한다. 후보 추가·제거·교차 응답·진행 중 갱신 회귀 5개 RED→GREEN, 목적 Presenter36개 통과. 전체 검증은 구현 기록의 마지막 절 참고.
