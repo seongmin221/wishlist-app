@@ -94,8 +94,8 @@ Android는 사용자 지시로 실기기 대신 에뮬레이터(Pixel_5 API 30, 
 - **iOS 사진 URL이 바뀌어도 이전 사진을 표시함:** 카드가 사진을 받은 URL을 기억하고, URL이 바뀌면 새 사진을 받고 없어지면 사진을 지운다.
 - **Fake ITEM-02 cursor가 밀리초로 잘려 다음 페이지 상품이 빠짐:** cursor에 `createdAt`의 전체 Instant 문자열을 담는다(`fake2:`). 같은 `.123456Z` 시각의 상품 41개가 40·1로 나뉘는 테스트를 더했고, 고치기 전 코드에서는 40·0으로 실패하는 것을 확인했다.
 
-- **(추가) 사진 URL이 바뀌어도 이전 비율로 배치됨:** 위 iOS 카드 수정은 사진만 바꾸고 칸 비율은 그대로였다. 두 플랫폼 모두 배치한 상품의 사진 URL이 바뀌거나 없어지면 배치를 처음부터 다시 한다(iOS `PhotoPagePlan.Item.photo`, Android `restartsLayout`). Android `CategoryPhotoBook`은 크기를 잰 URL을 기억해, 바뀐 사진의 크기는 배치가 읽기 전에 지우고 다시 잰다. 결정은 [decisions.md](../../../design/decisions.md)에 더했다. 100×400 → 400×100 변경 뒤 비율 0.25를 확인하는 iOS 테스트와 Android `restartsLayout` 테스트를 더했다.
+- **(추가) 사진 URL이 바뀌어도 이전 비율로 배치됨:** 위 iOS 카드 수정은 사진만 바꾸고 칸 비율은 그대로였다. 두 플랫폼 모두 배치한 상품의 사진 URL이 바뀌거나 없어지면 배치를 처음부터 다시 한다(iOS `PhotoPagePlan.Item.photo`, Android `restartsLayout`). Android는 측정 결과를 URL과 측정 순번에 묶는다(`PhotoMeasurements`). 그 카드의 마지막 측정만 결과를 남기고, 배치는 현재 사진 URL에서 잰 크기만 읽는다. 처음에는 바뀐 사진의 결과만 지웠는데, 진행 중이던 이전 사진의 측정이 새 배치 뒤에 끝나 잘못된 비율이 고정되는 경쟁이 추가 리뷰에서 나와 이렇게 바꿨다. 결정은 [decisions.md](../../../design/decisions.md)에 더했다. 100×400 → 400×100 변경 뒤 비율 0.25를 확인하는 iOS 테스트와 Android `restartsLayout` 테스트를 더했다.
 
 Android 세대 값 수정은 Compose UI 테스트 기반이 없어 테스트를 더하지 않았다.
 
-검증: shared Android host 636, Android unit debug 213(실패 0), iOS XCTest 245, `:android:compileDebugKotlin`·iOS Debug build 통과. iOS XCTest는 `WLTypographyTests.testMultilineTextReadsAsOneStaticText` 1건이 실패하며, 이번 변경 전 커밋에서도 같은 시뮬레이터에서 같은 결과라 이번 수정과 무관하다.
+검증: shared Android host 636, Android unit debug 215(실패 0)·lintDebug(0 errors, 경고 27), iOS XCTest 245, `:android:compileDebugKotlin`·iOS Debug build 통과. iOS XCTest는 `WLTypographyTests.testMultilineTextReadsAsOneStaticText` 1건이 실패하며, 이번 변경 전 커밋에서도 같은 시뮬레이터에서 같은 결과라 이번 수정과 무관하다.
