@@ -78,7 +78,7 @@ internal fun PurposeHeader(
     val barHalf = with(density) { (WLTopBarMetrics.Height / 2).toPx() }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
     val bottomClearance = maxOf(tabBarClearance(), WindowInsets.ime.asPaddingValues().calculateBottomPadding())
-    val editorMaxHeight = (maxHeight - wlTopBarBottom() - bottomClearance).coerceAtLeast(120.dp)
+    val editorMaxHeight = (maxHeight - wlTopBarBottom() - bottomClearance).coerceAtLeast(200.dp)
     Column(Modifier.fillMaxWidth().onPlaced { anchors.origin = it.positionInRoot(); anchors.width = it.size.width.toFloat() }) {
         WLTopBar(
             modifier = Modifier.onPlaced { anchors.topRowCenter = it.positionInRoot().y + it.size.height - barHalf },
@@ -93,10 +93,8 @@ internal fun PurposeHeader(
             } } else null,
         )
         Column(Modifier.then(if (form != null) Modifier.heightIn(max = editorMaxHeight) else Modifier)
-            .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // On short displays and above the IME, only the editor body scrolls; save stays reachable.
-            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column {
+            .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 28.dp)) {
+                // This transforming row must stay outside the scroll viewport: it draws into the topbar.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     WLIconTile(
                         modifier = Modifier.onPlaced { anchors.tileRoot = it.positionInRoot() }.graphicsLayer {
@@ -125,12 +123,14 @@ internal fun PurposeHeader(
                     InPlaceText(p.name, fields?.first, WLType.display28Edit, nameModifier, on, edit?.submitting != true, 40,
                         stringResource(R.string.purpose_name_label))
                 }
+            // Only editor details scroll on short displays/above IME; transformed title and footer stay outside.
+            Column(Modifier.then(if (form != null) Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()) else Modifier),
+                verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (p.description != null || form != null) {
                     InPlaceText(p.description.orEmpty(), fields?.second, WLType.body.copy(fontSize = 15.sp, lineHeight = 15.sp),
                         Modifier.fillMaxWidth().graphicsLayer { alpha = fadeOut() }.then(if (faded) Modifier.clearAndSetSemantics {} else Modifier)
                             .padding(top = 13.dp, bottom = 3.75.dp), on, edit?.submitting != true, 200, stringResource(R.string.purpose_description_label), multiline = true)
                 }
-            }
             AnimatedVisibility(form == null, enter = fadeIn(tween(200, easing = WishlistTokens.Curve.ease)), exit = fadeOut(tween(200, easing = WishlistTokens.Curve.ease))) {
                 Row(Modifier.graphicsLayer { alpha = fadeOut() }.then(if (faded) Modifier.clearAndSetSemantics {} else Modifier), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PurposePill(stringResource(R.string.purpose_candidate_add), WLLineIcon.Plus, c.card, c.text, enabled = false)
@@ -149,7 +149,7 @@ internal fun PurposeHeader(
                 }
             }
             }
-            if (form != null && edit != null) Row(Modifier.graphicsLayer { alpha = fadeOut() }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (form != null && edit != null) Row(Modifier.padding(top = 16.dp).graphicsLayer { alpha = fadeOut() }, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 WLButton(stringResource(R.string.dialog_cancel), WLButtonKind.Secondary, onCancel, enabled = !edit.submitting && !faded)
                 WLButton(stringResource(R.string.category_form_save), WLButtonKind.Primary, form::submit, enabled = edit.canSubmit && !faded, loading = edit.submitting)
             }
