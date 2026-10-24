@@ -222,6 +222,8 @@ PUR-05 → PUR-06. 상품은 유지하고 목적 연결만 사용자 해제로 �
 
 **통과:** 동일 URL의 새 key는 여전히 새 item, cache 재사용 후 owner별 category/purpose 재판단, 기존 item snapshot 불변, 기존 실패/처리 상태의 안내, KEEP_BOTH 판단 기록 유지, 선택 삭제+판단 한 transaction, review 결정과 분리, 동시 삭제·다중 후보·key 재전송 검증.
 
+**구현 상태:** B9 식별 값·Product cache(V22)·중복 쌍/receipt(V23)·DUP-01/02를 구현했다. [제품 정책](../../history/product-planning/mvp/decisions/b9-duplicate-resolution-policy-2026-10-24.md), [spec](../../superpowers/specs/2026-10-24-b9-duplicate-resolution-design.md), [계획](../../superpowers/plans/2026-10-24-b9-duplicate-resolution.md), [계약](duplicate-resolution-api.md), [구현 이력](../../history/architecture/server/b9-duplicate-resolution-implementation-2026-10-24.md)에 통과 조건별 테스트와 C6/B10/B11 인계를 기록했다. 동일 canonical뿐 아니라 판매처가 다른 동일 상품(GTIN·브랜드+MPN)과 여러 후보를 포함한다. 판매처의 식별 코드 노출률 측정(B11)과 비교 시트·안내 위치(C6)의 완료를 뜻하지 않는다.
+
 **조건:** 다른 판매처 동일 상품·여러 후보 처리 정책을 먼저 정한다. 동일 canonical만 구현한 상태를 전체 중복 기능 완료로 기록하지 않는다. 캐시 지연이 상품 조회·변경 구현을 막지는 않지만 출시 평가에서는 기획 범위 누락을 허용하지 않는다.
 
 ## B10 — 아카이브 전체 생명주기

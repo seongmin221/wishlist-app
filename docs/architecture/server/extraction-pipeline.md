@@ -1,6 +1,6 @@
 # Product metadata extraction pipeline
 
-> 상태: **B5 구현** · Product cache·중복 판단은 후속 · 배포 egress firewall은 B11
+> 상태: **B5 구현** · Product cache·식별 값·중복 판단은 B9 구현([계약](duplicate-resolution-api.md)) · 배포 egress firewall은 B11
 
 ```text
 입력 URL
@@ -35,6 +35,9 @@
 - 이름이 다른 Product가 둘 이상이면 brand·가격은 null이다. brand·merchant가 200자를 넘으면 null이다.
 - merchant는 `offers.seller.name` → `og:site_name`, 둘 다 없으면 null이다.
 - canonical은 `link[rel=canonical]` → `og:url`이 최종 URL과 같은 등록 도메인(OkHttp `topPrivateDomain`)이고 엄격한 URI 문법·http(s)·userinfo 없음·기본 port일 때만 채택한다. https 최종 URL에서 http canonical로 낮추는 것은 채택하지 않는다. 그 밖에는 최종 URL을 쓴다. 정규화는 scheme/host 소문자·fragment 제거·tracking query(`utm_*`, `fbclid`, `gclid`, `msclkid`, `igshid`, `mc_cid`, `mc_eid`) 제거이며 다른 query는 보존한다.
+
+- 상품 식별 값(B9): JSON-LD Product의 `gtin`/`gtin8`/`gtin12`/`gtin13`/`gtin14`(문자열·숫자·배열)를 모아 check digit 검증 후 14자리로 맞춘다. 서로 다른 유효 값이 있으면 버린다. `mpn`은 brand가 있을 때만 `brand|MPN` key로 만든다(NFKC, brand 소문자·문자/숫자만, MPN 대문자·공백/`-`/`_`/`.`/`/` 제거·3~64자). 이름이 다른 Product가 여럿이면 둘 다 null이다. `sku`는 판매처 코드라 쓰지 않는다.
+- Product cache(B9): 새 저장의 general 실행이 fetch 전에 정규화 공유 URL(alias) 또는 canonical URL로 7일 이내 READY 행을 찾는다. 새로 fetch한 `Complete` 결과만 metadata 저장과 같은 guarded transaction에서 upsert한다(browser lane 포함).
 
 ## URL 안전성
 

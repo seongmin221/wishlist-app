@@ -52,7 +52,7 @@
 
 `Product`는 canonical URL과 서버가 추출한 재사용 가능한 metadata를 위한 공용 캐시다. MVP에서는 canonical URL이 같은 `READY` 캐시만 추출 완료 시점부터 7일 동안 새 저장에 재사용한다. `PARTIAL`과 모든 실패 캐시는 재사용하지 않고, 새 저장 요청의 대상만 분석한다.
 
-재사용 가능한 `Product`가 있으면 그 시점의 정보를 새 `WishlistItem`에 복사해 빠르게 생성한다. `WishlistItem`은 사용자별 표시용 정보와 수동 수정값을 보관하는 독립 snapshot이며, 복사 뒤 `Product`와 어느 방향으로도 동기화하지 않는다. 사용자가 제품명·대표 이미지 등을 수정해도 자신의 `WishlistItem`에만 반영되고 `Product`나 다른 사용자의 항목에는 반영하지 않는다.
+재사용 가능한 `Product`가 있으면 그 시점의 정보를 새 `WishlistItem`에 복사해 빠르게 생성한다. 캐시는 정규화한 공유 URL 또는 canonical URL로 찾고, 새 저장에만 쓴다(재분석은 페이지를 다시 읽는다). 적중해도 카테고리·목적은 사용자별로 다시 판단하므로 그동안 항목은 `PROCESSING`이다. 가격의 마지막 확인 시각은 캐시가 추출된 시각이다([B9 계약](../architecture/server/duplicate-resolution-api.md#product-cache와-snapshot)). `WishlistItem`은 사용자별 표시용 정보와 수동 수정값을 보관하는 독립 snapshot이며, 복사 뒤 `Product`와 어느 방향으로도 동기화하지 않는다. 사용자가 제품명·대표 이미지 등을 수정해도 자신의 `WishlistItem`에만 반영되고 `Product`나 다른 사용자의 항목에는 반영하지 않는다.
 
 `Product` 정보가 나중에 보완되거나 변경돼도 기존 `WishlistItem`은 갱신하지 않으며, 화면 조회 때 `Product` metadata를 실시간으로 읽지 않는다. 추출은 새 저장 요청의 대상만 처리하고 관련 상품이나 기존 `WishlistItem`을 연쇄 추출·갱신하지 않는다. MVP는 최초 추출 뒤 상품 정보 변화를 주기적으로 모니터링하거나 자동 갱신하지 않는다.
 
