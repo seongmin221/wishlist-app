@@ -38,13 +38,8 @@ import app.wishlist.android.feature.category.tabBarClearance
 import app.wishlist.android.feature.category.keepAllBreaks
 import app.wishlist.android.feature.detail.ProductPhoto
 import app.wishlist.android.feature.detail.DetailStatusBlock
-import app.wishlist.android.feature.detail.rememberMinuteClock
-import app.wishlist.android.feature.detail.deviceUtcOffsetSeconds
-import app.wishlist.android.feature.home.HomeRowText
-import app.wishlist.android.feature.home.resolve
 import app.wishlist.android.navigation.*
 import app.wishlist.android.ui.LoginRoute
-import app.wishlist.shared.domain.DisplayFormat
 import app.wishlist.shared.model.PurposeSummary
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -153,14 +148,7 @@ private fun PurposeCard(p: PurposeSummary, expanded: Boolean, onClick: () -> Uni
     val c = LocalWLColors.current
     val shape = RoundedCornerShape(28.dp)
     val spec = tween<IntSize>(300, easing = WishlistTokens.Curve.emphasized)
-    val now = rememberMinuteClock()
-    val activity = HomeRowText.time(DisplayFormat.relative(p.activity.at, now, ::deviceUtcOffsetSeconds)).resolve()
-    val activityFormat = when (p.activity.kind) {
-        "CANDIDATE_ADDED" -> R.string.purpose_activity_added
-        "CREATED" -> R.string.purpose_activity_created
-        else -> null
-    }
-    val activityText = activityFormat?.let { stringResource(it, activity) } ?: activity
+    val activityText = purposeActivityText(p.activity)
     Column(Modifier.fillMaxWidth().clip(shape).background(purposeColor(p.colorKey)).border(2.dp, c.background, shape).clickable(role = Role.Button, onClick = onClick)) {
         Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 20.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             WLIconTile(size = 36.dp, radius = 12.dp) { WLIcon(purposeIcon(p.iconKey), size = 18.dp) }

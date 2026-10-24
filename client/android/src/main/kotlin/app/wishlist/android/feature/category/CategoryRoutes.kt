@@ -67,6 +67,9 @@ object CategoryChanges {
  */
 class CategoryPresenterOwner<P : Presenter>(val presenter: P) : ViewModel() {
     private var started = false
+
+    /** The last list anchor restore token the screen applied (C7; survives the screen leaving composition). */
+    var appliedRestore = 0L
     private var seenRevision = CategoryChanges.revision.value
 
     /** Records [revision]; true when it is newer than the one this owner saw (the screen should refresh). */

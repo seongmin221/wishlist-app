@@ -10,6 +10,12 @@ import app.wishlist.shared.presentation.Presenter
 /** Entry-owned shared presenter, retained on rotation and closed when the account route leaves. */
 internal class PurposePresenterOwner<P : Presenter>(val presenter: P) : ViewModel() {
     private var started = false
+
+    /** The last list anchor restore token the screen applied (C7; survives the screen leaving composition). */
+    var appliedRestore = 0L
+
+    /** The list's first visible card while it was last shown (C7: the anchor of the refresh when the screen comes back). */
+    var lastAnchor: app.wishlist.android.feature.category.ListAnchor.Position? = null
     private var seenRevision = PurposeChanges.revision.value
     fun once(start: (P) -> Unit) {
         if (started) return

@@ -1,0 +1,54 @@
+<resources>
+    <!-- FHome (C7) -->
+    <string name="home_group_review_title">Review category and purpose</string>
+    <string name="home_group_review_subtitle">Check what AI organized</string>
+    <string name="home_group_fill_title">Needs more information</string>
+    <string name="home_group_fill_subtitle">Just tell us the name and category</string>
+    <string name="home_pending_subtitle_signed_in">Information comes once it\'s sent</string>
+    <string name="home_preview_no_photo">No photo</string>
+    <string name="home_preview_no_category">No category</string>
+    <string name="home_preview_category_deleted">Category deleted</string>
+    <string name="home_todo_open_flow">View from the start</string>
+    <string name="home_todo_expand">Expand</string>
+    <string name="home_todo_collapse">Collapse</string>
+    <string name="home_summary_failed">Couldn\'t load your to-dos</string>
+    <string name="home_refresh_failed">Couldn\'t refresh</string>
+    <string name="home_purposes">Comparing</string>
+    <string name="home_purposes_all">All purposes</string>
+    <!-- FHomeReviewFlow / FHomeFillFlow (C7: passes only, nothing saved) -->
+    <string name="flow_close">Close</string>
+    <string name="flow_position">%1$d / %2$d</string>
+    <string name="flow_review_hint">Swipe right to confirm, left to hold</string>
+    <string name="flow_review_not_saved">Saving confirm and hold comes in the next step</string>
+    <string name="flow_review_hold">Hold</string>
+    <string name="flow_review_confirm">Confirm</string>
+    <string name="flow_review_category">Category</string>
+    <string name="flow_review_purpose">Purpose</string>
+    <string name="flow_review_change">Change</string>
+    <string name="flow_unavailable">Unavailable</string>
+    <string name="flow_ai_both">AI linked the category and purpose</string>
+    <string name="flow_ai_category">AI chose the category</string>
+    <string name="flow_ai_category_no_purpose">AI chose the category but found no matching purpose</string>
+    <string name="flow_ai_purpose">AI linked the purpose</string>
+    <string name="flow_review_done">All reviewed</string>
+    <string name="flow_review_summary">Passed %1$d</string>
+    <string name="flow_fill_done">All filled in</string>
+    <string name="flow_fill_summary">Skipped %1$d</string>
+    <string name="flow_home">Go home</string>
+    <string name="flow_restart">Start over</string>
+    <string name="flow_fill_reason_info">Couldn\'t get the product information</string>
+    <string name="flow_fill_reason_name">Couldn\'t find the product name</string>
+    <string name="flow_fill_reason_category">Couldn\'t choose a category</string>
+    <string name="flow_fill_reason_category_deleted">The category was deleted</string>
+    <string name="flow_fill_reanalyze">Analyze again</string>
+    <string name="flow_fill_or_manual">or enter it yourself</string>
+    <string name="flow_fill_image_label">Main image · Optional</string>
+    <string name="flow_fill_image_add">Add from photos</string>
+    <string name="flow_fill_name_label">Product name · Required</string>
+    <string name="flow_fill_name_placeholder">e.g. Sony WH-1000XM6</string>
+    <string name="flow_fill_category_label">Category · Required</string>
+    <string name="flow_fill_category_choose">Choose category</string>
+    <string name="flow_fill_skip">Skip</string>
+    <string name="flow_fill_save_next">Save and next</string>
+    <string name="flow_fill_not_saved">Saving comes in the next step</string>
+</resources>
