@@ -1,5 +1,6 @@
 import XCTest
 import Shared
+import SwiftUI
 @testable import Wishlist
 
 final class PurposePresentationTests: XCTestCase {
@@ -79,6 +80,108 @@ final class PurposePresentationTests: XCTestCase {
         await SharedTestRuntime.eventually { form.state.result != nil }
         XCTAssertEqual(form.state.result?.purposeDescription, "🙂 설명")
         XCTAssertEqual(form.state.result?.colorKey, "mint")
+    }
+
+    @MainActor
+    func testRetainedDetailRefreshesOnTabAndItemReturnWithoutReloadingSameTop() async throws {
+        let runtime = await SharedTestRuntime.readyDebug()
+        defer { runtime.close() }
+        let home = PurposeHomeOwner(presenter: runtime.purposeHomePresenter())
+        defer { home.close() }
+        home.loadOnce()
+        await SharedTestRuntime.eventually { home.state.loaded && !home.state.loading }
+        let purpose = try XCTUnwrap(home.state.purposes.first)
+        let owner = PurposeDetailOwner(presenter: runtime.purposeDetailPresenter())
+        defer { owner.close() }
+        let nav = WLNavigator(initialTab: .purpose)
+        XCTAssertTrue(nav.push(AppDestination.purpose(purpose.id).route, sourceKey: "test"))
+        nav.finishTransition()
+        let entryID = nav.entries(.purpose).last!.id
+        func observe(_ phase: ScenePhase = .active) {
+            owner.navigationChanged(id: purpose.id, entryID: entryID, navigator: nav, phase: phase)
+        }
+        observe()
+        await SharedTestRuntime.eventually { owner.state.detail != nil && !owner.state.itemsLoading }
+        let original = try XCTUnwrap(owner.state.detail)
+        let form = PurposeFormOwner(presenter: runtime.purposeFormPresenter())
+        owner.form = form
+        form.presenter.startEdit(detail: original)
+        await SharedTestRuntime.eventually { form.state.phase == .ready }
+        form.presenter.changeName(value: "보존할 초안")
+        await SharedTestRuntime.eventually { form.state.name == "보존할 초안" }
+
+        func update(_ name: String, version: Int32) async throws {
+            let result = try await runtime.purposeRepository().update(id: purpose.id, expectedVersion: version,
+                patch: PurposePatch(name: name, description: DescriptionChangeKeep.shared, colorKey: nil, iconKey: nil))
+            XCTAssertNotNil(result as? ClientResultSuccess<PurposeDetail>)
+        }
+        try await update("탭 밖에서 변경", version: original.version)
+        observe() // Remaining at the same top must not read again.
+        await SharedTestRuntime.stays(for: 0.15) { owner.state.detail?.name == original.name && !owner.state.loading }
+        XCTAssertTrue(nav.selectTab(.home)); nav.finishTransition()
+        observe()
+        await SharedTestRuntime.stays(for: 0.15) { owner.state.detail?.name == original.name }
+        XCTAssertTrue(nav.selectTab(.purpose)); nav.finishTransition()
+        observe()
+        await SharedTestRuntime.eventually { owner.state.detail?.name == "탭 밖에서 변경" && !owner.state.itemsLoading }
+        XCTAssertTrue(owner.form === form)
+        XCTAssertEqual(form.state.name, "보존할 초안")
+        XCTAssertTrue(form.state.dirty)
+
+        XCTAssertTrue(nav.push(AppDestination.item("candidate").route, sourceKey: "test")); nav.finishTransition()
+        observe()
+        try await update("아이템에서 돌아온 제목", version: original.version + 1)
+        observe() // Covered entries must not read.
+        await SharedTestRuntime.stays(for: 0.15) { owner.state.detail?.name == "탭 밖에서 변경" }
+        XCTAssertTrue(nav.pop()); nav.finishTransition()
+        observe()
+        await SharedTestRuntime.eventually { owner.state.detail?.name == "아이템에서 돌아온 제목" && !owner.state.itemsLoading }
+        XCTAssertTrue(owner.form === form)
+        XCTAssertEqual(form.state.name, "보존할 초안")
+
+        observe(.background)
+        try await update("활성화 뒤 제목", version: original.version + 2)
+        observe(.inactive)
+        await SharedTestRuntime.stays(for: 0.15) { owner.state.detail?.name == "아이템에서 돌아온 제목" }
+        observe()
+        await SharedTestRuntime.eventually { owner.state.detail?.name == "활성화 뒤 제목" && !owner.state.itemsLoading }
+        XCTAssertTrue(owner.form === form)
+        observe()
+        await SharedTestRuntime.stays(for: 0.15) { !owner.state.loading && !owner.state.itemsLoading }
+    }
+
+    @MainActor
+    func testCancellingConflictRecoveredEditUpdatesUnderlyingDetail() async throws {
+        let runtime = await SharedTestRuntime.readyDebug()
+        defer { runtime.close() }
+        let home = PurposeHomeOwner(presenter: runtime.purposeHomePresenter())
+        defer { home.close() }
+        home.loadOnce()
+        await SharedTestRuntime.eventually { home.state.loaded && !home.state.loading }
+        let purpose = try XCTUnwrap(home.state.purposes.first)
+        let owner = PurposeDetailOwner(presenter: runtime.purposeDetailPresenter())
+        defer { owner.close() }
+        owner.loadOnce(purpose.id)
+        await SharedTestRuntime.eventually { owner.state.detail != nil && !owner.state.loading }
+        let original = try XCTUnwrap(owner.state.detail)
+        let form = PurposeFormOwner(presenter: runtime.purposeFormPresenter())
+        owner.form = form
+        form.presenter.startEdit(detail: original)
+        await SharedTestRuntime.eventually { form.state.phase == .ready }
+        let result = try await runtime.purposeRepository().update(id: purpose.id, expectedVersion: original.version,
+            patch: PurposePatch(name: "서버에서 복구한 제목", description: DescriptionChangeKeep.shared, colorKey: nil, iconKey: nil))
+        XCTAssertNotNil(result as? ClientResultSuccess<PurposeDetail>)
+        form.presenter.changeName(value: "내 오래된 초안")
+        await SharedTestRuntime.eventually { form.state.dirty }
+        form.presenter.submit()
+        await SharedTestRuntime.eventually { form.state.message == .conflictLoaded }
+        form.presenter.changeName(value: "복구 뒤 다시 편집")
+        await SharedTestRuntime.eventually { form.state.name == "복구 뒤 다시 편집" }
+        XCTAssertEqual(form.state.recoveredDetail?.name, "서버에서 복구한 제목")
+        XCTAssertTrue(owner.finishEditing())
+        await SharedTestRuntime.eventually { owner.state.detail?.name == "서버에서 복구한 제목" }
+        XCTAssertEqual(owner.state.detail?.version, original.version + 1)
+        XCTAssertNil(owner.form)
     }
 
     @MainActor

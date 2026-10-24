@@ -49,13 +49,20 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
     val sheet = rememberWLHeaderSheetState()
     val scope = rememberCoroutineScope()
     val scroll = rememberScrollState()
-    val discard = rememberDiscardSpec { form = null }
+    val endEditing = {
+        form?.state?.value?.recoveredDetail?.let {
+            presenter.applyEdited(it)
+            PurposeChanges.changed()
+        }
+        form = null
+    }
+    val discard = rememberDiscardSpec { endEditing() }
     val cancelEdit = {
         val s = editing?.state?.value
         when {
             s?.submitting == true -> Unit
             s?.dirty == true -> { overlay.showDialog(discard); Unit }
-            else -> { form = null; Unit }
+            else -> { endEditing(); Unit }
         }
     }
     BackHandler(enabled = editing != null && !overlay.isShowing && nav.currentTab == WLTab.Purpose && !nav.isTransitioning && nav.stack(WLTab.Purpose).lastOrNull() == route) { cancelEdit() }

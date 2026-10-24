@@ -303,4 +303,61 @@ class PurposePresenterTest {
         assertEquals("", h.form.state.value.name)
     }
 
+    @Test fun conflictSnapshotSurvivesDraftChangesForCancelAndReopen() = scenario { h ->
+        val latest = purposeDetail("다른 기기", 7).copy(colorKey = "mint", iconKey = "book")
+        h.detail.load(latest.id); advanceUntilIdle()
+        h.form.startEdit(purposeDetail()); h.form.changeName("저장 시도"); advanceUntilIdle()
+        h.repo.updates.answer(fail(ErrorKind.CONFLICT, "PURPOSE_VERSION_CONFLICT", 7))
+        h.repo.details.answer(ok(latest))
+        h.form.submit(); advanceUntilIdle()
+        h.form.changeName("버릴 초안"); h.form.chooseColor("cyan"); advanceUntilIdle()
+        assertEquals(latest, h.form.state.value.recoveredDetail)
+        // Both platform cancel paths apply the known server snapshot, never the discarded draft.
+        h.detail.applyEdited(assertNotNull(h.form.state.value.recoveredDetail)); advanceUntilIdle()
+        assertEquals(latest, h.detail.state.value.detail)
+        h.form.startEdit(assertNotNull(h.detail.state.value.detail)); h.form.changeName("새 편집"); advanceUntilIdle()
+        assertNull(h.form.state.value.recoveredDetail)
+        h.form.submit(); advanceUntilIdle()
+        assertEquals(7, h.repo.patches.last().second)
+    }
+    @Test fun conflictReadRetryPublishesSnapshotAndAccountChangeClearsIt() = scenario { h ->
+        h.form.startEdit(purposeDetail()); h.form.changeName("초안"); advanceUntilIdle()
+        h.repo.updates.answer(fail(ErrorKind.CONFLICT, "PURPOSE_VERSION_CONFLICT", 7))
+        h.repo.details.answer(fail(ErrorKind.NETWORK))
+        h.form.submit(); advanceUntilIdle()
+        assertNull(h.form.state.value.recoveredDetail)
+        val latest = purposeDetail("서버", 7)
+        h.repo.details.answer(ok(latest))
+        h.form.retryLoad(); advanceUntilIdle()
+        assertEquals(latest, h.form.state.value.recoveredDetail)
+        h.session.changeAccount("B"); advanceUntilIdle()
+        assertNull(h.form.state.value.recoveredDetail)
+    }
+    @Test fun applyingRecoveredDetailCannotReplaceNewerSaveResult() = scenario { h ->
+        h.detail.load(purposeDetail().id); advanceUntilIdle()
+        val saved = purposeDetail("저장 성공", 8).copy(colorKey = "pink")
+        h.detail.applyEdited(saved); advanceUntilIdle()
+        h.detail.applyEdited(purposeDetail("충돌 복구", 7)); advanceUntilIdle()
+        assertEquals(saved, h.detail.state.value.detail)
+    }
+
+    @Test fun detailRefreshReadsLatestHeaderAndCompletedCandidates() = scenario { h ->
+        val processing = itemFixture(analysis = AnalysisStatus.PROCESSING, name = null)
+        h.repo.details.answer(ok(purposeDetail().copy(candidateCount = 1)))
+        h.pages.answer(ok(ItemPage(listOf(processing), 1, null)))
+        h.detail.load(purposeDetail().id); advanceUntilIdle()
+        val completed = processing.copy(analysis = ItemAnalysis(AnalysisStatus.READY), product = ProductSnapshot(name = "분석 완료"), version = 2)
+        val added = itemFixture(id = "00000000-0000-4000-8000-000000000003")
+        h.repo.details.answer(ok(purposeDetail("최신 목적", 2).copy(candidateCount = 2)))
+        h.pages.answer(ok(ItemPage(listOf(completed, added), 2, null)))
+        h.detail.refreshNow(); advanceUntilIdle()
+        assertEquals("최신 목적", h.detail.state.value.detail?.name)
+        assertEquals(2, h.detail.state.value.detail?.candidateCount)
+        assertEquals(AnalysisStatus.READY, h.detail.state.value.items.first().analysis.status)
+        assertEquals("분석 완료", h.detail.state.value.items.first().product.name)
+        assertEquals(listOf(completed.id, added.id), h.detail.state.value.items.map { it.id })
+        assertEquals(2, h.repo.details.calls.size)
+        assertEquals(2, h.pages.calls.size)
+    }
+
 }

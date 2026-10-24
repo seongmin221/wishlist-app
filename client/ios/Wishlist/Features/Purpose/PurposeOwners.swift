@@ -38,6 +38,7 @@ final class PurposeHomeOwner: CategoryStateOwner<PurposeHomeState> {
 final class PurposeDetailOwner: CategoryStateOwner<PurposeDetailState> {
     @ObservationIgnored private nonisolated(unsafe) let presenter: PurposeDetailPresenter
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var wasVisible = false
     @ObservationIgnored private var column: (width: CGFloat, scale: CGFloat)?
     @ObservationIgnored private var sizeTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var deadlineTask: Task<Void, Never>?
@@ -50,11 +51,32 @@ final class PurposeDetailOwner: CategoryStateOwner<PurposeDetailState> {
         super.init(initial: presenter.state.value, states: presenter.state, close: { presenter.close() })
     }
     func loadOnce(_ id: String) { guard !started else { return }; started = true; presenter.load(id: id) }
+    static func isVisible(entryID: Int?, navigator: WLNavigator, phase: ScenePhase) -> Bool {
+        phase == .active && navigator.currentTab == .purpose && entryID != nil
+            && navigator.entries(.purpose).last?.id == entryID
+    }
+    /// Retained layers stay mounted: only a hidden-to-front transition starts a new read.
+    func navigationChanged(id: String, entryID: Int?, navigator: WLNavigator, phase: ScenePhase) {
+        let visible = Self.isVisible(entryID: entryID, navigator: navigator, phase: phase)
+        defer { wasVisible = visible }
+        guard visible, !wasVisible else { return }
+        if started { refresh() } else { loadOnce(id) }
+    }
     func refresh() { presenter.refresh() }
     func refreshAndWait() async { try? await presenter.refreshNow() }
     func retry() { presenter.retry() }
     func loadMore() { presenter.loadMore() }
     func applyEdited(_ detail: PurposeDetail) { presenter.applyEdited(detail: detail) }
+    /// Preserve the server snapshot learned during conflict recovery before destroying the draft.
+    @discardableResult
+    func finishEditing() -> Bool {
+        guard let form else { return false }
+        let recovered = form.state.recoveredDetail
+        if let recovered { applyEdited(recovered) }
+        form.close()
+        self.form = nil
+        return recovered != nil
+    }
     func item(_ id: String) -> WishlistItem? { itemsByID[id] }
     func setColumn(width: CGFloat, scale: CGFloat) {
         guard width > 0, column?.width != width || column?.scale != scale else { return }

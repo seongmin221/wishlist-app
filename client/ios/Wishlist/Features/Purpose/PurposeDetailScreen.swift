@@ -20,11 +20,11 @@ struct PurposeDetailScreen: View {
     @State private var name = ""
     @State private var description = ""
     @State private var menuAnchor = WLAnchor()
-    @State private var wasActive = true
 
     var body: some View {
         let owner = owners.purposeDetail(entryID ?? -1)
         let detail = owner.state.detail
+        let visible = PurposeDetailOwner.isVisible(entryID: entryID, navigator: nav, phase: phase)
         let color = PurposeStyle.color(form?.state.colorKey ?? detail?.colorKey ?? "")
         GeometryReader { geometry in
             let safeTop = geometry.safeAreaInsets.top
@@ -62,7 +62,11 @@ struct PurposeDetailScreen: View {
                 }
             }
         }
-        .task { await runtime?.purposeUntilReady(); if !Task.isCancelled { owner.loadOnce(purposeID) } }
+        .task(id: visible) {
+            if visible { await runtime?.purposeUntilReady() }
+            guard !Task.isCancelled else { return }
+            owner.navigationChanged(id: purposeID, entryID: entryID, navigator: nav, phase: phase)
+        }
         #if DEBUG
         .onChange(of: detail?.id, initial: true) { _, id in
             guard id != nil, let detail else { return }
@@ -74,19 +78,14 @@ struct PurposeDetailScreen: View {
         .onChange(of: form?.state.result) { _, result in
             guard let result else { return }
             owner.applyEdited(result)
-            endEditing()
+            endEditing(refreshRecoveredHome: false)
             refreshHome()
         }
         .onChange(of: form?.state.message) { _, message in
             if message == .conflictLoaded { copyDraft() }
         }
         .onChange(of: form?.state.gone) { _, gone in
-            if gone == true { endEditing(); owner.refresh(); refreshHome() }
-        }
-        .onChange(of: phase) { _, next in
-            let active = next == .active
-            if active && !wasActive && form == nil { owner.refresh() }
-            wasActive = active
+            if gone == true { endEditing(refreshRecoveredHome: false); owner.refresh(); refreshHome() }
         }
         .onChange(of: nav.scrollToTopRequest) { _, tab in
             guard tab == .purpose, nav.entries(.purpose).last?.id == entryID else { return }
@@ -213,9 +212,10 @@ struct PurposeDetailScreen: View {
         if form.state.dirty, let overlay { overlay.showDialog(categoryDiscardDialog(overlay) { endEditing() }) }
         else { endEditing() }
     }
-    private func endEditing() {
-        form?.close()
-        withAnimation(reduceMotion ? nil : WishlistTokens.Curve.ease.animation(ms: 260)) { form = nil }
+    private func endEditing(refreshRecoveredHome: Bool = true) {
+        let owner = owners.purposeDetail(entryID ?? -1)
+        let recovered = withAnimation(reduceMotion ? nil : WishlistTokens.Curve.ease.animation(ms: 260)) { owner.finishEditing() }
+        if recovered && refreshRecoveredHome { refreshHome() }
         nav.setBackGuard(entryID ?? -1, nil)
     }
     private func refreshHome() {

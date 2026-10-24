@@ -74,7 +74,7 @@ class PurposeDetailPresenter internal constructor(
         if (mutable.value.appendFailed) loadMore()
     } }
     fun applyEdited(detail: PurposeDetail) { intent {
-        if (detail.id == id && !mutable.value.gone) {
+        if (detail.id == id && !mutable.value.gone && detail.version >= (mutable.value.detail?.version ?: 0)) {
             // Superseded header reads cannot put the pre-edit name back on screen.
             headerJob?.cancel(); headerJob = null
             mutable.value = mutable.value.copy(detail = detail, error = null, loading = false)

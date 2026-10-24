@@ -364,3 +364,7 @@ host/Native에서 공통 계약 7개와 Fake 집중 테스트 19개를 실제 �
 생성 폼은 응답 유실 가능 실패에만 payload와 멱등 key를 보관한다. 편집은 바뀐 필드만 보내며 빈 설명은 명시 null이다. C5의 충돌 복구 정책(최신값이 요청값이면 성공, 아니면 최신 초안 교체·안내, 재조회 실패 시 초안 유지·저장 차단)을 따른다. 제출 중 입력·닫기를 잠그고 계정 변경과 close는 요청을 취소한다. 오프라인 편집 큐는 없다.
 
 [설계](../../superpowers/specs/2026-10-24-client-c6-purpose-design.md) · [실행·검증 기록](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
+
+### C6 PR #23 리뷰 후속
+
+목적 편집 폼은 충돌 재조회로 받은 서버 snapshot을 `PurposeFormState.recoveredDetail`에 보관한다. 이 값은 이후 초안 수정에도 유지되고 새 폼·계정 변경에서는 지운다. 플랫폼의 취소·버리기 경로는 입력 초안 대신 이 snapshot을 상세에 적용하므로 편집을 재개할 때 복구 전 version을 다시 사용하지 않는다. 상세 `applyEdited`는 더 낮은 version의 snapshot을 거절해 저장 성공 후 늦은 복구값이 이름·색을 되돌리지 못하게 한다.

@@ -19,6 +19,8 @@ data class PurposeFormState(
     val colorKey: String = "coral", val iconKey: String = "heart", val dirty: Boolean = false,
     val canSubmit: Boolean = false, val submitting: Boolean = false, val message: FormMessage? = null,
     val fieldErrors: Map<String, FieldError> = emptyMap(), val result: PurposeDetail? = null, val gone: Boolean = false,
+    /** Latest server snapshot recovered after a conflict; survives further edits until this form resets. */
+    val recoveredDetail: PurposeDetail? = null,
 )
 class PurposeFormPresenter internal constructor(
     private val purposes: PurposeRepository, private val ids: IdGenerator,
@@ -131,18 +133,18 @@ class PurposeFormPresenter internal constructor(
                 is ClientResult.Success -> {
                     val latest = result.value
                     if (attemptedEdit == PurposeCommand(latest.name, latest.description, latest.colorKey, latest.iconKey)) {
-                        mutable.value = mutable.value.copy(submitting = false, phase = FormPhase.READY, result = latest)
-                    } else applyDetail(latest, FormMessage.CONFLICT_LOADED)
+                        mutable.value = mutable.value.copy(submitting = false, phase = FormPhase.READY, result = latest, recoveredDetail = latest)
+                    } else applyDetail(latest, FormMessage.CONFLICT_LOADED, recovered = latest)
                 }
                 is ClientResult.Failure -> if (result.error.code == "PURPOSE_NOT_FOUND") markGone()
                 else publish(mutable.value.copy(submitting = false, phase = FormPhase.CONFLICT_UNRESOLVED, message = FormMessage.CONFLICT_FAILED))
             }
         }
     }
-    private fun applyDetail(detail: PurposeDetail, message: FormMessage? = null) {
+    private fun applyDetail(detail: PurposeDetail, message: FormMessage? = null, recovered: PurposeDetail? = null) {
         baseline = detail
         publish(PurposeFormState(mode = FormMode.EDIT, name = detail.name, description = detail.description.orEmpty(),
-            colorKey = detail.colorKey, iconKey = detail.iconKey, message = message))
+            colorKey = detail.colorKey, iconKey = detail.iconKey, message = message, recoveredDetail = recovered))
     }
     private fun command(s: PurposeFormState) = PurposeCommand(s.name, s.description.ifEmpty { null }, s.colorKey, s.iconKey)
     private fun publish(s: PurposeFormState) {

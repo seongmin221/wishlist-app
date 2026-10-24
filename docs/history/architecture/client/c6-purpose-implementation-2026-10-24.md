@@ -21,9 +21,9 @@
 5. 보드의 목적 숫자는 장식 metadata가 아닌 실제 활성 상품 연결로 `5/3/2/4/3/2/0`을 만든다. 출퇴근 목적의 다섯 번째는 FiiO BTR7이며 기존 헤드폰 네 상품·Marshall 미지정/검토 상태와 카테고리 69개는 보존한다. 목적 activity snapshot을 별도로 두어 최근 활동순을 재현한다. 이미지가 없는 시드는 중립 placeholder를 사용한다.
 6. 빌드 환경의 `/usr/libexec/java_home -v 17`은 등록된 25로 되돌아간다. 설치된 `/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`과 `-Dorg.gradle.java.installations.paths`를 명령에 명시했다. 머신 경로는 프로젝트 설정에 넣지 않는다.
 
-## 검증
+## 최초 구현 검증 (PR #23 리뷰 전)
 
-아래는 최종 로컬 실행 결과다.
+아래는 최초 PR 게시 전 로컬 실행 결과다. 리뷰 후 최신 결과는 마지막 후속 절을 따른다.
 
 - 최초 목적 Presenter/Fake/mapper 행동 red: 27개 중 24개 실패(stub), 구현 뒤 목적 Presenter 18개 통과. 이후 페이지·close·계정·한도·문자 규칙을 추가해 Presenter 27개 통과.
 - 최종 공통 계층 명령: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=$HOME/Library/Android/sdk ./client/gradlew -p client -Dorg.gradle.java.installations.paths=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home :shared:allTests :shared:linkReleaseFrameworkIosArm64`. 결과: host **690**, iOS simulator **687**, 실패·오류·skip **0**, Release device framework 링크 통과. 로컬 로그 `/tmp/c6-shared-verified.log`.
@@ -59,3 +59,17 @@
 - `c546c10` — Android 접힘 제목 clipping 회귀 수정
 
 구현은 `client/c6-purpose`에 커밋했다. 구현 마무리 조회에서도 #22는 OPEN·isDraft=true·base develop이었다. 서버 파일 변경은 없으며 PR 게시와 병합 상태는 GitHub에서 확인한다.
+
+## PR #23 리뷰 후속: 재진입·충돌 취소 (2026-10-24)
+
+사용자 리뷰의 두 P2를 확인했다. iOS 목적 상세는 스택에 유지되는데 최초 조회만 실행해 탭·후보 상세 왕복 뒤 분석 결과를 다시 읽지 않았다. 상세 entry가 목적 탭의 최상단으로 다시 표시되는 가시성 전환에서 머리·후보 첫 페이지를 갱신한다. 편집 폼과 초안 수명은 유지하며 가려진 상세에는 재진입 갱신을 보내지 않는다.
+
+Android·iOS 모두 충돌 재조회로 복구한 최신 상세를 폼에만 보관해 취소 후 오래된 보기 정보가 나타났다. 폼 상태에 `recoveredDetail` snapshot을 남기고 취소·버리기에서 상세에 적용한다. 이후 수정한 초안은 버리고 서버에서 읽은 snapshot만 사용한다. 새 폼·계정 변경에서는 snapshot을 초기화하며 상세는 더 오래된 version 적용을 거절한다.
+
+회귀 검증: 복구 snapshot 유지·재조회 실패 후 재시도·계정 초기화·취소 후 재편집 version·낮은 version 거절과 후보 분석 완료·멤버십 갱신을 확인한다. iOS는 실제 Fake runtime을 통한 최상단 재등장·폼 유지·충돌 취소를 검증한다. 독립 리뷰 재확인에서 잔여 Critical/Important 지적이 없었고, 최종 실행 결과는 아래와 같다.
+
+- shared allTests: host **694**, iOS Native **691**, 실패·오류·skip 0.
+- Android debug/release unit 각각 **225**, assembleDebug/Release·lintDebug 통과(오류 0, 기존 경고 27).
+- iOS XCTest **257** 통과. 전체 runtime navigation·409 복구를 포함한다.
+- Release iOS arm64 framework 링크와 iOS Release simulator 빌드 통과.
+- 로그: `/tmp/c6-feedback-red.log`(30개 중 신규 3개 실패), `/tmp/c6-feedback-green.log`, `/tmp/c6-feedback-verify.log`, `/tmp/wishlist-ios-red.log`, `/tmp/wishlist-ios-recovery-red.log`, `/tmp/wishlist-ios-full-test.log`, `/tmp/wishlist-ios-release-build.log`.

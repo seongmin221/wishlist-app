@@ -33,7 +33,7 @@ FPurposeHome/Create/Detail/DetailEmpty/EditInPlace를 KMP → Android Compose·i
 
 `PurposeDetailPresenter`: state(PurposeDetailState: detail?,items,loading,itemsLoading,hasMore,appending,error?,itemsError?,appendFailed,gone), load(id),refresh(),refreshNow(),loadMore(),retry(),applyEdited(detail).
 
-`PurposeFormPresenter`: state(PurposeFormState: mode:FormMode,phase:FormPhase,name,description,colorKey,iconKey,dirty,canSubmit,submitting,message:FormMessage?,fieldErrors:Map<String,FieldError>,result:PurposeDetail?,gone). startCreate(),startEdit(detail),changeName(value),changeDescription(value),chooseColor(key),chooseIcon(key),submit(),retryLoad(). runtime factory는 purposeHomePresenter/purposeDetailPresenter/purposeFormPresenter()다. 성공 result는 폼 owner가 한 번 처리하고 닫는다.
+`PurposeFormPresenter`: state(PurposeFormState: mode:FormMode,phase:FormPhase,name,description,colorKey,iconKey,dirty,canSubmit,submitting,message:FormMessage?,fieldErrors:Map<String,FieldError>,result:PurposeDetail?,gone,recoveredDetail:PurposeDetail?). startCreate(),startEdit(detail),changeName(value),changeDescription(value),chooseColor(key),chooseIcon(key),submit(),retryLoad(). runtime factory는 purposeHomePresenter/purposeDetailPresenter/purposeFormPresenter()다. 성공 result는 폼 owner가 한 번 처리하고 닫는다.
 
 ## 검증
 
