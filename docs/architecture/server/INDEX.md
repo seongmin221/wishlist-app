@@ -34,5 +34,5 @@
 | B0 후속 리뷰의 queue claim·LLM 예산/마감·최종 version 복구·DB 시각 | [후속 기록](../../history/architecture/server/b0-followup-review-2026-10-06.md) |
 
 - [B4 상품 목록·홈 조회 설계](../../superpowers/specs/2026-10-07-b4-read-api-design.md) — 조회3개·공통 판정·snapshot·V15 구현·320 통과/1 skip
-- [B8 후보 이동과 영향 확인 삭제 API](candidate-move-deletion-api.md) — PUR-07/08·CAT-05/06·PUR-05/06 계약 · PUR-07/08·CAT-05/06 구현
+- [B8 후보 이동과 영향 확인 삭제 API](candidate-move-deletion-api.md) — PUR-07/08·CAT-05/06·PUR-05/06 계약 · 여섯 API 구현
 - [B8 구현 전 계약 검토](b8-contract-review-2026-10-24.md) — 반영 완료 · 삭제 replay 순서·분석 단계별 검증·영향 페이지·공개 응답

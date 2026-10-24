@@ -205,6 +205,40 @@ class CandidateRoutesTest {
         }
     }
 
+    @Test fun `deleted purpose replays after active lookup returns null`() = withAnalysisDatabase { source ->
+        val purpose = insertPurpose(source, owner, "목적", null)
+        val items = List(2) { seedItem(source, owner, ItemSeed(purpose = purpose, purposeSource = "AI")) }
+        val base = "/v1/purposes/$purpose"
+        withApi(source) {
+            val impact = send(HttpMethod.Get, "$base/deletion-impact").json()
+            assertEquals(listOf("version", "impactToken", "affectedCount", "items", "nextCursor"), impact.keys.toList())
+            assertEquals(2, impact.getValue("affectedCount").jsonPrimitive.int)
+            assertEquals(purpose.toString(), impact.getValue("items").jsonArray[0].jsonObject.getValue("purpose").jsonObject.getValue("id").jsonPrimitive.content)
+            val token = impact.getValue("impactToken").jsonPrimitive.content
+            send(HttpMethod.Get, "/v1/purposes/x/deletion-impact").assertError(HttpStatusCode.BadRequest, "INVALID_PURPOSE_ID")
+            send(HttpMethod.Get, "$base/deletion-impact?limit=x").assertError(HttpStatusCode.BadRequest, "INVALID_DELETION_QUERY")
+            send(HttpMethod.Get, "$base/deletion-impact", as_ = UUID.randomUUID()).assertError(HttpStatusCode.NotFound, "PURPOSE_NOT_FOUND")
+            send(HttpMethod.Delete, base, deletionBody(1, "0".repeat(64))).assertError(HttpStatusCode.Conflict, "PURPOSE_DELETION_IMPACT_CONFLICT")
+            send(HttpMethod.Delete, base, deletionBody(1, token), as_ = UUID.randomUUID()).assertError(HttpStatusCode.NotFound, "PURPOSE_NOT_FOUND")
+            send(HttpMethod.Delete, base, """{"expectedVersion":1}""").assertError(HttpStatusCode.UnprocessableEntity, "INVALID_DELETION_INPUT")
+
+            assertEquals(HttpStatusCode.NoContent, send(HttpMethod.Delete, base, deletionBody(1, token)).status)
+            send(HttpMethod.Get, base).assertError(HttpStatusCode.NotFound, "PURPOSE_NOT_FOUND")
+            val snapshot = itemSnapshot(source, items)
+            val membership = purposeState(source, purpose)
+            val replay = send(HttpMethod.Delete, base, deletionBody(1, token))
+            assertEquals(HttpStatusCode.NoContent, replay.status, replay.bodyAsText()); assertEquals("", replay.bodyAsText())
+            assertEquals(snapshot, itemSnapshot(source, items)); assertEquals(membership, purposeState(source, purpose)); assertEquals(1, deletionReceipts(source))
+            send(HttpMethod.Delete, base, deletionBody(2, token)).assertError(HttpStatusCode.NotFound, "PURPOSE_NOT_FOUND")
+            send(HttpMethod.Delete, base, deletionBody(1, "1".repeat(64))).assertError(HttpStatusCode.NotFound, "PURPOSE_NOT_FOUND")
+            send(HttpMethod.Delete, base, deletionBody(1, token), as_ = UUID.randomUUID()).assertError(HttpStatusCode.NotFound, "PURPOSE_NOT_FOUND")
+            send(HttpMethod.Get, "/v1/wishlist-items/${items[0]}").json().getValue("purpose").jsonObject.let {
+                assertEquals(JsonNull, it.getValue("id")); assertEquals("USER", it.getValue("source").jsonPrimitive.content)
+            }
+            assertEquals(snapshot, itemSnapshot(source, items)); assertEquals(1, deletionReceipts(source))
+        }
+    }
+
     @Test fun `impact cursor reports a changed impact as a conflict`() = withAnalysisDatabase { source ->
         val category = insertCustomCategory(source, owner)
         val items = List(2) { seedItem(source, owner, ItemSeed(customCategory = category)) }
@@ -226,6 +260,8 @@ class CandidateRoutesTest {
             } },
             { get("/v1/custom-categories/${UUID.randomUUID()}/deletion-impact") },
             { delete("/v1/custom-categories/${UUID.randomUUID()}") { setBody("""{"expectedVersion":1,"impactToken":"${"a".repeat(64)}"}""") } },
+            { get("/v1/purposes/${UUID.randomUUID()}/deletion-impact") },
+            { delete("/v1/purposes/${UUID.randomUUID()}") { setBody("""{"expectedVersion":1,"impactToken":"${"a".repeat(64)}"}""") } },
         )
         for (request in requests) {
             val register: io.ktor.server.routing.Route.(() -> Unit) -> Unit = { block ->

@@ -148,4 +148,36 @@ class StructureDeletionConcurrencyTest {
             assertEquals("4", classification(source, edited)["version"])
         }
     }
+
+    @Test fun `purpose deletion races moves and edits without losing membership`() = withAnalysisDatabase { source ->
+        val owner = UUID.randomUUID()
+        repeat(3) { round ->
+            val purpose = insertPurpose(source, owner, "목적 $round", null)
+            val member = seedItem(source, owner, ItemSeed(purpose = purpose, purposeSource = "USER"))
+            val newcomer = seedItem(source, owner)
+            val impact = source.impact(owner, DeletionKind.PURPOSE, purpose)
+            val (delete, move) = race({ source.deleteStructure(owner, DeletionKind.PURPOSE, purpose, 1, impact.impactToken) },
+                { CandidateMoveService(source).move(owner, purpose, UUID.randomUUID(), CandidateMoveRequest(1, listOf(MoveSelection(newcomer, 3, null)))) })
+            val codes = listOf(delete.code(), move.code())
+            assertEquals(1, codes.count { it == "OK" }, "round $round: $codes")
+            assertTrue(codes.single { it != "OK" } in setOf("PURPOSE_DELETION_IMPACT_CONFLICT", "PURPOSE_NOT_FOUND"))
+            val state = purposeState(source, purpose)
+            if (delete.isSuccess) {
+                assertEquals("DELETED", state["lifecycle"]); assertEquals("2", state["membership"]); assertEquals("0", state["count"])
+                assertNull(classification(source, newcomer)["purpose_id"])
+            } else {
+                assertEquals("ACTIVE", state["lifecycle"]); assertEquals("2", state["membership"]); assertEquals("2", state["count"])
+                assertEquals("CANDIDATE_ADDED", state["kind"], "the winning move records activity")
+            }
+
+            val edited = insertPurpose(source, owner, "편집 $round", null)
+            val item = seedItem(source, owner, ItemSeed(purpose = edited, purposeSource = "USER"))
+            val editedImpact = source.impact(owner, DeletionKind.PURPOSE, edited)
+            val (deleted, edit) = race({ source.deleteStructure(owner, DeletionKind.PURPOSE, edited, 1, editedImpact.impactToken) },
+                { ItemMutationService(source).edit(owner, item, 3, ItemChanges(name = FieldChange.Set("경합"))) })
+            assertEquals(1, listOf(deleted.code(), edit.code()).count { it == "OK" })
+            assertEquals("4", classification(source, item)["version"])
+            assertEquals(if (deleted.isSuccess) "2" else "1", purposeState(source, edited)["membership"])
+        }
+    }
 }

@@ -1,6 +1,6 @@
 # B8 후보 이동과 영향 확인 삭제 구현 이력
 
-> 2026-10-24 · 진행 중(B8a·B8b 완료) · [spec](../../../superpowers/specs/2026-10-24-b8-candidate-move-deletions-design.md) · [계획](../../../superpowers/plans/2026-10-24-b8-candidate-move-deletions.md) · [계약](../../../architecture/server/candidate-move-deletion-api.md) · [결정](../../product-planning/mvp/decisions/b8-candidate-move-deletion-policy-2026-10-24.md)
+> 2026-10-24 · B8a·B8b·B8c 구현 완료 · [spec](../../../superpowers/specs/2026-10-24-b8-candidate-move-deletions-design.md) · [계획](../../../superpowers/plans/2026-10-24-b8-candidate-move-deletions.md) · [계약](../../../architecture/server/candidate-move-deletion-api.md) · [결정](../../product-planning/mvp/decisions/b8-candidate-move-deletion-policy-2026-10-24.md)
 
 ## 실행 기록
 
@@ -28,6 +28,17 @@
   - Worker(GENERAL/BROWSER 각각): PENDING → 삭제 → 첫 claim이 삭제 후 version 2를 들고 실행, 삭제된 category를 결과로 받아도·공개 C026을 받아도 참조가 돌아오지 않고 PARTIAL(남은 category 없음)·메타데이터 반영·대체 job 없음. RUNNING → 삭제 → 이전 claim finish는 job CANCELLED·상품 FAILED_RETRYABLE·pending 결과 미반영. 반대 순서(USER custom category, Worker READY 먼저)는 이전 token 409 뒤 새 영향으로 삭제되고 분석 상태는 READY 유지. RUNNING → 삭제 → lease 만료 → 실제 `AnalysisJobReconciler.reconcileExpired`는 1건 복구(CANCELLED·FAILED_RETRYABLE·retry outbox 없음), 두 번째 복구 0건, 늦은 finish는 데이터 불변. 이어서 `ReanalysisService`로 새 generation을 claim·finish해도 참조 미복귀·PARTIAL, PATCH 재지정 가능.
 - 테스트 강도 확인(변형 후 원복): receipt 조회를 살아 있는 category 조회 뒤로 옮기면 삭제 서비스 테스트와 HTTP replay 테스트가, CATEGORY override를 빼면 PENDING claim 테스트가 실패했다.
 
+### Task 3: B8c 목적만 삭제(PUR-05·PUR-06)
+
+- RED: `PurposeDeletionTest` 5·HTTP·경합 테스트를 먼저 추가했다. 공통 서비스의 목적 분기가 `TODO("B8c")`이고 route가 없어서 6개가 `NotImplementedError`·404로 실패했다. `impact pages with tied createdAt…`는 Task 2의 공통 영향 조회가 이미 kind를 받으므로 첫 실행에서 통과했다(새 symbol 없음).
+- GREEN(실제 PostgreSQL): B8 전체 `app.candidates.*` 27·`app.http.Candidate*` 13·`DatabaseMigrationTest` 13 통과.
+  - 삭제: 영향 상품(이름 없음·PROCESSING 포함) 4개가 `purpose_id=null`·`purpose_source=USER`·version +1. category·누락 사유·review·분석 상태·override 보존, ARCHIVED 상품 불변, job 보존. 목적 DELETED·version +1·membershipVersion은 제거 상품별 +1(4), 활동 시각·종류 불변, PUR-03 404·PUR-01 목록 제외. 빈 목적 삭제 가능, ARCHIVED 목적 404. 삭제 목적으로의 PUR-08 이동 404, B7 PATCH 재연결 `PURPOSE_NOT_AVAILABLE`.
+  - token: page 밖 PUR-08 추가·B7 목적 해제·목적 메타데이터 수정이 각각 이전 token을 409로 만들고, 다음 cursor도 409. 같은 created_at 페이지 경계·limit 변경·끝 cursor는 category와 같다.
+  - replay: 같은 token·version 재전송은 204·상품/목적/receipt 불변. 다른 token·version·owner 404. HTTP에서 실제 DELETE → PUR-03 404 → 같은 DELETE 204(빈 body), 상품 상세는 `purpose.id=null`·`source=USER`.
+  - Worker(GENERAL/BROWSER 각각): PENDING → 삭제 → 첫 claim(version 2)·v3 snapshot으로 삭제 목적 또는 대체 목적을 판단해도 USER+null 유지, 분석은 READY, category는 AI C026으로 독립 반영, review PENDING, 대체 목적 membership 불변. RUNNING → 삭제 → finish는 CANCELLED·FAILED_RETRYABLE. 별도 RUNNING → 삭제 → lease 만료 → reconciler 1건(retry outbox 없음)·두 번째 0건·늦은 finish 불변. 두 상품 모두 새 generation 재분석에서 대체 목적을 판단해도 USER+null, 대체 목적 후보 수 0.
+  - 경합: 목적 삭제와 PUR-08 추가 경주는 하나만 성공(삭제 승리 시 이동 404·membership 2·후보 0, 이동 승리 시 삭제 409·후보 2·CANDIDATE_ADDED). 목적 삭제와 B7 편집 경주도 하나만 성공하고 membership이 결과와 일치.
+- 테스트 강도 확인(변형 후 원복): 삭제 상품의 목적 출처를 USER 대신 UNASSIGNED로 바꾸면 삭제·PENDING claim·RUNNING/lease 테스트 3개가 실패했다(AI가 대체 목적을 채움).
+
 ## 계획 대비 결정
 
 - 이동 body의 원소 오류(원소가 object가 아님·알 수 없는/누락된 원소 key·ID/version/expectedPurposeId 값)는 계약의 "원소의 필드 오류는 `items`"에 따라 `fields:["items"]`로 묶는다. 구조 오류로 비우는 것은 최상위 body(object 아님·최상위 key 불일치)뿐이다.
@@ -38,4 +49,6 @@
 - impactToken canonical은 `v1|owner|kind|id|version|membershipVersion(category는 -)|id:version,…`(ID 오름차순)의 SHA-256 hex다. 영향 cursor는 owner tag·kind·ID·token·위치를 담아 다음 page에서 현재 token과 비교한다.
 - 삭제 서비스는 category 행을 `CategoryRepository.find(lock)`로 잠근 뒤 영향 상품의 목적을 ID순으로, 상품을 `lockAll`로 잠근다. 최종 token은 잠긴 상품 version으로 다시 계산한다.
 - category 삭제는 review를 바꾸지 않는다(설계의 "review 보존"). AI 목적 때문에 PENDING이던 상품은 재지정 뒤에도 검토 대기로 남는다.
+- 목적 삭제는 review를 확정하지 않는다. AI 목적 때문에 PENDING이던 상품은 category가 AI이면 검토 대기로 남는다.
+- 목적 삭제의 목적 잠금은 삭제 대상 하나뿐이다(영향 상품은 모두 그 목적 소속). `PurposeRepository.find`는 receipt가 없을 때만 부른다.
 - 경합 재현용 test seam `CandidateMoveService(afterItemLock)`을 추가했다. 기본값은 no-op이다.

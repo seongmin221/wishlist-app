@@ -1,6 +1,8 @@
 package app.candidates
 
 import app.category.CategoryRepository
+import app.purpose.PurposeMembership
+import app.purpose.PurposeRepository
 import app.persistence.OwnerStructureLock
 import app.persistence.inTransaction
 import app.wishlist.ItemMutationRepository
@@ -15,6 +17,7 @@ import javax.sql.DataSource
  */
 class StructureDeletionService(private val dataSource: DataSource) {
     private val categories = CategoryRepository()
+    private val purposes = PurposeRepository()
 
     fun delete(owner: UUID, kind: DeletionKind, id: UUID, expectedVersion: Int, impactToken: String): Unit = dataSource.inTransaction { c ->
         OwnerStructureLock.lock(c, owner)
@@ -24,17 +27,17 @@ class StructureDeletionService(private val dataSource: DataSource) {
         }
         when (kind) {
             DeletionKind.CATEGORY -> categories.find(c, owner, id, lock = true)
-            DeletionKind.PURPOSE -> TODO("B8c")
+            DeletionKind.PURPOSE -> purposes.find(c, owner, id)
         } ?: throw CandidateException(kind.notFound)
         val ids = StructureImpacts.affected(c, owner, kind, id).map { it.first }
-        ItemMutationRepository.lockPurposes(c, owner, purposesOf(c, owner, ids))
+        ItemMutationRepository.lockPurposes(c, owner, if (kind == DeletionKind.PURPOSE) listOf(id) else purposesOf(c, owner, ids))
         val items = ItemMutationRepository.lockAll(c, owner, ids)
         val resource = checkNotNull(StructureImpacts.live(c, owner, kind, id))
         val token = StructureImpacts.fingerprint(owner, kind, id, resource, items.map { it.id to it.version })
         if (resource.version != expectedVersion || token != impactToken) throw CandidateException(kind.conflict)
         when (kind) {
             DeletionKind.CATEGORY -> deleteCategory(c, owner, id, ids)
-            DeletionKind.PURPOSE -> TODO("B8c")
+            DeletionKind.PURPOSE -> deletePurpose(c, owner, id, ids)
         }
         saveReceipt(c, owner, kind, id, expectedVersion, impactToken)
     }
@@ -54,6 +57,23 @@ class StructureDeletionService(private val dataSource: DataSource) {
             check(s.executeUpdate() == items.size)
         }
         c.prepareStatement("update custom_categories set deleted_at=clock_timestamp(), version=version+1, updated_at=clock_timestamp() where owner_id=? and id=?")
+            .use { s -> s.setObject(1, owner); s.setObject(2, id); check(s.executeUpdate() == 1) }
+    }
+
+    /**
+     * Items stay; each loses the purpose as a user unassignment (USER + null) with one membership step per item, so a
+     * later Worker result can neither restore the deleted purpose nor fill a replacement. Category and review stay.
+     */
+    private fun deletePurpose(c: Connection, owner: UUID, id: UUID, items: List<UUID>) {
+        if (items.isNotEmpty()) c.prepareStatement("""
+            update wishlist_items set purpose_id=null, purpose_source='USER', version=version+1, updated_at=clock_timestamp()
+            where owner_id=? and id = any(?)
+        """.trimIndent()).use { s ->
+            s.setObject(1, owner); s.setArray(2, c.createArrayOf("uuid", items.toTypedArray()))
+            check(s.executeUpdate() == items.size)
+        }
+        repeat(items.size) { PurposeMembership.recordTransition(c, owner, id, null) }
+        c.prepareStatement("update purposes set lifecycle_status='DELETED', version=version+1, updated_at=clock_timestamp() where owner_id=? and id=?")
             .use { s -> s.setObject(1, owner); s.setObject(2, id); check(s.executeUpdate() == 1) }
     }
 

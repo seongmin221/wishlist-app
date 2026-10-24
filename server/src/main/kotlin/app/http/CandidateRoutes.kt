@@ -98,6 +98,7 @@ fun Route.candidateRoutes(handlers: CandidateHandlers, signer: MediaUrlSigner, o
         }
     }
     deletionRoutes(DeletionKind.CATEGORY, "/v1/custom-categories/{id}", "INVALID_CATEGORY_ID", handlers, signer, ownerResolver)
+    deletionRoutes(DeletionKind.PURPOSE, "/v1/purposes/{id}", "INVALID_PURPOSE_ID", handlers, signer, ownerResolver)
 }
 
 /** CAT-05/06 and PUR-05/06 share one shape; [base] is the resource path with its `{id}` segment. */
