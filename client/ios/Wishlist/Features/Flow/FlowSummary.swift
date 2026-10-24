@@ -11,6 +11,7 @@ struct HomeFlowScreen: View {
     @Environment(\.wlNavigator) private var nav
     @Environment(\.scenePhase) private var phase
     @Environment(\.wlColors) private var c
+    @Environment(\.wlRuntime) private var runtime
 
     var body: some View {
         let owner = owners.homeFlow(entryID ?? -1)
@@ -23,7 +24,11 @@ struct HomeFlowScreen: View {
         // Board: the bottom buttons sit 36 above the screen edge (the home indicator is inside that 36).
         .ignoresSafeArea(.container, edges: .bottom)
         .background(c.background.ignoresSafeArea())
-        .onAppear { owner.startOnce(target) }
+        // Starts once the runtime is ready (Android `runtime.ready.first { it }`); a cancelled wait starts nothing.
+        .task {
+            await runtime?.purposeUntilReady()
+            if !Task.isCancelled { owner.startOnce(target) }
+        }
         .onChange(of: phase) { _, phase in
             owner.scenePhaseChanged(phase, visible: HomeFlowOwner.isVisible(entryID: entryID, navigator: nav))
         }

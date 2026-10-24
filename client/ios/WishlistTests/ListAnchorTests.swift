@@ -67,6 +67,23 @@ final class ListAnchorTests: XCTestCase {
         XCTAssertEqual(tracker.take(laidIds: ["c", "r"]), .item("r"))
     }
 
+    /// A restore whose card never lays out is dropped after 4 s (Android `RESTORE_WAIT_MS`): a later layout
+    /// does not jump the list, and a prepend landing afterwards keeps its own card again.
+    func testAPendingRestoreIsDroppedAfterFourSeconds() {
+        var tracker = ListAnchorTracker()
+        XCTAssertTrue(tracker.accept(token: 1, resolvedItemId: "x", now: 100))
+        XCTAssertNil(tracker.take(laidIds: ["a"], now: 103.9))
+        XCTAssertEqual(tracker.take(laidIds: ["a", "x"], now: 103.99), .item("x")) // still within 4 s
+        XCTAssertTrue(tracker.accept(token: 2, resolvedItemId: "y", now: 200))
+        XCTAssertNil(tracker.take(laidIds: ["y"], now: 204)) // 4 s passed: dropped
+        XCTAssertNil(tracker.take(laidIds: ["y"], now: 204.1))
+        XCTAssertTrue(tracker.accept(token: 3, resolvedItemId: "z", now: 300))
+        tracker.report("c", CGRect(x: 16, y: 120, width: 170, height: 200))
+        tracker.beginPrepend(top: 100)
+        tracker.prependLanded(now: 305)
+        XCTAssertEqual(tracker.take(laidIds: ["c"], now: 305), .item("c"))
+    }
+
     func testScrollAnchorPutsTheCardTopUnderTheCoveredTop() {
         let anchor = ListAnchorMath.anchor(topInset: 100, viewportHeight: 700, itemHeight: 200)
         // scrollTo aligns the item's point at y-fraction f with the viewport's: item top = f × (700 − 200).

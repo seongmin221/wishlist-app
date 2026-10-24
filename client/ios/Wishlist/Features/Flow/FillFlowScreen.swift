@@ -152,7 +152,7 @@ private struct FillContent: View {
             WLIconTile(color: tile.surface) { WLIcon(.pen, color: tile.icon) }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: WishlistTokens.Space.s4) {
-                WLText(String(localized: String.LocalizationValue(HomeTodoText.fillReasonKey(item.requiredAction))), WLTextStyle.bodyBold.resized(15))
+                WLText(String(localized: String.LocalizationValue(HomeTodoText.fillReasonKey(item))), WLTextStyle.bodyBold.resized(15))
                 WLText(HomeTodoText.host(item.sourceUrl), .label, color: c.textSecondary, maxLines: 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

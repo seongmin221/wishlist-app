@@ -1,7 +1,6 @@
 package app.wishlist.android.feature.flow
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** motion.md §4: release threshold `|dx| ≥ W × 0.3` or 800/s, rotation `dx / W × 16°` (same names and values as iOS). */
@@ -42,6 +41,9 @@ class CardThrowMathTest {
         assertEquals(340, CardThrowMath.remainingMillis(dx = 0f))
         assertEquals(170, CardThrowMath.remainingMillis(dx = 240f))
         assertEquals(170, CardThrowMath.remainingMillis(dx = -240f))
-        assertTrue(CardThrowMath.remainingMillis(dx = 600f) >= 0)
+        // Truncated, no floor (the same as iOS `exitMillis`).
+        assertEquals(332, CardThrowMath.remainingMillis(dx = 10f))
+        assertEquals(0, CardThrowMath.remainingMillis(dx = 480f))
+        assertEquals(0, CardThrowMath.remainingMillis(dx = 600f))
     }
 }

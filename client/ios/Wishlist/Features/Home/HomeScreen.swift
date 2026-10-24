@@ -13,6 +13,7 @@ struct HomeScreen: View {
     @Environment(\.wlNavigator) private var nav
     @Environment(\.wlEntryID) private var entryID
     @Environment(\.scenePhase) private var phase
+    @Environment(\.wlRuntime) private var runtime
     @State private var gate = FlowForegroundGate()
 
     var body: some View {
@@ -38,7 +39,13 @@ struct HomeScreen: View {
                 home.tick()
             }
         }
-        .task(id: visible) { if visible { home.appeared() } }
+        // HOME-01 waits for the runtime (Android `runtime.ready.first { it }`): before it the gated repository
+        // answers RUNTIME_NOT_READY, and a restored session would flash the retry card.
+        .task(id: visible) {
+            guard visible else { return }
+            await runtime?.purposeUntilReady()
+            if !Task.isCancelled { home.appeared() }
+        }
         .onChange(of: phase) { _, phase in
             if gate.shouldForeground(phase, visible: visible) { home.foreground() }
         }

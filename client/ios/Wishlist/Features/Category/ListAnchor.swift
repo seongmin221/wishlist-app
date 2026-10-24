@@ -6,7 +6,8 @@ import SwiftUI
 /// reports each drawn card's frame (global points) and asks for the first visible card when it refreshes
 /// (`refresh(anchorItemId:)`, `foreground`). Each Presenter `AnchorRestore` token is accepted once and
 /// applied only once its card is laid out (the page plan may still show skeletons right after a window
-/// replace); a prepend (`loadNewer`) keeps the card that was first visible.
+/// replace), or dropped when that card has not laid out within `restoreWait` (4 s, Android `RESTORE_WAIT_MS`);
+/// a prepend (`loadNewer`) keeps the card that was first visible. Times are `systemUptime` seconds.
 struct ListAnchorTracker {
     enum Target: Equatable {
         case top
@@ -15,7 +16,11 @@ struct ListAnchorTracker {
 
     private var frames: [String: CGRect] = [:]
     private var lastToken: Int64?
+    /// How long a restore waits for its card to lay out (the photo page plan gives up at 3 s).
+    static let restoreWait: TimeInterval = 4
+
     private var pending: Target?
+    private var pendingSince: TimeInterval = 0
     private var prependAnchor: String?
     private var prepending = false
     private var newerArmed = true
@@ -33,10 +38,10 @@ struct ListAnchorTracker {
     }
 
     /// A new Presenter restore: true the first time its token is seen (then waits for `take`).
-    mutating func accept(token: Int64, resolvedItemId: String?) -> Bool {
+    mutating func accept(token: Int64, resolvedItemId: String?, now: TimeInterval = ListAnchorTracker.now) -> Bool {
         guard token != lastToken else { return false }
         lastToken = token
-        pending = resolvedItemId.map(Target.item) ?? .top
+        setPending(resolvedItemId.map(Target.item) ?? .top, now: now)
         return true
     }
 
@@ -56,9 +61,10 @@ struct ListAnchorTracker {
     }
 
     /// The newer cards landed in front (a Presenter restore still waiting wins over it).
-    mutating func prependLanded() {
+    mutating func prependLanded(now: TimeInterval = ListAnchorTracker.now) {
         guard prepending, let anchor = prependAnchor else { return }
-        if pending == nil { pending = .item(anchor) }
+        expire(now: now)
+        if pending == nil { setPending(.item(anchor), now: now) }
         prepending = false
         prependAnchor = nil
     }
@@ -70,11 +76,24 @@ struct ListAnchorTracker {
     }
 
     /// The scroll to make now, once: `.top`, or the card when it is laid out.
-    mutating func take(laidIds: [String]) -> Target? {
+    mutating func take(laidIds: [String], now: TimeInterval = ListAnchorTracker.now) -> Target? {
+        expire(now: now)
         guard let target = pending else { return nil }
         if case .item(let id) = target, !laidIds.contains(id) { return nil }
         pending = nil
         return target
+    }
+
+    static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    private mutating func setPending(_ target: Target, now: TimeInterval) {
+        pending = target
+        pendingSince = now
+    }
+
+    /// A card restore still waiting after `restoreWait` is dropped (`.top` needs no layout and never waits).
+    private mutating func expire(now: TimeInterval) {
+        if case .item = pending, now - pendingSince >= Self.restoreWait { pending = nil }
     }
 }
 

@@ -45,14 +45,23 @@ final class HomeTodoTextTests: XCTestCase {
         XCTAssertNil(line(.unknown, .unknown))
     }
 
+    /// Ruling 11 (Android `HomeFlowText.fillReason`, same precedence): a missing name → 제품명을 찾지 못했어요
+    /// unless the extraction failed; other INFORMATION_COMPLETION → 상품 정보를 가져오지 못했어요; the category actions
+    /// keep their own line whatever the name.
     func testFillReasonFollowsTheRequiredAction() throws {
         let bundle = try ko()
-        func reason(_ action: RequiredAction) -> String {
-            bundle.localizedString(forKey: HomeTodoText.fillReasonKey(action), value: nil, table: nil)
+        func reason(_ action: RequiredAction, nameMissing: Bool = false, _ analysis: AnalysisStatus = .partial) -> String {
+            bundle.localizedString(forKey: HomeTodoText.fillReasonKey(action, nameMissing: nameMissing, analysis: analysis), value: nil, table: nil)
         }
+        XCTAssertEqual(reason(.informationCompletion, nameMissing: true), "제품명을 찾지 못했어요")
+        XCTAssertEqual(reason(.informationCompletion, nameMissing: true, .failedTerminal), "상품 정보를 가져오지 못했어요")
+        XCTAssertEqual(reason(.informationCompletion, nameMissing: true, .failedRetryable), "상품 정보를 가져오지 못했어요")
         XCTAssertEqual(reason(.informationCompletion), "상품 정보를 가져오지 못했어요")
-        XCTAssertEqual(reason(.categoryAssignment), "카테고리를 정하지 못했어요")
-        XCTAssertEqual(reason(.categoryReassignment), "카테고리가 삭제됐어요")
+        XCTAssertEqual(reason(.categoryAssignment, nameMissing: true, .ready), "카테고리를 정하지 못했어요")
+        XCTAssertEqual(reason(.categoryReassignment, nameMissing: true, .ready), "카테고리가 삭제됐어요")
+        let en = try en()
+        XCTAssertEqual(en.localizedString(forKey: HomeTodoText.fillReasonKey(.informationCompletion, nameMissing: true, analysis: .partial), value: nil, table: nil),
+                       "Couldn't find the product name")
     }
 
     func testHostDropsTheSchemeAndWww() {

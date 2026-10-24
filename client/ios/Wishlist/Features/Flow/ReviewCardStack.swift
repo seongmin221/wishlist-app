@@ -7,11 +7,14 @@ import SwiftUI
 /// - Throw: the leaving card is its own layer, `translateX → ±480`, `rotate → ±16°` around (50%, 90%) in
 ///   340 `throw` (a released drag continues for the part left). The stack under it is already the next one
 ///   (front = the first upcoming card) and rises `scale .94 → 1`, `translateY 14 → 0`, 40 later, 300 `emphasized`.
-///   `onPass` runs when the card is gone; until the Presenter moves on, the leaving id stands for its card.
+///   `onPass` runs when the throw starts (Ruling 10, Android too: "n / 전체" moves at once); until the Presenter
+///   moves on, the leaving id stands for its card. The leaving card (`leaving`, owned by the flow screen so it
+///   outlives the last pass's switch to the summary) is cleared when its exit animation ends.
 /// - Drag: `translateX(dx)`, `rotate(dx / W × 16°)`; release follows `CardThrowMath.decide`, else 250 `emphasized` back.
 /// - Input (buttons and drag) is ignored while a card leaves. Back cards: at most 2, from the cards left.
 struct ReviewCardStack: View {
     let state: HomeFlowState
+    @Binding var leaving: Leaving?
     let onPass: () -> Void
 
     @Environment(\.wlColors) private var c
@@ -22,7 +25,6 @@ struct ReviewCardStack: View {
     #else
     @State private var dragX: CGFloat = 0
     #endif
-    @State private var leaving: Leaving?
     @State private var width: CGFloat = 0
     /// The current card id read when a throw ends (the closure outlives the render that made it).
     @State private var shown = ShownCard()
@@ -37,7 +39,10 @@ struct ReviewCardStack: View {
     }
 
     var body: some View {
-        let front = ReviewStackModel.front(current: state.current, upcoming: state.upcoming, leavingID: leaving?.id)
+        // After the last pass only the leaving card is drawn (over the summary); hints and buttons keep their
+        // place, invisible, so the leaving card does not move.
+        let done = state.phase == .done
+        let front = done ? nil : ReviewStackModel.front(current: state.current, upcoming: state.upcoming, leavingID: leaving?.id)
         let backs = ReviewStackModel.backs(position: Int(state.position), total: Int(state.total), frontIsNext: front?.item.id != state.current?.item.id)
         VStack(spacing: 0) {
             ZStack {
@@ -48,8 +53,7 @@ struct ReviewCardStack: View {
                 }
                 if let leaving {
                     LeavingCard(leaving: leaving, width: width) {
-                        // A foreground rebuild may have replaced the card meanwhile: pass only the thrown one.
-                        if ReviewStackModel.shouldPass(currentID: shown.id, leavingID: leaving.id) { onPass() }
+                        if self.leaving == leaving { self.leaving = nil }
                     }
                         .transition(.identity)
                         .zIndex(10)
@@ -58,14 +62,16 @@ struct ReviewCardStack: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             Spacer(minLength: WishlistTokens.Space.s16)
-            hints
-            buttons
+            Group {
+                hints
+                buttons
+            }
+            .opacity(done ? 0 : 1)
+            .accessibilityHidden(done)
         }
+        .allowsHitTesting(!done)
         .padding(.init(top: WishlistTokens.Space.s12, leading: WishlistTokens.Space.s20, bottom: 36, trailing: WishlistTokens.Space.s20))
-        .onChange(of: state.current?.item.id, initial: true) { _, id in
-            shown.id = id
-            if let leaving, id != leaving.id { self.leaving = nil }
-        }
+        .onChange(of: state.current?.item.id, initial: true) { _, id in shown.id = id }
     }
 
     // MARK: Stack
@@ -111,10 +117,12 @@ struct ReviewCardStack: View {
 
     private func throwCard(_ direction: CGFloat) {
         guard leaving == nil, let card = state.current, state.phase == .active else { return }
+        // A foreground rebuild may already have replaced the card the user saw: pass only that one.
+        guard ReviewStackModel.shouldPass(currentID: shown.id, leavingID: card.item.id) else { return }
         let start = dragX
+        onPass()
         if reduceMotion {
             dragX = 0
-            onPass()
             return
         }
         var still = Transaction()
@@ -156,8 +164,11 @@ enum ReviewStackModel {
         return current.item.id == leavingID ? upcoming.first : current
     }
 
-    /// The throw ended: pass only if the card shown is still the one thrown.
+    /// The throw starts: pass only if the card shown is still the one thrown.
     static func shouldPass(currentID: String?, leavingID: String) -> Bool { currentID == leavingID }
+
+    /// The stack is drawn while there is a card to process, and after the last pass while its card still leaves.
+    static func showsStack(done: Bool, hasCurrent: Bool, leaving: Bool) -> Bool { leaving || (!done && hasCurrent) }
 
     /// Back cards behind the front: the cards left after it, at most 2.
     static func backs(position: Int, total: Int, frontIsNext: Bool) -> Int {

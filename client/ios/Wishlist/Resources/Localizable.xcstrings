@@ -3839,6 +3839,23 @@
         }
       }
     },
+    "flow.fill.reason.name": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "제품명을 찾지 못했어요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't find the product name"
+          }
+        }
+      }
+    },
     "flow.fill.reason.category": {
       "extractionState": "manual",
       "localizations": {

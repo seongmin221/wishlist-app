@@ -28,13 +28,22 @@ enum HomeTodoText {
         }
     }
 
-    /// The fill flow header reason for the item's required action.
-    static func fillReasonKey(_ action: RequiredAction) -> String {
+    /// The fill flow header reason (Ruling 11, Android `HomeFlowText.fillReason`): the category actions first;
+    /// otherwise a missing name → 제품명을 찾지 못했어요 unless the extraction failed, else 상품 정보를 가져오지 못했어요.
+    static func fillReasonKey(_ action: RequiredAction, nameMissing: Bool, analysis: AnalysisStatus) -> String {
         switch action {
-        case .categoryAssignment: "flow.fill.reason.category"
-        case .categoryReassignment: "flow.fill.reason.deleted"
-        default: "flow.fill.reason.info"
+        case .categoryAssignment: return "flow.fill.reason.category"
+        case .categoryReassignment: return "flow.fill.reason.deleted"
+        default:
+            let failed = analysis == .failedRetryable || analysis == .failedTerminal
+            return nameMissing && !failed ? "flow.fill.reason.name" : "flow.fill.reason.info"
         }
+    }
+
+    /// `fillReasonKey` for an item (a blank name counts as missing).
+    static func fillReasonKey(_ item: WishlistItem) -> String {
+        let name = item.product.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return fillReasonKey(item.requiredAction, nameMissing: name.isEmpty, analysis: item.analysis.status)
     }
 
     /// The carousel preview's small line: the category for review and analysis, the missing piece for fill.
@@ -81,7 +90,7 @@ enum HomeTodoText {
     /// Every key the C7 screens read (tests check both languages have them).
     static let allKeys = [
         "flow.summary.passed", "flow.summary.skipped", "flow.review.ai.both", "flow.review.ai.category", "flow.review.ai.purpose",
-        "flow.fill.reason.info", "flow.fill.reason.category", "flow.fill.reason.deleted",
+        "flow.fill.reason.info", "flow.fill.reason.name", "flow.fill.reason.category", "flow.fill.reason.deleted",
         "home.preview.no.category", "home.preview.category.deleted", "home.preview.no.photo",
         "home.group.review.title", "home.group.review.subtitle", "home.group.fill.title", "home.group.fill.subtitle",
         "home.group.open", "home.pending.subtitle.signed.in","home.purposes", "home.purposes.all", "home.summary.failed", "home.refresh.failed",

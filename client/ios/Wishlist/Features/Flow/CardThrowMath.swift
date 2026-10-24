@@ -19,8 +19,6 @@ enum CardThrowMath {
     static let nextMillis = 300
     static let nextScale: CGFloat = 0.94
     static let nextOffset: CGFloat = 14
-    /// A released drag already far out still takes a visible moment to leave.
-    static let minExitMillis = 80
 
     static func decide(dx: CGFloat, velocityX: CGFloat, width: CGFloat) -> ThrowDecision {
         if abs(velocityX) >= flingVelocity { return velocityX > 0 ? .right : .left }
@@ -34,9 +32,10 @@ enum CardThrowMath {
         return Double(dx / width) * maxRotation
     }
 
-    /// The rest of the 340 throw from a released drag at `dx` (the part of ±480 still to go).
+    /// The rest of the 340 throw from a released drag at `dx` (the part of ±480 still to go), truncated with
+    /// no floor like Android `remainingMillis`: a card released at ±480 or beyond is already out (0).
     static func exitMillis(fromDx dx: CGFloat) -> Int {
         let left = max(0, 1 - abs(dx) / exitDistance)
-        return max(minExitMillis, Int((CGFloat(exitMillis) * left).rounded()))
+        return min(exitMillis, Int(CGFloat(exitMillis) * left))
     }
 }
