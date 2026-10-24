@@ -436,30 +436,40 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         return owner.customs.any { !it.deleted && it.parentId == parent && it.id != exceptId && CategoryInputRules.normalizedKey(it.name) == key }
     }
 
-    /** ITEM-02 category scope: newest first (`createdAt DESC, id DESC`), keyset cursor. */
-    suspend fun itemsByCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = request(ApiId.ITEM_02) { owner ->
-        if (limit !in 1..100) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
-        val known = FakeTaxonomy.leaf(categoryId) != null || owner.custom(categoryId) != null
-        if (!known) return@request if (canonicalUuidOrNull(categoryId) != null) categoryNotFound()
-            else failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
-        val key = canonicalUuidOrNull(categoryId) ?: categoryId
-        val all = owner.entries.values.map { it.item }.filter { visible(it) && it.category.id == key }
-            .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
-        val after = cursor?.let { raw ->
-            val parts = raw.removePrefix(CURSOR_PREFIX).split('|')
-            // The full instant (not millis): items sharing a millisecond must not fall between pages.
-            val at = parts.getOrNull(0)?.let { runCatching { Instant.parse(it) }.getOrNull() }
-            if (!raw.startsWith(CURSOR_PREFIX) || parts.size != 2 || at == null)
-                return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_CURSOR")
-            at to parts[1]
+    /** ITEM-02 category scope: newest first (`createdAt DESC, id DESC`), keyset page or anchor window. */
+    suspend fun itemsByCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        itemsByCategory(categoryId, cursor, limit, anchor = null, before = 0, after = 0)
+
+    suspend fun itemsByCategoryAround(categoryId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        itemsByCategory(categoryId, cursor = null, limit = null, anchor, before, after)
+
+    private suspend fun itemsByCategory(categoryId: String, cursor: String?, limit: Int?, anchor: String?, before: Int, after: Int) =
+        request(ApiId.ITEM_02) { owner ->
+            if (!validWindowQuery(limit, anchor, before, after)) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            val known = FakeTaxonomy.leaf(categoryId) != null || owner.custom(categoryId) != null
+            if (!known) return@request if (canonicalUuidOrNull(categoryId) != null) categoryNotFound()
+                else failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            val key = canonicalUuidOrNull(categoryId) ?: categoryId
+            val all = owner.entries.values.map { it.item }.filter { visible(it) && it.category.id == key }
+                .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
+            // Tokens are scoped to owner + category (another scope's token is a cursor error).
+            itemPage(owner, all, "fake2:${session.state.value.accountId}:$key:", cursor, limit, anchor, before, after)
         }
-        val rest = if (after == null) all else all.filter {
-            it.createdAt < after.first || (it.createdAt == after.first && it.id < after.second)
+
+    /** Query checks come before any lookup (a bad limit is 400 even for a missing scope), like the server. */
+    private fun validWindowQuery(limit: Int?, anchor: String?, before: Int, after: Int) =
+        if (anchor == null) limit != null && limit in 1..100 else before in 0..20 && after in 0..20
+
+    /** One ITEM-02 slice of [all] (already in scope order) as an [ItemPage] with per-card anchors. */
+    private fun itemPage(owner: OwnerStore, all: List<WishlistItem>, prefix: String, cursor: String?, limit: Int?,
+                         anchor: String?, before: Int, after: Int): ClientResult<ItemPage> =
+        when (val window = fakeWindow(all, { it.createdAt to it.id }, prefix, cursor, limit, anchor, before, after)) {
+            is ClientResult.Failure -> window
+            is ClientResult.Success -> window.value.let { w ->
+                ClientResult.Success(ItemPage(w.items.map { present(owner, it) }, all.size, w.nextCursor, w.previousCursor,
+                    w.items.associate { it.id to w.anchorOf(it) }, w.anchor))
+            }
         }
-        val page = rest.take(limit)
-        val next = if (rest.size > limit) page.last().let { "$CURSOR_PREFIX${it.createdAt}|${it.id}" } else null
-        ClientResult.Success(ItemPage(page.map { present(owner, it) }, all.size, next))
-    }
 
     /** DEBUG/test control: puts a finished item as is (policy applied); replaces one with the same id. */
     suspend fun putItem(item: WishlistItem): ClientResult<WishlistItem> = request(null) { owner ->
@@ -550,25 +560,20 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         ClientResult.Success(purposeView(owner, updated))
     }
 
-    suspend fun itemsByPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = request(ApiId.ITEM_02) { owner ->
-        if (limit !in 1..100) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
-        val key = canonicalUuidOrNull(purposeId) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
-        if (key !in owner.purposeRows) return@request purposeNotFound()
-        val all = purposeItems(owner, key)
-        // Cursor is scoped to owner + purpose and preserves sub-millisecond order.
-        val prefix = "fake-purpose:${session.state.value.accountId}:$key:"
-        val after = cursor?.let { raw ->
-            val parts = raw.removePrefix(prefix).split('|')
-            val at = parts.getOrNull(0)?.let { runCatching { Instant.parse(it) }.getOrNull() }
-            if (!raw.startsWith(prefix) || parts.size != 2 || at == null || canonicalUuidOrNull(parts[1]) == null)
-                return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_CURSOR")
-            at to parts[1]
+    suspend fun itemsByPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        itemsByPurpose(purposeId, cursor, limit, anchor = null, before = 0, after = 0)
+
+    suspend fun itemsByPurposeAround(purposeId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        itemsByPurpose(purposeId, cursor = null, limit = null, anchor, before, after)
+
+    private suspend fun itemsByPurpose(purposeId: String, cursor: String?, limit: Int?, anchor: String?, before: Int, after: Int) =
+        request(ApiId.ITEM_02) { owner ->
+            if (!validWindowQuery(limit, anchor, before, after)) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            val key = canonicalUuidOrNull(purposeId) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            if (key !in owner.purposeRows) return@request purposeNotFound()
+            // Tokens are scoped to owner + purpose and preserve sub-millisecond order.
+            itemPage(owner, purposeItems(owner, key), "fake-purpose:${session.state.value.accountId}:$key:", cursor, limit, anchor, before, after)
         }
-        val rest = if (after == null) all else all.filter { it.createdAt < after.first || (it.createdAt == after.first && it.id < after.second) }
-        val page = rest.take(limit)
-        val next = if (rest.size > limit) page.last().let { "$prefix${it.createdAt}|${it.id}" } else null
-        ClientResult.Success(ItemPage(page.map { present(owner, it) }, all.size, next))
-    }
 
     private fun purposeNotFound() = failure(ErrorKind.NOT_FOUND, "PURPOSE_NOT_FOUND")
 
@@ -591,7 +596,6 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         const val CUSTOM_LIMIT = 20
         const val CREATE_PER_WINDOW = 5
         val CREATE_WINDOW = 60.seconds
-        const val CURSOR_PREFIX = "fake2:"
     }
 }
 

@@ -84,10 +84,25 @@ internal class ScriptedCategoryServer(clock: Clock) {
                 respondResult(categories.update(path.substringAfterLast('/'), version, patch)) { detailJson(it) }
             }
             request.method == HttpMethod.Get && path == "/v1/wishlist-items" -> {
+                val badQuery = ClientError(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
                 val categoryId = query["categoryId"]
-                    ?: return@run error(HttpStatusCode.BadRequest, ClientError(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY"))
-                val limit = query["limit"]?.toIntOrNull() ?: 40
-                respondResult(lists.byCategory(categoryId, query["cursor"], limit), query = true) { pageJson(it) }
+                val purposeId = query["purposeId"]
+                if ((categoryId == null) == (purposeId == null)) return@run error(HttpStatusCode.BadRequest, badQuery)
+                val anchor = query["anchor"]
+                val result = if (anchor != null) {
+                    // anchor never travels with cursor/limit; before/after default to 20 (B4).
+                    if (query["cursor"] != null || query["limit"] != null) return@run error(HttpStatusCode.BadRequest, badQuery)
+                    val before = query["before"]?.let { it.toIntOrNull() ?: return@run error(HttpStatusCode.BadRequest, badQuery) } ?: 20
+                    val after = query["after"]?.let { it.toIntOrNull() ?: return@run error(HttpStatusCode.BadRequest, badQuery) } ?: 20
+                    if (categoryId != null) lists.byCategoryAround(categoryId, anchor, before, after)
+                    else lists.byPurposeAround(purposeId!!, anchor, before, after)
+                } else {
+                    if (query["before"] != null || query["after"] != null) return@run error(HttpStatusCode.BadRequest, badQuery)
+                    val limit = query["limit"]?.toIntOrNull() ?: 40
+                    if (categoryId != null) lists.byCategory(categoryId, query["cursor"], limit)
+                    else lists.byPurpose(purposeId!!, query["cursor"], limit)
+                }
+                respondResult(result, query = true) { pageJson(it) }
             }
             else -> error(HttpStatusCode.NotFound, ClientError(ErrorKind.NOT_FOUND, "NOT_FOUND"))
         }
@@ -158,10 +173,13 @@ internal class ScriptedCategoryServer(clock: Clock) {
     }
 
     private fun pageJson(p: ItemPage) = buildJsonObject {
-        put("items", JsonArray(p.items.map { buildJsonObject { put("item", wireItem(it)); put("anchorCursor", "a-${it.id}") } }))
+        put("items", JsonArray(p.items.map { buildJsonObject { put("item", wireItem(it)); put("anchorCursor", p.anchorCursors.getValue(it.id)) } }))
         put("totalCount", p.totalCount)
+        put("previousCursor", p.previousCursor)
         put("nextCursor", p.nextCursor)
-        put("previousCursor", JsonNull)
+        put("requestedAnchorItemId", p.anchor?.requestedItemId)
+        put("resolvedAnchorItemId", p.anchor?.resolvedItemId)
+        put("anchorResolved", p.anchor?.resolved)
     }
 }
 

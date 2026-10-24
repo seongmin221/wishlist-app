@@ -93,7 +93,7 @@ internal class RemoteCategoryRepository(
     }
 }
 
-/** B4 ITEM-02, category scope. Kotlin-internal. */
+/** B4 ITEM-02, category and purpose scopes (pages and anchor windows). Kotlin-internal. */
 internal class RemoteItemListRepository(
     private val session: AuthSession,
     private val transport: AuthenticatedTransport,
@@ -114,5 +114,22 @@ internal class RemoteItemListRepository(
             parameter("categoryId", categoryId)
             cursor?.let { parameter("cursor", it) }
             parameter("limit", limit)
+        }
+
+    override suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        around("categoryId", categoryId, anchor, before, after)
+
+    override suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        around("purposeId", purposeId, anchor, before, after)
+
+    /** The anchor query carries position and requested id; cursor/limit are never sent with it. */
+    private suspend fun around(scopeKey: String, scopeId: String, anchor: String, before: Int, after: Int) =
+        transport.call(session, ApiId.ITEM_02, ::parseItemPage) {
+            method = HttpMethod.Get
+            url("/v1/wishlist-items")
+            parameter(scopeKey, scopeId)
+            parameter("anchor", anchor)
+            parameter("before", before)
+            parameter("after", after)
         }
 }

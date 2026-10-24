@@ -102,28 +102,60 @@ internal fun parseCreated(body: String): ClientResult<CategoryCreated> = reading
 
 private val pageJson = Json { ignoreUnknownKeys = true }
 
-/** ITEM-02 page: `items[].item` uses the shared item mapper; a card that fails it fails the page. */
+private fun JsonObject.optionalBoolean(key: String): Boolean? = when (val v = get(key)) {
+    null, JsonNull -> null
+    is JsonPrimitive -> if (v.isString) throw Malformed() else v.content.toBooleanStrictOrNull() ?: throw Malformed()
+    else -> throw Malformed()
+}
+
+/** Item ids are kept in canonical lowercase, like [mapItem]. */
+private fun itemId(raw: String): String = canonicalUuidOrNull(raw) ?: raw
+
+/** The page fields around the cards; the card rows are mapped afterwards. */
+private class PageFrame(val rows: JsonArray, val total: Int, val next: String?, val previous: String?, val anchor: ItemAnchor?)
+
+/**
+ * ITEM-02/HOME-02 page or window: `items[].item` uses the shared item mapper (a card that fails it
+ * fails the page) and `items[].anchorCursor` lands in [ItemPage.anchorCursors]. The three anchor
+ * fields are null in page mode (anchor null); a non-null `anchorResolved` needs the requested id.
+ */
 internal fun parseItemPage(body: String): ClientResult<ItemPage> {
     val page = reading(body) { o ->
-        Triple(o.array("items"), o.int("totalCount"), o.optionalString("nextCursor"))
+        val anchor = o.optionalBoolean("anchorResolved")?.let { resolved ->
+            ItemAnchor(
+                requestedItemId = itemId(o.optionalString("requestedAnchorItemId") ?: throw Malformed()),
+                resolvedItemId = o.optionalString("resolvedAnchorItemId")?.let(::itemId),
+                resolved = resolved,
+            )
+        }
+        PageFrame(o.array("items"), o.int("totalCount"), o.optionalString("nextCursor"), o.optionalString("previousCursor"), anchor)
     }
-    val (rows, total, next) = when (page) {
+    val frame = when (page) {
         is ClientResult.Failure -> return page
         is ClientResult.Success -> page.value
     }
-    val items = rows.map { row ->
-        val item = (row as? JsonObject)?.get("item") as? JsonObject ?: return invalid
+    val anchors = mutableMapOf<String, String>()
+    val items = frame.rows.map { row ->
+        val card = row as? JsonObject ?: return invalid
+        val item = card["item"] as? JsonObject ?: return invalid
         val dto = try {
             pageJson.decodeFromJsonElement(WishlistItemDto.serializer(), item)
         } catch (e: IllegalArgumentException) {
             return invalid
         }
-        when (val mapped = mapItem(dto)) {
-            is ClientResult.Failure -> return mapped
-            is ClientResult.Success -> mapped.value
+        val mapped = when (val result = mapItem(dto)) {
+            is ClientResult.Failure -> return result
+            is ClientResult.Success -> result.value
         }
+        // Older test servers omit anchorCursor; a present one must be a string.
+        when (val cursor = card["anchorCursor"]) {
+            null, JsonNull -> Unit
+            is JsonPrimitive -> if (cursor.isString) anchors[mapped.id] = cursor.content else return invalid
+            else -> return invalid
+        }
+        mapped
     }
-    return ClientResult.Success(ItemPage(items, total, next))
+    return ClientResult.Success(ItemPage(items, frame.total, frame.next, frame.previous, anchors, frame.anchor))
 }
 
 /** CAT-03 body (description omitted when null, examples always sent). */

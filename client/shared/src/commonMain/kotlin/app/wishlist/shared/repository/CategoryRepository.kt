@@ -24,7 +24,7 @@ interface CategoryRepository {
     suspend fun update(id: String, expectedVersion: Int, patch: CategoryPatch): ClientResult<CustomCategoryDetail>
 }
 
-/** B4 ITEM-02, category and purpose scopes. Newest first; [cursor] from the previous page. */
+/** B4 ITEM-02, category and purpose scopes. Newest first; [cursor] is a page's next or previous cursor. */
 interface ItemListRepository {
     suspend fun byCategory(categoryId: String, cursor: String? = null, limit: Int = DEFAULT_LIMIT): ClientResult<ItemPage>
 
@@ -32,7 +32,19 @@ interface ItemListRepository {
     suspend fun byPurpose(purposeId: String, cursor: String? = null, limit: Int = DEFAULT_LIMIT): ClientResult<ItemPage> =
         ClientResult.Failure(app.wishlist.shared.core.ClientError(app.wishlist.shared.core.ErrorKind.UNAVAILABLE))
 
+    /**
+     * ITEM-02 window around a card's `anchorCursor`: up to [before] newer + the anchor + [after] older
+     * (each 0~20). A card that left the scope falls back (see [ItemAnchor]); never sent with cursor/limit.
+     */
+    suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int = DEFAULT_SPAN, after: Int = DEFAULT_SPAN): ClientResult<ItemPage> =
+        ClientResult.Failure(app.wishlist.shared.core.ClientError(app.wishlist.shared.core.ErrorKind.UNAVAILABLE))
+
+    /** Purpose-scope window; same rules as [byCategoryAround]. */
+    suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int = DEFAULT_SPAN, after: Int = DEFAULT_SPAN): ClientResult<ItemPage> =
+        ClientResult.Failure(app.wishlist.shared.core.ClientError(app.wishlist.shared.core.ErrorKind.UNAVAILABLE))
+
     companion object {
         const val DEFAULT_LIMIT = 40
+        const val DEFAULT_SPAN = 20
     }
 }

@@ -43,6 +43,20 @@ internal class FakeCategoryFixture : CategoryContractFixture {
         return id
     }
 
+    override suspend fun createPurpose(ownerId: String): String = asOwner(ownerId) {
+        store.createPurpose(PurposeCommand("목적", null, "coral", "heart"), Uuid.random().toString()).successValue().purpose.id
+    }
+
+    override suspend fun placePurposeItem(ownerId: String, purposeId: String): String = asOwner(ownerId) {
+        store.putItem(contractItem(++itemSeq, "C024", "후보", LifecycleStatus.ACTIVE).copy(purpose = ItemPurpose(purposeId, ValueSource.USER))).successValue().id
+    }
+
+    private suspend fun <T> asOwner(ownerId: String, block: suspend () -> T): T {
+        val previous = session.state.value.accountId
+        if (previous != ownerId) session.changeAccount(ownerId)
+        return block().also { if (previous != null && previous != ownerId) session.changeAccount(previous) }
+    }
+
     override fun advanceSeconds(seconds: Long) { now += seconds.seconds }
 }
 

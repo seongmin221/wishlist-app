@@ -59,6 +59,10 @@ internal object UnavailableCategoryRepository : CategoryRepository {
 internal object UnavailableItemListRepository : ItemListRepository {
     override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = unavailable(API_UNAVAILABLE)
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = unavailable(API_UNAVAILABLE)
+    override suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        unavailable(API_UNAVAILABLE)
+    override suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        unavailable(API_UNAVAILABLE)
 }
 
 /** CAT-01~04 may be bound to different backends; each method uses its own API's delegate. */
@@ -130,6 +134,10 @@ internal class GatedItemListRepository(
         if (ready.value) delegate.byPurpose(purposeId, cursor, limit) else unavailable(RUNTIME_NOT_READY)
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
         if (ready.value) delegate.byCategory(categoryId, cursor, limit) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        if (ready.value) delegate.byCategoryAround(categoryId, anchor, before, after) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        if (ready.value) delegate.byPurposeAround(purposeId, anchor, before, after) else unavailable(RUNTIME_NOT_READY)
 }
 
 internal class GatedLocalStore(
