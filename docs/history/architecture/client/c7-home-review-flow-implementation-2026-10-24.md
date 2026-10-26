@@ -157,3 +157,9 @@ GitHub 조회(2026-10-24): #22 `state=OPEN`, `isDraft=true`, `baseRefName=develo
 - Android `LifecycleResumeEffect`는 어떤 activity resume도 foreground로 센다. iOS는 background에서 돌아올 때만 센다. 차이는 읽기 한 번이 더 도는 정도다.
 - 로딩·실패 UI가 플랫폼마다 다르다. iOS는 `ProgressView`, Android는 섹션을 숨긴다. 갱신 실패 안내는 iOS가 계속 보이고 Android는 잠깐 보인다. 연속 처리 LOADING 모양도 다르다.
 - 맨 위에서 당겨 새로고침하면 새 상품이 화면 위쪽에 남는다. 스펙의 anchor 유지 갱신을 따른 결과지만 제품 확인이 필요하다.
+
+## PR #25 리뷰 후속 (2026-10-27)
+
+- **연속 처리 전체 수:** foreground로 현재 카드 앞에 새로 저장된 상품을 빼고 `2 / 60`을 보인 뒤, 다음 페이지를 받으면 `21 / 61`로 늘었다. 다음 페이지의 앞쪽 수를 이번 세션의 넘긴·건너뛴 ID로만 세면서 foreground가 뺀 상품을 잊었기 때문이다. 이제 window를 다시 만들 때 현재 카드 앞의 상품 중 넘긴 것이 아닌 항목을 모두 `skippedBefore`에 넣는다(캐러셀 시작과 같은 처리). 이 상품은 세션 동안 나오지 않고 `처음부터 다시 보기`에서 다시 보인다. 회귀 테스트 `appendKeepsNewerItemsExcludedByForeground`가 수정 전 `21 / 61`로 실패했고 수정 후 `21 / 60`으로 통과한다.
+- **iOS 목적 상세 첫 카드 복원:** 복원 대상이 목록 첫 상품이면 무조건 건너뛰어, 다른 기기에서 앞 후보가 지워져 현재 카드가 첫 상품이 되면 이전 스크롤 위치에 다른 상품이나 목록 끝이 남을 수 있었다. 이제 첫 상품이면서 목록이 이미 맨 위일 때만 시트를 그대로 두고, 그 밖에는 복원한다(`ListAnchorMath.sheetRestoreScrolls`, 테스트 `testASheetRestoreSkipsOnlyAFirstCardAlreadyAtTheListTop`). Android는 첫 카드를 건너뛰지 않아 바꾸지 않았다. 코드 경로와 단위 테스트로 확인했고 기기 재현은 하지 않았다.
+- 검증: shared host **785** / iOS simulator **782**, iOS XCTest **288**, 실패 0. `:android:assembleDebug` 통과.

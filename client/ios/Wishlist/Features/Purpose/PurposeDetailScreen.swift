@@ -233,7 +233,8 @@ struct PurposeDetailScreen: View {
     private var firstVisible: String? { anchors.firstVisible(top: sheet.sheetTop + 28) }
 
     /// C7 list anchor inside the sheet: restore a refreshed window's card under the expanded band (a restore to
-    /// the list's first card or to the top keeps the sheet where it is), and `loadNewer` at the list's top edge.
+    /// the top, or to the first card while the list is already at its top, keeps the sheet where it is), and
+    /// `loadNewer` at the list's top edge.
     private func candidateContent(owner: PurposeDetailOwner, detail: PurposeDetail) -> some View {
         let state = owner.state
         return ScrollViewReader { proxy in
@@ -244,7 +245,8 @@ struct PurposeDetailScreen: View {
             }
             .modifier(ListAnchorWiring(box: anchors, restore: state.restore, laidIds: owner.plan.laidIds,
                                        firstItemId: state.items.first?.id, prepending: state.prepending) { target in
-                guard case .item(let id) = target, id != owner.state.items.first?.id else { return }
+                guard case .item(let id) = target,
+                      ListAnchorMath.sheetRestoreScrolls(to: id, firstItemId: owner.state.items.first?.id, listAtTop: atTop) else { return }
                 ListAnchorMath.scroll(proxy, to: id, box: anchors)
             })
             .onChange(of: [atTop, state.hasNewer, state.prepending || state.itemsLoading], initial: true) { _, key in

@@ -21,6 +21,15 @@ final class ListAnchorTests: XCTestCase {
         XCTAssertNil(ListAnchorTracker().firstVisible(top: 0))
     }
 
+    func testASheetRestoreSkipsOnlyAFirstCardAlreadyAtTheListTop() {
+        // Already at the list's top: the first card is where it belongs, the sheet stays put.
+        XCTAssertFalse(ListAnchorMath.sheetRestoreScrolls(to: "a", firstItemId: "a", listAtTop: true))
+        // Cards in front were removed elsewhere: the anchor is now first but the list is scrolled down.
+        XCTAssertTrue(ListAnchorMath.sheetRestoreScrolls(to: "a", firstItemId: "a", listAtTop: false))
+        XCTAssertTrue(ListAnchorMath.sheetRestoreScrolls(to: "b", firstItemId: "a", listAtTop: true))
+        XCTAssertTrue(ListAnchorMath.sheetRestoreScrolls(to: "b", firstItemId: "a", listAtTop: false))
+    }
+
     func testEachRestoreTokenIsAppliedOnceAfterItsCardIsLaidOut() {
         var tracker = ListAnchorTracker()
         XCTAssertTrue(tracker.accept(token: 1, resolvedItemId: "x"))

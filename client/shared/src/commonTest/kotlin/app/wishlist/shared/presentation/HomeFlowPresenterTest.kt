@@ -329,6 +329,28 @@ class HomeFlowPresenterTest {
     }
 
     @Test
+    fun appendKeepsNewerItemsExcludedByForeground() = runTest {
+        signIn()
+        val items = placeReview(60)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        p.pass(); advanceUntilIdle()
+        // Saved elsewhere meanwhile: in front of the current card, so this session never shows it.
+        val newer = placeReview(1).single()
+        p.foreground()
+        advanceUntilIdle()
+        assertEquals(2 to 60, p.counter)
+        // The window holds 20 cards after the current one; passing down to the stack reads the next page.
+        repeat(19) { p.pass(); advanceUntilIdle() }
+        assertEquals("group:CLASSIFICATION_REVIEW:next:20", home.calls.last())
+        assertEquals(items[20], p.state.value.current?.item?.id)
+        assertEquals(21 to 60, p.counter)
+        assertEquals(false, newer in p.ids)
+        p.close()
+    }
+
+    @Test
     fun foregroundWindowNextCursorAppendsPage() = runTest {
         signIn()
         val items = placeReview(45)

@@ -98,6 +98,13 @@ struct ListAnchorTracker {
 }
 
 enum ListAnchorMath {
+    /// Inside a header sheet, a restore leaves the sheet alone only when its card is the list's first and the
+    /// list already sits at its top. A first card with the list scrolled down (cards in front were removed
+    /// elsewhere) still scrolls, or another card or the list's end would stay in view.
+    static func sheetRestoreScrolls(to id: String, firstItemId: String?, listAtTop: Bool) -> Bool {
+        !(id == firstItemId && listAtTop)
+    }
+
     /// `ScrollViewProxy.scrollTo(_:anchor:)` lines up the item's point at fraction y with the viewport's
     /// point at the same fraction, so the item's top lands at `y × (viewport − item)`. This y puts the top at
     /// `topInset` (0 when the card is taller than the room left).

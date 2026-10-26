@@ -110,7 +110,7 @@ class HomeFlowPresenter internal constructor(
             loadJob = request({ if (anchor != null) home.groupAround(g, anchor) else home.group(g) }) { result ->
                 loadJob = null
                 refreshing = false
-                if (result is ClientResult.Success) rebuild(result.value, keep.item, skipFront = false)
+                if (result is ClientResult.Success) rebuild(result.value, keep.item)
                 settle()
             }
         }
@@ -153,7 +153,7 @@ class HomeFlowPresenter internal constructor(
         loadJob = request({ if (anchor != null) home.groupAround(g, anchor) else home.group(g) }) { result ->
             loadJob = null
             when (result) {
-                is ClientResult.Success -> rebuild(result.value, keep = null, skipFront = anchor != null)
+                is ClientResult.Success -> rebuild(result.value, keep = null)
                 is ClientResult.Failure -> fail(result.error) { initialLoad(anchor) }
             }
             settle()
@@ -184,12 +184,13 @@ class HomeFlowPresenter internal constructor(
 
     /**
      * Replaces the queue from a first page or window. [keep]: the card shown when a foreground read
-     * started. [skipFront]: the cards in front of the start card are behind this session (anchored start).
+     * started. The cards in front of the start card are behind this session (an anchored start, or
+     * cards saved elsewhere since): they join [skippedBefore] so a later page still counts them in front.
      */
-    private fun rebuild(page: ItemPage, keep: WishlistItem?, skipFront: Boolean) {
+    private fun rebuild(page: ItemPage, keep: WishlistItem?) {
         val ids = page.items.map { it.id }
         val from = startIndex(page, ids, keep)
-        if (skipFront) skippedBefore += ids.take(from)
+        skippedBefore += ids.take(from).filterNot { it in passedIds }
         queue = page.items.drop(from).filterNot { seen(it.id) }.map { card(it, page) }
         next = page.nextCursor
         val front = if (page.previousCursor == null) {
