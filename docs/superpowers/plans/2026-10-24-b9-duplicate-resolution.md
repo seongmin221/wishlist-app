@@ -138,6 +138,6 @@
 - Modify: `docs/architecture/server/mvp-api-inventory.md`(DUP-01/02 구현, 남은 결정 행 해결), `mvp-api-implementation-order.md`(B9 구현 상태), `extraction-pipeline.md`(cache·식별), `mvp-product-api-design.md`(다른 판매처 행), `docs/product/organize-candidates.md`·`save-a-product.md`(확정 정책 반영), 각 `INDEX.md`(architecture/server, history/architecture/server, product-planning decisions, superpowers specs/plans), spec 상태줄.
 
 - [ ] **Step 1:** 전체 `./gradlew test --rerun-tasks`(위 환경 변수). 기대: 실패/오류 0, RealUrlPilot 등 opt-in skip만 있다. 수치를 기록한다.
-- [ ] **Step 2:** 문서를 갱신한다. 인계는 C6(안내 위치·비교 시트·결과 한 줄), B10(archive item 쌍 숨김 검증), B11(판매처 식별 코드 노출률 측정·cache 증가량·receipt 증가)이다.
+- [ ] **Step 2:** 문서를 갱신한다. 인계는 C10(안내 위치·비교 시트·결과 한 줄), B10(archive item 쌍 숨김 검증), B11(판매처 식별 코드 노출률 측정·cache 증가량·receipt 증가)이다.
 - [ ] **Step 3:** 브랜치 전체 리뷰(fresh reviewer)를 받는다. 지적을 처리하고 영향받은 테스트를 다시 실행한다.
 - [ ] **Step 4: 커밋** — `docs: B9 중복 해소 계약·회귀와 인계 기록`

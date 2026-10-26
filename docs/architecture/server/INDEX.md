@@ -18,7 +18,7 @@
 | AI 목적 후보·snapshot v3·T0~T7 단계·판단/판단 없음 | [purpose-ai-candidates.md](purpose-ai-candidates.md) |
 | MEDIA-01·02 클라이언트 계약·한도·오류·표시 URL·local 저장소·정리 | [media-upload-api.md](media-upload-api.md) |
 | ITEM-04~08 편집·보완·검토·삭제·재분석 계약·오류·deletionImpact | [wishlist-item-mutation-api.md](wishlist-item-mutation-api.md) |
-| B9 구현·검증·경합·결정·C6/B10/B11 인계 | [B9 구현 기록](../../history/architecture/server/b9-duplicate-resolution-implementation-2026-10-24.md) |
+| B9 구현·검증·경합·결정·C10/B10/B11 인계 | [B9 구현 기록](../../history/architecture/server/b9-duplicate-resolution-implementation-2026-10-24.md) |
 | B8 구현·RED/GREEN·경합·결정 | [B8 구현 기록](../../history/architecture/server/b8-candidate-move-deletions-implementation-2026-10-24.md) |
 | B7 구현·RED/GREEN·경합·회귀·B8/B10/B11 인계 | [B7 구현 기록](../../history/architecture/server/b7-item-mutations-implementation-2026-10-14.md) |
 | B6 구현·RED/GREEN·리뷰·검증·B7/B10/B11 인계 | [B6 구현 기록](../../history/architecture/server/b6-media-upload-implementation-2026-10-13.md) |

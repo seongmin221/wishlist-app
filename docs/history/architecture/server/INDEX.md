@@ -1,6 +1,6 @@
 # Server 의사결정
 
-- [B9 중복 비교와 선택 해소 구현 이력](b9-duplicate-resolution-implementation-2026-10-24.md) — 식별 값·Product cache(V22)·중복 쌍/receipt(V23)·DUP-01/02 · 664 tests 662 통과/2 opt-in skip·경합·독립 리뷰 Important 2 반영·C6/B10/B11 인계
+- [B9 중복 비교와 선택 해소 구현 이력](b9-duplicate-resolution-implementation-2026-10-24.md) — 식별 값·Product cache(V22)·중복 쌍/receipt(V23)·DUP-01/02 · 664 tests 662 통과/2 opt-in skip·경합·독립 리뷰 Important 2 반영·C10/B10/B11 인계
 - [B8 후보 이동과 영향 확인 삭제 구현 이력](b8-candidate-move-deletions-implementation-2026-10-24.md) — PUR-07/08(V20)·CAT-05/06·PUR-05/06(V21) 구현 · Task별 RED/GREEN·경합·608 tests 606 통과/2 opt-in skip·독립 리뷰 Minor 5·C5/B10/B11 인계
 - [B7 상품 사용자 변경 구현 이력](b7-item-mutations-implementation-2026-10-14.md) — ITEM-04~08·deletionImpact·V19, Task별 RED/GREEN·경합·569 tests 567 통과/2 opt-in skip·독립 리뷰 Important 1 반영·B8/B10/B11 인계
 - [B7 상품 사용자 변경 문서 검토](b7-item-mutations-document-review-2026-10-14.md) — 3차 정적 검토 완료 · 기존 지적 5건 반영 확인·추가 지적 없음

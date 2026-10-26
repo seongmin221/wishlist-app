@@ -1,18 +1,18 @@
 # B9 중복 비교와 선택 해소 구현 이력
 
-> 2026-10-24 · 브랜치 `server/b9-duplicate-resolution` · 시작 `ef2077d`(B8 PR #24 병합) · [계약](../../../architecture/server/duplicate-resolution-api.md) · [정책](../../product-planning/mvp/decisions/b9-duplicate-resolution-policy-2026-10-24.md) · [설계](../../../superpowers/specs/2026-10-24-b9-duplicate-resolution-design.md) · [계획](../../../superpowers/plans/2026-10-24-b9-duplicate-resolution.md)
+> 2026-10-24 · 브랜치 `server/b9-duplicate-resolution` · 시작 `ef2077d`(B8 PR #24 병합), PR 전 `896fbc2`(C6 #23 병합) 위로 rebase · [계약](../../../architecture/server/duplicate-resolution-api.md) · [정책](../../product-planning/mvp/decisions/b9-duplicate-resolution-policy-2026-10-24.md) · [설계](../../../superpowers/specs/2026-10-24-b9-duplicate-resolution-design.md) · [계획](../../../superpowers/plans/2026-10-24-b9-duplicate-resolution.md)
 
 ## 범위와 결과
 
-구현 순서 문서 B9의 다섯 단계를 모두 구현했다: canonical·상품 식별 기준 → Product cache와 item snapshot 복사 → 중복 candidate/decision 저장 → DUP-01 → DUP-02. 동일 canonical만이 아니라 판매처가 다른 동일 상품(GTIN·브랜드+MPN)과 여러 후보(쌍별 판단)를 포함한다. 클라이언트 C6(비교 시트·안내 위치)와 B10 이후는 범위 밖이다.
+구현 순서 문서 B9의 다섯 단계를 모두 구현했다: canonical·상품 식별 기준 → Product cache와 item snapshot 복사 → 중복 candidate/decision 저장 → DUP-01 → DUP-02. 동일 canonical만이 아니라 판매처가 다른 동일 상품(GTIN·브랜드+MPN)과 여러 후보(쌍별 판단)를 포함한다. 클라이언트 C10(비교 시트·안내 위치)와 B10 이후는 범위 밖이다.
 
 | 커밋 | 내용 |
 | --- | --- |
-| `d98ab7e` | 식별 값(GTIN·brand+MPN) 추출·정규화, V22 `products`/`product_url_aliases`·item/job 컬럼, cache upsert/lookup, 가격 확인 시각 승계 |
-| `52c4fd5` | 재분석은 cache를 쓰지 않음(신규 저장만 재사용) |
-| `be9748f` | V23 `duplicate_candidates`/`duplicate_decision_receipts`, finish·재시도 소진에서 bases 재계산, kind 계산 SQL/Kotlin, 상품 DTO `duplicateCandidates` |
-| `7401877` | DUP-01 조회·DUP-02 결정(ITEM-05 삭제 단계 분리·재사용), HTTP route |
-| `bc59bcd` | 최종 리뷰 반영: 페이지를 못 읽은 기존 항목의 SAME_URL, 옵션별 Product의 식별 값 합의, V14 index 비교 baseline |
+| `c137e63` | 식별 값(GTIN·brand+MPN) 추출·정규화, V22 `products`/`product_url_aliases`·item/job 컬럼, cache upsert/lookup, 가격 확인 시각 승계 |
+| `a47bf71` | 재분석은 cache를 쓰지 않음(신규 저장만 재사용) |
+| `861651a` | V23 `duplicate_candidates`/`duplicate_decision_receipts`, finish·재시도 소진에서 bases 재계산, kind 계산 SQL/Kotlin, 상품 DTO `duplicateCandidates` |
+| `c999211` | DUP-01 조회·DUP-02 결정(ITEM-05 삭제 단계 분리·재사용), HTTP route |
+| `644df5a` | 최종 리뷰 반영: 페이지를 못 읽은 기존 항목의 SAME_URL, 옵션별 Product의 식별 값 합의, V14 index 비교 baseline |
 
 ## 통과 조건별 검증(실제 PostgreSQL 16 Testcontainers)
 
@@ -38,9 +38,9 @@ Task 3·4는 테스트를 먼저 썼지만, 다른 빌드가 동시에 돌아 �
 
 ## 전체 회귀
 
-수정 전 실행(`--rerun-tasks`): 662 tests, 659 통과, 2 opt-in skip(`PlaywrightRealBrowserTest`, `RealUrlPilotTest`), 1 실패. 실패는 `WishlistReadIndexTest`였다. V14 baseline이 공용 projection의 `duplicate_candidates` join을 갖지 않았기 때문이며, `bc59bcd`에서 V17/V18 컬럼과 같은 방식으로 임시 골격을 두어 해결했다.
+수정 전 실행(`--rerun-tasks`): 662 tests, 659 통과, 2 opt-in skip(`PlaywrightRealBrowserTest`, `RealUrlPilotTest`), 1 실패. 실패는 `WishlistReadIndexTest`였다. V14 baseline이 공용 projection의 `duplicate_candidates` join을 갖지 않았기 때문이며, `644df5a`에서 V17/V18 컬럼과 같은 방식으로 임시 골격을 두어 해결했다.
 
-최종 실행(`bc59bcd`, `--rerun-tasks`): **664 tests, 662 통과, 2 opt-in skip, 실패·오류 0**. B8 마지막 기록(608 tests) 대비 B9 테스트 56건이 늘었다.
+최종 실행(`644df5a`, `--rerun-tasks`): **664 tests, 662 통과, 2 opt-in skip, 실패·오류 0**. B8 마지막 기록(608 tests) 대비 B9 테스트 56건이 늘었다.
 
 명령과 환경은 [로컬 테스트 환경](../../../architecture/server/local-test-environment.md)과 같다(JDK 17, `/var/run/docker.sock` Podman, `RUN_REAL_URL_PILOT=0`).
 
@@ -70,8 +70,8 @@ Task 3·4는 테스트를 먼저 썼지만, 다른 빌드가 동시에 돌아 �
 | Minor: DUP-01이 후보마다 삭제 영향 조회(최대 50) | 보류 |
 | Minor: "DUP-02 vs 기존 상품 자신의 재분석 finish" 경합을 제3 상품 finish로 검증 | 보류. 둘 다 owner 잠금으로 직렬화된다 |
 
-## C6·B10·B11 인계
+## C10·B10·B11 인계
 
-- **C6:** 분류·목적 확인 카드는 상품 DTO의 `duplicateCandidates`로 안내를 띄우고 DUP-01로 비교 시트를 연다. kind별 문구: MATCH는 "같은 상품으로 보이는 항목", SAME_URL은 "동일한 URL로 저장된 항목", AWAITING_ANALYSIS는 판단 대기다. 결정은 DUP-02이며, 확인창에는 지울 쪽 `deletionImpact`를 쓴다. 결정 뒤 카드의 결과 한 줄은 응답의 `candidate.decision`으로 표시한다. 검토에 들어가지 않는 새 항목(PARTIAL 등)의 안내 위치는 C6에서 정한다. 409 뒤에는 DUP-01을 다시 읽는다. replay body는 판단 당시 결과다.
+- **C10:** 분류·목적 확인 카드는 상품 DTO의 `duplicateCandidates`로 안내를 띄우고 DUP-01로 비교 시트를 연다. kind별 문구: MATCH는 "같은 상품으로 보이는 항목", SAME_URL은 "동일한 URL로 저장된 항목", AWAITING_ANALYSIS는 판단 대기다. 결정은 DUP-02이며, 확인창에는 지울 쪽 `deletionImpact`를 쓴다. 결정 뒤 카드의 결과 한 줄은 응답의 `candidate.decision`으로 표시한다. 검토에 들어가지 않는 새 항목(PARTIAL 등)의 안내 위치는 C10에서 정한다. 409 뒤에는 DUP-01을 다시 읽는다. replay body는 판단 당시 결과다.
 - **B10:** archive된 상품의 쌍은 행이 남고 보이지 않는다. 전체 복원 때 OPEN 쌍이 다시 보이는 것이 맞는지, 오래된 bases를 다시 계산할지 정한다. archive된 상품에 대한 DUP-02 차단(404)을 종합 검증에 포함한다.
 - **B11:** 실제 판매처의 GTIN/MPN 노출률을 측정한다. 판매처 간 탐지는 이 값에 달려 있다. `products`·alias·receipt 증가량, 탐지 후보 조회 비용과 index 사용, 전역 `products` 행 잠금 대기를 관측한다. B9 이전에 저장한 상품은 식별 값이 없으며 backfill하지 않았다(출시 전).

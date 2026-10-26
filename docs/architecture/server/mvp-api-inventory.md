@@ -261,7 +261,7 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 | 연속 처리 재진입/restart | **B4 해결**: 살아 있는 화면은 현재 anchor 재조회, 앱 신규 실행은 최신 첫 구간. restart는 기기 skip 초기화와 현재 미완료 재조회이며 CONFIRMED/DEFERRED 검토 재노출 없음. 별도 restart API 없음 | HOME-02/ITEM-08 |
 | 상품명·브랜드·archive 제목 입력 제한 | 목적은 **B3 해결**(이름40/설명200 code point·중복 허용). 상품명·브랜드·archive 제목은 추가 확인 | ITEM-04/ITEM-07, ARC-06 |
 | 상품 후보 수 상한·bulk 최대 크기 | 목적 수는 **B3 해결**(ACTIVE 30개·60초 10건). 상품 window 규칙은 있음. 후보 이동 bulk는 **B8 해결**(서로 다른 상품 1~100개). archive bulk는 별도 확인 | PUR-07/PUR-08, ARC-01/ARC-02 |
-| 중복 여러 후보·다른 판매처 동일 상품 | **B9 해결**: 쌍별 판단, 판매처 간은 GTIN/브랜드+MPN만, 실패 기존 항목은 SAME_URL 안내·판단 허용, 검토 밖 새 항목도 후보 저장(안내 위치는 C6) | DUP-01/DUP-02 |
+| 중복 여러 후보·다른 판매처 동일 상품 | **B9 해결**: 쌍별 판단, 판매처 간은 GTIN/브랜드+MPN만, 실패 기존 항목은 SAME_URL 안내·판단 허용, 검토 밖 새 항목도 후보 저장(안내 위치는 C10) | DUP-01/DUP-02 |
 | 새 자원 만들기와 편집 취소 | purpose는 **B3 해결**: 취소 뒤에도 생성한 목적 유지(빈 목적 자동 삭제 금지). category의 수명은 별도 확인 | CAT-03 + ITEM-04/ITEM-07/ITEM-08 |
 | archive 목적 snapshot·복원 예외 | 최신 상세는 목적 아이콘 필요. 설명/color/icon의 복원 범위·삭제 custom 참조·archive 제목 수정 후 목적 이름 복원 기준 확인 | ARC-02/ARC-04/ARC-07/ARC-08 |
 | 아카이브 후보의 분석 상태 | 일반적으로 비교 가능 item을 다루지만 PROCESSING/보완 필요 후보를 목적에 추가·archive할 수 있는지 명확히 필요 | PUR-07/PUR-08, ARC-01/ARC-02/ARC-08 |

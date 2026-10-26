@@ -28,7 +28,7 @@
 
 ## 상품 표현의 후보 수
 
-`WishlistItemDto`에 `duplicateCandidates: {matchCount, sameUrlCount, awaitingAnalysisCount}`를 추가했다. 그 상품이 new인, 보이는 OPEN 쌍을 kind별로 센 값이다. 셋 다 0이면 key를 생략한다. 상세·목록·홈·후보·영향·생성 replay 응답에 똑같이 붙는다. 분류·목적 확인 카드의 "같은 상품으로 보이는 항목이 있어요" 안내 근거다. 안내 위치는 C6에서 정한다.
+`WishlistItemDto`에 `duplicateCandidates: {matchCount, sameUrlCount, awaitingAnalysisCount}`를 추가했다. 그 상품이 new인, 보이는 OPEN 쌍을 kind별로 센 값이다. 셋 다 0이면 key를 생략한다. 상세·목록·홈·후보·영향·생성 replay 응답에 똑같이 붙는다. 분류·목적 확인 카드의 "같은 상품으로 보이는 항목이 있어요" 안내 근거다. 안내 위치는 C10에서 정한다.
 
 ## 중복 후보 조회 DUP-01
 

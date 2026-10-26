@@ -6,7 +6,7 @@
 
 B8(PR #24) 병합 지점 `ef2077d`에서 B9를 구현한다. 순서는 상품 식별 기준 → Product cache와 item snapshot 복사 → 중복 candidate/decision 저장 → DUP-01 → DUP-02다. 사용자가 같은 상품을 두 번 저장해도 저장은 막지 않는다. 대신 추출이 끝난 뒤 기존 항목과 비교해 둘 다 두기, 새 항목 지우기, 기존 항목 지우기를 고르게 한다. 고른 판단은 영속 기록한다.
 
-범위 밖: 클라이언트 C6(비교 시트 연결·안내 위치), B10 archive lifecycle, B11 배포, 이름 유사도·AI 기반 동일 상품 판정.
+범위 밖: 클라이언트 C10(비교 시트 연결·안내 위치), B10 archive lifecycle, B11 배포, 이름 유사도·AI 기반 동일 상품 판정.
 
 근거: [구현 순서 B9](../../architecture/server/mvp-api-implementation-order.md#b9--중복-비교와-판단), [inventory DUP-01/02](../../architecture/server/mvp-api-inventory.md), [중복 결정](../../history/product-planning/mvp/decisions/duplicate-items.md), [cache 결정](../../history/product-planning/mvp/decisions/product-cache-snapshot.md), [구매 후보 정리](../../product/organize-candidates.md#중복-후보-비교와-정리), [디자인 결정 2026-10-02](../../design/decisions.md), 디자인 보드 `FDuplicateCompare*`·`FDuplicateConfirm*`, [B8 인계](../../history/architecture/server/b8-candidate-move-deletions-implementation-2026-10-24.md).
 
@@ -16,7 +16,7 @@ B8(PR #24) 병합 지점 `ef2077d`에서 B9를 구현한다. 순서는 상품 �
 | --- | --- | --- |
 | Q1 | 다른 판매처 동일 상품의 판단 근거 | **식별 코드만 사용한다.** 페이지 구조화 데이터의 GTIN이 일치하거나, 정규화한 브랜드+모델 번호(MPN)가 일치할 때만 같은 상품으로 본다. 이름 유사도와 AI 판정은 쓰지 않는다. 코드를 노출하지 않는 판매처 쌍은 탐지하지 못한다 |
 | Q2 | 후보가 여럿일 때 판단 단위 | **후보 쌍별로 판단한다.** 새 항목과 각 기존 항목을 1:1로 판단한다. 새 항목 지우기는 그 새 항목의 남은 쌍을 모두 정리한다 |
-| Q3 | 검토에 들어가지 않는 새 항목(PARTIAL, 연결을 사용자가 모두 정한 항목)의 후보 | **후보만 저장한다.** 서버는 후보를 기록하고 DUP-01/02를 언제든 허용한다. 화면 안내 위치는 C6에서 정한다 |
+| Q3 | 검토에 들어가지 않는 새 항목(PARTIAL, 연결을 사용자가 모두 정한 항목)의 후보 | **후보만 저장한다.** 서버는 후보를 기록하고 DUP-01/02를 언제든 허용한다. 화면 안내 위치는 C10에서 정한다 |
 
 ## 보존할 규칙
 
@@ -98,7 +98,7 @@ new의 실제 상태가 READY/PARTIAL이고 canonical이 있을 때만 쌍이 �
 
 ## 4. 상품 표현에 후보 수 추가
 
-`WishlistItemDto`에 `duplicateCandidates: {matchCount, sameUrlCount, awaitingAnalysisCount}`를 추가한다. item이 `new`인 OPEN 쌍 중 두 item이 모두 ACTIVE이고 계산한 kind가 있는 것만 kind별로 센다. 세 값이 모두 0이면 key를 생략한다. 기존 card/detail JSON과 같은 생략 방식이다. 공용 projection(`WishlistItemRowMapper`)에 넣으므로 상세·목록·홈·replay에 같이 나온다. review 카드의 "같은 상품으로 보이는 항목이 있어요" 안내 근거다. 안내 위치는 C6에서 정한다(Q3).
+`WishlistItemDto`에 `duplicateCandidates: {matchCount, sameUrlCount, awaitingAnalysisCount}`를 추가한다. item이 `new`인 OPEN 쌍 중 두 item이 모두 ACTIVE이고 계산한 kind가 있는 것만 kind별로 센다. 세 값이 모두 0이면 key를 생략한다. 기존 card/detail JSON과 같은 생략 방식이다. 공용 projection(`WishlistItemRowMapper`)에 넣으므로 상세·목록·홈·replay에 같이 나온다. review 카드의 "같은 상품으로 보이는 항목이 있어요" 안내 근거다. 안내 위치는 C10에서 정한다(Q3).
 
 ## 5. DUP-01 계약
 
@@ -166,10 +166,10 @@ new의 실제 상태가 READY/PARTIAL이고 canonical이 있을 때만 쌍이 �
 - **DUP-01:** 종류·근거·allowedDecisions·deletionImpact, 같은 시각 keyset 순회, 다른 item cursor 400, 다른 owner 404, 상대 삭제 시 숨김, DTO 후보 수 일치.
 - **DUP-02:** 세 결정의 결과와 version. 판단과 삭제의 원자성(쓰기 중 실패 주입 시 전부 rollback). review 분리(ITEM-08 전후 서로 불변). KEEP_BOTH 뒤 재조회·재분석. 다중 후보에서 쌍별 판단, DELETE_NEW 뒤 나머지 숨김. replay(삭제 뒤 포함)와 다른 payload 409. 동시 요청: 같은 쌍 다른 key 두 요청, 같은 key 동시 replay, DUP-02 DELETE_EXISTING과 ITEM-05 경합, DUP-02와 existing 재분석 finish 경합, 서로 다른 쌍이 같은 item을 지우는 경합. 잠금 순서로 deadlock이 없어야 한다. owner 격리.
 - **HTTP:** 두 route 공개 조립, 401/400/422/404/409, replay header, 서명 이미지, 취소 전파.
-- **회귀:** 최종 전체 `./gradlew test`. docs의 계약·inventory·순서·이력·INDEX를 갱신하고 C6/B10/B11 인계를 기록한다.
+- **회귀:** 최종 전체 `./gradlew test`. docs의 계약·inventory·순서·이력·INDEX를 갱신하고 C10/B10/B11 인계를 기록한다.
 
 ## 남는 한계(정직한 범위)
 
 - 다른 판매처 탐지는 페이지가 GTIN 또는 brand+MPN을 구조화 데이터로 노출할 때만 된다. 디자인 예시(musinsa vs hoka.com)도 두 페이지가 코드를 노출해야 잡힌다. 출시 평가 때 실제 판매처의 노출률을 측정해야 한다(B11 인계).
 - B9 이전에 저장한 상품은 GTIN·MPN key가 없다. 재분석 전까지 판매처 간 탐지 대상이 아니다. 출시 전이라 backfill하지 않는다(*내 판단*). canonical 기준 탐지는 기존 값으로 된다. 단, 기존 상품끼리의 쌍은 둘 중 하나가 B9 이후 분석을 끝낼 때 생긴다.
-- 화면에서 후보를 어디에 안내할지는 C6 범위다.
+- 화면에서 후보를 어디에 안내할지는 C10 범위다.
