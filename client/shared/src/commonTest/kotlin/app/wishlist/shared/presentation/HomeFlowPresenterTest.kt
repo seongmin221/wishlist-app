@@ -42,9 +42,12 @@ private class RecordingHome(private val fake: HomeRepository) : HomeRepository {
     val calls = mutableListOf<String>()
     var gate: CompletableDeferred<Unit>? = null
     var hold: CompletableDeferred<Unit>? = null
+    /** Fails the read-back of the cards in front of a window (the 100-card pages). */
+    var failFrontPages = false
     override suspend fun summary() = error("not used")
     override suspend fun group(group: HomeActionGroup, cursor: String?, limit: Int): ClientResult<ItemPage> {
         calls += "group:${group.name}:${if (cursor == null) "first" else "next"}:$limit"
+        if (failFrontPages && limit == 100) return ClientResult.Failure(ClientError(ErrorKind.NETWORK))
         gate?.await()
         return fake.group(group, cursor, limit).also { hold?.await() }
     }
@@ -347,6 +350,67 @@ class HomeFlowPresenterTest {
         assertEquals(items[20], p.state.value.current?.item?.id)
         assertEquals(21 to 60, p.counter)
         assertEquals(false, newer in p.ids)
+        p.close()
+    }
+
+    @Test
+    fun foregroundCountsNewerItemsOutsideTheWindow() = runTest {
+        signIn()
+        val items = placeReview(60)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        repeat(30) { p.pass(); advanceUntilIdle() }
+        assertEquals(31 to 60, p.counter)
+        // Saved elsewhere: more than 20 cards in front of the current one, so outside the window.
+        val newer = placeReview(1).single()
+        home.calls.clear()
+        p.foreground()
+        advanceUntilIdle()
+        assertEquals(items[30], p.state.value.current?.item?.id)
+        assertEquals(31 to 60, p.counter)
+        // The cards in front beyond the window are read back once (11 of them in one page of 100).
+        assertEquals(listOf("around:CLASSIFICATION_REVIEW:20:20", "group:CLASSIFICATION_REVIEW:next:100"), home.calls)
+        repeat(29) { p.pass(); advanceUntilIdle() }
+        assertEquals(60 to 60, p.counter)
+        assertEquals(false, newer in p.ids)
+        p.close()
+    }
+
+    @Test
+    fun failedFrontReadBackKeepsTheQueue() = runTest {
+        signIn()
+        val items = placeReview(60)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        repeat(30) { p.pass(); advanceUntilIdle() }
+        placeReview(1)
+        home.failFrontPages = true
+        p.foreground()
+        advanceUntilIdle()
+        // The window still lands; without the read-back this session's ids stand in for the cards in front.
+        assertEquals(HomeFlowPhase.ACTIVE, p.state.value.phase)
+        assertNull(p.state.value.error)
+        assertEquals(items[30], p.state.value.current?.item?.id)
+        assertEquals(31 to 61, p.counter)
+        p.close()
+    }
+
+    @Test
+    fun appendWithoutForegroundKeepsTheTotal() = runTest {
+        signIn()
+        val items = placeReview(60)
+        val p = presenter()
+        p.start(REVIEW, null)
+        advanceUntilIdle()
+        p.pass(); advanceUntilIdle()
+        // Saved elsewhere with no foreground: the next page must not count it in front.
+        placeReview(1)
+        repeat(18) { p.pass(); advanceUntilIdle() }
+        assertEquals("group:CLASSIFICATION_REVIEW:next:20", home.calls.last())
+        assertEquals(items[19], p.state.value.current?.item?.id)
+        assertEquals(20 to 60, p.counter)
         p.close()
     }
 

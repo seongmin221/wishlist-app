@@ -20,6 +20,15 @@ private val FLOW_GROUPS = setOf(HomeActionGroup.CLASSIFICATION_REVIEW, HomeActio
 /** Cards kept ready behind the current one; at this many or fewer left, the next HOME-02 page is read. */
 private const val STACK = 2
 
+/** Page size for reading back the cards in front of a window (HOME-02 allows 1~100). */
+private const val FRONT_PAGE = 100
+
+/** At most this many read-back pages per window; past that the session's ids stand in for the rest. */
+private const val FRONT_PAGES_MAX = 20
+
+/** A window or first page, with the ids in front of it read back page by page (null: not read). */
+private class FlowRead(val page: ItemPage, val frontIds: List<String>?)
+
 /**
  * The home continuous-processing queue over HOME-02 (C7, read only). A session is one flow screen's
  * lifetime: [pass] records a temporary pass in memory (C7 saves nothing; C8 replaces it with the
@@ -33,8 +42,10 @@ private const val STACK = 2
  *   and a fallback newer than the current card means nothing older is left. Passed and skipped cards
  *   never come back.
  * - `total` = passes + cards left, where cards left = `totalCount −` the items in front of the
- *   current card: counted in the window when it has no previous cursor, else this session's passed
- *   and skipped ids. Other devices' changes are corrected on the next read.
+ *   current card. A window with a previous cursor has more in front than it shows: those pages are
+ *   read back so the count is exact (cards saved elsewhere meanwhile included). A next page keeps the
+ *   total (its `totalCount` would count cards saved in front since), and the last page fixes it to
+ *   the cards left. Other devices' changes are corrected on the next foreground or start.
  * - Reads happen only on these intents (and the next page near the end), never on a timer. A failed
  *   first read is [HomeFlowPhase.ERROR] ([retry] repeats it); a failed foreground or next-page read
  *   keeps the queue without a notice, and the next signal reads again.
@@ -107,7 +118,7 @@ class HomeFlowPresenter internal constructor(
             appendJob?.cancel(); appendJob = null
             refreshing = true
             publish()
-            loadJob = request({ if (anchor != null) home.groupAround(g, anchor) else home.group(g) }) { result ->
+            loadJob = request({ read(g, anchor) }) { result ->
                 loadJob = null
                 refreshing = false
                 if (result is ClientResult.Success) rebuild(result.value, keep.item)
@@ -150,7 +161,7 @@ class HomeFlowPresenter internal constructor(
         phase = HomeFlowPhase.LOADING
         error = null
         publish()
-        loadJob = request({ if (anchor != null) home.groupAround(g, anchor) else home.group(g) }) { result ->
+        loadJob = request({ read(g, anchor) }) { result ->
             loadJob = null
             when (result) {
                 is ClientResult.Success -> rebuild(result.value, keep = null)
@@ -172,8 +183,9 @@ class HomeFlowPresenter internal constructor(
                     val known = queue.mapTo(hashSetOf()) { it.item.id }
                     queue = queue + page.items.filter { it.id !in known && seen(it.id).not() }.map { card(it, page) }
                     next = page.nextCursor
-                    // A next page always has items in front: this session's passed and skipped ids stand in for them.
-                    remaining = (page.totalCount - passedIds.size - skippedBefore.size).coerceAtLeast(queue.size)
+                    // Its totalCount also counts cards saved in front since the last window: keep the total,
+                    // and on the last page the queue is exactly what is left.
+                    remaining = if (next == null) queue.size else remaining.coerceAtLeast(queue.size)
                 }
                 is ClientResult.Failure -> if (queue.isEmpty()) fail(result.error) { append() }
             }
@@ -187,21 +199,46 @@ class HomeFlowPresenter internal constructor(
      * started. The cards in front of the start card are behind this session (an anchored start, or
      * cards saved elsewhere since): they join [skippedBefore] so a later page still counts them in front.
      */
-    private fun rebuild(page: ItemPage, keep: WishlistItem?) {
+    private fun rebuild(read: FlowRead, keep: WishlistItem?) {
+        val page = read.page
         val ids = page.items.map { it.id }
         val from = startIndex(page, ids, keep)
-        skippedBefore += ids.take(from).filterNot { it in passedIds }
+        val before = read.frontIds.orEmpty() + ids.take(from)
+        skippedBefore += before.filterNot { it in passedIds }
         queue = page.items.drop(from).filterNot { seen(it.id) }.map { card(it, page) }
         next = page.nextCursor
-        val front = if (page.previousCursor == null) {
-            queue.firstOrNull()?.let { ids.indexOf(it.item.id) } ?: ids.size
-        } else {
-            passedIds.size + skippedBefore.size
+        val inWindow = queue.firstOrNull()?.let { ids.indexOf(it.item.id) } ?: ids.size
+        val front = when {
+            page.previousCursor == null -> inWindow
+            read.frontIds != null -> read.frontIds.size + inWindow
+            // The read-back failed or was cut off: this session's ids stand in for the cards in front.
+            else -> passedIds.size + skippedBefore.size
         }
         remaining = (page.totalCount - front).coerceAtLeast(queue.size)
         phase = HomeFlowPhase.ACTIVE
         error = null
         retryLast = null
+    }
+
+    /**
+     * The window around [anchor] (or the first page), then the pages in front of it while it has a
+     * previous cursor. A failed or overlong read-back leaves [FlowRead.frontIds] null; only the window's
+     * own failure fails the read.
+     */
+    private suspend fun read(g: HomeActionGroup, anchor: String?): ClientResult<FlowRead> {
+        val page = when (val r = if (anchor != null) home.groupAround(g, anchor) else home.group(g)) {
+            is ClientResult.Failure -> return r
+            is ClientResult.Success -> r.value
+        }
+        var cursor = page.previousCursor ?: return ClientResult.Success(FlowRead(page, emptyList()))
+        val front = ArrayDeque<String>()
+        repeat(FRONT_PAGES_MAX) {
+            val back = home.group(g, cursor, FRONT_PAGE) as? ClientResult.Success ?: return ClientResult.Success(FlowRead(page, null))
+            // Newest first, each page newer than the one read before it.
+            back.value.items.asReversed().forEach { front.addFirst(it.id) }
+            cursor = back.value.previousCursor ?: return ClientResult.Success(FlowRead(page, front.toList()))
+        }
+        return ClientResult.Success(FlowRead(page, null))
     }
 
     private fun startIndex(page: ItemPage, ids: List<String>, keep: WishlistItem?): Int {
