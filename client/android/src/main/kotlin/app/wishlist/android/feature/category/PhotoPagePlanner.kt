@@ -1,5 +1,8 @@
 package app.wishlist.android.feature.category
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
@@ -80,6 +83,56 @@ class PhotoPagePlanner(private val timeoutMs: Long = PAGE_TIMEOUT_MS) {
             return (width * scale).toInt().coerceAtLeast(1) to (height * scale).toInt().coerceAtLeast(1)
         }
     }
+}
+
+/**
+ * One layout of a category list: its pages, planner and laid-out ratios. A restart (refresh, another
+ * category, a laid-out card's photo changed) makes a new one, so a page job still running for an older
+ * layout settles and publishes only into that one and never into the layout on screen.
+ */
+internal class PhotoGridLayout(timeoutMs: Long = PhotoPagePlanner.PAGE_TIMEOUT_MS) {
+    private val planner = PhotoPagePlanner(timeoutMs)
+    /** Item ids per page (one ITEM-02 answer each), in list order. */
+    val pages = mutableStateListOf<List<String>>()
+    /** The photo URL each paged card was laid out with. */
+    val photos = mutableMapOf<String, String?>()
+    /** Laid-out ratios as state, so a settled page recomposes the grid (the planner itself is plain). */
+    val ratios = mutableStateMapOf<String, Float>()
+
+    /** Polls page [index] every 100 ms until the planner lays it out, then publishes its ratios. */
+    suspend fun settlePage(index: Int, cards: List<PhotoPagePlanner.Card>, photosNow: () -> Map<String, PhotoPagePlanner.Photo>, elapsedMs: () -> Long) {
+        // In list order: a later page waits for the earlier ones even when its photos came first.
+        while (!planner.settle(index, cards, photosNow(), elapsedMs())) delay(100)
+        cards.forEach { card -> planner.ratioOf(card.id)?.let { ratios[card.id] = it } }
+    }
+}
+
+/**
+ * One list's photo sizes, each tied to the URL it was read from (pure, JVM-tested). Only the latest
+ * [begin] of a card may [finish], so a late answer for a replaced photo (or a cancelled read) is dropped;
+ * [photosFor] gives a layout only sizes of the photos its cards show now.
+ */
+class PhotoMeasurements {
+    private var serial = 0
+    private val latest = mutableMapOf<String, Pair<String?, Int>>()
+    private val measured = mutableMapOf<String, Pair<String?, PhotoPagePlanner.Photo>>()
+
+    /** A read of [id]'s photo at [url]: its token for [finish], or null when that size is already known. */
+    fun begin(id: String, url: String?): Int? {
+        if (id in measured && measured[id]?.first == url) return null
+        latest[id] = url to ++serial
+        return serial
+    }
+
+    /** Records [photo] for [id] if [token] is its latest [begin] (an older read's answer is dropped). */
+    fun finish(id: String, token: Int, photo: PhotoPagePlanner.Photo) {
+        val wanted = latest[id] ?: return
+        if (wanted.second == token) measured[id] = wanted.first to photo
+    }
+
+    /** The sizes of [cards]' current photos (id to photo URL); a size read from another URL is left out. */
+    fun photosFor(cards: Map<String, String?>): Map<String, PhotoPagePlanner.Photo> =
+        cards.mapNotNull { (id, url) -> measured[id]?.takeIf { it.first == url }?.let { id to it.second } }.toMap()
 }
 
 /** Limits one list's photo requests to [PhotoPagePlanner.MAX_CONCURRENT]; a cancelled waiter never starts. */

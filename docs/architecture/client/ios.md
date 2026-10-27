@@ -146,12 +146,31 @@
 - **화면 위치:** `Features/Category/{CategoryHomeScreen,CategoryPager,CategoryListScreen,CategoryFormView,CategoryFormSheet,CategoryFormButtons,CategoryPickerSheet,CategoryOwners,CategoryText,PhotoPagePlan}`. route는 `AppDestination.categoryList(hint)`(탭 바 유지 slide, 계정 범위). 카테고리 탭 루트가 실제 화면이고 release 빈 화면은 목적 탭만 남았다. `DemoCategoryScreen`은 지웠다.
 - **owner:** `WLEntryOwners`가 칸마다 카테고리 owner(첫 화면·목록·폼·선택)를 만들고 닫는다(C4 패턴).
 - **첫 화면:** 레일 + 직접 만든 세로 페이저(드래그 진행값 + 300ms `emphasized` 스냅, 페이지가 화면보다 길면 페이지 안을 먼저 움직임·관성 없음). 첫 페이지 위 당겨서 새로고침은 직접 그린 ProgressView. 로그인 전·빈 탭은 D5·D6.
-- **목록:** 지연 생성 두 열(120개를 다 그리지 않고 화면 밖 카드의 요청 취소). 열 배정은 고정된 사진 비율 + 글 높이 어림. owner가 그 페이지 사진을 미리 받아 크기를 알면 skeleton을 끝낸다(이미지는 로더 캐시에만, owner는 비율만 보관).
+- **목록:** 지연 생성 두 열(120개를 다 그리지 않고 화면 밖 카드의 요청 취소). 열 배정은 고정된 사진 비율 + 글 높이 어림. owner가 그 페이지 사진을 미리 받아 크기를 알면 skeleton을 끝낸다(이미지는 로더 캐시에만, owner는 비율만 보관). `PhotoPagePlan.Item`은 사진 URL을 함께 담아, 배치한 상품의 사진이 바뀌면 배치를 처음부터 다시 한다. 카드도 사진을 받은 URL을 기억해 바뀐 사진을 다시 받는다.
 - **사진 로더(`Platform/RemoteImage.swift`):** `image(for:width:scale:maxPixels:)`가 이미지와 EXIF 적용 원본 크기를 돌려준다. 기다리는 쪽이 모두 취소되면 안쪽 다운로드 Task를 취소한다(`withTaskCancellationHandler`). 로더 전체 허가 6개(`AsyncPermits`)로 실제 받기·디코드를 제한하고, 허가를 기다리다 취소된 요청은 시작하지 않는다. 디코드 픽셀은 열 폭² × 3 이하.
 - **입력:** `WLInput(limitUnit: .codePoint)`. marked text 동안 자르지 않고(`WLInputComposition`), 확정 뒤 상한 안의 마지막 grapheme 경계에서 자른다([QA-CLI-017](../../learning/client/q-and-a/QA-CLI-017-code-point-input-limit.md)).
 - **시트:** `OverlayHost`에 `SheetGuard`(allow/block/confirm)와 footer 영역을 더했다. 폼 시트는 취소·만들기/저장 줄을 footer로 하단에 고정하고 내용만 스크롤한다. 제출 중에는 guard가 막 누르기·끌기·VoiceOver escape를 막고, 주 버튼은 진행 표시("불러오는 중")로 바뀐다(2026-10-15 결정).
 - **DEBUG:** `Debug/SeedImageProtocol.swift`(`seed.wishlist.invalid` `/tall/` 1:4, `/slow/` 5초), launch 인자 `-wl.fake.longCategory <id>`·`-wl.fake.delayCategoryCreate <ms>`·`-wl.fake.editCategoryOnSave <name>`(첫 편집 저장 직전 Fake에서 이름을 바꿔 409 재현), 설정의 개발용 줄(선택 시트 열기, 다른 기기에서 이름 바꾸기).
 - **남은 점:** 소프트웨어 키보드가 올라온 상태의 footer는 시뮬레이터에서 직접 보지 못했다(하드웨어 키보드 연결). VoiceOver로 페이지를 넘기는 길은 레일 버튼뿐이다. IME 조합 중 동작은 기존 `WLInputComposition`에 기대고 자르는 함수만 테스트했다.
+
+## 목적 화면 (C6)
+
+`Features/Purpose`가 KMP Purpose Presenter의 SKIE flow를 구독한다. entry owner가 상세와 편집 폼을 보유하므로 탭 전환·상품 상세 왕복으로 편집 초안이 닫히지 않는다. 그 자리 편집의 뒤로 버튼·가장자리 제스처는 같은 dirty/submitting guard를 사용하고 계정 이탈은 stack과 owner를 해제한다.
+
+`WLHeaderSheet`의 실측 머리 높이·시트 끌기·목록 스크롤을 재사용하며 연속 진행값으로 제목·아이콘 크기와 위치, 설명·버튼 opacity를 바꾼다. 만들기 시트 footer·그 자리 밑줄 입력에 40/200 code point와 IME 조합 보호를 적용한다. C5 사진 배치를 재사용하고 #22의 사진 공유 요소 전환은 포함하지 않는다. 후속 기능의 비활성 진입점은 사용자 답변에 따른다.
+
+[검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
+
+C6 PR #23 후속에서 상세 owner는 목적 탭 선택·entry 최상단·활성 scene 여부를 함께 보고 가려짐→표시 전환에만 머리와 후보를 갱신한다. 처음 로드와 재등장을 구분하며, 동일한 최상단의 재렌더는 갱신하지 않는다. 편집 폼은 갱신 중에도 유지된다. 충돌 후 취소·버리기에서는 복구한 서버 snapshot을 상세에 적용하고 폼을 닫는다.
+
+## 홈·연속 처리·목록 anchor (C7)
+
+- **홈:** `Features/Home`의 `HomeLoggedInView`(분석 대기 → HOME-01 그룹, 첫 실패 재시도·갱신 실패 안내), `HomeTodoCard`(머리 탭은 연속 처리, 화살표 200ms 180° 펼침, 캐러셀 최대 4), `HomePurposeSummary`, 문구 매핑 `HomeTodoText`. `HomeScreen`은 홈 탭 최상단이 보이고 runtime이 준비된 뒤(`purposeUntilReady`, Android `runtime.ready.first`) `appeared()`, 보이는 중 background 복귀에서 `foreground()`를 부른다. 연속 처리 `startOnce`도 준비를 기다린다.
+- **연속 처리:** `Features/Flow`. route 값 `HomeFlowTarget`·entry owner `HomeFlowOwner`(`WLEntryOwners.homeFlow`), `ReviewFlowScreen`·`ReviewCardStack`(`.rotationEffect(anchor: 0.5,0.9)`를 `.offset` 앞에 적용), `FillFlowScreen`, `FlowSummary`, `CardThrowMath`. 넘김은 던지기 시작에 기록하고(Ruling 10) 나가는 카드는 `ReviewFlowScreen`이 들고 있어 마지막 카드가 요약 위로 끝까지 날아간다. 새 파일은 `project.pbxproj`의 `Flow` group에 등록했다(파일 시스템 동기화 group 미사용).
+- **목록 anchor:** `Features/Category/ListAnchor.swift`(`ListAnchorTracker` 순수 로직·`ListAnchorWiring`). 카드가 4초 안에 배치되지 않은 복원은 버린다(Android `RESTORE_WAIT_MS`). 카테고리 목록은 고정 머리 아래, 목적 상세는 `WLHeaderSheet` 안에서 `ScrollViewReader`로 복원한다. 목적 상세 복원은 시뮬레이터에서 확인하지 않았다.
+- DEBUG 전용 launch argument `-wl.c7.screen <state>`가 실제 owner를 몰아 화면 확인 상태를 연다(UI 자동 조작 도구가 없어서).
+
+[구현·검증](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).
 
 ## 카드 사진 → 상세 사진 전환 (C5 PR B)
 

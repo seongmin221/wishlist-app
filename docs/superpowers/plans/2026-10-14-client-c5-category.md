@@ -13,8 +13,7 @@
 ## Global Constraints
 
 - 상태: **확정 v1 (2026-10-14).** 실행 방식: 직접 진행(필요하면 묶음 3·4를 subagent로 병렬). **Android 기기 확인은 사용자 지시(2026-10-14)로 당분간 에뮬레이터 `Medium_Phone_API_36.0`(en-US)로 한다.** 실기기 Flip6 확인은 연결되면 PR 전에 다시 한다.
-- 진행(2026-10-15): **PR B Task 20~23 구현·로컬 검증 완료(`client/c5-photo-transition`, draft PR #22, base `client/c5-category`).** Android unit 227 · XCTest 258(독립 리뷰 반영 뒤), 기기 확인은 에뮬레이터 `emulator-5556`·iPhone 17 Pro 시뮬레이터([PR B 기록](../../history/architecture/client/c5-pr-b-implementation-2026-10-15.md)). 모서리(카드 20 → 상세 0)는 사용자 확인 대기.
-- 진행(2026-10-15): **PR A Task 0~19 구현·로컬 검증 완료(draft PR #21).** Android·iOS 화면은 병렬 worktree에서 만들고 이 브랜치로 가져왔다([PR A 기록](../../history/architecture/client/c5-pr-a-implementation-2026-10-15.md)). PR B(Task 20~23) 남음.
+- 진행(2026-10-15): **PR A Task 0~19 구현·로컬 검증 완료. #21은 2026-10-24 MERGED(`0b95e90`).** Android·iOS 화면은 병렬 worktree에서 만들고 이 브랜치로 가져왔다([PR A 기록](../../history/architecture/client/c5-pr-a-implementation-2026-10-15.md)). PR B #22(Task 20~23)는 Draft OPEN이며 develop 미병합이다. C5 전체 완료가 아니다.
 - 진행(2026-10-14): **Task 0~9 완료(묶음 1·2).** Baseline host 501 · simulator 498 · Android unit 183 · XCTest 211. A1 시점 host 633 · simulator 630 · Android unit 183 · XCTest 214, 실패·skip 0. 묶음 3(Android)부터 진행.
 - 작업 공간 `/Users/user/orca/workspaces/wishlist-app/client-c5-category`, 브랜치 `client/c5-category`(PR A, base `develop`). PR B는 Task 20 시작 때 `client/c5-category` 위에 `client/c5-photo-transition`을 만들고 base를 A로 연다. A merge 뒤 `origin/develop`으로 rebase하고 base를 `develop`으로 바꾼다(D4). 시작 HEAD `3b13232`(origin/develop `e2653f6` + docs 2커밋). merge는 사용자 승인 없이 하지 않는다. 다른 워크스페이스는 수정·삭제하지 않는다. 이슈 #18(웹뷰 순수 로직 shared 이전)은 건드리지 않는다.
 - Kotlin **2.3.21**, Android **API 26+**, iOS **17+**, JDK **17**. 새 의존성 없음(multiplatform-settings 대신 `app_state`, Nuke 없음). 공유 코드에 Compose/SwiftUI 의존성 없음.

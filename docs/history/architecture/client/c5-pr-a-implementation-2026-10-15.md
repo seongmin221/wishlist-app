@@ -1,5 +1,7 @@
 # C5 PR A 구현 기록 (2026-10-15)
 
+> 상태 갱신(2026-10-24): PR A #21 MERGED, merge commit `0b95e90`. PR B #22는 Draft OPEN·develop 미병합이다. C5 전체 완료가 아니며 C6는 #21까지만 포함한 기준에서 진행한다.
+
 > 브랜치 `client/c5-category`(시작 `e2653f6`, origin/develop C4 PR #15·#16 merge 뒤). 설계 [spec](../../../superpowers/specs/2026-10-14-client-c5-category-design.md)(D1~D15)·[plan](../../../superpowers/plans/2026-10-14-client-c5-category.md) Task 0~19, 설계 검토 [기록](c5-category-design-review-2026-10-14.md). PR A는 카테고리 기능 전체이고, 카드 사진 → 상세 공유 요소 전환은 PR B다(D4).
 
 ## 작업 요약
@@ -83,3 +85,19 @@ Android는 사용자 지시로 실기기 대신 에뮬레이터(Pixel_5 API 30, 
 고치지 않은 것: **목록 페이지가 캐시 쓰기를 기다림.** 40개를 한 transaction에 쓰는 짧은 작업이고, 기다리지 않으면 캐시 쓰기와 다음 상세 GET 쓰기의 순서가 보장되지 않는다.
 
 검증: shared Android host 635 · iOS simulator 632, Android unit debug·release 212, iOS XCTest 244(실패·skip 0), assemble·lint(0 errors, 경고 27)·`linkReleaseFrameworkIosArm64`·iOS Release simulator build·`gen_tokens --check` 통과.
+
+## PR 리뷰 반영(2026-10-24, PR #21)
+
+5건 모두 고쳤다.
+
+- **Android 여러 페이지를 읽은 뒤 새로고침하면 skeleton이 남음:** 목록이 다시 시작될 때 세대 값을 올리고, 페이지 배치 작업의 `key`·`LaunchedEffect` 인자에 넣는다. 첫 페이지의 id·순서가 같아도 배치 작업을 다시 시작한다.
+- **iOS 계정 복원이 늦으면 첫 조회 오류가 남음:** 카테고리 첫 화면은 `runtime.ready`가 true가 된 뒤 `loadOnce()`한다(Android와 같은 규칙).
+- **iOS 시트가 열리는 중 계정을 떠나면 시트가 남음:** `OverlayHostState.dismissAllWhenSettled()`로 열리는 중이면 한 프레임씩 기다렸다 모두 닫는다. 같은 로직을 쓰던 로컬 제출 상세도 이 함수를 쓴다.
+- **iOS 사진 URL이 바뀌어도 이전 사진을 표시함:** 카드가 사진을 받은 URL을 기억하고, URL이 바뀌면 새 사진을 받고 없어지면 사진을 지운다.
+- **Fake ITEM-02 cursor가 밀리초로 잘려 다음 페이지 상품이 빠짐:** cursor에 `createdAt`의 전체 Instant 문자열을 담는다(`fake2:`). 같은 `.123456Z` 시각의 상품 41개가 40·1로 나뉘는 테스트를 더했고, 고치기 전 코드에서는 40·0으로 실패하는 것을 확인했다.
+
+- **(추가) 사진 URL이 바뀌어도 이전 비율로 배치됨:** 위 iOS 카드 수정은 사진만 바꾸고 칸 비율은 그대로였다. 두 플랫폼 모두 배치한 상품의 사진 URL이 바뀌거나 없어지면 배치를 처음부터 다시 한다(iOS `PhotoPagePlan.Item.photo`, Android `restartsLayout`). Android는 측정 결과를 URL과 측정 순번에 묶는다(`PhotoMeasurements`). 그 카드의 마지막 측정만 결과를 남기고, 배치는 현재 사진 URL에서 잰 크기만 읽는다. 처음에는 바뀐 사진의 결과만 지웠는데, 진행 중이던 이전 사진의 측정이 새 배치 뒤에 끝나 잘못된 비율이 고정되는 경쟁이 추가 리뷰에서 나와 이렇게 바꿨다. 이어서 이전 페이지 작업이 초기화된 같은 planner에 옛 사진 크기로 배치를 확정하는 경쟁도 나왔다. 그래서 세대 값 대신 배치 상태 전체(페이지·planner·비율)를 `PhotoGridLayout` 하나로 묶고 다시 시작할 때마다 새로 만든다. 이전 작업은 자기 묶음에만 쓸 수 있다. 결정은 [decisions.md](../../../design/decisions.md)에 더했다. 100×400 → 400×100 변경 뒤 비율 0.25를 확인하는 iOS 테스트와 Android `restartsLayout` 테스트를 더했다.
+
+Android 세대 값 수정은 Compose UI 테스트 기반이 없어 테스트를 더하지 않았다.
+
+검증: shared Android host 636, Android unit debug 216(실패 0)·lintDebug(0 errors, 경고 27), iOS XCTest 245, `:android:compileDebugKotlin`·iOS Debug build 통과. iOS XCTest는 `WLTypographyTests.testMultilineTextReadsAsOneStaticText` 1건이 실패하며, 이번 변경 전 커밋에서도 같은 시뮬레이터에서 같은 결과라 이번 수정과 무관하다.

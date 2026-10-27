@@ -60,5 +60,8 @@ internal class ScriptedCategories : CategoryRepository {
 
 internal class ScriptedItemList : ItemListRepository {
     val pages = Script<ItemPage> { ok(ItemPage(emptyList(), 0, null)) }
+    val windows = Script<ItemPage> { ok(ItemPage(emptyList(), 0, null)) }
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int) = pages.next(categoryId to cursor)
+    override suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int, after: Int) =
+        windows.next(listOf(categoryId, anchor, before, after))
 }

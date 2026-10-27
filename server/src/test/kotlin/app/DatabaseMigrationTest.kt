@@ -51,7 +51,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"), versions)
                     }
                 }
             }
@@ -308,8 +308,8 @@ class DatabaseMigrationTest {
                 }
                 val before = listOf("wishlist_items", "analysis_jobs").associateWith { snapshot(connection, it, emptyList()) }
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
-                assertEquals(before["wishlist_items"], snapshot(connection, "wishlist_items", listOf("media_asset_id")))
-                assertEquals(before["analysis_jobs"], snapshot(connection, "analysis_jobs", emptyList()))
+                assertEquals(before["wishlist_items"], snapshot(connection, "wishlist_items", listOf("media_asset_id") + V22_ITEM_COLUMNS))
+                assertEquals(before["analysis_jobs"], snapshot(connection, "analysis_jobs", V22_JOB_COLUMNS))
                 connection.createStatement().use { s ->
                     s.executeQuery("select media_asset_id from wishlist_items").use { r -> assertTrue(r.next()); assertNull(r.getObject(1)) }
                     s.executeQuery("select count(*) from media_assets").use { r -> assertTrue(r.next()); assertEquals(0, r.getInt(1)) }
@@ -372,11 +372,135 @@ class DatabaseMigrationTest {
         }
     }
 
+    @Test fun `V19 upgrade keeps V18 receipts and limits receipts to one owned target`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("18").load().migrate()
+            database.createConnection("").use { c ->
+                val owner = UUID.randomUUID(); val other = UUID.randomUUID()
+                fun exec(sql: String) = c.createStatement().use { it.executeUpdate(sql) }
+                exec("insert into app_users(id) values ('$owner'),('$other')")
+                fun item(ownerId: UUID): UUID = UUID.randomUUID().also { id ->
+                    exec("""insert into wishlist_items(id,owner_id,client_submission_id,source_url,analysis_status,lifecycle_status,current_generation)
+                        values ('$id','$ownerId','${UUID.randomUUID()}','https://example.com/$id','FAILED_RETRYABLE','ACTIVE',1)""")
+                }
+                val category = UUID.randomUUID(); val purpose = UUID.randomUUID()
+                exec("""insert into custom_categories(id,owner_id,parent_id,name,normalized_name,display_order)
+                    select '$category','$owner',id,'내 카테고리','내 카테고리',1 from public_category_groups order by id limit 1""")
+                exec("""insert into purposes(id,owner_id,name,color_key,icon_key,activity_at) values ('$purpose','$owner','목적','CORAL','HEART',clock_timestamp())""")
+                exec("""insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,category_id)
+                    values ('$owner','CREATE_CUSTOM_CATEGORY','${UUID.randomUUID()}','${"a".repeat(64)}','$category')""")
+                exec("""insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,purpose_id)
+                    values ('$owner','CREATE_PURPOSE','${UUID.randomUUID()}','${"b".repeat(64)}','$purpose')""")
+                val mine = item(owner); val foreign = item(other)
+                fun receipts() = c.createStatement().use { s ->
+                    s.executeQuery("select (to_jsonb(t) - 'wishlist_item_id')::text from mutation_receipts t order by operation").use { r ->
+                        buildList { while (r.next()) add(r.getString(1)) }
+                    }
+                }
+                val before = receipts()
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                assertEquals(before, receipts())
+                fun itemReceipt(target: String, extra: String = "", values: String = "") =
+                    """insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,wishlist_item_id$extra)
+                        values ('$owner','REANALYZE_WISHLIST_ITEM','${UUID.randomUUID()}','${"c".repeat(64)}',$target$values)"""
+                assertEquals(1, exec(itemReceipt("'$mine'")))
+                val rejected = listOf(
+                    itemReceipt("'$foreign'"),
+                    itemReceipt("'${UUID.randomUUID()}'"),
+                    itemReceipt("null"),
+                    itemReceipt("'$mine'", ",purpose_id", ",'$purpose'"),
+                    itemReceipt("'$mine'", ",category_id", ",'$category'"),
+                )
+                for (sql in rejected) assertFailsWith<SQLException>(sql) { exec(sql) }
+                c.createStatement().use { s ->
+                    s.executeQuery("select count(*) from pg_constraint where conname='wishlist_items_owner_id_unique'").use { r ->
+                        assertTrue(r.next()); assertEquals(1, r.getInt(1))
+                    }
+                }
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
+    @Test fun `V20 upgrade keeps V19 receipts and adds owner scoped candidate move receipts`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("19").load().migrate()
+            database.createConnection("").use { c ->
+                val owner = UUID.randomUUID(); val other = UUID.randomUUID()
+                fun exec(sql: String) = c.createStatement().use { it.executeUpdate(sql) }
+                exec("insert into app_users(id) values ('$owner'),('$other')")
+                val purpose = UUID.randomUUID(); val foreignPurpose = UUID.randomUUID()
+                exec("""insert into purposes(id,owner_id,name,color_key,icon_key,activity_at) values ('$purpose','$owner','목적','CORAL','HEART',clock_timestamp()),
+                    ('$foreignPurpose','$other','남의 목적','CORAL','HEART',clock_timestamp())""")
+                exec("""insert into mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,purpose_id)
+                    values ('$owner','CREATE_PURPOSE','${UUID.randomUUID()}','${"b".repeat(64)}','$purpose')""")
+                fun receipts() = c.createStatement().use { s ->
+                    s.executeQuery("select to_jsonb(t)::text from mutation_receipts t order by operation").use { r -> buildList { while (r.next()) add(r.getString(1)) } }
+                }
+                val before = receipts()
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                assertEquals(before, receipts())
+                val key = UUID.randomUUID()
+                fun receipt(ownerId: Any, target: Any, k: UUID = UUID.randomUUID(), result: String = "'{\"schema\":1}'") =
+                    """insert into candidate_mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,purpose_id,result_json)
+                        values ('$ownerId','MOVE_CANDIDATES','$k','${"c".repeat(64)}','$target',$result)"""
+                assertEquals(1, exec(receipt(owner, purpose, key)))
+                for (sql in listOf(receipt(owner, purpose, key), receipt(owner, foreignPurpose), receipt(UUID.randomUUID(), purpose),
+                    receipt(owner, purpose, result = "null"), receipt(owner, purpose, result = "'not json'"))) {
+                    assertFailsWith<SQLException>(sql) { exec(sql) }
+                }
+                assertEquals(1, exec(receipt(other, foreignPurpose, key)), "keys are scoped by owner")
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
+    @Test fun `V21 upgrade keeps V20 receipts and adds one owner scoped deletion receipt per resource`() {
+        PostgresTestContainer().use { database ->
+            database.start()
+            DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).target("20").load().migrate()
+            database.createConnection("").use { c ->
+                val owner = UUID.randomUUID(); val purpose = UUID.randomUUID()
+                fun exec(sql: String) = c.createStatement().use { it.executeUpdate(sql) }
+                exec("insert into app_users(id) values ('$owner')")
+                exec("insert into purposes(id,owner_id,name,color_key,icon_key,activity_at) values ('$purpose','$owner','목적','CORAL','HEART',clock_timestamp())")
+                exec("""insert into candidate_mutation_receipts(owner_id,operation,idempotency_key,request_fingerprint,purpose_id,result_json)
+                    values ('$owner','MOVE_CANDIDATES','${UUID.randomUUID()}','${"c".repeat(64)}','$purpose','{"schema":1}')""")
+                fun receipts() = c.createStatement().use { s ->
+                    s.executeQuery("select to_jsonb(t)::text from candidate_mutation_receipts t").use { r -> buildList { while (r.next()) add(r.getString(1)) } }
+                }
+                val before = receipts()
+                DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
+                assertEquals(before, receipts())
+                val resource = UUID.randomUUID()
+                fun receipt(ownerId: Any = owner, kind: String = "CATEGORY", id: UUID = resource, version: Int = 1, token: String = "a".repeat(64)) =
+                    """insert into structure_deletion_receipts(owner_id,kind,resource_id,expected_version,impact_token)
+                        values ('$ownerId','$kind','$id',$version,'$token')"""
+                assertEquals(1, exec(receipt()))
+                assertEquals(1, exec(receipt(kind = "PURPOSE")), "kinds are separate")
+                for (sql in listOf(receipt(), receipt(ownerId = UUID.randomUUID(), id = UUID.randomUUID()), receipt(kind = "ITEM", id = UUID.randomUUID()),
+                    receipt(id = UUID.randomUUID(), version = 0), receipt(id = UUID.randomUUID(), token = "A".repeat(64)),
+                    receipt(id = UUID.randomUUID(), token = "a".repeat(63)))) {
+                    assertFailsWith<SQLException>(sql) { exec(sql) }
+                }
+                DatabaseFactory.migrationConfiguration(database.jdbcUrl, database.username, database.password).load().validate()
+            }
+        }
+    }
+
     private companion object {
+        /** B9a identity and cache provenance; existing rows keep them null. */
+        val V22_ITEM_COLUMNS = listOf("normalized_source_url", "product_gtin", "product_mpn_key", "product_cache_id")
+        val V22_JOB_COLUMNS = listOf("pending_gtin", "pending_mpn_key", "pending_checked_at", "pending_product_cache_id")
+
         /** Columns added by V17 and later; older upgrade snapshots ignore them. */
         val LATER_COLUMNS = mapOf(
-            "wishlist_items" to listOf("product_brand", "product_price", "product_currency", "merchant_name", "metadata_checked_at", "media_asset_id"),
-            "analysis_jobs" to listOf("pending_brand", "pending_price", "pending_currency", "pending_merchant", "recovery_seq", "recovery_check_at"),
+            "wishlist_items" to listOf("product_brand", "product_price", "product_currency", "merchant_name", "metadata_checked_at", "media_asset_id")
+                + V22_ITEM_COLUMNS,
+            "analysis_jobs" to listOf("pending_brand", "pending_price", "pending_currency", "pending_merchant", "recovery_seq", "recovery_check_at")
+                + V22_JOB_COLUMNS,
             "outbox_events" to listOf("not_before"),
         )
     }

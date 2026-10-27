@@ -23,6 +23,10 @@ object WishlistItemViewMapper {
             requiredAction = policy.requiredAction, allowedActions = policy.allowedActions,
             manualCompletionAt = state.manualCompletionAt?.toString(), clientCreatedAt = item.clientCreatedAt?.toString(),
             createdAt = item.createdAt.toString(), updatedAt = item.updatedAt.toString(),
+            deletionImpact = item.deletionImpact?.let { impact ->
+                DeletionImpactDto(impact.purpose?.let { PurposeImpactDto(it.id.toString(), it.name, it.candidateCount, it.candidateCount - 1) })
+            },
+            duplicateCandidates = item.duplicateCounts?.let { DuplicateCountsDto(it.match, it.sameUrl, it.awaitingAnalysis) },
         )
     }
 

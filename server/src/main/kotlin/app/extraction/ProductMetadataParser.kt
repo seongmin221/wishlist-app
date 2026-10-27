@@ -12,11 +12,13 @@ import org.jsoup.nodes.Document
 data class ParsedProduct(
     val title: String?, val description: String?, val imageUrl: String?, val brand: String?,
     val price: BigDecimal?, val currency: String?, val merchant: String?, val declaredCanonical: String?,
+    val gtin: String? = null, val mpnKey: String? = null,
 )
 
 /** Reads structured product facts only; no heuristics or AI guesses for brand, price or merchant. */
 object ProductMetadataParser {
     private const val MAX_LABEL_LENGTH = 200
+    private val GTIN_KEYS = listOf("gtin", "gtin8", "gtin12", "gtin13", "gtin14")
     private val AMOUNT = Regex("""^\d{1,15}(\.\d{1,4})?$""")
     private val CURRENCIES = Currency.getAvailableCurrencies().map { it.currencyCode }.toSet()
 
@@ -36,14 +38,24 @@ object ProductMetadataParser {
             else validPrice(meta(document, "product:price:amount"), meta(document, "product:price:currency"))
         val brand = if (ambiguous) null else label(brandName(product?.get("brand")) ?: meta(document, "product:brand"))
         val seller = offers.firstNotNullOfOrNull { offer -> brandName(offer["seller"]) }
+        // Variant pages repeat one name per option: an identifier stands for the page only when every node,
+        // unnamed ones included, has a valid one and they agree. A node without one may be a different option,
+        // so a node uses only its own brand; the page-level brand fallback applies to a single node alone.
+        val gtin = if (ambiguous) null else agreed(products) { node -> ProductIdentifiers.gtin(GTIN_KEYS.flatMap { amounts(node[it]) }) }
+        val mpnBrand = { node: JsonObject -> if (products.size == 1) brand else label(brandName(node["brand"])) }
+        val mpnKey = if (ambiguous) null else agreed(products) { node -> ProductIdentifiers.mpnKey(mpnBrand(node), text(node["mpn"])) }
         return ParsedProduct(
             title = title, description = description, imageUrl = image, brand = brand,
             price = price?.first, currency = price?.second,
             merchant = label(seller ?: meta(document, "og:site_name")),
             declaredCanonical = document.selectFirst("link[rel=canonical]")?.attr("href")?.takeIf { it.isNotBlank() }
                 ?: meta(document, "og:url"),
+            gtin = gtin, mpnKey = mpnKey,
         )
     }
+
+    private fun agreed(nodes: List<JsonObject>, read: (JsonObject) -> String?): String? =
+        nodes.map { read(it) ?: return null }.distinct().singleOrNull()
 
     private fun collectProducts(element: JsonElement): List<JsonObject> = when (element) {
         is JsonArray -> element.flatMap(::collectProducts)
@@ -90,6 +102,12 @@ object ProductMetadataParser {
     /** Prices may be JSON numbers or strings; null and booleans are not amounts. */
     private fun amount(element: JsonElement?): String? =
         (element as? JsonPrimitive)?.takeUnless { it is kotlinx.serialization.json.JsonNull }?.content?.trim()?.takeIf { it.isNotEmpty() }
+
+    /** Identifier values may be strings, numbers or arrays of either. */
+    private fun amounts(element: JsonElement?): List<String> = when (element) {
+        is JsonArray -> element.flatMap(::amounts)
+        else -> listOfNotNull(amount(element))
+    }
 
     private fun meta(document: Document, property: String): String? =
         document.selectFirst("meta[property=$property]")?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }

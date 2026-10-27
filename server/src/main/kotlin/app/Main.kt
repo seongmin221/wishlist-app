@@ -30,6 +30,8 @@ import app.wishlist.CreateWishlistItemService
 import app.wishlist.WishlistReadService
 import app.home.HomeReadService
 import app.wishlist.GetWishlistItemService
+import app.wishlist.ItemMutationService
+import app.wishlist.ReanalysisService
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.tasks.v2.CloudTasksClient
 import com.google.firebase.FirebaseApp
@@ -138,11 +140,14 @@ fun Route.apiRoutes(source: DataSource, dispatchAfterCommit: (UUID) -> Unit, med
     val readService = WishlistReadService(source)
     mediaRoutes(media, resolve)
     wishlistRoutes(CreateWishlistItemService(source, dispatchAfterCommit), GetWishlistItemService(source), media.signer, resolve)
+    wishlistItemMutationRoutes(ItemMutationHandlers.of(ItemMutationService(source), ReanalysisService(source, dispatchAfterCommit)), media.signer, resolve)
     wishlistReadRoutes(readService, media.signer, resolve)
     homeActionRoutes(readService, media.signer, resolve)
     homeSummaryRoutes(HomeReadService(source), media.signer, resolve)
     categoryRoutes(CategoryService(source), resolve)
     purposeRoutes(PurposeService(source), media.signer, resolve)
+    candidateRoutes(CandidateHandlers.of(source), media.signer, resolve)
+    duplicateRoutes(DuplicateHandlers.of(source), media.signer, resolve)
 }
 
 private fun openMediaStorage(config: MediaStorageConfig, resources: RuntimeResources): MediaStorage = when (config) {

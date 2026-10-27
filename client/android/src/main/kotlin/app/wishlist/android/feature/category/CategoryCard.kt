@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -74,9 +73,9 @@ import coil3.size.Scale
  * decoded to fit the column width × 3 column widths (ratio kept, [PhotoPagePlanner.decodeBox]). The
  * answer's pixel size gives the card ratio; the request is the same one the card draws, so the card
  * reads it from Coil's memory cache. A failed or missing photo is [PhotoPagePlanner.Photo.Failed]. The
- * sizes go to the list entry's [CategoryGridLayout.photos] (they outlive the composition).
+ * sizes are the list entry's [CategoryGridState.sizes] (they outlive the composition).
  */
-internal class CategoryPhotoBook(private val context: Context, private val photos: MutableMap<String, PhotoPagePlanner.Photo>) {
+internal class CategoryPhotoBook(private val context: Context, private val sizes: PhotoMeasurements) {
     private val gate = PhotoRequestGate()
 
     fun request(url: String, columnWidthPx: Int): ImageRequest {
@@ -84,18 +83,35 @@ internal class CategoryPhotoBook(private val context: Context, private val photo
         return ImageRequest.Builder(context).data(url).size(w, h).scale(Scale.FIT).precision(Precision.EXACT).build()
     }
 
-    /** Reads [item]'s photo size (once). Runs in the caller's scope: leaving the screen cancels it. */
+    /** The known sizes of [items]' current photos (a size read from a replaced photo URL is left out). */
+    fun photosFor(items: List<WishlistItem>): Map<String, PhotoPagePlanner.Photo> =
+        sizes.photosFor(items.associate { it.id to categoryPhotoUrl(it) })
+
+    /** Reads [item]'s photo size (once per photo URL). Runs in the caller's scope: leaving the screen cancels it. */
     suspend fun measure(item: WishlistItem, columnWidthPx: Int) {
-        if (item.id in photos) return
-        val url = (photoSourceFor(item.product.imageUrl) as? PhotoSource.Remote)?.url
+        val url = categoryPhotoUrl(item)
+        val token = sizes.begin(item.id, url) ?: return
         if (url == null) {
-            photos[item.id] = PhotoPagePlanner.Photo.Failed
+            sizes.finish(item.id, token, PhotoPagePlanner.Photo.Failed)
             return
         }
         val result = gate.run { SingletonImageLoader.get(context).execute(request(url, columnWidthPx)) }
-        photos[item.id] = (result as? SuccessResult)?.image?.let { PhotoPagePlanner.Photo.Sized(it.width, it.height) }
-            ?: PhotoPagePlanner.Photo.Failed
+        sizes.finish(item.id, token, (result as? SuccessResult)?.image?.let { PhotoPagePlanner.Photo.Sized(it.width, it.height) }
+            ?: PhotoPagePlanner.Photo.Failed)
     }
+}
+
+/** The card's remote photo URL (null: drawn as the placeholder). */
+internal fun categoryPhotoUrl(item: WishlistItem): String? = (photoSourceFor(item.product.imageUrl) as? PhotoSource.Remote)?.url
+
+/**
+ * Whether the grid starts its layout over for [ids]/[photoUrls] after laying out [known] with [knownPhotos]:
+ * the list no longer starts with the known ids (a refresh, another category) or a known card's photo changed.
+ */
+internal fun restartsLayout(known: List<String>, knownPhotos: Map<String, String?>, ids: List<String>, photoUrls: Map<String, String?>): Boolean {
+    if (known.isEmpty()) return false
+    if (ids.size < known.size || ids.take(known.size) != known) return true
+    return known.any { knownPhotos[it] != photoUrls[it] }
 }
 
 private val PhotoShape = RoundedCornerShape(WishlistTokens.Radius.m)
@@ -106,7 +122,7 @@ internal data class ShownPhoto(val image: Image, val memoryCacheKey: MemoryCache
 /**
  * 사진 상품 카드(FCategoryList): 사진(모서리 20, [ratio] = 높이/폭) + 8 + 이름 14 · 4 · 가격 18/700(없으면 숨김) · 4 ·
  * 목적 점 + "목적 이름 · N일 전 확인"(D8; 확인 시각이 없으면 목적만). 미확정 검토는 사진 왼쪽 위 ✳(D13).
- * 사진 칸은 [sourceKey]로 상세 사진과 이어지는 공유 요소다(C5 PR B). 누르면 지금 그리는 사진을 [onClick]으로 넘기고,
+ * [sourceKey]가 있으면 사진 칸은 상세 사진과 이어지는 공유 요소다(C5 PR B, 카테고리 목록만). 누르면 지금 그리는 사진을 [onClick]으로 넘기고,
  * 그 상세가 뒤로 떠나는 동안에는 상세가 그리던 사진([PhotoHandoff.reverseFor])을 먼저 그린다.
  */
 @Composable
@@ -116,13 +132,15 @@ internal fun CategoryCard(
     meta: CardMetaLine,
     unconfirmed: Boolean,
     photoRequest: ImageRequest?,
-    sourceKey: String,
     onClick: (ShownPhoto?) -> Unit,
+    merchantMeta: Boolean = false,
+    title: String = item.product.name.orEmpty(),
+    sourceKey: String? = null,
 ) {
     val c = LocalWLColors.current
     val unconfirmedLabel = stringResource(R.string.category_card_unconfirmed)
     var shown by remember(photoRequest) { mutableStateOf<ShownPhoto?>(null) }
-    val reverse = reversePhoto(sourceKey)
+    val reverse = sourceKey?.let { reversePhoto(it) }
     Column(
         Modifier.fillMaxWidth().clickable(role = Role.Button) { onClick(shown) },
         verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8),
@@ -131,7 +149,8 @@ internal fun CategoryCard(
         val corner = if (reverse != null) {
             photoCorner(atRest = WishlistTokens.Radius.m, entering = 0.dp, millis = Motion.pushPhotoBack)
         } else WishlistTokens.Radius.m
-        Box(Modifier.fillMaxWidth().aspectRatio(1f / ratio).wlSharedPhoto(sourceKey, corner)) {
+        val photoBox = Modifier.fillMaxWidth().aspectRatio(1f / ratio)
+        Box(if (sourceKey != null) photoBox.wlSharedPhoto(sourceKey, corner) else photoBox.clip(PhotoShape)) {
             if (photoRequest != null) {
                 ProductPhotoRequest(photoRequest, Modifier.fillMaxSize()) { shown = it }
             } else {
@@ -154,16 +173,16 @@ internal fun CategoryCard(
             }
         }
         Column(Modifier.padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4)) {
-            WLText(keepAllBreaks(item.product.name.orEmpty()), WLType.body)
+            WLText(keepAllBreaks(title), WLType.body)
             PriceText(item.product.price?.canonical, item.product.currency)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val purpose = meta.purpose
-                if (purpose is PurposeLabel.Named) {
+                if (!merchantMeta && purpose is PurposeLabel.Named) {
                     val color = DetailText.purposeColor(purpose.colorKey)
                     if (color != null) PurposeDot(color) else Box(Modifier.size(10.dp).background(c.textSecondary, CircleShape))
                 }
-                val purposeText = CategoryText.purposePart(meta)?.let { stringResource(it) } ?: (purpose as PurposeLabel.Named).name
-                val text = CategoryText.checkedPart(meta)?.let { "$purposeText · ${it.resolve()}" } ?: purposeText
+                val purposeText = if (merchantMeta) item.product.merchant.orEmpty() else CategoryText.purposePart(meta)?.let { stringResource(it) } ?: (purpose as PurposeLabel.Named).name
+                val text = CategoryText.checkedPart(meta)?.let { listOf(purposeText, it.resolve()).filter(String::isNotEmpty).joinToString(" · ") } ?: purposeText
                 WLText(text, WLType.label, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

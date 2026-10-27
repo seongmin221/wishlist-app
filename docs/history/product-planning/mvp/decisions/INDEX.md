@@ -24,6 +24,7 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 
 ## 상품 확인과 편집
 
+- [B7 상품 사용자 변경](b7-item-mutation-policy-2026-10-14.md) — 확정 · 2026-10-14 · 상품명·브랜드 200자·편집 취소 뒤 category 유지·편집의 검토 상태·사진 해제 시 외부 이미지 복귀·PATCH 범위·재분석 60초 10건·owner 잠금 유지
 - [B6 사용자 이미지 업로드](b6-media-upload-policy-2026-10-12.md) — 제품·운영 정책 확정 · JPEG 5MiB·긴 변 2048·signed PUT·15분 intent·24시간 미참조 정리·1시간 읽기 URL·외부 이미지 URL 보관·APP0·APP2 ICC·APP14 외 segment 거절·PENDING 10개
 - [B4 상품 목록과 홈 조회](b4-read-api-policy-2026-10-07.md) — 제품 정책 확정 · 홈 목적 3개·빈 목적 포함·restart·목록 기준 category count·별도 할 일 합계 없음
 - [상품 정보 직접 보완의 완료 기준](manual-completion.md) — 확정 · 2026-09-10
@@ -33,3 +34,5 @@ MVP 사용자 흐름별 제품 결정과 당시의 판단 근거를 모은다. �
 ## 구매 결정 마무리
 
 - [아카이브와 삭제 안전장치](archive-delete-safeguards.md) — 확정 · 2026-09-05
+- [B8 후보 이동과 삭제 정책](b8-candidate-move-deletion-policy-2026-10-24.md) — 확정 · 2026-10-24
+- [B9 중복 후보 정책](b9-duplicate-resolution-policy-2026-10-24.md) — 확정 · 2026-10-24 · 판매처 간 식별 코드·쌍별 판단·검토 밖 후보 저장

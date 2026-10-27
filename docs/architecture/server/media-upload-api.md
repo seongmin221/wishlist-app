@@ -4,7 +4,7 @@
 
 ## 적용 범위
 
-Firebase 인증 owner가 사진 보관함에서 고른 사진을 private 저장소에 직접 올리고, 검증된 READY `mediaId`를 받는 계약이다. 상품에 연결하는 ITEM-04·07은 B7, archive snapshot 참조는 B10이다. 실제 bucket·signBlob 권한·URL 만료는 B11에서 확인한다. 결정은 [B6 제품·운영 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md), 설계 근거는 [B6 spec](../../superpowers/specs/2026-10-12-b6-media-upload-design.md)에 있다.
+Firebase 인증 owner가 사진 보관함에서 고른 사진을 private 저장소에 직접 올리고, 검증된 READY `mediaId`를 받는 계약이다. 상품 연결은 B7의 ITEM-04·07([상품 사용자 변경 계약](wishlist-item-mutation-api.md))이 하고, archive snapshot 참조는 B10이다. 실제 bucket·signBlob 권한·URL 만료는 B11에서 확인한다. 결정은 [B6 제품·운영 결정](../../history/product-planning/mvp/decisions/b6-media-upload-policy-2026-10-12.md), 설계 근거는 [B6 spec](../../superpowers/specs/2026-10-12-b6-media-upload-design.md)에 있다.
 
 ## 흐름
 
@@ -13,7 +13,7 @@ Firebase 인증 owner가 사진 보관함에서 고른 사진을 private 저장�
   → MEDIA-01 POST /v1/media/upload-intents   (mediaId + 15분 signed PUT)
   → PUT upload.url (받은 headers 그대로)
   → MEDIA-02 POST /v1/media/{id}/completion  (READY + 표시 URL)
-  → (B7) ITEM-04/07에 mediaId 연결
+  → ITEM-04/07에 mediaId 연결 (B7: owner → 상품 → media for update, READY·미사용 확인)
 ```
 
 ## 한도
@@ -96,4 +96,4 @@ ITEM-01 생성·재전송, ITEM-02, ITEM-03, HOME-01 `actionGroups[].previews`·
 
 ## 정리 (OPS-01 `media` 단계)
 
-만료 PENDING, FAILED, 상품(ACTIVE·ARCHIVED, 또는 바뀐 지 24시간이 안 된 DELETED)이 참조하지 않는 READY를 참조가 없어진 때(`unreferenced_since`)부터 24시간 뒤 지운다. `unreferenced_since`는 READY가 될 때 기록되고, 상품에 연결된 동안은 null이라 정리 index에 들어가지 않는다(B7이 연결 때 null, 해제·삭제 때 현재 시각으로 둔다). 행은 `DELETED` tombstone으로 남아 멱등 key가 계속 410을 돌려준다. 삭제 실패는 2분 lease 뒤 재시도한다. 남은 시간에 저장소 호출 하나(5초)가 들어가지 않으면 후보를 시작하지 않는다. 앞 단계가 시간을 다 써 media 단계를 건너뛰면 실패가 아니라 report의 `deferredSteps`에 기록되고 500을 내지 않는다. report에 `mediaDeleted`, `mediaDeleteFailed`를 더했다.
+만료 PENDING, FAILED, 상품(ACTIVE·ARCHIVED, 또는 바뀐 지 24시간이 안 된 DELETED)이 참조하지 않는 READY를 참조가 없어진 때(`unreferenced_since`)부터 24시간 뒤 지운다. `unreferenced_since`는 READY가 될 때 기록되고, 상품에 연결된 동안은 null이라 정리 index에 들어가지 않는다(B7이 연결 때 null, 해제·교체·상품 삭제 때 현재 시각으로 둔다. 사진을 해제하면 상품은 분석으로 얻은 외부 이미지로 돌아간다). 행은 `DELETED` tombstone으로 남아 멱등 key가 계속 410을 돌려준다. 삭제 실패는 2분 lease 뒤 재시도한다. 남은 시간에 저장소 호출 하나(5초)가 들어가지 않으면 후보를 시작하지 않는다. 앞 단계가 시간을 다 써 media 단계를 건너뛰면 실패가 아니라 report의 `deferredSteps`에 기록되고 500을 내지 않는다. report에 `mediaDeleted`, `mediaDeleteFailed`를 더했다.

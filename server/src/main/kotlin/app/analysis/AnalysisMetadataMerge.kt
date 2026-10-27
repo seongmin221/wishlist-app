@@ -3,17 +3,22 @@ package app.analysis
 import java.math.BigDecimal
 import java.sql.Connection
 import java.sql.Types
+import java.time.Instant
 import java.util.UUID
 
 internal data class StoredMetadata(
     val name: String?, val description: String?, val image: String?, val canonical: String?,
     val brand: String?, val merchant: String?, val price: BigDecimal?, val currency: String?,
     val nameSource: String?, val imageSource: String?, val overrides: Set<String>,
+    val gtin: String? = null, val mpnKey: String? = null, val productCacheId: String? = null,
 )
 
 internal data class PendingMetadata(
     val name: String?, val description: String?, val image: String?, val canonical: String?,
     val brand: String?, val merchant: String?, val price: BigDecimal?, val currency: String?,
+    val gtin: String? = null, val mpnKey: String? = null,
+    /** Set only for a cache copy: the cache row and the time its facts were read. */
+    val productCacheId: String? = null, val checkedAt: Instant? = null,
 ) {
     /** Every saved page read carries its canonical URL; NeedsBrowser saves nothing. */
     val pageRead: Boolean get() = canonical != null
@@ -23,11 +28,13 @@ internal data class MergedMetadata(
     val name: String?, val description: String?, val image: String?, val canonical: String?,
     val brand: String?, val merchant: String?, val price: BigDecimal?, val currency: String?,
     val nameSource: String?, val imageSource: String?, val recordCheckedAt: Boolean,
+    val gtin: String? = null, val mpnKey: String? = null, val productCacheId: String? = null, val checkedAt: Instant? = null,
 ) {
     fun assignments(): Map<String, Any?> = linkedMapOf(
         "product_name" to name, "product_description" to description, "product_image_url" to image, "canonical_url" to canonical,
         "name_source" to nameSource, "image_source" to imageSource, "product_brand" to brand, "merchant_name" to merchant,
-        "product_price" to price, "product_currency" to currency,
+        "product_price" to price, "product_currency" to currency, "product_gtin" to gtin, "product_mpn_key" to mpnKey,
+        "product_cache_id" to productCacheId,
     )
 }
 
@@ -56,12 +63,18 @@ internal fun mergeMetadata(existing: StoredMetadata, pending: PendingMetadata, c
         nameSource = source(existing.name, pending.name, existing.nameSource, nameProtected),
         imageSource = source(existing.image, pending.image, existing.imageSource, imageProtected),
         recordCheckedAt = pending.pageRead,
+        // Identity belongs to the latest page read like the price; users cannot edit it.
+        gtin = if (pending.pageRead) pending.gtin else existing.gtin,
+        mpnKey = if (pending.pageRead) pending.mpnKey else existing.mpnKey,
+        productCacheId = if (pending.pageRead) pending.productCacheId else existing.productCacheId,
+        checkedAt = pending.checkedAt,
     )
 }
 
 internal fun Connection.readStoredMetadata(itemId: UUID): StoredMetadata = prepareStatement("""
     select product_name,product_description,product_image_url,canonical_url,product_brand,merchant_name,product_price,product_currency,
-           name_source,image_source,user_override_fields from wishlist_items where id=?
+           name_source,image_source,user_override_fields,product_gtin,product_mpn_key,product_cache_id::text
+    from wishlist_items where id=?
 """.trimIndent()).use { s ->
     s.setObject(1, itemId)
     s.executeQuery().use { r ->
@@ -69,34 +82,36 @@ internal fun Connection.readStoredMetadata(itemId: UUID): StoredMetadata = prepa
         val overrides = r.getArray("user_override_fields")
         val fields = try { (overrides.array as Array<*>).map { it as String }.toSet() } finally { overrides.free() }
         StoredMetadata(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getString(5), r.getString(6),
-            r.getBigDecimal(7), r.getString(8), r.getString(9), r.getString(10), fields)
+            r.getBigDecimal(7), r.getString(8), r.getString(9), r.getString(10), fields, r.getString(12), r.getString(13), r.getString(14))
     }
 }
 
 internal fun Connection.readPendingMetadata(jobId: UUID): PendingMetadata = prepareStatement("""
     select pending_product_name,pending_product_description,pending_product_image_url,pending_canonical_url,
-           pending_brand,pending_merchant,pending_price,pending_currency from analysis_jobs where id=?
+           pending_brand,pending_merchant,pending_price,pending_currency,pending_gtin,pending_mpn_key,
+           pending_product_cache_id::text,pending_checked_at from analysis_jobs where id=?
 """.trimIndent()).use { s ->
     s.setObject(1, jobId)
     s.executeQuery().use { r ->
         check(r.next())
         PendingMetadata(r.getString(1), r.getString(2), r.getString(3), r.getString(4), r.getString(5), r.getString(6),
-            r.getBigDecimal(7), r.getString(8))
+            r.getBigDecimal(7), r.getString(8), r.getString(9), r.getString(10), r.getString(11), r.getTimestamp(12)?.toInstant())
     }
 }
 
-private val UUID_COLUMNS = setOf("custom_category_id", "purpose_id")
+private val UUID_COLUMNS = setOf("custom_category_id", "purpose_id", "product_cache_id")
 
 /**
  * One UPDATE with a single DB clock read for updated_at, metadata_checked_at and classified_at; bumps version once.
  * Caller holds the item lock and owns the transaction.
  */
-internal fun Connection.updateAnalyzedItem(itemId: UUID, values: Map<String, Any?>, recordCheckedAt: Boolean, classified: Boolean) {
+internal fun Connection.updateAnalyzedItem(itemId: UUID, values: Map<String, Any?>, recordCheckedAt: Boolean, classified: Boolean,
+                                           checkedAt: Instant? = null) {
     val assignments = values.keys.joinToString { if (it in UUID_COLUMNS) "$it=?::uuid" else "$it=?" }
     prepareStatement("""
         with now as (select clock_timestamp() t)
         update wishlist_items set $assignments,
-            metadata_checked_at=case when ? then now.t else metadata_checked_at end,
+            metadata_checked_at=case when ? then coalesce(?::timestamptz, now.t) else metadata_checked_at end,
             classified_at=case when ? then now.t else classified_at end,
             version=version+1, updated_at=now.t
         from now where id=?
@@ -109,7 +124,8 @@ internal fun Connection.updateAnalyzedItem(itemId: UUID, values: Map<String, Any
                 else -> s.setString(parameter++, value as String)
             }
         }
-        s.setBoolean(parameter++, recordCheckedAt); s.setBoolean(parameter++, classified); s.setObject(parameter, itemId)
+        s.setBoolean(parameter++, recordCheckedAt); s.setTimestamp(parameter++, checkedAt?.let(java.sql.Timestamp::from))
+        s.setBoolean(parameter++, classified); s.setObject(parameter, itemId)
         check(s.executeUpdate() == 1)
     }
 }

@@ -39,9 +39,10 @@ class CreateWishlistItemService(
                 val itemId = UUID.randomUUID()
                 val result = if (items.insertItem(connection, itemId, ownerId, key, sourceUrl, clientCreatedAt)) {
                     val eventId = items.insertInitialAnalysis(connection, itemId)
-                    CreateResult.Created(checkNotNull(items.findOwned(connection, ownerId, itemId)), eventId)
+                    CreateResult.Created(DeletionImpacts.attach(connection, ownerId, checkNotNull(items.findOwned(connection, ownerId, itemId))), eventId)
                 } else {
-                    val item = checkNotNull(items.findBySubmission(connection, ownerId, key)) { "conflicting wishlist item missing" }
+                    val item = DeletionImpacts.attach(connection, ownerId,
+                        checkNotNull(items.findBySubmission(connection, ownerId, key)) { "conflicting wishlist item missing" })
                     if (item.sourceUrl == sourceUrl) CreateResult.Replayed(item) else CreateResult.IdempotencyKeyReused(item)
                 }
                 connection.commit()

@@ -24,6 +24,12 @@ final class WLEntryOwners {
     private var categoryLists: [Int: CategoryListOwner] = [:]
     /// C5 category Presenters; nil only in owner tests that never open a category screen.
     let categories: CategoryFactories?
+    private var purposeHomes: [Int: PurposeHomeOwner] = [:]
+    private var purposeDetails: [Int: PurposeDetailOwner] = [:]
+    let purposes: PurposeFactories?
+    /// C7 continuous-processing flows; nil only in owner tests that never open one.
+    private let makeFlow: (() -> HomeFlowPresenter)?
+    private var flows: [Int: HomeFlowOwner] = [:]
     private var retired: Set<Int> = []
     private lazy var closedItem: ItemDetailPresenterOwner = {
         let owner = ItemDetailPresenterOwner(presenter: makeItem())
@@ -40,23 +46,61 @@ final class WLEntryOwners {
         makeItem: @escaping () -> ItemDetailPresenter,
         makeLocal: @escaping () -> LocalSubmissionDetailPresenter,
         makeWeb: @escaping @MainActor (URL) -> WebViewModel = { @MainActor in WebViewModel(url: $0) },
-        categories: CategoryFactories? = nil
+        categories: CategoryFactories? = nil,
+        purposes: PurposeFactories? = nil,
+        makeFlow: (() -> HomeFlowPresenter)? = nil
     ) {
         self.makeItem = makeItem
         self.makeLocal = makeLocal
         self.makeWeb = makeWeb
         self.categories = categories
+        self.purposes = purposes
+        self.makeFlow = makeFlow
     }
 
     convenience init(runtime: SharedRuntime) {
         self.init(makeItem: { runtime.itemDetailPresenter() }, makeLocal: { runtime.localSubmissionDetailPresenter() },
-                  categories: CategoryFactories(runtime: runtime))
+                  categories: CategoryFactories(runtime: runtime), purposes: PurposeFactories(runtime: runtime),
+                  makeFlow: { runtime.homeFlowPresenter() })
     }
 
     private var factories: CategoryFactories {
         guard let categories else { preconditionFailure("WLEntryOwners built without category factories") }
         return categories
     }
+
+    private var purposeFactories: PurposeFactories {
+        guard let purposes else { preconditionFailure("WLEntryOwners built without purpose factories") }
+        return purposes
+    }
+
+    func purposeHome(_ id: Int) -> PurposeHomeOwner {
+        if let owner = purposeHomes[id] { return owner }
+        let owner = PurposeHomeOwner(presenter: purposeFactories.home())
+        if retired.contains(id) { owner.close(); return owner }
+        purposeHomes[id] = owner
+        return owner
+    }
+
+    func purposeDetail(_ id: Int) -> PurposeDetailOwner {
+        if let owner = purposeDetails[id] { return owner }
+        let owner = PurposeDetailOwner(presenter: purposeFactories.detail())
+        if retired.contains(id) { owner.close(); return owner }
+        purposeDetails[id] = owner
+        return owner
+    }
+
+    /// A home flow entry's owner (C7); closed with the entry like the detail owners.
+    func homeFlow(_ id: Int) -> HomeFlowOwner {
+        if let owner = flows[id] { return owner }
+        guard let makeFlow else { preconditionFailure("WLEntryOwners built without a flow factory") }
+        let owner = HomeFlowOwner(presenter: makeFlow())
+        if retired.contains(id) { owner.close(); return owner }
+        flows[id] = owner
+        return owner
+    }
+
+    func purposeForm() -> PurposeFormOwner { PurposeFormOwner(presenter: purposeFactories.form()) }
 
     /// The category tab root's owner (the root entry is never removed, so it lives with the app).
     func categoryHome(_ entryId: Int) -> CategoryHomeOwner {
@@ -119,6 +163,9 @@ final class WLEntryOwners {
             webs.removeValue(forKey: id)?.close()
             categoryHomes.removeValue(forKey: id)?.close()
             categoryLists.removeValue(forKey: id)?.close()
+            purposeHomes.removeValue(forKey: id)?.close()
+            purposeDetails.removeValue(forKey: id)?.close()
+            flows.removeValue(forKey: id)?.close()
         }
     }
 }

@@ -29,7 +29,8 @@ internal object AppRuntimeConfig {
     private fun allBackends(backend: Backend): Map<ApiId, Backend> = ApiId.entries.associateWith { backend }
 }
 
-/** APIs the DEBUG app runs on the Fake backend: C2/C3 ITEM-01·03, C5 CAT-01~04 and ITEM-02. */
+/** APIs the DEBUG app runs on the Fake backend: C2/C3 ITEM-01·03, C5 CAT-01~04/ITEM-02, C6 PUR-01~04, C7 HOME-01·02. */
 internal val DEBUG_FAKE_APIS: Set<ApiId> = setOf(
     ApiId.ITEM_01, ApiId.ITEM_03, ApiId.ITEM_02, ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04,
+    ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04, ApiId.HOME_01, ApiId.HOME_02,
 )

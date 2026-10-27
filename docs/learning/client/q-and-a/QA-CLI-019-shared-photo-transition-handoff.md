@@ -1,4 +1,4 @@
-# QA-CLI-018: 카드 사진이 상세로 커지는 동안 사진이 비지 않게 하려면 무엇이 필요한가?
+# QA-CLI-019: 카드 사진이 상세로 커지는 동안 사진이 비지 않게 하려면 무엇이 필요한가?
 
 > 확인 날짜: 2026-10-15 · C5 PR B Task 20~22 · 구현: Android `navigation/PhotoHandoff`·`feature/detail/DetailPhoto`, iOS `Navigation/PhotoHandoff`·`RemoteImageLoader.bestCached(for:)`·`Features/Detail/DetailSharedPhoto` · 기록: [PR B 구현 기록](../../../history/architecture/client/c5-pr-b-implementation-2026-10-15.md)
 

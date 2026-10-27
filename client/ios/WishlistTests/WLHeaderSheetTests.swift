@@ -78,6 +78,8 @@ final class WLHeaderSheetTests: XCTestCase {
         model.height = 440
         RunLoop.main.run(until: Date().addingTimeInterval(0.6))
         XCTAssertEqual(state.restingTop, 440, accuracy: 0.5)
+        // The header clip and touch region must grow with the edit panel, even without a scroll event.
+        XCTAssertEqual(state.sheetTop, 440, accuracy: 0.5)
         XCTAssertEqual(state.travel, 340, accuracy: 0.5)
         XCTAssertEqual(box.sheetContentTop, 480, accuracy: 0.5)
         XCTAssertEqual(state.detent, .resting)

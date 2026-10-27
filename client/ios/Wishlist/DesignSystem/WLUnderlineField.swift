@@ -10,18 +10,40 @@ struct WLUnderlineField: View {
     var editable = true
     var placeholder = ""
     var underlineColor: Color?
+    var foregroundColor: Color?
+    var maxLength = Int.max
+    var limitUnit: WLInputLimitUnit = .grapheme
+    var multiline = false
 
     @Environment(\.wlColors) private var c
     @FocusState private var focused: Bool
+    @State private var composition = WLInputComposition()
+
+    private func reconcile() {
+        guard !composition.isComposing else { return }
+        let truncated = WLInput.truncate(value, maxLength: maxLength, unit: limitUnit)
+        if value != truncated { value = truncated }
+    }
+
+    @ViewBuilder private var field: some View {
+        if multiline {
+            TextField("", text: $value, prompt: Text(placeholder).foregroundStyle(c.textSecondary), axis: .vertical)
+                .lineLimit(1...3)
+        } else {
+            TextField("", text: $value, prompt: Text(placeholder).foregroundStyle(c.textSecondary))
+        }
+    }
 
     var body: some View {
         let line: Color = !editable ? .clear : (focused ? c.text : (underlineColor ?? c.underline))
-        TextField("", text: $value, prompt: Text(placeholder).foregroundStyle(c.textSecondary))
+        field
             .focused($focused)
             .disabled(!editable)
-            .foregroundStyle(c.text)
-            .tint(c.text)
+            .foregroundStyle(foregroundColor ?? c.text)
+            .tint(foregroundColor ?? c.text)
             .wlText(style)
             .wlUnderlined(style, color: line)
+            .background(WLInputCompositionProbe(composition: composition, onCommitted: reconcile))
+            .onChange(of: value, initial: true) { _, _ in reconcile() }
     }
 }

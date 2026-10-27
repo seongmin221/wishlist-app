@@ -226,7 +226,7 @@ POST /v1/wishlist-items/{id}/analysis-attempts
 Idempotency-Key: {attemptRequestId}
 ```
 
-유효한 `FAILED_RETRYABLE` 항목을 `PROCESSING`으로 전환하고 새 generation의 작업을 만든다. 같은 사용자 행동의 전송 재시도에는 같은 key를 사용한다.
+유효한 `FAILED_RETRYABLE` 항목을 `PROCESSING`으로 전환하고 새 generation의 작업을 만든다. 같은 사용자 행동의 전송 재시도에는 같은 key를 사용한다. B7 구현의 replay·한도(owner별 60초 10건)·오류는 [상품 사용자 변경 계약](server/wishlist-item-mutation-api.md)에 있다.
 
 ### 직접 보완 완료
 
@@ -234,7 +234,7 @@ Idempotency-Key: {attemptRequestId}
 PUT /v1/wishlist-items/{id}/manual-completion
 ```
 
-제품명, 카테고리, `expectedVersion`을 필수로 받고 이미지와 목적은 선택적으로 받는다. 상태 전이 조건을 서버가 검사한다.
+제품명, 카테고리, `expectedVersion`을 필수로 받고 브랜드·이미지·목적은 선택적으로 받는다. 상태 전이 조건을 서버가 검사한다. 상세는 [상품 사용자 변경 계약](server/wishlist-item-mutation-api.md).
 
 ### 분류·목적 검토
 
@@ -242,7 +242,7 @@ PUT /v1/wishlist-items/{id}/manual-completion
 PUT /v1/wishlist-items/{id}/review-decision
 ```
 
-`CONFIRM` 또는 `DEFER`, 선택적인 카테고리·목적 수정과 `expectedVersion`을 받는다. 완료된 검토를 다시 여는 API는 MVP에서 제공하지 않는다.
+`CONFIRM` 또는 `DEFER`, 선택적인 카테고리·목적 수정과 `expectedVersion`을 받는다. 완료된 검토를 다시 여는 API는 MVP에서 제공하지 않는다. 상세는 [상품 사용자 변경 계약](server/wishlist-item-mutation-api.md).
 
 ### 일반 편집과 삭제
 
@@ -251,7 +251,7 @@ PATCH /v1/wishlist-items/{id}
 DELETE /v1/wishlist-items/{id}
 ```
 
-`PATCH`는 전달된 제품명, 이미지, 카테고리와 목적만 변경하며 `expectedVersion`을 요구한다. `DELETE`는 version을 요구하지 않는다. 같은 사용자가 이미 삭제된 ID를 반복 삭제하면 `204 No Content`를 반환하며, 존재하지 않거나 다른 사용자의 ID는 `404 Not Found`로 처리한다.
+`PATCH`는 전달된 제품명, 이미지, 카테고리와 목적만 변경하며 `expectedVersion`을 요구한다. `DELETE`는 version을 요구하지 않는다. 같은 사용자가 이미 삭제된 ID를 반복 삭제하면 `204 No Content`를 반환하며, 존재하지 않거나 다른 사용자의 ID는 `404 Not Found`로 처리한다. B7은 version 충돌을 `WISHLIST_ITEM_VERSION_CONFLICT`, 허용되지 않는 상태를 `WISHLIST_ITEM_STATE_CONFLICT`(둘 다 409·`currentVersion`)로 나누며 전체 필드·오류 계약은 [상품 사용자 변경 계약](server/wishlist-item-mutation-api.md)에 있다.
 
 ### 공통 응답
 

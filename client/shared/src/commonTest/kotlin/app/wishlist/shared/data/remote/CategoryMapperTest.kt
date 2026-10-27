@@ -87,4 +87,31 @@ class CategoryMapperTest {
         assertEquals(ErrorKind.INVALID_RESPONSE, parseCustomDetail(PATCHED_JSON.replace("\"examples\":[]", "\"examples\":[1]")).error().kind)
         assertIs<ClientResult.Failure>(parseCreated("""{"category":null,"customUsedCount":1,"customLimit":20}"""))
     }
+    @Test
+    fun itemPageKeepsCardAnchorsAndWindowFields() {
+        val id = "00000000-0000-4000-8000-000000000101"
+        val window = parseItemPage("""{"items":[{"item":$BASE_ITEM_JSON,"anchorCursor":"anc-1"}],"totalCount":7,
+            "previousCursor":"prev","nextCursor":"next","requestedAnchorItemId":"00000000-0000-4000-8000-0000000001FF",
+            "resolvedAnchorItemId":"$id","anchorResolved":false}""").successValue()
+        assertEquals(mapOf(id to "anc-1"), window.anchorCursors)
+        assertEquals("prev", window.previousCursor)
+        assertEquals("next", window.nextCursor)
+        assertEquals(ItemAnchor("00000000-0000-4000-8000-0000000001ff", id, false), window.anchor)
+        val empty = parseItemPage("""{"items":[],"totalCount":0,"previousCursor":null,"nextCursor":null,
+            "requestedAnchorItemId":"$id","resolvedAnchorItemId":null,"anchorResolved":false}""").successValue()
+        assertEquals(ItemAnchor(id, null, false), empty.anchor)
+        // Page mode: the three anchor fields are null and there is no anchor.
+        val page = parseItemPage("""{"items":[{"item":$BASE_ITEM_JSON,"anchorCursor":"anc-1"}],"totalCount":1,
+            "previousCursor":null,"nextCursor":null,"requestedAnchorItemId":null,"resolvedAnchorItemId":null,"anchorResolved":null}""").successValue()
+        assertNull(page.anchor)
+        assertNull(page.previousCursor)
+        assertEquals(ItemPage(page.items, 1, null, anchorCursors = mapOf(id to "anc-1")), page)
+        val bad = listOf(
+            """{"items":[{"item":$BASE_ITEM_JSON,"anchorCursor":1}],"totalCount":1,"nextCursor":null}""",
+            """{"items":[],"totalCount":0,"nextCursor":null,"previousCursor":3}""",
+            """{"items":[],"totalCount":0,"nextCursor":null,"anchorResolved":"true","requestedAnchorItemId":"$id"}""",
+            """{"items":[],"totalCount":0,"nextCursor":null,"anchorResolved":true}""",
+        )
+        for (body in bad) assertEquals(ErrorKind.INVALID_RESPONSE, parseItemPage(body).error().kind, body)
+    }
 }

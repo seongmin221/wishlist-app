@@ -23,6 +23,56 @@ class PhotoPagePlannerTest {
         assertEquals(1f, planner.ratioOf("c")) // no photo → 1:1 at once
     }
 
+    @Test fun aChangedPhotoOrAnotherListStartsTheLayoutOver() {
+        val known = listOf("a", "b")
+        val photos = mapOf("a" to "https://a/tall.jpg", "b" to null)
+        assertFalse(restartsLayout(emptyList(), emptyMap(), known, photos))
+        assertFalse(restartsLayout(known, photos, known + "c", photos + ("c" to "https://a/c.jpg"))) // grew
+        assertTrue(restartsLayout(known, photos, known, photos + ("a" to "https://a/wide.jpg"))) // photo changed
+        assertTrue(restartsLayout(known, photos, known, photos + ("a" to null))) // photo removed
+        assertTrue(restartsLayout(known, photos, listOf("b", "a"), photos)) // reordered
+        assertTrue(restartsLayout(known, photos, listOf("a"), photos)) // shrank
+    }
+
+    @Test fun aLateSizeOfAReplacedPhotoIsDropped() {
+        val sizes = PhotoMeasurements()
+        val readA = sizes.begin("a", "https://a/tall.jpg")!!
+        val readB = sizes.begin("a", "https://a/wide.jpg")!! // a refresh replaced the photo while A was read
+        sizes.finish("a", readA, Photo.Sized(100, 400)) // A answers late
+        assertEquals(emptyMap<String, Photo>(), sizes.photosFor(mapOf("a" to "https://a/wide.jpg")))
+        sizes.finish("a", readB, Photo.Sized(400, 100))
+        assertEquals(mapOf("a" to Photo.Sized(400, 100)), sizes.photosFor(mapOf("a" to "https://a/wide.jpg")))
+        assertNull(sizes.begin("a", "https://a/wide.jpg")) // known: not read again
+        val planner = PhotoPagePlanner()
+        planner.settle(0, listOf(Card("a", true)), sizes.photosFor(mapOf("a" to "https://a/wide.jpg")), 0)
+        assertEquals(0.25f, planner.ratioOf("a"))
+    }
+
+    @Test fun aSizeIsOnlyGivenForThePhotoACardShowsNow() {
+        val sizes = PhotoMeasurements()
+        sizes.finish("a", sizes.begin("a", "https://a/tall.jpg")!!, Photo.Sized(100, 400))
+        assertEquals(emptyMap<String, Photo>(), sizes.photosFor(mapOf("a" to "https://a/wide.jpg")))
+        assertEquals(emptyMap<String, Photo>(), sizes.photosFor(mapOf("a" to null)))
+        // A cancelled read never finishes; the next read of the same photo starts again.
+        assertNotNull(sizes.begin("b", "https://a/b.jpg"))
+        assertNotNull(sizes.begin("b", "https://a/b.jpg"))
+    }
+
+    @Test fun aPageJobOfAReplacedLayoutNeverTouchesTheNewOne() = runTest {
+        val tall = mapOf("a" to Photo.Sized(100, 400))
+        val wide = mapOf("a" to Photo.Sized(400, 100))
+        val cards = listOf(Card("a", true))
+        val old = PhotoGridLayout()
+        val replaced = PhotoGridLayout() // a photo change restarted the layout while the old job still runs
+        val newJob = launch { replaced.settlePage(0, cards, { emptyMap() }, { 0 }) }
+        old.settlePage(0, cards, { tall }, { 0 }) // the old job's photo and poll finish first
+        assertEquals(4f, old.ratios["a"])
+        assertNull(replaced.ratios["a"])
+        newJob.cancel()
+        replaced.settlePage(0, cards, { wide }, { 0 })
+        assertEquals(0.25f, replaced.ratios["a"])
+    }
+
     @Test fun naturalRatioIsNotClamped() {
         val planner = PhotoPagePlanner()
         planner.settle(0, listOf(Card("tall", true), Card("wide", true)),

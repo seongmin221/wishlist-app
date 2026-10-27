@@ -47,7 +47,7 @@ internal fun HomeLoggedOutContent(state: HomeState.LoggedOut) {
                 expanded = expanded,
                 onExpandedChange = { expanded = it },
             ) {
-                state.pending.forEach { row -> key(row.key) { HomeLinkRow(row, WLLineIcon.Clock, tileSize = 44.dp, showsOriginal = true) } }
+                HomeTodoRows { state.pending.forEach { row -> key(row.key) { HomeLinkRow(row, WLLineIcon.Clock, tileSize = 44.dp, showsOriginal = true) } } }
             }
         }
     }

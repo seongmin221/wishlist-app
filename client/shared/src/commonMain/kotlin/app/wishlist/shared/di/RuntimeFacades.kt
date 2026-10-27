@@ -11,11 +11,13 @@ import app.wishlist.shared.model.Purpose
 import app.wishlist.shared.model.WishlistItem
 import app.wishlist.shared.model.*
 import app.wishlist.shared.repository.CatalogRepository
+import app.wishlist.shared.repository.PurposeRepository
 import app.wishlist.shared.repository.CategoryRepository
 import app.wishlist.shared.repository.ItemListRepository
 import app.wishlist.shared.repository.CreateItemCommand
 import app.wishlist.shared.repository.CreateItemRepository
 import app.wishlist.shared.repository.GetItemRepository
+import app.wishlist.shared.repository.HomeRepository
 import app.wishlist.shared.repository.LocalStore
 import app.wishlist.shared.repository.SnapshotCreateItemRepository
 import kotlinx.coroutines.flow.StateFlow
@@ -56,7 +58,12 @@ internal object UnavailableCategoryRepository : CategoryRepository {
 
 /** The UNAVAILABLE backend for ITEM-02. */
 internal object UnavailableItemListRepository : ItemListRepository {
+    override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = unavailable(API_UNAVAILABLE)
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = unavailable(API_UNAVAILABLE)
+    override suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        unavailable(API_UNAVAILABLE)
+    override suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        unavailable(API_UNAVAILABLE)
 }
 
 /** CAT-01~04 may be bound to different backends; each method uses its own API's delegate. */
@@ -124,8 +131,14 @@ internal class GatedItemListRepository(
     private val ready: StateFlow<Boolean>,
     internal val delegate: ItemListRepository,
 ) : ItemListRepository {
+    override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        if (ready.value) delegate.byPurpose(purposeId, cursor, limit) else unavailable(RUNTIME_NOT_READY)
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
         if (ready.value) delegate.byCategory(categoryId, cursor, limit) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        if (ready.value) delegate.byCategoryAround(categoryId, anchor, before, after) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        if (ready.value) delegate.byPurposeAround(purposeId, anchor, before, after) else unavailable(RUNTIME_NOT_READY)
 }
 
 internal class GatedLocalStore(
@@ -189,4 +202,48 @@ internal object ClosedLocalStore : LocalStore {
     override suspend fun clearCurrentCache(): ClientResult<Unit> = unavailable(RUNTIME_NOT_READY)
     override suspend fun readAppState(key: String): ClientResult<String?> = unavailable(RUNTIME_NOT_READY)
     override suspend fun writeAppState(key: String, value: String?): ClientResult<Unit> = unavailable(RUNTIME_NOT_READY)
+}
+
+/** Each PUR method honors its own backend binding. */
+internal class RoutedPurposeRepository(
+    internal val summary: PurposeRepository, internal val detail: PurposeRepository,
+    internal val create: PurposeRepository, internal val update: PurposeRepository,
+) : PurposeRepository {
+    override suspend fun summary() = summary.summary()
+    override suspend fun detail(id: String) = detail.detail(id)
+    override suspend fun create(command: PurposeCommand, idempotencyKey: String) = create.create(command, idempotencyKey)
+    override suspend fun update(id: String, expectedVersion: Int, patch: PurposePatch) = update.update(id, expectedVersion, patch)
+}
+internal object UnavailablePurposeRepository : PurposeRepository {
+    override suspend fun summary(): ClientResult<PurposeCatalog> = unavailable(API_UNAVAILABLE)
+    override suspend fun detail(id: String): ClientResult<PurposeDetail> = unavailable(API_UNAVAILABLE)
+    override suspend fun create(command: PurposeCommand, idempotencyKey: String): ClientResult<PurposeCreated> = unavailable(API_UNAVAILABLE)
+    override suspend fun update(id: String, expectedVersion: Int, patch: PurposePatch): ClientResult<PurposeDetail> = unavailable(API_UNAVAILABLE)
+}
+internal class GatedPurposeRepository(private val ready: StateFlow<Boolean>, internal val delegate: PurposeRepository) : PurposeRepository {
+    override suspend fun summary() = if (ready.value) delegate.summary() else unavailable(RUNTIME_NOT_READY)
+    override suspend fun detail(id: String) = if (ready.value) delegate.detail(id) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun create(command: PurposeCommand, idempotencyKey: String) = if (ready.value) delegate.create(command, idempotencyKey) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun update(id: String, expectedVersion: Int, patch: PurposePatch) = if (ready.value) delegate.update(id, expectedVersion, patch) else unavailable(RUNTIME_NOT_READY)
+}
+
+/** HOME-01 and HOME-02 may be bound to different backends; each method uses its own API's delegate. */
+internal class RoutedHomeRepository(internal val summary: HomeRepository, internal val group: HomeRepository) : HomeRepository {
+    override suspend fun summary() = summary.summary()
+    override suspend fun group(group: HomeActionGroup, cursor: String?, limit: Int) = this.group.group(group, cursor, limit)
+    override suspend fun groupAround(group: HomeActionGroup, anchor: String, before: Int, after: Int) =
+        this.group.groupAround(group, anchor, before, after)
+}
+internal object UnavailableHomeRepository : HomeRepository {
+    override suspend fun summary(): ClientResult<HomeSummary> = unavailable(API_UNAVAILABLE)
+    override suspend fun group(group: HomeActionGroup, cursor: String?, limit: Int): ClientResult<ItemPage> = unavailable(API_UNAVAILABLE)
+    override suspend fun groupAround(group: HomeActionGroup, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        unavailable(API_UNAVAILABLE)
+}
+internal class GatedHomeRepository(private val ready: StateFlow<Boolean>, internal val delegate: HomeRepository) : HomeRepository {
+    override suspend fun summary() = if (ready.value) delegate.summary() else unavailable(RUNTIME_NOT_READY)
+    override suspend fun group(group: HomeActionGroup, cursor: String?, limit: Int) =
+        if (ready.value) delegate.group(group, cursor, limit) else unavailable(RUNTIME_NOT_READY)
+    override suspend fun groupAround(group: HomeActionGroup, anchor: String, before: Int, after: Int) =
+        if (ready.value) delegate.groupAround(group, anchor, before, after) else unavailable(RUNTIME_NOT_READY)
 }

@@ -21,4 +21,5 @@
 | QA-CLI-015 | 원본 링크 웹뷰는 웹 페이지가 앱을 마음대로 움직이지 못하게 무엇을 막는가? | [QA-CLI-015](QA-CLI-015-webview-security.md) |
 | QA-CLI-016 | 카테고리 만들기 응답을 잃으면 다시 눌러도 하나만 생기는가? | [QA-CLI-016](QA-CLI-016-category-create-idempotency.md) |
 | QA-CLI-017 | 카테고리 이름 "최대 40자"는 무엇을 세고, 한글 입력 중에는 어떻게 자르는가? | [QA-CLI-017](QA-CLI-017-code-point-input-limit.md) |
-| QA-CLI-018 | 카드 사진이 상세로 커지는 동안 사진이 비지 않게 하려면 무엇이 필요한가? | [QA-CLI-018](QA-CLI-018-shared-photo-transition-handoff.md) |
+| QA-CLI-018 | 카드를 끌 때 회전 중심(50%, 90%)이 SwiftUI에서만 어긋난 이유는? | [QA-CLI-018](QA-CLI-018-card-rotation-pivot-order.md) |
+| QA-CLI-019 | 카드 사진이 상세로 커지는 동안 사진이 비지 않게 하려면 무엇이 필요한가? | [QA-CLI-019](QA-CLI-019-shared-photo-transition-handoff.md) |

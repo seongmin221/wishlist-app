@@ -45,8 +45,8 @@ class WishlistItemRepository(private val dataSource: DataSource) {
     internal fun insertItem(connection: Connection, itemId: UUID, ownerId: UUID, key: UUID, sourceUrl: String, clientCreatedAt: Instant?): Boolean =
         connection.prepareStatement("""
             insert into wishlist_items (id, owner_id, client_submission_id, source_url, client_created_at,
-                analysis_status, lifecycle_status, current_generation, category_missing_reason)
-            values (?, ?, ?, ?, ?, 'PROCESSING', 'ACTIVE', 1, 'EXTRACTION_UNRESOLVED')
+                analysis_status, lifecycle_status, current_generation, category_missing_reason, normalized_source_url)
+            values (?, ?, ?, ?, ?, 'PROCESSING', 'ACTIVE', 1, 'EXTRACTION_UNRESOLVED', ?)
             on conflict (owner_id, client_submission_id) do nothing
         """.trimIndent()).use { statement ->
             statement.setObject(1, itemId)
@@ -54,17 +54,22 @@ class WishlistItemRepository(private val dataSource: DataSource) {
             statement.setObject(3, key)
             statement.setString(4, sourceUrl)
             statement.setObject(5, clientCreatedAt?.atOffset(ZoneOffset.UTC))
+            statement.setString(6, app.extraction.UrlCanonicalizer.normalize(sourceUrl))
             statement.executeUpdate() == 1
         }
 
-    internal fun insertInitialAnalysis(connection: Connection, itemId: UUID): UUID {
+    internal fun insertInitialAnalysis(connection: Connection, itemId: UUID): UUID = insertAnalysis(connection, itemId, 1)
+
+    /** A GENERAL_PENDING job for [generation] and its outbox event; returns the event ID for post-commit dispatch. */
+    internal fun insertAnalysis(connection: Connection, itemId: UUID, generation: Int): UUID {
         val jobId = UUID.randomUUID()
         val eventId = UUID.randomUUID()
         connection.prepareStatement(
-            "insert into analysis_jobs (id, wishlist_item_id, generation, stage) values (?, ?, 1, 'GENERAL_PENDING')",
+            "insert into analysis_jobs (id, wishlist_item_id, generation, stage) values (?, ?, ?, 'GENERAL_PENDING')",
         ).use { statement ->
             statement.setObject(1, jobId)
             statement.setObject(2, itemId)
+            statement.setInt(3, generation)
             check(statement.executeUpdate() == 1)
         }
         connection.prepareStatement(
@@ -72,7 +77,7 @@ class WishlistItemRepository(private val dataSource: DataSource) {
         ).use { statement ->
             statement.setObject(1, eventId)
             statement.setObject(2, jobId)
-            statement.setString(3, "analysis-$jobId-1")
+            statement.setString(3, "analysis-$jobId-$generation")
             check(statement.executeUpdate() == 1)
         }
         return eventId

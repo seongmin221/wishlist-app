@@ -1,11 +1,14 @@
 package app.wishlist.android.ui
 
+import app.wishlist.android.feature.flow.HomeFlowRoute
 import app.wishlist.android.navigation.WLNavigator
 import app.wishlist.android.navigation.WLPushStyle
 import app.wishlist.android.navigation.WLTab
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import app.wishlist.shared.model.HomeActionGroup
 import org.junit.Test
 
 class AppRouteCodecTest {
@@ -56,5 +59,21 @@ class AppRouteCodecTest {
         assertFalse(shouldDropAccountScoped(previous = "a", next = "a"))
         assertTrue(shouldDropAccountScoped(previous = "a", next = null))
         assertTrue(shouldDropAccountScoped(previous = "a", next = "b"))
+    }
+    @Test
+    fun homeFlowRoutesRoundTripWithAndWithoutAStartAnchor() {
+        val fromCard = HomeFlowRoute(HomeActionGroup.CLASSIFICATION_REVIEW, startAnchor = null)
+        val fromPreview = HomeFlowRoute(HomeActionGroup.INFORMATION_COMPLETION, startAnchor = "opaque/anchor+token=")
+        listOf(fromCard, fromPreview).forEach { route ->
+            assertEquals(route, AppRouteCodec.decode(AppRouteCodec.encode(route)!!))
+            assertTrue(route.accountScoped)
+            assertFalse(route.showsTabBar)
+            assertEquals(WLPushStyle.Slide, route.pushStyle)
+        }
+        assertEquals("flow", ProductionRouteCodec.encode(fromCard)!!.first())
+        // The analysis group has no flow; a broken token decodes to nothing.
+        assertNull(AppRouteCodec.decode(listOf("flow", "ANALYSIS_IN_PROGRESS", "")))
+        assertNull(AppRouteCodec.decode(listOf("flow", "CLASSIFICATION_REVIEW", "%%%")))
+        assertNull(AppRouteCodec.decode(listOf("flow", "NOPE", "")))
     }
 }

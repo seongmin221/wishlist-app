@@ -1,6 +1,8 @@
 package app.wishlist.android.ui
 
 import app.wishlist.android.feature.category.CategoryListRoute
+import app.wishlist.android.feature.flow.HomeFlowRoute
+import app.wishlist.android.feature.purpose.PurposeDetailRoute
 import app.wishlist.android.feature.web.WebViewRoute
 import app.wishlist.android.navigation.WLPushStyle
 import app.wishlist.android.navigation.WLRoute
@@ -44,6 +46,8 @@ internal object ProductionRouteCodec : WLRouteCodec {
         is LocalSubmissionRoute -> listOf("local", route.submissionId)
         is WebViewRoute -> listOf("web", WebViewRoute.encodeToken(route.url))
         is CategoryListRoute -> CategoryListRoute.encode(route)
+        is PurposeDetailRoute -> PurposeDetailRoute.encode(route)
+        is HomeFlowRoute -> HomeFlowRoute.encode(route)
         else -> null
     }
 
@@ -55,6 +59,8 @@ internal object ProductionRouteCodec : WLRouteCodec {
         tokens.size == 2 && tokens[0] == "local" -> LocalSubmissionRoute(tokens[1])
         tokens.size == 2 && tokens[0] == "web" -> WebViewRoute.decodeToken(tokens[1])
         tokens.firstOrNull() == "category" -> CategoryListRoute.decode(tokens)
+        tokens.firstOrNull() == "purpose" -> PurposeDetailRoute.decode(tokens)
+        tokens.firstOrNull() == "flow" -> HomeFlowRoute.decode(tokens)
         else -> null
     }
 }

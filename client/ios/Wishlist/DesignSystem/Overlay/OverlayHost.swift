@@ -270,6 +270,16 @@ final class OverlayHostState {
     }
 }
 
+extension OverlayHostState {
+    /// `dismissAll`, waiting a frame at a time while an overlay is still opening (`dismissAll` refuses then).
+    @MainActor
+    func dismissAllWhenSettled() async {
+        while !entries.isEmpty, !dismissAll(), !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 16_000_000)
+        }
+    }
+}
+
 private struct OverlayHostStateKey: EnvironmentKey {
     static let defaultValue: OverlayHostState? = nil
 }

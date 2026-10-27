@@ -15,6 +15,11 @@ class GeneralExtractionProcessor(
 
     fun process(claim: AnalysisClaim): ProcessingOutcome {
         val sourceUrl = pending.sourceUrl(claim) ?: return ProcessingOutcome.Stale
+        // Only a new save (generation 1) may reuse the cache; reanalysis exists to read the page again.
+        // A hit replaces the network read only; classification still runs for this owner.
+        if (claim.generation == 1) pending.cachedProduct(claim)?.let { cached ->
+            return if (!pending.saveMetadata(claim, cached.metadata, cached)) ProcessingOutcome.Stale else classify(claim, cached.metadata)
+        }
         val result = try { extract(sourceUrl) } catch (_: DnsLookupFailed) {
             return ProcessingOutcome.Retryable
         } catch (_: UnsafeUrlException) {

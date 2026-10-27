@@ -103,4 +103,60 @@ class ProductMetadataParserTest {
         assertNull(parse("<title>Example Shop</title>", truncated = true).title)
         assertEquals("Example Shop", parse("<title>Example Shop</title>").title)
     }
+
+    @Test fun `product identifiers come from the structured product node`() {
+        val parsed = parse(jsonLd("""{"@type":"Product","name":"Speedgoat 6","brand":{"@type":"Brand","name":"HOKA"},
+            "gtin13":"4006381333931","mpn":"1123190-BBLC"}"""))
+        assertEquals("04006381333931", parsed.gtin)
+        assertEquals("hoka|1123190BBLC", parsed.mpnKey)
+        val numeric = parse(jsonLd("""{"@type":"Product","name":"Speedgoat 6","gtin":4006381333931}"""))
+        assertEquals("04006381333931", numeric.gtin)
+        assertNull(numeric.mpnKey)
+    }
+
+    @Test fun `ambiguous product pages carry no identifiers`() {
+        val parsed = parse(jsonLd("""[{"@type":"Product","name":"A","brand":"HOKA","gtin13":"4006381333931","mpn":"X-100"},
+            {"@type":"Product","name":"B","gtin13":"4006381333931"}]"""))
+        assertNull(parsed.gtin)
+        assertNull(parsed.mpnKey)
+    }
+
+    @Test fun `variant nodes with one name share identifiers only when they agree`() {
+        val variants = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"0036000291452","mpn":"1123190-10"}]"""))
+        assertNull(variants.gtin, "the first variant's code must not stand for the page")
+        assertNull(variants.mpnKey)
+        val agreeing = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190"}]"""))
+        assertEquals("04006381333931", agreeing.gtin)
+        assertEquals("hoka|1123190", agreeing.mpnKey)
+    }
+
+    @Test fun `a variant without valid identifiers keeps the page from taking another variant's code`() {
+        val missing = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA"}]"""))
+        assertNull(missing.gtin, "an option with no code may be a different product")
+        assertNull(missing.mpnKey)
+        val invalid = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333932","mpn":"X"}]"""))
+        assertNull(invalid.gtin, "a bad check digit is not agreement")
+        assertNull(invalid.mpnKey, "a too-short model number is not agreement")
+        val nameless = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product"}]"""))
+        assertNull(nameless.gtin, "an unnamed node is still a product node of this page")
+        assertNull(nameless.mpnKey)
+    }
+
+    @Test fun `a variant never borrows another variant's brand for its model number`() {
+        val missing = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","mpn":"SIZE-9"},
+            {"@type":"Product","name":"Speedgoat 6","mpn":"SIZE-9"}]"""))
+        assertNull(missing.mpnKey, "the second option's brand is unknown")
+        val tooLong = "B".repeat(201)
+        val invalid = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","mpn":"SIZE-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"$tooLong","mpn":"SIZE-9"}]"""))
+        assertNull(invalid.mpnKey, "an unusable brand is not agreement")
+        val single = parse("""<meta property="product:brand" content="HOKA">""" +
+            jsonLd("""{"@type":"Product","name":"Speedgoat 6","mpn":"SIZE-9"}"""))
+        assertEquals("hoka|SIZE9", single.mpnKey, "one product node may still use the page's own brand")
+    }
 }

@@ -1,14 +1,22 @@
 # 서버 연동 상태
 
+> 2026-10-27: 서버 B9 완료로 DUP-01/02의 서버 열만 갱신했다([계약](../server/duplicate-resolution-api.md)). 클라이언트 연결은 C10이다.
+>
+> 2026-10-24 C7 갱신: ITEM-02 window·anchor(카테고리·목적 범위), HOME-01·HOME-02를 Fake·Remote로 구현하고 MockEngine으로 검증했다. DEBUG FAKE / RELEASE UNAVAILABLE. 실서버 검증은 미실행이다. C6 #23 MERGED(`896fbc2`), C5 PR B #22 Draft OPEN·develop 미병합. ITEM-04~08은 C8이며 구현하지 않았다.
+>
+> 2026-10-24 C6 갱신: PUR-01 SUMMARY·PUR-02~04, ITEM-02 purposeId를 구현했다. DEBUG FAKE / RELEASE UNAVAILABLE. 실서버 검증은 미실행이다. C5 #21 MERGED(`0b95e90`), #22 Draft OPEN·develop 미병합.
+>
 > 2026-10-15 C5 갱신: CAT-01~04·ITEM-02(카테고리 범위) Fake·Remote·MockEngine 계약. 아래 원래 머리말은 C3/B4 기준이다.
-
+>
+> 2026-10-14: 서버 B7 완료로 ITEM-03(deletionImpact)·ITEM-04~08의 서버 열만 갱신했다. 클라이언트 열은 아래 기준 그대로다.
+>
 > 2026-10-09 client C3·server B4 병합 HEAD `419be18` 정밀검사 기준. 앱 backend는 C2/C3 조립 결과이며 서버 B3/B4 완료와 별개다. 이전 B2 기준 표에서 ITEM-02·HOME-01/02·PUR-01~04 서버 상태를 갱신했다. 검사 근거·재현·검증 범위는 [연동 정밀검사](../../history/architecture/client/client-server-integration-audit-2026-10-09.md)에 있다.
 
 C2 Remote 대상은 **ITEM-01·ITEM-03만**이다. Task 5는 Create/Get Fake와 seed 전용 `CatalogRepository`를 구현했고, 공통 계약 harness의 같은 7개 시나리오를 Fake에서 실제 실행했다. Task 6b는 ITEM-01·03의 Remote(`RemoteItemRepository`)와 MockEngine 기반 공통 계약 7개를 구현·실행했다(fixture는 서버 develop `1c6d949`의 DTO·mapper에서 손으로 옮겼다). 기존 C2/C3의 모든 행은 실서버 미검증이었다. 2026-10-09 검사에서 ITEM-01/03은 임시 검증 경로로 실제 HTTP·PostgreSQL을 대조했다. native 앱·실제 Firebase 인증·분석 worker까지 연결한 검증은 아직 미실행이다. 최종 로컬 검증 결과는 [C2 최종 검증 기록](../../history/architecture/client/c2-final-verification-2026-10-07.md)에 있다.
 
 검사에서 확인한 대문자 URL scheme·계정 전환 실패·MockEngine malformed ID 계약은 `bugfix/client-server-contract`에서 수정하고 회귀 검증했다. Fake/Mock의 생성 URL·UUID·시각도 보완했으며 공통 계약은 현재 각각 17개 시나리오다. 상세 재현·수정 범위·후속 C4~C7 계약 차이는 위 정밀검사 기록을 따른다. 실제 인증·앱 backend는 이번 보완으로 연결되지 않는다.
 
-`CatalogRepository`의 category/purpose/item 조회는 화면 개발용 시드 경계다. CAT-01의 SELECT/BROWSE·count, PUR-01의 요약, ITEM-02의 cursor/anchor wire 계약 완료를 의미하지 않는다. BoardDisplayMetadata의 69개 chip 합계·목적 후보 숫자는 이미지 비교 fixture이고 실제 저장소 집계에 사용하지 않는다. Task 8 runtime 조립 기준 앱 backend는 아래 표의 `앱 backend` 열과 같다. DEBUG 앱은 ITEM-01·03만 FAKE이고 나머지는 UNAVAILABLE이며(C5부터 CAT-01~04·ITEM-02도 FAKE, 아래 C5 절), RELEASE 앱은 37개 모두 UNAVAILABLE이다. 두 앱 모두 REMOTE가 없다(Remote는 ITEM-01·03 테스트에서만 조립하며, 앱 backend를 이번 검사에서 바꾸지 않았다). 인증과 실서버 연결은 아래 "인증 연결" 단계다.
+`CatalogRepository`의 category/purpose/item 조회는 화면 개발용 시드 경계다. CAT-01의 SELECT/BROWSE·count, PUR-01의 요약, ITEM-02의 cursor/anchor wire 계약 완료를 의미하지 않는다. BoardDisplayMetadata의 69개 chip 합계·목적 후보 숫자는 이미지 비교 fixture이고 실제 저장소 집계에 사용하지 않는다. Task 8 runtime 조립 기준 앱 backend는 아래 표의 `앱 backend` 열과 같다. DEBUG 앱은 ITEM-01·03만 FAKE이고 나머지는 UNAVAILABLE이며(C5부터 CAT-01~04·ITEM-02, C6부터 PUR-01~04, C7부터 HOME-01·02도 FAKE, 아래 단계별 절), RELEASE 앱은 37개 모두 UNAVAILABLE이다. 두 앱 모두 REMOTE가 없다(Remote는 ITEM-01·03 테스트에서만 조립하며, 앱 backend를 이번 검사에서 바꾸지 않았다). 인증과 실서버 연결은 아래 "인증 연결" 단계다.
 
 ## C3: ITEM-01 사용 경로
 
@@ -34,36 +42,56 @@ C3는 fake 인증만 쓴다(C3-D2). Apple Developer 가입 뒤 별도 "인증 �
 - **MockEngine 범위:** `ScriptedCategoryServer`는 Fake store를 HTTP로 감싼다(경로·query·헤더·상태 코드·오류 envelope·JSON은 계약 문서대로). 클라이언트 wire 처리 확인이며 서버 구현 검증이 아니다. 실서버는 "인증 연결" 단계.
 - **알려진 차이:** Fake 이름 중복 비교에 NFC가 없다([KMP 한계](kmp.md#c5에서-생긴-항목)).
 
+## C6: 목적 (PUR-01~04, ITEM-02 purposeId)
+
+- **계약:** [B3 목적 API](../server/purpose-management-api.md). SUMMARY는 limit·cursor를 생략하여 전체 snapshot을 읽고, 진입·foreground·사용자 갱신 시 처음부터 교체한다. SELECT 소비 화면은 C8 이후다.
+- **변환:** `PurposeStyleKeys`가 UI 소문자 token과 서버 대문자 6색·8아이콘을 명시적으로 매핑한다. 알 수 없는 응답 key는 보존하고 중립 placeholder를 표시하며, 요청은 알려진 key만 허용한다.
+- **Fake:** 생성 receipt·최신 replay, 30개/60초 10건, CAS, 편집 무변경, 생성·후보 유입 활동순, 모든 ACTIVE 후보 membership·최대 4개 preview를 재현한다. 삭제·후보 추가·종료·아카이브 API는 범위 밖이다.
+- **검증 경계:** `ScriptedPurposeServer`는 Fake를 HTTP 표현으로 감싼 MockEngine이다. 클라이언트 URL·query·헤더·JSON·오류·계정 경계를 검증하며 실제 서버 구현이나 Firebase 연동의 증거가 아니다.
+- **ITEM-02:** purposeId 후보 목록은 cache decorator로 같은 상품 version에서도 최신 목적 표시를 반영한다. C6에서는 갱신 시 첫 페이지로 교체했고, C7부터 anchor window로 교체한다(아래 C7 절).
+- **구현·검증:** [C6 기록](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
+
+## C7: 홈·연속 처리·목록 anchor (HOME-01·02, ITEM-02 window)
+
+- **계약:** [B4 조회 API](../server/wishlist-item-read-api.md)의 ITEM-02 window(`anchor`·`before`/`after` 0~20, 기본 20, cursor·limit와 함께 보내지 않음)·HOME-01·HOME-02. page limit은 ITEM 40 / HOME 20.
+- **앱 backend:** DEBUG는 HOME-01·HOME-02 FAKE, RELEASE는 UNAVAILABLE. ITEM-02 window는 기존 ITEM-02 binding(DEBUG FAKE)을 따른다. REMOTE는 MockEngine 테스트에서만 조립한다.
+- **Fake:** `fakeWindow`가 서버 `WishlistWindowReader` 규칙(anchor 정확 일치 → 다음 오래된 → 다음 새 항목 fallback, 빈 scope는 requested만, 한쪽이 짧아도 반대쪽을 늘리지 않음, 비워진 방향의 inclusive 복귀 cursor, scope·용도별 token 검사)을 재현한다. HOME-01은 세 그룹을 고정 순서로 채우고 미리보기 최대 4·`recentPurposes` 최대 3(빈 목적 포함)이다. 기기의 미전송 항목은 포함하지 않는다.
+- **Remote·mapper:** `RemoteHomeRepository`, `RemoteItemListRepository` around 요청. 카드별 `anchorCursor`·`previousCursor`·anchor 세 필드를 읽는다. HOME-01의 알 수 없는 group은 무시하고 없는 그룹은 0이며, 같은 그룹이 두 번 오면 INVALID_RESPONSE다(서버 계약 위반으로 판단한 클라이언트 규칙).
+- **캐시:** HOME-01 미리보기·HOME-02·window 카드도 GET 규칙으로 upsert한다. window 자체는 저장하지 않는다.
+- **알려진 차이:** Fake·`ScriptedCategoryServer`의 ITEM-02 오류 code는 기존 테스트 호환으로 `INVALID_WISHLIST_ITEM_QUERY`/`INVALID_WISHLIST_ITEM_CURSOR`이고 서버 계약은 `INVALID_WISHLIST_QUERY`/`INVALID_WISHLIST_CURSOR`다. Remote는 서버 code를 그대로 전달하며 공통 코드가 이 문자열을 비교하지 않는다. HOME은 `INVALID_HOME_QUERY`/`INVALID_HOME_CURSOR`로 서버와 같다.
+- **검증 경계:** `ScriptedHomeServer`·`ScriptedCategoryServer`는 Fake를 HTTP로 감싼 MockEngine이다. 클라이언트 wire 처리 검증이며 실서버·Firebase 검증이 아니다.
+- **구현·검증:** [C7 기록](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).
+
 ## Fake 상태 규칙
 
-FakeStore가 단독으로 생성 idempotency·최신 snapshot 재전송·삭제 tombstone·version CAS·직접 보완·검토·재분석 generation을 관리한다. `FakeControls`의 edit/manual-completion/review/delete/reanalyze는 개발용 상태 제어이며 ITEM-04~08의 공개 wire 저장소 구현이 아니다. 삭제 반복과 늦은 분석 무시를 포함한 상태 규칙 및 계정 변경 중 지연 요청을 host/Native에서 검증했다. 카테고리/목적 CRUD·archive/restore·목적 삭제는 구현하지 않았다.
+FakeStore가 단독으로 생성 idempotency·최신 snapshot 재전송·삭제 tombstone·version CAS·직접 보완·검토·재분석 generation을 관리한다. `FakeControls`의 edit/manual-completion/review/delete/reanalyze는 개발용 상태 제어이며 ITEM-04~08의 공개 wire 저장소 구현이 아니다. 삭제 반복과 늦은 분석 무시를 포함한 상태 규칙 및 계정 변경 중 지연 요청을 host/Native에서 검증했다. 카테고리는 CAT-01~04, 목적은 PUR-01 SUMMARY·PUR-02~04를 구현했다. 카테고리/목적 삭제·archive/restore는 구현하지 않았다.
 
 ## API별 상태
 
 | API ID | 서버 B단계·상태 | 클라이언트 C단계 | 앱 backend (DEBUG / RELEASE, C2·C3 같음) | Fake | Remote | MockEngine 검증 | 실서버 검증 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ITEM-01 | B1 완료 | C2 기반 → C3 사용(공유 전송) | FAKE / UNAVAILABLE | 구현 · 공통 계약 17개 통과 · C3 snapshot create | 구현 · `RemoteItemRepository` | 공통 계약 17개 + Remote 집중 테스트 통과 | 실HTTP·DB repository 검증 / 앱·Firebase 미실행 |
-| ITEM-02 | B4 완료 | C5 카테고리 범위(목록·이어 붙이기) → C6 목적 범위 → C7 anchor | FAKE / UNAVAILABLE | 구현(카테고리 범위) · 공통 계약 3개 · keyset cursor | 구현(카테고리 범위) · `RemoteItemListRepository` | 공통 계약 3개 통과(Fake 감싼 MockEngine) | 미실행 |
-| ITEM-03 | B1 완료 | C2 기반 → C3 refresh 사용 → C4 상품 상세 조회(PR A, 캐시 decorator 경유) | FAKE / UNAVAILABLE | 구현 · 공통 계약 17개 통과 | 구현 · `RemoteItemRepository` | 공통 계약 17개 + Remote 집중 테스트 통과 | 실HTTP·DB repository 검증 / 앱·Firebase 미실행 |
-| ITEM-04 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
-| ITEM-05 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
-| ITEM-06 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
-| ITEM-07 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
-| ITEM-08 | B7 미구현 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
-| HOME-01 | B4 완료 | C7 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C7 | 미실행 | 미실행 |
-| HOME-02 | B4 완료 | C7 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C7 | 미실행 | 미실행 |
-| DUP-01 | B9 미구현 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
-| DUP-02 | B9 미구현 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
+| ITEM-02 | B4 완료 | C5 카테고리 범위(목록·이어 붙이기) → C6 목적 범위 → C7 window·anchor·previousCursor | FAKE / UNAVAILABLE | 구현(카테고리·목적 범위) · keyset cursor · C7 window·anchor fallback·복귀 cursor | 구현(카테고리·목적 범위) · `RemoteItemListRepository` · C7 around 요청 | 공통 계약 통과(C7 window 3개 추가, Fake 감싼 MockEngine) | 미실행 |
+| ITEM-03 | B1 완료 · B7 deletionImpact | C2 기반 → C3 refresh 사용 → C4 상품 상세 조회(PR A, 캐시 decorator 경유) | FAKE / UNAVAILABLE | 구현 · 공통 계약 17개 통과 | 구현 · `RemoteItemRepository` | 공통 계약 17개 + Remote 집중 테스트 통과 | 실HTTP·DB repository 검증 / 앱·Firebase 미실행 |
+| ITEM-04 | B7 완료 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
+| ITEM-05 | B7 완료 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
+| ITEM-06 | B7 완료 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
+| ITEM-07 | B7 완료 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
+| ITEM-08 | B7 완료 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
+| HOME-01 | B4 완료 | C7 | FAKE / UNAVAILABLE | 구현 · 세 그룹 고정 순서·미리보기 4·목적 3 | 구현 · `RemoteHomeRepository` | Fake/Remote 공통 계약 9개 + mapper·wire 테스트 통과 | 미실행 |
+| HOME-02 | B4 완료 | C7 | FAKE / UNAVAILABLE | 구현 · 그룹 page·anchor window·fallback·cursor scope | 구현 · `RemoteHomeRepository` | Fake/Remote 공통 계약(HOME-01과 같은 9개 묶음) 통과 | 미실행 |
+| DUP-01 | B9 완료 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
+| DUP-02 | B9 완료 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
 | CAT-01 | B2 완료 | C5 | FAKE / UNAVAILABLE | 구현 · SELECT/BROWSE·count·custom 순서 | 구현 · `RemoteCategoryRepository` | 공통 계약 15개 중 해당 시나리오 통과 | 미실행 |
 | CAT-02 | B2 완료 | C5 | FAKE / UNAVAILABLE | 구현 · 404·itemCount | 구현 | 공통 계약 통과 | 미실행 |
 | CAT-03 | B2 완료 | C5 | FAKE / UNAVAILABLE | 구현 · receipt replay·20개·60초 5건·중복·`fields` | 구현 · Idempotency-Key·201/200·Retry-After | 공통 계약 통과 + Remote 전용 5개 | 미실행 |
 | CAT-04 | B2 완료 | C5 | FAKE / UNAVAILABLE | 구현 · version CAS·동일 내용 무변경·null 해제 | 구현 · 바뀐 필드만·명시적 null | 공통 계약 통과 + Remote 전용 | 미실행 |
 | CAT-05 | B8 미구현 | C9 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C9 | 미실행 | 미실행 |
 | CAT-06 | B8 미구현 | C9 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C9 | 미실행 | 미실행 |
-| PUR-01 | B3 완료 | C6 | UNAVAILABLE / UNAVAILABLE | 시드 조회 구현 · wire projection 미구현 | 미구현 · C6 | 미실행 | 미실행 |
-| PUR-02 | B3 완료 | C6 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C6 | 미실행 | 미실행 |
-| PUR-03 | B3 완료 | C6 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C6 | 미실행 | 미실행 |
-| PUR-04 | B3 완료 | C6 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C6 | 미실행 | 미실행 |
+| PUR-01 | B3 완료 | C6 | FAKE / UNAVAILABLE | 구현 · SUMMARY 전체 재조회·활동순(SELECT 미구현) | 구현 · `RemotePurposeRepository` | Fake/Remote 공통 계약·wire 테스트 | 미실행 |
+| PUR-02 | B3 완료 | C6 | FAKE / UNAVAILABLE | 구현 · receipt replay·30개·60초 10건 | 구현 · `RemotePurposeRepository` | Fake/Remote 공통 계약·wire 테스트 | 미실행 |
+| PUR-03 | B3 완료 | C6 | FAKE / UNAVAILABLE | 구현 · 동적 후보 수·allowedActions·목적 표시 | 구현 · `RemotePurposeRepository` | Fake/Remote 공통 계약·wire 테스트 | 미실행 |
+| PUR-04 | B3 완료 | C6 | FAKE / UNAVAILABLE | 구현 · version CAS·명시 null·편집 활동순 유지 | 구현 · `RemotePurposeRepository` | Fake/Remote 공통 계약·wire 테스트 | 미실행 |
 | PUR-05 | B8 미구현 | C9 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C9 | 미실행 | 미실행 |
 | PUR-06 | B8 미구현 | C9 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C9 | 미실행 | 미실행 |
 | PUR-07 | B8 미구현 | C9 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C9 | 미실행 | 미실행 |

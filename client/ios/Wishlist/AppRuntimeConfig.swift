@@ -11,7 +11,9 @@ enum AppRuntimeConfig {
         backends[.item01] = .fake
         backends[.item03] = .fake
         // C5: categories (CAT-01~04) and the category item list (ITEM-02).
-        for api in [ApiId.item02, .cat01, .cat02, .cat03, .cat04] { backends[api] = .fake }
+        for api in [ApiId.item02, .cat01, .cat02, .cat03, .cat04, .pur01, .pur02, .pur03, .pur04] { backends[api] = .fake }
+        // C7: home summary (HOME-01) and action-group list (HOME-02).
+        for api in [ApiId.home01, .home02] { backends[api] = .fake }
         return RepositoryBindings(buildMode: .debug, backends: backends)
         #else
         // C2 release: no auth provider or server connection yet, so all 37 APIs are unavailable.

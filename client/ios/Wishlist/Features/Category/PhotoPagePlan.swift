@@ -19,6 +19,8 @@ struct PhotoPagePlan: Equatable {
     struct Item: Equatable {
         let id: String
         let hasPhoto: Bool
+        /// The photo URL the size is read from: a changed photo is a different item for the layout.
+        var photo: String? = nil
     }
 
     private struct Page: Equatable {
@@ -34,8 +36,11 @@ struct PhotoPagePlan: Equatable {
     private(set) var columns: [[String]] = [[], []]
     private var heights: [CGFloat] = [0, 0]
 
+    /// Items already handed to the plan, in order.
+    var knownItems: [Item] { pages.flatMap(\.items) }
+
     /// Item ids already handed to the plan, in order.
-    var knownIds: [String] { pages.flatMap { $0.items.map(\.id) } }
+    var knownIds: [String] { knownItems.map(\.id) }
 
     /// Ids of the laid-out pages (shown as cards), in order.
     var laidIds: [String] { pages.prefix { $0.laid }.flatMap { $0.items.map(\.id) } }
@@ -49,10 +54,10 @@ struct PhotoPagePlan: Equatable {
     }
 
     /// Follows the Presenter's item list: a list that only grew adds its tail as a new page; any other
-    /// change (refresh, another category) starts over with the whole list as the first page.
+    /// change (refresh, another category, a known item's photo changed) starts over with the whole list as the first page.
     mutating func sync(_ items: [Item], now: Date) {
-        let known = knownIds
-        if items.count >= known.count, Array(items.prefix(known.count).map(\.id)) == known {
+        let known = knownItems
+        if items.count >= known.count, Array(items.prefix(known.count)) == known {
             let tail = Array(items.dropFirst(known.count))
             if !tail.isEmpty { pages.append(Page(items: tail, arrived: now)) }
         } else {

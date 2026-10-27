@@ -56,7 +56,21 @@ enum class WLLineIcon(private vararg val d: String, val stroke: Float = 1.8f, va
     // C5 카테고리(gen_category.py·gen_full_home.py 아이콘).
     Pending("M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7", stroke = 2f),
     Pen("M4 20h4L19 9l-4-4L4 16z", "M13 7l4 4", stroke = 2f),
-    Plus("M12 5v14M5 12h14", stroke = 2f);
+    Plus("M12 5v14M5 12h14", stroke = 2f),
+    Archive(rect(3f, 4f, 18f, 5f, 1.5f), "M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"),
+    Purpose(rect(4f, 8f, 16f, 12f, 3f), "M7 5h10"),
+    Music("M9 18V6l10-2v12", circle(7f, 18f, 2f), circle(17f, 16f, 2f)),
+    Star("M12 4l2.4 5 5.6.8-4 3.9 1 5.5-5-2.7-5 2.7 1-5.5-4-3.9 5.6-.8z"),
+    Book("M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"),
+    Tent("M3 20L12 5l9 15zM12 5v15"),
+    Home("M4 11l8-7 8 7v9H4z"),
+    Gift(rect(4f, 9f, 16f, 11f, 1f), "M12 9v11M4 13h16M12 9c-2-4-6-3-5 0M12 9c2-4 6-3 5 0"),
+    Plane("M3 13l18-7-7 18-3-8z"),
+
+    // C7 연속 처리(FHomeReviewFlow 보류·확정, FHomeFillFlow 대표 이미지).
+    ArrowLeft("M19 12H5M11 6l-6 6 6 6"),
+    ArrowRight("M5 12h14M13 6l6 6-6 6"),
+    Image(rect(3f, 5f, 18f, 14f, 3f), circle(9f, 11f, 2f), "M21 16l-5-5-8 8");
 
     // 처음 그릴 때 만든다(JVM 단위 테스트에서 enum 값만 다룰 때 android Path를 만들지 않는다).
     internal val path by lazy { PathParser().parsePathString(d.joinToString("")).toPath() }

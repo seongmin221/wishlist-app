@@ -10,6 +10,8 @@ enum WLLineIcon {
     case close, lock, reload, share, globe, copy, apps, phone
     // C5 카테고리: 점선 추가 칩의 +, ⋯ 메뉴 편집 연필, 미확정 표시 ✳.
     case plus, pen, pending
+    // C6 purpose palette: the handoff SVG paths, identical to Android WLLineIcon.
+    case home, plane, gift, tent, music, star, book
 
     var stroke: CGFloat {
         switch self {
@@ -164,6 +166,39 @@ enum WLLineIcon {
             path.addPath(Self.lines([(p(13, 7), p(17, 11))]))
         case .pending: // M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7
             path = Self.lines([(p(12, 4), p(12, 20)), (p(4, 12), p(20, 12)), (p(6.3, 6.3), p(17.7, 17.7)), (p(17.7, 6.3), p(6.3, 17.7))])
+        case .home: // M4 11l8-7 8 7v9H4z
+            path.addLines([p(4, 11), p(12, 4), p(20, 11), p(20, 20), p(4, 20)])
+            path.closeSubpath()
+        case .plane: // M3 13l18-7-7 18-3-8z
+            path.addLines([p(3, 13), p(21, 6), p(14, 24), p(11, 16)])
+            path.closeSubpath()
+        case .gift: // rect 4 9 16 11 r1 + ribbon + bow
+            path.addPath(Self.rect(4, 9, 16, 11, 1))
+            path.addPath(Self.lines([(p(12, 9), p(12, 20)), (p(4, 13), p(20, 13))]))
+            path.move(to: p(12, 9))
+            path.addCurve(to: p(7, 9), control1: p(10, 5), control2: p(6, 6))
+            path.move(to: p(12, 9))
+            path.addCurve(to: p(17, 9), control1: p(14, 5), control2: p(18, 6))
+        case .tent: // M3 20L12 5l9 15zM12 5v15
+            path.addLines([p(3, 20), p(12, 5), p(21, 20)])
+            path.closeSubpath()
+            path.addPath(Self.lines([(p(12, 5), p(12, 20))]))
+        case .music: // M9 18V6l10-2v12 + two circle r2
+            path.addLines([p(9, 18), p(9, 6), p(19, 4), p(19, 16)])
+            path.addPath(Self.circle(7, 18, 2))
+            path.addPath(Self.circle(17, 16, 2))
+        case .star: // M12 4l2.4 5 5.6.8-4 3.9 1 5.5-5-2.7-5 2.7 1-5.5-4-3.9 5.6-.8z
+            path.addLines([p(12, 4), p(14.4, 9), p(20, 9.8), p(16, 13.7), p(17, 19.2),
+                           p(12, 16.5), p(7, 19.2), p(8, 13.7), p(4, 9.8), p(9.6, 9)])
+            path.closeSubpath()
+        case .book: // M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z
+            path.addLines([p(5, 4), p(15, 4)])
+            Self.arc(&path, from: p(15, 4), to: p(18, 7), radius: 3, sweep: true)
+            path.addLine(to: p(18, 20))
+            path.addLine(to: p(8, 20))
+            Self.arc(&path, from: p(8, 20), to: p(5, 17), radius: 3, sweep: true)
+            path.addLine(to: p(5, 4))
+            path.closeSubpath()
         case .phone: // rect 7 3 10 18 r2 + M11 18h2
             path.addPath(Self.rect(7, 3, 10, 18, 2))
             path.addPath(Self.lines([(p(11, 18), p(13, 18))]))

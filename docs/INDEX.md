@@ -12,3 +12,5 @@ AI 탐색의 최상위 진입점이다. 원문 검색을 대체하지 않고, �
 | Design & plans | 확정 설계와 구현 순서 | [superpowers/INDEX.md](superpowers/INDEX.md) |
 
 작성 규칙과 문서 상태 표기는 [README.md](README.md)를 참고한다.
+
+현재 클라이언트 작업: [C7 홈·연속 처리·목록 anchor 설계](superpowers/specs/2026-10-24-client-c7-home-review-flow-design.md) · [계획](superpowers/plans/2026-10-24-client-c7-home-review-flow.md) · [구현·검증](history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md) · [서버 연동 상태](architecture/client/server-integration-status.md). 기준: C6 #23 MERGED(`896fbc2`), C5 #21 MERGED, #22 Draft OPEN·develop 미병합.

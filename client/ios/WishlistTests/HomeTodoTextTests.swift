@@ -1,0 +1,81 @@
+import Shared
+import XCTest
+@testable import Wishlist
+
+/// C7 home and flow wording (Android `HomeTodoTextTest`, same values): the header count, the flow
+/// position, the end summaries (passes only, never 확정·보류 counts), the review card's AI line and the
+/// fill header reason.
+final class HomeTodoTextTests: XCTestCase {
+    private func ko() throws -> Bundle { try XCTUnwrap(HomeRowText.bundle(for: "ko")) }
+    private func en() throws -> Bundle { try XCTUnwrap(HomeRowText.bundle(for: "en")) }
+
+    func testHeaderCountsEveryTodo() throws {
+        XCTAssertEqual(HomeRowText.todoCount(8, bundle: try ko()), "할 일 8개")
+    }
+
+    func testPositionReadsCurrentOverTotal() {
+        XCTAssertEqual(HomeTodoText.position(2, of: 5), "2 / 5")
+    }
+
+    func testSummariesCountOnlyPasses() throws {
+        XCTAssertEqual(HomeTodoText.passedSummary(3, bundle: try ko()), "넘김 3")
+        XCTAssertEqual(HomeTodoText.skippedSummary(2, bundle: try ko()), "건너뜀 2")
+        XCTAssertEqual(HomeTodoText.passedSummary(1, bundle: try en()), "Passed 1")
+        XCTAssertEqual(HomeTodoText.skippedSummary(2, bundle: try en()), "Skipped 2")
+    }
+
+    func testAILineFollowsTheSources() {
+        XCTAssertEqual(HomeTodoText.aiLineKey(category: .ai, purpose: .ai), "flow.review.ai.both")
+        XCTAssertEqual(HomeTodoText.aiLineKey(category: .ai, purpose: .unassigned), "flow.review.ai.category")
+        XCTAssertEqual(HomeTodoText.aiLineKey(category: .ai, purpose: .user), "flow.review.ai.category")
+        XCTAssertEqual(HomeTodoText.aiLineKey(category: .user, purpose: .ai), "flow.review.ai.purpose")
+        XCTAssertNil(HomeTodoText.aiLineKey(category: .user, purpose: .user))
+        XCTAssertNil(HomeTodoText.aiLineKey(category: nil, purpose: .unassigned))
+    }
+
+    /// Ruling 7 wording, the same on Android.
+    func testAILineWording() throws {
+        let bundle = try ko()
+        func line(_ c: ValueSource?, _ p: ValueSource) -> String? {
+            HomeTodoText.aiLineKey(category: c, purpose: p).map { bundle.localizedString(forKey: $0, value: nil, table: nil) }
+        }
+        XCTAssertEqual(line(.ai, .ai), "AI가 카테고리와 목적을 연결했어요")
+        XCTAssertEqual(line(.ai, .unassigned), "AI가 카테고리를 정했어요")
+        XCTAssertEqual(line(.user, .ai), "AI가 목적을 연결했어요")
+        XCTAssertNil(line(.unknown, .unknown))
+    }
+
+    /// Ruling 11 (Android `HomeFlowText.fillReason`, same precedence): a missing name → 제품명을 찾지 못했어요
+    /// unless the extraction failed; other INFORMATION_COMPLETION → 상품 정보를 가져오지 못했어요; the category actions
+    /// keep their own line whatever the name.
+    func testFillReasonFollowsTheRequiredAction() throws {
+        let bundle = try ko()
+        func reason(_ action: RequiredAction, nameMissing: Bool = false, _ analysis: AnalysisStatus = .partial) -> String {
+            bundle.localizedString(forKey: HomeTodoText.fillReasonKey(action, nameMissing: nameMissing, analysis: analysis), value: nil, table: nil)
+        }
+        XCTAssertEqual(reason(.informationCompletion, nameMissing: true), "제품명을 찾지 못했어요")
+        XCTAssertEqual(reason(.informationCompletion, nameMissing: true, .failedTerminal), "상품 정보를 가져오지 못했어요")
+        XCTAssertEqual(reason(.informationCompletion, nameMissing: true, .failedRetryable), "상품 정보를 가져오지 못했어요")
+        XCTAssertEqual(reason(.informationCompletion), "상품 정보를 가져오지 못했어요")
+        XCTAssertEqual(reason(.categoryAssignment, nameMissing: true, .ready), "카테고리를 정하지 못했어요")
+        XCTAssertEqual(reason(.categoryReassignment, nameMissing: true, .ready), "카테고리가 삭제됐어요")
+        let en = try en()
+        XCTAssertEqual(en.localizedString(forKey: HomeTodoText.fillReasonKey(.informationCompletion, nameMissing: true, analysis: .partial), value: nil, table: nil),
+                       "Couldn't find the product name")
+    }
+
+    func testHostDropsTheSchemeAndWww() {
+        XCTAssertEqual(HomeTodoText.host("https://www.coupang.com/vp/1"), "coupang.com")
+        XCTAssertEqual(HomeTodoText.host("not a url"), "not a url")
+    }
+
+    /// Every key the C7 screens read exists in both languages.
+    func testEveryKeyIsInBothLanguages() throws {
+        let keys = HomeTodoText.allKeys
+        for bundle in [try ko(), try en()] {
+            for key in keys {
+                XCTAssertNotEqual(bundle.localizedString(forKey: key, value: "\u{0}", table: nil), "\u{0}", key)
+            }
+        }
+    }
+}

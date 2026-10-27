@@ -14,7 +14,12 @@ internal class FakeCategoryRepository(private val store: FakeStore) : CategoryRe
     override suspend fun update(id: String, expectedVersion: Int, patch: CategoryPatch) = store.updateCategory(id, expectedVersion, patch)
 }
 
-/** B4 ITEM-02 category scope on the Fake store. */
+/** B4 ITEM-02 category and purpose scopes (pages and anchor windows) on the Fake store. */
 internal class FakeItemListRepository(private val store: FakeStore) : ItemListRepository {
+    override suspend fun byCategoryAround(categoryId: String, anchor: String, before: Int, after: Int) =
+        store.itemsByCategoryAround(categoryId, anchor, before, after)
+    override suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int, after: Int) =
+        store.itemsByPurposeAround(purposeId, anchor, before, after)
+    override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int) = store.itemsByPurpose(purposeId, cursor, limit)
     override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int) = store.itemsByCategory(categoryId, cursor, limit)
 }

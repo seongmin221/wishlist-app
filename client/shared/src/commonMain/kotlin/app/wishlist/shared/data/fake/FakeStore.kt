@@ -3,7 +3,9 @@ package app.wishlist.shared.data.fake
 
 import app.wishlist.shared.core.*
 import app.wishlist.shared.domain.CategoryInputRules
+import app.wishlist.shared.domain.PurposeInputRules
 import app.wishlist.shared.domain.evaluateItem
+import app.wishlist.shared.domain.homeActionGroup
 import app.wishlist.shared.domain.isListEligible
 import app.wishlist.shared.model.*
 import app.wishlist.shared.repository.CreateItemCommand
@@ -24,8 +26,9 @@ import kotlin.uuid.Uuid
  * Analysis advances only through explicit controls, never on a timer.
  */
 internal class FakeStore(private val session: AuthSession, private val clock: Clock, private val ids: IdGenerator) {
+    /** [heldAnalysis]: a seeded board card that stays PROCESSING; [completeDueAnalyses] skips it. */
     private data class Entry(var item: WishlistItem, var analysisGeneration: Int = 1,
-        val retryAttempts: MutableSet<String> = mutableSetOf())
+        val retryAttempts: MutableSet<String> = mutableSetOf(), val heldAnalysis: Boolean = false)
     private class OwnerStore {
         val entries = mutableMapOf<String, Entry>()
         val submissionIds = mutableMapOf<String, String>()
@@ -36,7 +39,9 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         val receipts = mutableMapOf<String, FakeReceipt>()
         /** Successful (non-replay) creation times, for the 60-second limit. */
         val creations = mutableListOf<Instant>()
-        var purposes: List<Purpose> = emptyList()
+        val purposeRows = mutableMapOf<String, PurposeDetail>()
+        val purposeReceipts = mutableMapOf<String, Pair<PurposeCommand, String>>()
+        val purposeCreations = mutableListOf<Instant>()
         var seeded = false
         /** The board seed's first leaf (DEBUG analysis files items there); null before seeding. */
         var firstSeedLeaf: String? = null
@@ -117,7 +122,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     suspend fun seed(data: BoardSeedData): ClientResult<Unit> = request(null) { owner ->
         if (owner.seeded) return@request ClientResult.Success(Unit)
         // Store keys use the same canonical form as every lookup; reject before any partial write.
-        val items = data.items.map { item ->
+        val items = (data.items + data.homeItems).map { item ->
             val id = canonicalUuidOrNull(item.id) ?: return@request invalidItemId()
             val key = canonicalUuidOrNull(item.clientSubmissionId)
                 ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
@@ -129,14 +134,15 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
             val (description, examples) = BoardSeeds.customText[custom.name] ?: (null to emptyList())
             owner.customs += FakeCustom(id, parent, custom.name, description, examples, custom.version ?: 1, nextCustomOrder(owner, parent))
         }
-        owner.purposes = data.purposes.toList()
+        data.purposes.forEach { p -> owner.purposeRows[p.id] = PurposeDetail(p.id, p.name, p.description, p.colorKey, p.iconKey,
+            0, 1, p.version, data.purposeActivities.getValue(p.id), p.createdAt, p.updatedAt, emptySet()) }
         owner.firstSeedLeaf = data.categories.firstOrNull { it.parentId != null }?.id
         val displayed = items.map { item ->
             if (item.purpose.id == null) item else item.copy(purpose = purpose(owner, item.purpose.id, item.purpose.source))
         }
         displayed.forEach { item ->
             if (item.id !in owner.entries && item.clientSubmissionId !in owner.submissionIds) {
-                owner.entries[item.id] = Entry(withPolicy(item))
+                owner.entries[item.id] = Entry(withPolicy(item), heldAnalysis = item.analysis.status == AnalysisStatus.PROCESSING)
                 owner.submissionIds[item.clientSubmissionId] = item.id
             }
         }
@@ -152,7 +158,9 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         })
     }
     suspend fun firstSeedLeaf(): ClientResult<String?> = request(null) { ClientResult.Success(it.firstSeedLeaf) }
-    suspend fun purposes(): ClientResult<List<Purpose>> = request(ApiId.PUR_01) { ClientResult.Success(it.purposes) }
+    suspend fun purposes(): ClientResult<List<Purpose>> = request(ApiId.PUR_01) { owner ->
+        ClientResult.Success(owner.purposeRows.values.map { Purpose(it.id, it.name, it.description, it.colorKey, it.iconKey, it.version, it.createdAt, it.updatedAt) })
+    }
     suspend fun items(categoryId: String?, purposeId: String?): ClientResult<List<WishlistItem>> = request(ApiId.ITEM_02) { owner ->
         ClientResult.Success(owner.entries.values.map { present(owner, it.item) }.filter {
             isListEligible(it) && (categoryId == null || it.category.id == categoryId) &&
@@ -171,6 +179,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
      * Completes, through the same rules as [completeAnalysis], every ACTIVE PROCESSING item of the
      * current owner created at least [minAge] before [now]. There is no timer: the caller decides
      * when (DEBUG refresh). Returns how many items were completed; an invalid outcome skips its item.
+     * Seeded PROCESSING items (the board's analyzing card) are never completed this way.
      */
     suspend fun completeDueAnalyses(
         now: Instant,
@@ -178,7 +187,7 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         outcome: (WishlistItem) -> AnalysisOutcome,
     ): ClientResult<Int> = request(null) { owner ->
         val due = owner.entries.values.filter {
-            it.item.lifecycleStatus == LifecycleStatus.ACTIVE && it.item.analysis.status == AnalysisStatus.PROCESSING &&
+            !it.heldAnalysis && it.item.lifecycleStatus == LifecycleStatus.ACTIVE && it.item.analysis.status == AnalysisStatus.PROCESSING &&
                 now - it.item.createdAt >= minAge
         }
         ClientResult.Success(due.count { entry ->
@@ -262,7 +271,8 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
                 is ClientResult.Failure -> result
                 is ClientResult.Success -> {
                     entry.item = next(result.value)
-                    ClientResult.Success(entry.item)
+                    purposeMembershipChanged(owner, item, entry.item)
+                    ClientResult.Success(present(owner, entry.item))
                 }
             }
         }
@@ -271,7 +281,9 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     suspend fun delete(id: String): ClientResult<Unit> = request(null) { owner ->
         val entry = owner.entry(id) ?: return@request missing(id)
         if (entry.item.lifecycleStatus != LifecycleStatus.DELETED) {
+            val previous = entry.item
             entry.item = next(entry.item.copy(lifecycleStatus = LifecycleStatus.DELETED))
+            purposeMembershipChanged(owner, previous, entry.item)
         }
         ClientResult.Success(Unit)
     }
@@ -309,8 +321,10 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
     )
     /** Like the server's B3 PurposeDto: display fields from the owner's purpose, keys in wire form (`CORAL`, `MUSIC`). */
     private fun purpose(owner: OwnerStore, id: String, source: ValueSource): ItemPurpose {
-        val definition = owner.purposes.firstOrNull { it.id == id }
-        return ItemPurpose(id, source, definition?.name, definition?.colorKey?.uppercase(), definition?.iconKey?.uppercase())
+        val definition = owner.purposeRows[id]
+        return ItemPurpose(id, source, definition?.name,
+            definition?.colorKey?.let { PurposeStyleKeys.colorToWire(it) ?: it },
+            definition?.iconKey?.let { PurposeStyleKeys.iconToWire(it) ?: it })
     }
     private fun category(owner: OwnerStore, id: String?, source: ValueSource): ItemCategory =
         displayed(owner, ItemCategory(id, source))
@@ -322,7 +336,8 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         val custom = owner.custom(id) ?: return category
         return category.copy(id = custom.id, name = custom.name, parentId = custom.parentId, kind = "CUSTOM")
     }
-    private fun present(owner: OwnerStore, item: WishlistItem): WishlistItem = item.copy(category = displayed(owner, item.category))
+    private fun present(owner: OwnerStore, item: WishlistItem): WishlistItem = item.copy(category = displayed(owner, item.category),
+        purpose = item.purpose.id?.let { purpose(owner, it, item.purpose.source) } ?: item.purpose)
     // ---- B2 CAT-01~04 and B4 ITEM-02 (category scope) ----
 
     /** Server `WishlistReadPredicates.categoryVisible`: ACTIVE with a non-blank name. */
@@ -424,38 +439,180 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         return owner.customs.any { !it.deleted && it.parentId == parent && it.id != exceptId && CategoryInputRules.normalizedKey(it.name) == key }
     }
 
-    /** ITEM-02 category scope: newest first (`createdAt DESC, id DESC`), keyset cursor. */
-    suspend fun itemsByCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> = request(ApiId.ITEM_02) { owner ->
-        if (limit !in 1..100) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
-        val known = FakeTaxonomy.leaf(categoryId) != null || owner.custom(categoryId) != null
-        if (!known) return@request if (canonicalUuidOrNull(categoryId) != null) categoryNotFound()
-            else failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
-        val key = canonicalUuidOrNull(categoryId) ?: categoryId
-        val all = owner.entries.values.map { it.item }.filter { visible(it) && it.category.id == key }
-            .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
-        val after = cursor?.let { raw ->
-            val parts = raw.removePrefix(CURSOR_PREFIX).split('|')
-            val millis = parts.getOrNull(0)?.toLongOrNull()
-            if (!raw.startsWith(CURSOR_PREFIX) || parts.size != 2 || millis == null)
-                return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_CURSOR")
-            Instant.fromEpochMilliseconds(millis) to parts[1]
+    /** ITEM-02 category scope: newest first (`createdAt DESC, id DESC`), keyset page or anchor window. */
+    suspend fun itemsByCategory(categoryId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        itemsByCategory(categoryId, cursor, limit, anchor = null, before = 0, after = 0)
+
+    suspend fun itemsByCategoryAround(categoryId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        itemsByCategory(categoryId, cursor = null, limit = null, anchor, before, after)
+
+    private suspend fun itemsByCategory(categoryId: String, cursor: String?, limit: Int?, anchor: String?, before: Int, after: Int) =
+        request(ApiId.ITEM_02) { owner ->
+            if (!validWindowQuery(limit, anchor, before, after)) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            val known = FakeTaxonomy.leaf(categoryId) != null || owner.custom(categoryId) != null
+            if (!known) return@request if (canonicalUuidOrNull(categoryId) != null) categoryNotFound()
+                else failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            val key = canonicalUuidOrNull(categoryId) ?: categoryId
+            val all = owner.entries.values.map { it.item }.filter { visible(it) && it.category.id == key }
+                .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
+            // Tokens are scoped to owner + category (another scope's token is a cursor error).
+            itemPage(owner, all, "fake2:${session.state.value.accountId}:$key:", cursor, limit, anchor, before, after)
         }
-        val rest = if (after == null) all else all.filter {
-            it.createdAt < after.first || (it.createdAt == after.first && it.id < after.second)
+
+    /** One ITEM-02/HOME-02 slice of [all] (already in scope order) as an [ItemPage] with per-card anchors. */
+    private fun itemPage(owner: OwnerStore, all: List<WishlistItem>, prefix: String, cursor: String?, limit: Int?,
+                         anchor: String?, before: Int, after: Int,
+                         queryCode: String = "INVALID_WISHLIST_ITEM_QUERY", cursorCode: String = "INVALID_WISHLIST_ITEM_CURSOR"): ClientResult<ItemPage> =
+        when (val window = fakeWindow(all, { it.createdAt to it.id }, prefix, cursor, limit, anchor, before, after, queryCode, cursorCode)) {
+            is ClientResult.Failure -> window
+            is ClientResult.Success -> window.value.let { w ->
+                ClientResult.Success(ItemPage(w.items.map { present(owner, it) }, all.size, w.nextCursor, w.previousCursor,
+                    w.items.associate { it.id to w.anchorOf(it) }, w.anchor))
+            }
         }
-        val page = rest.take(limit)
-        val next = if (rest.size > limit) page.last().let { "$CURSOR_PREFIX${it.createdAt.toEpochMilliseconds()}|${it.id}" } else null
-        ClientResult.Success(ItemPage(page.map { present(owner, it) }, all.size, next))
-    }
 
     /** DEBUG/test control: puts a finished item as is (policy applied); replaces one with the same id. */
     suspend fun putItem(item: WishlistItem): ClientResult<WishlistItem> = request(null) { owner ->
         val id = canonicalUuidOrNull(item.id) ?: return@request invalidItemId()
         val stored = withPolicy(item.copy(id = id, category = displayed(owner, item.category)))
+        val previous = owner.entries[id]?.item
         owner.entries[id] = Entry(stored)
+        purposeMembershipChanged(owner, previous, stored)
         owner.submissionIds[stored.clientSubmissionId] = id
         ClientResult.Success(stored)
     }
+
+    // ---- B3 PUR-01~04; membership and ITEM-02 use every ACTIVE item, including unnamed ones. ----
+    private fun purposeItems(owner: OwnerStore, id: String) = owner.entries.values.map { it.item }
+        .filter { it.lifecycleStatus == LifecycleStatus.ACTIVE && it.purpose.id == id }
+        .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
+
+    private fun purposeView(owner: OwnerStore, row: PurposeDetail): PurposeDetail {
+        val count = purposeItems(owner, row.id).size
+        return row.copy(candidateCount = count, allowedActions = buildSet {
+            add("EDIT"); add("DELETE"); add("ADD_CANDIDATES"); if (count > 0) add("ARCHIVE")
+        })
+    }
+
+    private fun purposeMembershipChanged(owner: OwnerStore, before: WishlistItem?, after: WishlistItem) {
+        val oldId = before?.takeIf { it.lifecycleStatus == LifecycleStatus.ACTIVE }?.purpose?.id
+        val newId = after.takeIf { it.lifecycleStatus == LifecycleStatus.ACTIVE }?.purpose?.id
+        if (oldId == newId) return
+        oldId?.let { id -> owner.purposeRows[id]?.let { row -> owner.purposeRows[id] = row.copy(membershipVersion = row.membershipVersion + 1) } }
+        newId?.let { id -> owner.purposeRows[id]?.let { row -> owner.purposeRows[id] = row.copy(
+            membershipVersion = row.membershipVersion + 1, activity = PurposeActivity(clock.now(), "CANDIDATE_ADDED")) } }
+    }
+
+    /** PUR-01 summary rows (activity DESC, id DESC); HOME-01 recentPurposes is their first three. */
+    private fun purposeSummaries(owner: OwnerStore): List<PurposeSummary> =
+        owner.purposeRows.values.sortedWith(compareByDescending<PurposeDetail> { it.activity.at }.thenByDescending { it.id }).map { row ->
+            val candidates = purposeItems(owner, row.id)
+            PurposeSummary(row.id, row.name, row.description, row.colorKey, row.iconKey, row.version, candidates.size,
+                row.activity, candidates.take(4).map { PurposePreview(it.id, it.product.imageUrl) })
+        }
+
+    suspend fun purposeSummary(): ClientResult<PurposeCatalog> = request(ApiId.PUR_01) { owner ->
+        val rows = purposeSummaries(owner)
+        ClientResult.Success(PurposeCatalog(rows, rows.size, 30, ArchiveSummary(0, emptyList())))
+    }
+
+    suspend fun purposeDetail(id: String): ClientResult<PurposeDetail> = request(ApiId.PUR_03) { owner ->
+        val key = canonicalUuidOrNull(id) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_PURPOSE_ID")
+        val row = owner.purposeRows[key] ?: return@request purposeNotFound()
+        ClientResult.Success(purposeView(owner, row))
+    }
+
+    suspend fun createPurpose(command: PurposeCommand, idempotencyKey: String): ClientResult<PurposeCreated> = request(ApiId.PUR_02) { owner ->
+        val key = canonicalUuidOrNull(idempotencyKey) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_IDEMPOTENCY_KEY")
+        val invalid = PurposeInputRules.validate(command)
+        if (invalid.isNotEmpty()) return@request failure(ErrorKind.VALIDATION, "INVALID_PURPOSE_INPUT", fields = invalid)
+        owner.purposeReceipts[key]?.let { (original, id) ->
+            if (original != command) return@request failure(ErrorKind.CONFLICT, "IDEMPOTENCY_KEY_REUSED")
+            val row = owner.purposeRows[id] ?: return@request failure(ErrorKind.CONFLICT, "PURPOSE_NOT_AVAILABLE")
+            return@request ClientResult.Success(PurposeCreated(purposeView(owner, row), owner.purposeRows.size, 30))
+        }
+        val now = clock.now()
+        val recent = owner.purposeCreations.filter { now - it < CREATE_WINDOW }
+        if (recent.size >= 10) {
+            val wait = (recent.min() + CREATE_WINDOW - now).inWholeNanoseconds
+            return@request ClientResult.Failure(ClientError(ErrorKind.RATE_LIMITED, "PURPOSE_CREATE_RATE_LIMITED", retryAfterSeconds = maxOf(1L, (wait + 999_999_999) / 1_000_000_000)))
+        }
+        if (owner.purposeRows.size >= 30) return@request failure(ErrorKind.CONFLICT, "PURPOSE_LIMIT_REACHED")
+        val id = Uuid.parse(ids.newId()).toString()
+        check(id !in owner.purposeRows) { "IdGenerator returned an existing purpose ID" }
+        val row = PurposeDetail(id, command.name, command.description, command.colorKey, command.iconKey,
+            0, 1, 1, PurposeActivity(now, "CREATED"), now, now, emptySet())
+        owner.purposeRows[id] = row
+        owner.purposeReceipts[key] = command to id
+        owner.purposeCreations += now
+        ClientResult.Success(PurposeCreated(purposeView(owner, row), owner.purposeRows.size, 30))
+    }
+
+    suspend fun updatePurpose(id: String, expectedVersion: Int, patch: PurposePatch): ClientResult<PurposeDetail> = request(ApiId.PUR_04) { owner ->
+        val key = canonicalUuidOrNull(id) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_PURPOSE_ID")
+        val row = owner.purposeRows[key] ?: return@request purposeNotFound()
+        if (expectedVersion <= 0 || patch.isEmpty) return@request failure(ErrorKind.VALIDATION, "INVALID_PURPOSE_INPUT")
+        if (row.version != expectedVersion) return@request failure(ErrorKind.CONFLICT, "PURPOSE_VERSION_CONFLICT", currentVersion = row.version)
+        val description = when (val change = patch.description) { DescriptionChange.Keep -> row.description; is DescriptionChange.Set -> change.value }
+        val command = PurposeCommand(patch.name ?: row.name, description, patch.colorKey ?: row.colorKey, patch.iconKey ?: row.iconKey)
+        val invalid = PurposeInputRules.validate(command)
+        if (invalid.isNotEmpty()) return@request failure(ErrorKind.VALIDATION, "INVALID_PURPOSE_INPUT", fields = invalid)
+        val changed = command != PurposeCommand(row.name, row.description, row.colorKey, row.iconKey)
+        val updated = if (!changed) row else row.copy(name = command.name, description = command.description, colorKey = command.colorKey,
+            iconKey = command.iconKey, version = row.version + 1, updatedAt = clock.now())
+        owner.purposeRows[key] = updated
+        ClientResult.Success(purposeView(owner, updated))
+    }
+
+    suspend fun itemsByPurpose(purposeId: String, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        itemsByPurpose(purposeId, cursor, limit, anchor = null, before = 0, after = 0)
+
+    suspend fun itemsByPurposeAround(purposeId: String, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        itemsByPurpose(purposeId, cursor = null, limit = null, anchor, before, after)
+
+    private suspend fun itemsByPurpose(purposeId: String, cursor: String?, limit: Int?, anchor: String?, before: Int, after: Int) =
+        request(ApiId.ITEM_02) { owner ->
+            if (!validWindowQuery(limit, anchor, before, after)) return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            val key = canonicalUuidOrNull(purposeId) ?: return@request failure(ErrorKind.VALIDATION, "INVALID_WISHLIST_ITEM_QUERY")
+            if (key !in owner.purposeRows) return@request purposeNotFound()
+            // Tokens are scoped to owner + purpose and preserve sub-millisecond order.
+            itemPage(owner, purposeItems(owner, key), "fake-purpose:${session.state.value.accountId}:$key:", cursor, limit, anchor, before, after)
+        }
+
+    private fun purposeNotFound() = failure(ErrorKind.NOT_FOUND, "PURPOSE_NOT_FOUND")
+
+    // ---- B4 HOME-01/02: groups are the server's homeGroupFor(requiredAction) over ACTIVE items. ----
+    private fun homeItems(owner: OwnerStore, group: HomeActionGroup) = owner.entries.values.map { it.item }
+        .filter { it.lifecycleStatus == LifecycleStatus.ACTIVE && homeActionGroup(it.requiredAction) == group }
+        .sortedWith(compareByDescending<WishlistItem> { it.createdAt }.thenByDescending { it.id })
+
+    /** HOME-02 tokens are scoped to owner + group, so another group's token is a cursor error. */
+    private fun homePrefix(group: HomeActionGroup) = "fake-home:${session.state.value.accountId}:${group.name}:"
+
+    /** HOME-01: the three groups in fixed order (empty ones too) with four newest previews, and three recent purposes. */
+    suspend fun homeSummary(): ClientResult<HomeSummary> = request(ApiId.HOME_01) { owner ->
+        val groups = HomeActionGroup.entries.map { group ->
+            val all = homeItems(owner, group)
+            val window = when (val page = fakeWindow(all, { it.createdAt to it.id }, homePrefix(group), null, HOME_PREVIEWS, null, 0, 0)) {
+                is ClientResult.Failure -> return@request page
+                is ClientResult.Success -> page.value
+            }
+            HomeGroupSummary(group, all.size, window.items.map { HomePreview(present(owner, it), window.anchorOf(it)) })
+        }
+        ClientResult.Success(HomeSummary(groups, purposeSummaries(owner).take(HOME_PURPOSES)))
+    }
+
+    suspend fun homeGroup(group: HomeActionGroup, cursor: String?, limit: Int): ClientResult<ItemPage> =
+        homeGroup(group, cursor, limit, anchor = null, before = 0, after = 0)
+
+    suspend fun homeGroupAround(group: HomeActionGroup, anchor: String, before: Int, after: Int): ClientResult<ItemPage> =
+        homeGroup(group, cursor = null, limit = null, anchor, before, after)
+
+    private suspend fun homeGroup(group: HomeActionGroup, cursor: String?, limit: Int?, anchor: String?, before: Int, after: Int) =
+        request(ApiId.HOME_02) { owner ->
+            if (!validWindowQuery(limit, anchor, before, after)) return@request failure(ErrorKind.VALIDATION, HOME_QUERY)
+            itemPage(owner, homeItems(owner, group), homePrefix(group), cursor, limit, anchor, before, after, HOME_QUERY, "INVALID_HOME_CURSOR")
+        }
 
     private fun categoryNotFound() = failure(ErrorKind.NOT_FOUND, "CATEGORY_NOT_FOUND")
 
@@ -473,10 +630,12 @@ internal class FakeStore(private val session: AuthSession, private val clock: Cl
         ClientResult.Failure(ClientError(kind, code, currentVersion = currentVersion, fields = fields))
 
     private companion object {
+        const val HOME_QUERY = "INVALID_HOME_QUERY"
+        const val HOME_PREVIEWS = 4
+        const val HOME_PURPOSES = 3
         const val CUSTOM_LIMIT = 20
         const val CREATE_PER_WINDOW = 5
         val CREATE_WINDOW = 60.seconds
-        const val CURSOR_PREFIX = "fake1:"
     }
 }
 

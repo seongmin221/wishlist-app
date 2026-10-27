@@ -37,6 +37,9 @@ internal data class BoardSeedData(
     val displayMetadata: BoardDisplayMetadata,
     val carrierId: String,
     val commuteId: String,
+    val purposeActivities: Map<String, PurposeActivity>,
+    /** FHome-only cards (정보 보완 필요, 분류 중): no category or purpose, so no board count above moves. */
+    val homeItems: List<WishlistItem> = emptyList(),
 )
 
 /**
@@ -45,6 +48,9 @@ internal data class BoardSeedData(
  * the board: the eight headphones and the two DAC items carry the board's names and prices, the
  * rest are plain "<category> <n>" items, older than the headphones.
  */
+private fun withPolicy(item: WishlistItem): WishlistItem =
+    evaluateItem(item).let { item.copy(requiredAction = it.requiredAction, allowedActions = it.allowedActions) }
+
 internal object BoardSeeds {
     /** FCategoryEditSheet text of the custom categories (gen_category.py `MINE`); others have none. */
     val customText: Map<String, Pair<String?, List<String>>> = mapOf(
@@ -102,14 +108,17 @@ internal object BoardSeeds {
         group("G011", "건강·웰빙")
         leaf("C086", "수면·회복 용품", "G011", 1)
 
+        // Purpose activity is a board snapshot, independent of category card save/check timestamps.
+        val purposeCreatedAt = now - 45.days
+        val emptyCreatedAt = now - 30.days - 1.minutes // stable last card after the 30-day gift activity
         val purposes = listOf(
-            Purpose(newId(), "출퇴근 헤드폰", "지하철에서 쓸 노이즈 캔슬링 헤드폰", "coral", "music", 1, now, now),
-            Purpose(newId(), "가을 트레일 러닝", null, "mustard", "star", 1, now, now),
-            Purpose(newId(), "홈오피스 의자", null, "periwinkle", "book", 1, now, now),
-            Purpose(newId(), "캠핑 첫 장비", null, "cyan", "tent", 1, now, now),
-            Purpose(newId(), "거실 조명 바꾸기", null, "mint", "home", 1, now, now),
-            Purpose(newId(), "엄마 생신 선물", null, "pink", "gift", 1, now, now),
-            Purpose(newId(), "여행 캐리어", "다음 달 출장 때 쓸 기내용 캐리어", "mustard", "plane", 1, now, now),
+            Purpose(newId(), "출퇴근 헤드폰", "지하철에서 쓸 노이즈 캔슬링 헤드폰", "coral", "music", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "가을 트레일 러닝", null, "mustard", "star", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "홈오피스 의자", null, "periwinkle", "book", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "캠핑 첫 장비", null, "cyan", "tent", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "거실 조명 바꾸기", null, "mint", "home", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "엄마 생신 선물", null, "pink", "gift", 1, purposeCreatedAt, purposeCreatedAt),
+            Purpose(newId(), "여행 캐리어", "다음 달 출장 때 쓸 기내용 캐리어", "mustard", "plane", 1, emptyCreatedAt, emptyCreatedAt),
         )
         val commuteId = purposes.first().id
         val headphones = categories.single { it.id == "C026" }
@@ -172,7 +181,59 @@ internal object BoardSeeds {
             val missing = (categoryCounts.getValue(category.id) - (covered[category.id] ?: 0)).coerceAtLeast(0)
             (1..missing).map { n -> plain(category, "${category.name} $n", "39000", null, 3, minutesAgo++) }
         }
-        val items = headphoneItems + dacItems + fillers
+        val purposesByName = purposes.associateBy { it.name }
+        fun assigned(item: WishlistItem, name: String) = item.copy(purpose = ItemPurpose(purposesByName.getValue(name).id, ValueSource.USER))
+        var assignedShoe = false
+        val items = (headphoneItems + dacItems + fillers).map { item ->
+            when {
+                // Preserve the original headphone membership, Marshall review and every named card.
+                item.product.name == "FiiO BTR7" -> assigned(item, "출퇴근 헤드폰")
+                item.category.id == "C053" -> assigned(item, "가을 트레일 러닝")
+                item.category.id == "C006" && !assignedShoe -> { assignedShoe = true; assigned(item, "가을 트레일 러닝") }
+                item.category.id == "C034" -> assigned(item, "홈오피스 의자")
+                item.category.id == "C056" -> assigned(item, "캠핑 첫 장비")
+                item.category.id == "C039" -> assigned(item, "거실 조명 바꾸기")
+                item.category.id == "C014" -> assigned(item, "엄마 생신 선물")
+                else -> item
+            }
+        }
+        // FHome 분류·목적 확인 3: the Marshall card plus the first shoe and kitchen fillers, renamed to
+        // the board's items and waiting for review (same categories and purposes, so no count moves).
+        val boardReviews = mapOf("C006" to ("호카 스피드고트 6" to "209000"), "C043" to ("발뮤다 더 토스터" to "349000"))
+        val reviewed = mutableSetOf<String>()
+        val boardItems = items.map { item ->
+            val category = item.category.id ?: return@map item
+            val (name, price) = boardReviews[category]?.takeIf { reviewed.add(category) } ?: return@map item
+            withPolicy(item.copy(
+                product = item.product.copy(name = name, price = DecimalAmount.parseOrNull(price)),
+                purpose = if (item.purpose.id == null) item.purpose else item.purpose.copy(source = ValueSource.AI),
+                reviewStatus = ReviewStatus.PENDING,
+            ))
+        }
+        // FHome 정보 보완 필요 3 (name, category, deleted custom) and 분류 중 1, in board order.
+        fun homeOnly(url: String, name: String?, category: ItemCategory, status: AnalysisStatus, minutesAgo: Int): WishlistItem {
+            val at = now - minutesAgo.minutes
+            return withPolicy(WishlistItem(
+                id = newId(), clientSubmissionId = newId(), version = 1, sourceUrl = url,
+                product = ProductSnapshot(name = name, nameSource = name?.let { ValueSource.AI }), category = category,
+                purpose = ItemPurpose(), analysis = ItemAnalysis(status), reviewStatus = ReviewStatus.NOT_REQUIRED,
+                lifecycleStatus = LifecycleStatus.ACTIVE, requiredAction = RequiredAction.NONE, createdAt = at, updatedAt = at,
+            ))
+        }
+        val homeItems = listOf(
+            homeOnly("https://29cm.co.kr/product/seed", null, ItemCategory(), AnalysisStatus.PROCESSING, 1),
+            homeOnly("https://coupang.com/vp/products/seed", null,
+                ItemCategory(missingReason = CategoryMissingReason.EXTRACTION_UNRESOLVED), AnalysisStatus.PARTIAL, 2),
+            homeOnly("https://seed.wishlist.invalid/fill/oak-side-table", "오크 원목 사이드 테이블",
+                ItemCategory(source = ValueSource.AI, missingReason = CategoryMissingReason.AI_ABSTAINED), AnalysisStatus.PARTIAL, 3),
+            homeOnly("https://seed.wishlist.invalid/fill/fiio-btr7", "FiiO BTR7",
+                ItemCategory(source = ValueSource.USER, missingReason = CategoryMissingReason.CUSTOM_CATEGORY_DELETED), AnalysisStatus.READY, 4),
+        )
+        val activityDays = listOf(1, 3, 7, 14, 21, 30)
+        val purposeActivities = purposes.mapIndexed { index, purpose ->
+            purpose.id to if (index < activityDays.size) PurposeActivity(now - activityDays[index].days, "CANDIDATE_ADDED")
+                else PurposeActivity(purpose.createdAt, "CREATED")
+        }.toMap()
         val cards = listOf(
             BoardCardFixture("l1", items[0].id, "#FFFFFF", "#9A9A96", "#D8D8D4", 1.0 / 1.0, "출퇴근 헤드폰 · 2일 전 확인"),
             BoardCardFixture("l2", items[1].id, "#7A6B5B", "#E9DFD2", "#A99683", 5.0 / 4.0, "출퇴근 헤드폰 · 2일 전 확인"),
@@ -189,11 +250,9 @@ internal object BoardSeeds {
             BoardCardFixture("c5", items[4].id, "#3F4B44", "#C9D3CB", "#7F8E84", 5.0 / 4.0, "29CM · 1주 전 확인"),
         )
         return BoardSeedData(
-            categories, purposes, items,
-            BoardDisplayMetadata(purposes.mapIndexed { index, purpose ->
-                purpose.id to listOf(5, 3, 2, 4, 3, 2, 0)[index]
-            }.toMap(), cards),
-            carrierId = purposes.last().id, commuteId = commuteId,
+            categories, purposes, boardItems,
+            BoardDisplayMetadata(purposes.associate { purpose -> purpose.id to boardItems.count { it.purpose.id == purpose.id } }, cards),
+            carrierId = purposes.last().id, commuteId = commuteId, purposeActivities = purposeActivities, homeItems = homeItems,
         )
     }
 }

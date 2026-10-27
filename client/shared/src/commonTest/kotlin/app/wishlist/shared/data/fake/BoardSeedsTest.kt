@@ -8,6 +8,10 @@ import app.wishlist.shared.model.ReviewStatus
 import app.wishlist.shared.model.ValueSource
 import kotlin.test.*
 import kotlin.time.Instant
+import kotlin.time.Duration.Companion.days
+import kotlinx.coroutines.test.runTest
+import app.wishlist.shared.core.MutableAuthSession
+import app.wishlist.shared.model.LifecycleStatus
 import kotlin.uuid.Uuid
 
 class BoardSeedsTest {
@@ -68,14 +72,57 @@ class BoardSeedsTest {
         assertEquals(purposeIds, data.displayMetadata.purposeCandidateCounts.keys)
     }
 
-    @Test fun board_counts_are_separate_from_membership_and_carrier_stays_empty() {
+    @Test fun purpose_board_counts_are_actual_membership_and_carrier_stays_empty() {
         val data = seed()
         assertEquals(7, data.purposes.size)
         assertEquals(0, data.items.count { it.purpose.id == data.carrierId })
-        assertEquals(4, data.items.count { it.purpose.id == data.commuteId })
+        assertEquals(5, data.items.count { it.purpose.id == data.commuteId })
+        assertEquals(listOf(5, 3, 2, 4, 3, 2, 0), data.purposes.map { purpose -> data.items.count { it.purpose.id == purpose.id && it.lifecycleStatus == LifecycleStatus.ACTIVE } })
         assertEquals(5, data.displayMetadata.purposeCandidateCounts[data.commuteId])
         assertEquals(listOf(5, 3, 2, 4, 3, 2, 0), data.purposes.map { data.displayMetadata.purposeCandidateCounts[it.id] })
         assertEquals(69, data.items.size)
+    }
+
+    @Test fun seeded_purpose_summary_matches_card_order_real_counts_and_relative_activity() = runTest {
+        val data = seed()
+        val session = MutableAuthSession(); session.changeAccount("A")
+        val store = FakeStore(session, Clock { now }, IdGenerator { Uuid.random().toString() })
+        store.seed(data).successValue()
+        val repo = FakePurposeRepository(store)
+        val catalog = repo.summary().successValue()
+        assertEquals(data.purposes.map { it.id }, catalog.purposes.map { it.id })
+        assertEquals(listOf(5, 3, 2, 4, 3, 2, 0), catalog.purposes.map { it.candidateCount })
+        assertEquals(listOf(1L, 3L, 7L, 14L, 21L, 30L, 30L), catalog.purposes.map { (now - it.activity.at).inWholeDays })
+        assertEquals(List(6) { "CANDIDATE_ADDED" } + "CREATED", catalog.purposes.map { it.activity.kind })
+        catalog.purposes.forEach { purpose ->
+            val items = FakeItemListRepository(store).byPurpose(purpose.id).successValue()
+            assertEquals(purpose.candidateCount, items.totalCount)
+            assertEquals(items.items.take(4).map { it.id }, purpose.previews.map { it.itemId })
+            assertEquals(purpose.activity, repo.detail(purpose.id).successValue().activity)
+        }
+        val before = catalog.purposes
+        store.seed(data).successValue()
+        assertEquals(before, repo.summary().successValue().purposes)
+    }
+
+    @Test fun seeded_home_matches_the_fhome_board_without_touching_the_board_counts() = runTest {
+        val data = seed()
+        // The home-only items carry no category or purpose and are not list-eligible.
+        assertEquals(4, data.homeItems.size)
+        assertTrue(data.homeItems.all { it.category.id == null && it.purpose.id == null })
+        val session = MutableAuthSession(); session.changeAccount("A")
+        val store = FakeStore(session, Clock { now }, IdGenerator { Uuid.random().toString() })
+        store.seed(data).successValue()
+        val home = FakeHomeRepository(store)
+        val summary = home.summary().successValue()
+        assertEquals(listOf(1, 3, 3), summary.groups.map { it.count })
+        assertEquals(listOf("마샬 MAJOR V", "호카 스피드고트 6", "발뮤다 더 토스터"), summary.groups[2].previews.map { it.item.product.name })
+        assertEquals(listOf(null, "오크 원목 사이드 테이블", "FiiO BTR7"), summary.groups[1].previews.map { it.item.product.name })
+        assertEquals(listOf("29cm.co.kr"), summary.groups[0].previews.map { it.item.sourceUrl.substringAfter("://").substringBefore('/') })
+        assertEquals(69, store.items(null, null).successValue().size)
+        // The board's analyzing card stays: the debug driver never completes a seeded one.
+        assertEquals(0, DebugAnalysisDriver(store, Clock { now + 1.days }).advance().successValue())
+        assertEquals(1, home.summary().successValue().groups[0].count)
     }
 
     @Test fun every_chip_number_is_real_membership() {
@@ -123,7 +170,7 @@ class BoardSeedsTest {
     @Test fun same_clock_and_id_sequence_are_deterministic_and_time_is_injected() {
         val a = seed()
         assertEquals(a, seed())
-        a.purposes.forEach { assertEquals(now, it.createdAt); assertEquals(now, it.updatedAt) }
+        a.purposes.forEach { assertTrue(it.createdAt <= now - 30.days); assertEquals(it.createdAt, it.updatedAt) }
         a.items.forEach { assertTrue(it.createdAt <= now); assertEquals(it.createdAt, it.updatedAt) }
     }
 

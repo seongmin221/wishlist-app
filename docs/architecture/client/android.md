@@ -122,11 +122,29 @@
 - **화면 위치:** `feature/category/{CategoryHomeScreen,CategoryListScreen,CategoryCard,CategoryFormSheet,CategoryPickerSheet,CategoryLayout,CategoryRoutes,CategoryText,PhotoPagePlanner}`. route `CategoryListRoute(hint)`는 탭 바를 보이는 slide·계정 범위이고, codec token은 필드별 base64url `category/<id>/<b64 이름>/<parentId>/<b64 상위>/<kind>`. 모듈은 나누지 않았다(C3-D10 유지: feature 폴더 경계로 충분하고 빌드 시간 문제가 없다).
 - **owner:** 공용 `CategoryPresenterOwner<P : Presenter>` 하나를 칸별 `ViewModelStore`(C4)로 둔다. shared Presenter 생성자가 internal이라 owner 수명은 가짜 Presenter로 테스트한다.
 - **첫 화면:** 레일 124dp + `VerticalPager`(300ms `emphasized` 스냅). 넘치는 페이지는 안쪽 스크롤이 끝난 뒤 남은 끌기를 페이저로 넘긴다(`OverflowToPager`). 갱신 결과가 넘김 직후 오면 페이저는 마지막으로 멈춘 상위에 맞춘다. 목록에서 편집이 저장되면 앱 전역 `CategoryChanges` 카운터가 올라 첫 화면이 돌아올 때 `refresh()`한다(목록이 덮는 동안 첫 화면 composition이 없기 때문).
-- **목록:** `Masonry2Col` + `PhotoPagePlanner`(페이지 단위 skeleton, 3초, 디코드 상자 열 폭 × 열 폭×3 FIT, 동시 6개 semaphore). 비율은 Coil이 그 상자로 디코드한 결과 크기에서 얻는다(비율 오차 1px 이내). 화면 밖 카드의 개별 취소는 없고 화면을 떠나면 함께 취소된다.
+- **목록:** `Masonry2Col` + `PhotoPagePlanner`(페이지 단위 skeleton, 3초, 디코드 상자 열 폭 × 열 폭×3 FIT, 동시 6개 semaphore). 비율은 Coil이 그 상자로 디코드한 결과 크기에서 얻는다(비율 오차 1px 이내). 화면 밖 카드의 개별 취소는 없고 화면을 떠나면 함께 취소된다. 목록이 다시 시작되거나(앞부분 id가 다름) 배치한 카드의 사진 URL이 바뀌면(`restartsLayout`) 배치 상태 묶음 `PhotoGridLayout`(페이지·planner·비율)을 새로 만들어 처음부터 다시 배치한다. 이전 묶음의 페이지 작업이 아직 돌아도 그 묶음에만 쓰고 화면의 묶음은 건드리지 못한다. `CategoryPhotoBook`은 사진 크기를 URL별로 다시 잰다. 측정 결과는 그 카드의 마지막 측정 요청일 때만 남고(`PhotoMeasurements`), 배치는 카드의 현재 사진 URL에서 잰 크기만 쓴다. 바뀌기 전 사진의 늦은 응답은 버린다.
 - **입력:** `WLInput(limitUnit = InputLimitUnit.CodePoint)`. IME 조합 중에는 자르지 않는 기존 경로를 그대로 쓴다([QA-CLI-017](../../learning/client/q-and-a/QA-CLI-017-code-point-input-limit.md)).
 - **시트:** `OverlayHost.showSheet(dismissGuard = { SheetDismiss.Allow | Block | Confirm }, onConfirmDismiss, selfLaidOut)`. guard는 막 누르기·끌기·뒤로에 모두 적용된다. 폼은 `selfLaidOut` + `WLSheetBody`로 머리 고정·본문 스크롤·버튼 줄 하단 고정(내비게이션 막대·IME 위). 제출 중 주 버튼은 `WLButton(loading = true)`(20dp 진행 표시, 눌리지 않음, TalkBack은 글자를 읽음).
 - **DEBUG:** `DebugSeedImages`(`seed.wishlist.invalid` `/tall/` 1:4, `/slow/` 5초), launch extras `wl.fake.longCategory`(120개), `wl.fake.delayCategoryCreate`(ms), `wl.fake.editCategory`(`<id>|<name>`), 목적 탭 데모 끝의 "카테고리 선택 시트 열기".
 - **남은 점:** 실기기(Flip6) 확인은 하지 않았다(에뮬레이터만). 409 재조회 중 진행 표시는 기기에서 따로 찍지 않았다. Compose 제스처·IME 조합은 단위 테스트가 없다(Robolectric 없음).
+
+## 목적 화면 (C6)
+
+실제 목적 탭은 `feature/purpose`에서 KMP Purpose Presenter에 연결한다. -22dp 카드 겹침과 펼친 ID를 유지하며 생성은 custom overlay sheet의 고정 footer·IME code point 입력을 사용한다. 상세는 계정 범위 route이며 기존 `WLHeaderSheet`의 드래그·nested scroll·실측 기본 높이를 사용해 색 면을 고정하고 머리를 연속 변형한다. 폼과 상세 Presenter는 entry ViewModelStore에 묶인다.
+
+후보 목록은 C5 사진 배치·loader를 재사용하며 판매처·마지막 확인 시각을 표시한다. #22는 미병합이므로 사진 공유 요소 전환을 포함하지 않는다. 후보 추가·삭제·종료·끝난 비교는 사용자 답변에 따라 비활성 진입점을 유지한다. 후보 0개에는 비교 끝내기를 숨긴다.
+
+[검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
+
+C6 PR #23 후속에서 목적 편집 취소·버리기는 폼의 `recoveredDetail`이 있으면 상세에 먼저 적용한다. 사용자가 복구 후 다시 수정한 초안은 버리고, 서버에서 읽은 이름·색·version을 유지하여 재편집 시 같은 오래된 version으로 저장하지 않는다.
+
+## 홈·연속 처리·목록 anchor (C7)
+
+- **홈:** `feature/home`의 `HomeLoggedInContent`(분석 대기 카드 → HOME-01 그룹 → 실패 시 재시도 카드), `HomeTodoCard`(접힘 시작, 화살표 200ms 180°, 미리보기 캐러셀 최대 4), `HomePurposeSummary`(비교 중인 목적 3개·목적 전체). `HomeScreen`은 composition 진입마다 `appeared()`, 두 번째 이후 resume에서 `foreground()`를 부른다(C6 재등장 패턴).
+- **연속 처리:** `feature/flow`. `HomeFlowRoute`(계정 범위, 탭 막대 없음, 시작 anchor는 base64url 인코딩), entry ViewModel `HomeFlowOwner`, `ReviewFlowScreen`·`ReviewCardStack`(던지기 340 `throw`, 회전 중심 50%/90%, 뒤 카드 2장, `pointerInput`은 고정 Box에 두어 속도를 stack 좌표로 측정), `FillFlowScreen`(내용만 320 `standard` 넘김, 건너뛰기만 동작), `FlowSummary`. 판정 순수 함수는 `CardThrowMath`(iOS와 같은 값·Ruling 6). 문자열은 새 `home_flow_strings.xml`(ko·en)에 두어 #22와 겹치는 `strings.xml`을 건드리지 않는다.
+- **목록 anchor:** `feature/category/ListAnchor.kt`가 masonry `Column`의 배치된 카드 위치로 첫 보이는 카드를 정하고 restore token을 한 번 적용한다(같은 카드면 카드 안 offset 유지). 위쪽 끝 `loadNewer`는 끝을 떠났다 돌아올 때만 다시 부른다(Ruling 9). 카테고리 목록과 목적 상세가 공유한다.
+
+[구현·검증](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).
 
 ## 카드 사진 → 상세 사진 전환 (C5 PR B)
 

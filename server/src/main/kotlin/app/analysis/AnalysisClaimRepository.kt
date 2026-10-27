@@ -47,7 +47,8 @@ class AnalysisClaimRepository(private val dataSource: DataSource) {
         val firstColumn = if (lane == AnalysisLane.GENERAL) "first_attempt_at" else "first_browser_attempt_at"
         val clearMetadata = if (lane == AnalysisLane.GENERAL)
             "pending_product_name=null,pending_product_description=null,pending_product_image_url=null,pending_canonical_url=null," +
-            "pending_brand=null,pending_price=null,pending_currency=null,pending_merchant=null," else ""
+            "pending_brand=null,pending_price=null,pending_currency=null,pending_merchant=null,pending_gtin=null,pending_mpn_key=null," +
+            "pending_checked_at=null,pending_product_cache_id=null," else ""
         val lease = connection.prepareStatement("""
             update analysis_jobs set stage=?,execution_token=?,lease_until=clock_timestamp()+interval '${AnalysisTiming.LEASE_SECONDS} seconds',
                 claimed_item_version=?, recovery_check_at=null, $countColumn=$countColumn+1,$firstColumn=coalesce($firstColumn,clock_timestamp()),

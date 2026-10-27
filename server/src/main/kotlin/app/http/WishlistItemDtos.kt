@@ -8,9 +8,12 @@ import app.wishlist.LifecycleStatus
 import app.wishlist.RequiredAction
 import app.wishlist.ReviewStatus
 import app.wishlist.ValueSource
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class WishlistItemDto(
     val id: String,
@@ -29,7 +32,22 @@ data class WishlistItemDto(
     val manualCompletionAt: String? = null,
     val allowedActions: Set<ItemAction> = emptySet(),
     val clientCreatedAt: String? = null,
+    /** Omitted (not null) when absent: ApiJson encodes defaults, and cards must not grow this key. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val deletionImpact: DeletionImpactDto? = null,
+    /** Omitted when the item has no visible duplicate pair as the new side. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val duplicateCandidates: DuplicateCountsDto? = null,
 )
+
+@Serializable
+data class DuplicateCountsDto(val matchCount: Int, val sameUrlCount: Int, val awaitingAnalysisCount: Int)
+
+@Serializable
+data class DeletionImpactDto(val purpose: PurposeImpactDto?)
+
+@Serializable
+data class PurposeImpactDto(val id: String, val name: String, val candidateCount: Int, val remainingCount: Int)
 
 @Serializable
 data class ProductDto(

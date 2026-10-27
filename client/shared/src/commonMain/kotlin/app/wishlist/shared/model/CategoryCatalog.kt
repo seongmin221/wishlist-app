@@ -76,9 +76,27 @@ data class CategoryPatch(
     val isEmpty: Boolean get() = name == null && description == DescriptionChange.Keep && examples == null
 }
 
-/** One ITEM-02 page. [nextCursor] is opaque and null on the last page. */
+/**
+ * Where an ITEM-02/HOME-02 window landed. [resolved] false is a normal recovery, not an error: the
+ * requested card left the scope and [resolvedItemId] is the next older one (else the next newer);
+ * null when the scope is empty.
+ */
+data class ItemAnchor(
+    val requestedItemId: String,
+    val resolvedItemId: String?,
+    val resolved: Boolean,
+)
+
+/**
+ * One ITEM-02/HOME-02 page or anchor window, newest first. Cursors are opaque and present only when
+ * items exist beyond the window: [nextCursor] older, [previousCursor] newer (null on the first page).
+ * [anchorCursors] maps each card id to its anchor token (not a page cursor). [anchor] is null in page mode.
+ */
 data class ItemPage(
     val items: List<WishlistItem>,
     val totalCount: Int,
     val nextCursor: String?,
+    val previousCursor: String? = null,
+    val anchorCursors: Map<String, String> = emptyMap(),
+    val anchor: ItemAnchor? = null,
 )

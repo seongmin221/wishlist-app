@@ -35,6 +35,15 @@ private class RemoteCategoryHarness : CategoryContractFixture {
     override suspend fun placeItem(ownerId: String, categoryId: String, name: String?, lifecycle: LifecycleStatus): String =
         server.asOwner(ownerId) { server.store.putItem(contractItem(++itemSeq, categoryId, name, lifecycle)).successValue().id }
 
+    override suspend fun createPurpose(ownerId: String): String = server.asOwner(ownerId) {
+        server.store.createPurpose(PurposeCommand("목적", null, "coral", "heart"), "00000000-0000-4000-9000-" + (++itemSeq).toString().padStart(12, '0')).successValue().purpose.id
+    }
+
+    override suspend fun placePurposeItem(ownerId: String, purposeId: String): String = server.asOwner(ownerId) {
+        server.store.putItem(contractItem(++itemSeq, "C024", "후보", LifecycleStatus.ACTIVE)
+            .copy(purpose = ItemPurpose(purposeId, ValueSource.USER))).successValue().id
+    }
+
     override fun advanceSeconds(seconds: Long) { now += seconds.seconds }
     override suspend fun close() = server.engine.close()
 }
@@ -89,6 +98,17 @@ class RemoteCategoryRepositoryTest {
         assertEquals("C026", list.url.parameters["categoryId"])
         assertEquals("c/1?#", list.url.parameters["cursor"])
         assertEquals("40", list.url.parameters["limit"])
+    }
+
+    @Test fun aroundSendsOnlyAnchorAndBounds() = runTest {
+        val h = RemoteCategoryHarness(); h.session.changeAccount(owner)
+        // A foreign anchor is refused (400); only the request shape matters here.
+        assertEquals(ErrorKind.VALIDATION, h.items.byCategoryAround("C026", "tok").error().kind)
+        h.items.byPurposeAround("00000000-0000-4000-8000-0000000000ff", "tok", before = 0, after = 5).error()
+        val (category, purpose) = h.server.engine.requestHistory
+        assertEquals("/v1/wishlist-items", category.url.encodedPath)
+        assertEquals("categoryId=C026&anchor=tok&before=20&after=20", category.url.encodedQuery)
+        assertEquals("purposeId=00000000-0000-4000-8000-0000000000ff&anchor=tok&before=0&after=5", purpose.url.encodedQuery)
     }
 
     @Test fun rateLimitReadsRetryAfterAndFieldsReachTheError() = runTest {

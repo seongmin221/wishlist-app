@@ -28,6 +28,7 @@ import app.wishlist.shared.presentation.LocalDetailOutcome
 import app.wishlist.shared.presentation.RowStatus
 import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.model.AnalysisStatus
+import app.wishlist.shared.model.HomeActionGroup
 import app.wishlist.shared.submission.ShareCardKind
 import kotlin.time.Duration.Companion.seconds
 import app.wishlist.shared.di.ClientBuildMode.DEBUG
@@ -58,6 +59,62 @@ class SharedModulesTest {
         "마샬 MAJOR V", "뱅앤올룹슨 Beoplay H95", "소니 ULT WEAR", "오디오테크니카 ATH-M50x",
     )
 
+    @Test fun purposeApisHaveExplicitImplementedBackends() {
+        val purposes = setOf(ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04)
+        assertTrue(FAKE_IMPLEMENTED_APIS.containsAll(purposes))
+        assertTrue(REMOTE_IMPLEMENTED_APIS.containsAll(purposes))
+    }
+
+    @Test fun homeApisHaveExplicitImplementedBackends() {
+        val home = setOf(ApiId.HOME_01, ApiId.HOME_02)
+        assertTrue(FAKE_IMPLEMENTED_APIS.containsAll(home))
+        assertTrue(REMOTE_IMPLEMENTED_APIS.containsAll(home))
+        // RELEASE never binds the Fake home; DEBUG may.
+        home.forEach { api ->
+            assertFailsWith<IllegalArgumentException> { createRuntime(RepositoryBindings(RELEASE, allBackends(Backend.UNAVAILABLE) + (api to Backend.FAKE))) }
+        }
+        val debug = createRuntime(debugBindings(ApiId.HOME_01 to Backend.FAKE, ApiId.HOME_02 to Backend.FAKE))
+        assertEquals(listOf(Backend.FAKE, Backend.FAKE), home.map { debug.resolvedBackend(it) })
+        debug.close()
+        val mixed = createRuntime(debugBindings(ApiId.HOME_01 to Backend.REMOTE), RemoteConfig(TEST_BASE_URL, FakeTokenSource()))
+        assertEquals(listOf(Backend.REMOTE, Backend.UNAVAILABLE), home.map { mixed.resolvedBackend(it) })
+        mixed.close()
+    }
+
+    @Test fun runtime_home_repository_reads_the_seeded_fake_and_gates_before_start_and_after_close() = runTest {
+        val runtime = createRuntime(debugBindings(ApiId.HOME_01 to Backend.FAKE, ApiId.HOME_02 to Backend.FAKE, ApiId.PUR_01 to Backend.FAKE),
+            dispatcher = StandardTestDispatcher(testScheduler))
+        val home = runtime.homeRepository()
+        assertEquals(RUNTIME_NOT_READY, home.summary().error().code)
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        val summary = home.summary().successValue()
+        // The FHome board: analysis 1, information 3, review 3, and the three most recent purposes.
+        assertEquals(listOf(1, 3, 3), summary.groups.map { it.count })
+        assertEquals(listOf("마샬 MAJOR V", "호카 스피드고트 6", "발뮤다 더 토스터"), summary.groups.last().previews.map { it.item.product.name })
+        assertEquals(listOf(null, "오크 원목 사이드 테이블", "FiiO BTR7"), summary.groups[1].previews.map { it.item.product.name })
+        assertEquals(listOf("출퇴근 헤드폰", "가을 트레일 러닝", "홈오피스 의자"), summary.recentPurposes.map { it.name })
+        val review = home.group(HomeActionGroup.CLASSIFICATION_REVIEW).successValue()
+        assertEquals(summary.groups.last().previews.map { it.item.id }, review.items.map { it.id })
+        runtime.close()
+        assertEquals(RUNTIME_NOT_READY, home.group(HomeActionGroup.CLASSIFICATION_REVIEW).error().code)
+    }
+
+    @Test fun runtime_home_flow_presenter_reads_the_seeded_review_group() = runTest {
+        val runtime = createRuntime(debugBindings(ApiId.HOME_01 to Backend.FAKE, ApiId.HOME_02 to Backend.FAKE, ApiId.PUR_01 to Backend.FAKE),
+            dispatcher = StandardTestDispatcher(testScheduler))
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        val flow = runtime.homeFlowPresenter()
+        flow.start(HomeActionGroup.CLASSIFICATION_REVIEW, null); advanceUntilIdle()
+        val state = flow.state.value
+        assertEquals("마샬 MAJOR V", state.current?.item?.product?.name)
+        assertEquals(listOf("호카 스피드고트 6", "발뮤다 더 토스터"), state.upcoming.map { it.item.product.name })
+        assertEquals(1 to 3, state.position to state.total)
+        flow.close()
+        runtime.close()
+    }
+
     // --- Explicit bindings -------------------------------------------------------------------
 
     @Test fun bindings_must_list_all_37_apis() {
@@ -87,10 +144,10 @@ class SharedModulesTest {
 
     @Test fun unimplemented_api_cannot_be_bound_to_remote_or_fake() {
         val remote = RemoteConfig(TEST_BASE_URL, FakeTokenSource())
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.HOME_01 to Backend.REMOTE), remote) }
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.DUP_01 to Backend.REMOTE), remote) }
         assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.CAT_05 to Backend.FAKE)) }
         // The seed catalog does not make PUR-01 a Fake wire API (C6).
-        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.PUR_01 to Backend.FAKE)) }
+        assertFailsWith<IllegalArgumentException> { createRuntime(debugBindings(ApiId.PUR_05 to Backend.FAKE)) }
     }
 
     @Test fun remote_config_is_required_if_and_only_if_some_api_is_remote() {
@@ -366,6 +423,46 @@ class SharedModulesTest {
         advanceUntilIdle()
         assertEquals(RUNTIME_NOT_READY, late.state.value.error?.code)
         late.close()
+    }
+
+    @Test fun runtime_purpose_backends_route_independently_and_gate_before_start_and_after_close() = runTest {
+        val runtime = createRuntime(debugBindings(ApiId.PUR_01 to Backend.FAKE, ApiId.PUR_02 to Backend.REMOTE,
+            ApiId.PUR_03 to Backend.FAKE), remote = RemoteConfig(TEST_BASE_URL, FakeTokenSource()), dispatcher = StandardTestDispatcher(testScheduler))
+        assertEquals(listOf(Backend.FAKE, Backend.REMOTE, Backend.FAKE, Backend.UNAVAILABLE),
+            listOf(ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04).map { runtime.resolvedBackend(it) })
+        val purpose = runtime.purposeRepository()
+        val command = app.wishlist.shared.model.PurposeCommand("목적", null, "coral", "heart")
+        suspend fun expectClosed() {
+            assertEquals(RUNTIME_NOT_READY, purpose.summary().error().code)
+            assertEquals(RUNTIME_NOT_READY, purpose.detail(remoteItemId).error().code)
+            assertEquals(RUNTIME_NOT_READY, purpose.create(command, remoteItemId).error().code)
+            assertEquals(RUNTIME_NOT_READY, purpose.update(remoteItemId, 1, app.wishlist.shared.model.PurposePatch(name = "새 이름")).error().code)
+            assertEquals(RUNTIME_NOT_READY, runtime.itemListRepository().byPurpose(remoteItemId).error().code)
+        }
+        expectClosed()
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        assertTrue(purpose.summary().successValue().purposes.isNotEmpty())
+        assertEquals(API_UNAVAILABLE, purpose.update(remoteItemId, 1, app.wishlist.shared.model.PurposePatch(name = "새 이름")).error().code)
+        runtime.close(); expectClosed()
+    }
+
+    @Test fun runtime_purpose_presenters_use_seed_and_new_create_detail() = runTest {
+        val apis = listOf(ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04, ApiId.ITEM_02)
+        val runtime = createRuntime(debugBindings(*apis.map { it to Backend.FAKE }.toTypedArray()), dispatcher = StandardTestDispatcher(testScheduler))
+        runtime.startDebugSession(); advanceUntilIdle()
+        runtime.auth().signIn(AuthProvider.GOOGLE).successValue(); advanceUntilIdle()
+        val home = runtime.purposeHomePresenter(); home.load(); advanceUntilIdle()
+        assertTrue(home.state.value.purposes.isNotEmpty())
+        val form = runtime.purposeFormPresenter(); form.startCreate(); advanceUntilIdle(); form.changeName("새 목적"); form.submit(); advanceUntilIdle()
+        val created = assertNotNull(form.state.value.result)
+        assertEquals(0, created.candidateCount)
+        val detail = runtime.purposeDetailPresenter(); detail.load(created.id); advanceUntilIdle()
+        assertEquals(created, detail.state.value.detail)
+        assertTrue(detail.state.value.items.isEmpty())
+        home.refresh(); advanceUntilIdle()
+        assertTrue(home.state.value.purposes.any { it.id == created.id && it.candidateCount == 0 })
+        form.close(); detail.close(); home.close(); runtime.close()
     }
 
     @Test fun runtime_category_presenters_run_on_the_seeded_fake() = runTest {

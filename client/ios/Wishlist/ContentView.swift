@@ -27,12 +27,18 @@ private struct AppShell: View {
     @State private var motion: WLNavMotion
     @State private var entryOwners: WLEntryOwners
     @State private var overlay = OverlayHostState()
+    private let runtime: SharedRuntime
 
     @Environment(AccountPresenterOwner.self) private var account
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(runtime: SharedRuntime) {
+        self.runtime = runtime
+        #if DEBUG
+        let navigator = WLNavigator(initialTab: DebugLaunchHooks.string(of: "wl.purpose.screen", in: ProcessInfo.processInfo.arguments) == nil ? .home : .purpose)
+        #else
         let navigator = WLNavigator()
+        #endif
         _navigator = State(initialValue: navigator)
         _motion = State(initialValue: WLNavMotion(navigator: navigator))
         // Cheap when thrown away on a re-init: owners create Presenters only when a screen asks.
@@ -62,6 +68,35 @@ private struct AppShell: View {
                 .zIndex(1)
             }
         }
+        #if DEBUG
+        .task {
+            if let c7 = DebugLaunchHooks.string(of: C7DebugScreens.key, in: ProcessInfo.processInfo.arguments) {
+                await C7DebugScreens.open(c7, runtime: runtime, navigator: navigator, owners: entryOwners)
+                return
+            }
+            guard let screen = DebugLaunchHooks.string(of: "wl.purpose.screen", in: ProcessInfo.processInfo.arguments) else { return }
+            await runtime.purposeUntilReady()
+            // A fresh simulator has no saved Fake account. Only this explicit screenshot hook signs in.
+            if runtime.auth().account.value == nil { _ = try? await runtime.auth().signIn(provider: .google) }
+            if screen == "home" { return }
+            guard let rootID = navigator.entries(.purpose).first?.id else { return }
+            let home = entryOwners.purposeHome(rootID)
+            home.loadOnce()
+            for _ in 0..<100 {
+                if home.state.loaded { break }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+            if screen == "create" {
+                showPurposeCreateSheet(overlay: overlay, owners: entryOwners) { detail in
+                    home.refresh()
+                    navigator.push(AppDestination.purpose(detail.id).route, sourceKey: "purpose/debug-created")
+                }
+            } else if let purpose = screen == "empty" ? home.state.purposes.first(where: { $0.candidateCount == 0 })
+                : home.state.purposes.first(where: { $0.name == "출퇴근 헤드폰" }) ?? home.state.purposes.first {
+                navigator.push(AppDestination.purpose(purpose.id).route, sourceKey: "purpose/debug")
+            }
+        }
+        #endif
         .onChange(of: account.state.account?.accountId) { previous, next in
             if ContentView.shouldDropAccountScoped(previous: previous, next: next) {
                 entryOwners.close(motion.dropAccountScoped())
@@ -78,7 +113,7 @@ private struct AppShell: View {
     }
 }
 
-/// 앱의 단일 route renderer: 실제 기능 화면(debug·release 공통)을 먼저 고르고, 카테고리·목적 탭은 debug 데모(release는 이름만).
+/// 앱의 단일 route renderer: 기능 화면은 debug·release 공통이다.
 private struct AppRoute: View {
     let route: WLRoute
 
@@ -90,11 +125,7 @@ private struct AppRoute: View {
             case .category:
                 CategoryHomeScreen()
             case .purpose:
-                #if DEBUG
-                DemoTabRoot(tab: tab)
-                #else
-                PlainTabRoot(tab: tab)
-                #endif
+                PurposeHomeScreen()
             }
         }
         if let destination = route.destination.base as? AppDestination {
@@ -105,6 +136,8 @@ private struct AppRoute: View {
             case .local(let submissionId): LocalSubmissionScreen(submissionId: submissionId)
             case .web(let page): WebViewScreen(page: page)
             case .categoryList(let target): CategoryListScreen(target: target)
+            case .purpose(let id): PurposeDetailScreen(purposeID: id)
+            case .homeFlow(let target): HomeFlowScreen(target: target)
             }
         }
         #if DEBUG

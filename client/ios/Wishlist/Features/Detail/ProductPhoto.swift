@@ -18,6 +18,8 @@ struct ProductPhoto: View {
     let imageUrl: String?
     var fill = true
     var inset: CGFloat = 0
+    /// The placeholder face (default card color; C7 tiles drawn on a card use a field color to stay visible).
+    var placeholderColor: Color?
 
     @Environment(\.wlColors) private var c
     @Environment(\.displayScale) private var scale
@@ -31,16 +33,18 @@ struct ProductPhoto: View {
         .accessibilityHidden(true)
     }
 
-    private var placeholder: some View { DetailPhotoPlaceholder() }
+    private var placeholder: some View { DetailPhotoPlaceholder(color: placeholderColor) }
 }
 
-/// 사진 자리표시(D9): 카드색 면 + 중립 상품 아이콘 32(칸 전체).
+/// 사진 자리표시(D9): 카드색 면(`color`가 있으면 그 색) + 중립 상품 아이콘 32(칸 전체).
 struct DetailPhotoPlaceholder: View {
+    var color: Color?
+
     @Environment(\.wlColors) private var c
 
     var body: some View {
         ZStack {
-            c.card
+            color ?? c.card
             Canvas { ctx, sz in
                 let k = sz.width / 24
                 ctx.scaleBy(x: k, y: k)
