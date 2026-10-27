@@ -45,4 +45,14 @@ class DetailPhotoTest {
         assertEquals(false, keepsSharedPhotoSlot(photoEntry = true, hasItem = true, hasError = false, kind = DetailKind.GONE))
         assertEquals(false, keepsSharedPhotoSlot(photoEntry = false, hasItem = true, hasError = false, kind = DetailKind.READY))
     }
+
+    /** A drawn detail photo counts only for the address it was loaded from (a refresh that removes or replaces it). */
+    @Test
+    fun aDrawnPhotoIsDroppedWhenThePhotoAddressChangesOrGoes() {
+        val loaded = "https://img/a" to "photo-a"
+        assertEquals("photo-a", drawnPhotoFor("https://img/a", loaded))
+        assertNull(drawnPhotoFor(null, loaded))
+        assertNull(drawnPhotoFor("https://img/b", loaded))
+        assertNull(drawnPhotoFor("https://img/a", null as Pair<String, String>?))
+    }
 }

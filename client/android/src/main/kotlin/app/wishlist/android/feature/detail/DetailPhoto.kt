@@ -59,6 +59,13 @@ internal fun detailPhotoUnder(hasHeld: Boolean, drawn: Boolean): DetailPhotoUnde
 internal fun detailPhotoRatio(held: PhotoPixels?, drawn: PhotoPixels?): Float? =
     listOfNotNull(held, drawn).firstOrNull { it.width > 0 && it.height > 0 }?.let { it.height.toFloat() / it.width }
 
+/**
+ * The drawn detail photo, if it was loaded from [url] (the item's photo now). A refresh that removes or
+ * replaces the photo drops it: the slot falls back to the held photo or the placeholder, and going back
+ * shrinks what the detail shows now, not the old photo.
+ */
+internal fun <I> drawnPhotoFor(url: String?, loaded: Pair<String, I>?): I? = loaded?.takeIf { url != null && it.first == url }?.second
+
 private fun Image.pixels() = PhotoPixels(width, height)
 
 /**
@@ -78,8 +85,11 @@ internal fun DetailSharedPhoto(imageUrl: String?, sourceKey: String) {
     val nav = LocalWLNavigator.current
     val entry = LocalWLEntry.current
     val held = entry?.let { handoff.forward(it.id) }
-    var drawn by remember { mutableStateOf<Image?>(null) }
     val url = (photoSourceFor(imageUrl) as? PhotoSource.Remote)?.url
+    var loaded by remember { mutableStateOf<Pair<String, Image>?>(null) }
+    val drawn = drawnPhotoFor(url, loaded)
+    // A photo of another address is not kept (it is no longer drawn or handed back).
+    LaunchedEffect(url) { if (loaded?.first != url) loaded = null }
     val ratio = detailPhotoRatio(held?.image?.pixels(), drawn?.pixels())
 
     if (entry != null) {
@@ -88,7 +98,9 @@ internal fun DetailSharedPhoto(imageUrl: String?, sourceKey: String) {
             handoff.motionEnded(entry.id)
         }
         val current = drawn ?: held?.image
-        LaunchedEffect(entry.id, current) { current?.let { handoff.showing(entry.id, sourceKey, it) } }
+        LaunchedEffect(entry.id, current) {
+            if (current != null) handoff.showing(entry.id, sourceKey, current) else handoff.notShowing(entry.id)
+        }
         DisposableEffect(entry.id) { onDispose { handoff.notShowing(entry.id) } }
         LaunchedEffect(entry.id) {
             snapshotFlow { PhotoHandoff.isLeaving(nav.activeTransition, entry.tab, entry.id, nav.entries(entry.tab).map { it.id }) }
@@ -120,7 +132,7 @@ internal fun DetailSharedPhoto(imageUrl: String?, sourceKey: String) {
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
                     onSuccess = {
-                        drawn = it.result.image
+                        loaded = url to it.result.image
                         entry?.let { e -> handoff.detailDrawn(e.id) }
                     },
                 )

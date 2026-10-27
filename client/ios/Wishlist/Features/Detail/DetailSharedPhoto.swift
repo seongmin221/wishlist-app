@@ -17,6 +17,14 @@ enum DetailSharedSlot {
     static func shown(loaded: UIImage?, held: UIImage?, cached: () -> UIImage?) -> UIImage? {
         loaded ?? held ?? cached()
     }
+
+    /// The loaded detail photo, if it was loaded from `url` (the item's photo now). A refresh that removes or
+    /// replaces the photo drops it: the slot falls back to the held photo, the cache or the placeholder, and
+    /// going back shrinks what the detail shows now (Android `drawnPhotoFor`).
+    static func loaded(for url: URL?, _ loaded: (url: URL, image: UIImage)?) -> UIImage? {
+        guard let url, let loaded, loaded.url == url else { return nil }
+        return loaded.image
+    }
 }
 
 /// The slot: a 1:1 card-color frame (r20) with the photo fitted inside the 56 inset. The fitted photo
@@ -31,14 +39,14 @@ struct DetailSharedPhoto: View {
     @Environment(\.wlEntryID) private var entryID
     @Environment(\.displayScale) private var scale
     @Environment(\.wlColors) private var c
-    @State private var loaded: UIImage?
+    @State private var loaded: (url: URL, image: UIImage)?
 
     private static let inset: CGFloat = 56
 
     var body: some View {
         let url = remotePhotoURL(imageUrl)
         let held = entryID.flatMap { motion.handoff.forward($0) }
-        let shown = DetailSharedSlot.shown(loaded: loaded, held: held) { url.flatMap { RemoteImageLoader.shared.bestCached(for: $0) } }
+        let shown = DetailSharedSlot.shown(loaded: DetailSharedSlot.loaded(for: url, loaded), held: held) { url.flatMap { RemoteImageLoader.shared.bestCached(for: $0) } }
         let animating = entryID.map { motion.channels($0).animating } ?? false
         DetailPhotoFrame {
             GeometryReader { geo in
@@ -59,13 +67,17 @@ struct DetailSharedPhoto: View {
                 .task(id: DetailPhotoKey(url: url, width: Int(box.width * scale), height: Int(box.height * scale))) {
                     guard let url, box.width > 0, box.height > 0 else { return }
                     if let image = await RemoteImageLoader.shared.image(for: url, frame: box, scale: scale, fill: false), !Task.isCancelled {
-                        loaded = image
+                        loaded = (url, image)
                         if let entryID { motion.handoff.detailDrawn(entryID) }
                     }
                 }
             }
         }
         .accessibilityHidden(true)
+        // A photo of another address is not kept (it is no longer drawn or handed back).
+        .onChange(of: url) { _, now in
+            if let current = loaded, current.url != now { loaded = nil }
+        }
         .onChange(of: animating, initial: true) { _, now in
             if !now, let entryID { motion.handoff.motionEnded(entryID) }
         }

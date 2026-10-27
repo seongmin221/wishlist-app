@@ -23,4 +23,13 @@ final class DetailSharedPhotoTests: XCTestCase {
         XCTAssertTrue(DetailSharedSlot.shown(loaded: nil, held: nil, cached: { cached }) === cached)
         XCTAssertNil(DetailSharedSlot.shown(loaded: nil, held: nil, cached: { nil }))
     }
+
+    /// A loaded detail photo counts only for the address it was loaded from (a refresh that removes or replaces it).
+    func testALoadedPhotoIsDroppedWhenThePhotoAddressChangesOrGoes() {
+        let a = URL(string: "https://img/a")!, b = URL(string: "https://img/b")!, image = UIImage()
+        XCTAssertTrue(DetailSharedSlot.loaded(for: a, (a, image)) === image)
+        XCTAssertNil(DetailSharedSlot.loaded(for: nil, (a, image)))
+        XCTAssertNil(DetailSharedSlot.loaded(for: b, (a, image)))
+        XCTAssertNil(DetailSharedSlot.loaded(for: a, nil))
+    }
 }
