@@ -50,6 +50,23 @@ object CandidateCursorCodec {
         fields[5] to ReadPosition(CursorPrimitives.instant(micros), requireNotNull(parseCanonicalUuid(fields[7])))
     }.getOrNull()
 
+    /** DUP-01 position hint bound to owner and the new item; the position is the existing item's (createdAt, id). */
+    fun encodeDuplicates(owner: UUID, item: UUID, position: ReadPosition): String {
+        val micros = CursorPrimitives.micros(position.createdAt)
+        require(micros in 0..CursorPrimitives.MAX_MICROS)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(
+            "v1|DUPLICATES|${CursorPrimitives.ownerTag(owner)}|$item|$micros|${position.id}".toByteArray(Charsets.UTF_8))
+    }
+
+    fun decodeDuplicates(owner: UUID, item: UUID, raw: String): ReadPosition? = runCatching {
+        val fields = fields(raw)
+        require(fields.size == 6 && fields[0] == "v1" && fields[1] == "DUPLICATES" && fields[2] == CursorPrimitives.ownerTag(owner))
+        require(fields[3] == item.toString())
+        val micros = fields[4].toLong()
+        require(micros in 0..CursorPrimitives.MAX_MICROS)
+        ReadPosition(CursorPrimitives.instant(micros), requireNotNull(parseCanonicalUuid(fields[5])))
+    }.getOrNull()
+
     private fun fields(raw: String): List<String> {
         require(raw.length in 1..2048 && tokenCharacters.matches(raw))
         return Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)

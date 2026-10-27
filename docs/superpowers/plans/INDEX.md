@@ -17,3 +17,4 @@
 - [C6 목적 화면 구현 계획 — 데이터·Presenter·Android·iOS·통합 검증](2026-10-24-client-c6-purpose.md) — 완료(#23 MERGED `896fbc2`, 2026-10-24)
 - [B8 후보 이동과 영향 확인 삭제 계획](2026-10-24-b8-candidate-move-deletions.md) — 하위 묶음별 구현·검증·커밋 · 실행 완료
 - [C7 홈·연속 처리·목록 anchor 계획](2026-10-24-client-c7-home-review-flow.md) — Task 1~8 완료(로컬 검증), DEBUG Fake / RELEASE UNAVAILABLE, C8 명령 미구현
+- [B9 중복 비교와 선택 해소 계획](2026-10-24-b9-duplicate-resolution.md) — 식별·cache·탐지·DUP-01/02·회귀 · 실행 완료

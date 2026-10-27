@@ -257,6 +257,6 @@ category/purpose/media를 참조하는 상품 변경은 해당 자원이 준비�
 | 목적·상품 입력 제한 | 서버/클라이언트 동일 제한을 정하고 목적 이름 중복은 ID 기반으로 허용하는 방향 | DTO validation·schema 제한 |
 | archive 복원 | 목적 설명·색·아이콘도 snapshot 보존. 사라진 custom category는 빈 category+정보 보완으로 복원하는 방향 | snapshot schema·복원 상태 |
 | archive 정렬 | 종료 시각 내림차순, 검색은 기존 MVP 제외 | cursor·목록 쿼리 |
-| 서로 다른 판매처 중복 | 식별자 기반 지원 범위를 별도로 확정 | 추출 필드·동일성 검사·사용자 안내 |
+| 서로 다른 판매처 중복 | **B9 해결**: GTIN 또는 브랜드+MPN 일치만, 이름·AI 판정 없음([정책](../../history/product-planning/mvp/decisions/b9-duplicate-resolution-policy-2026-10-24.md)) | 추출 필드·동일성 검사·사용자 안내 |
 
 디자인 문서의 이미 확정된 규칙과 이 제안 기본값을 구분한다. 사용자 검토 후 해당 제품 문서·상태/API 계약에 반영하고 각 구현 묶음의 구체적인 실행 계획을 작성한다.

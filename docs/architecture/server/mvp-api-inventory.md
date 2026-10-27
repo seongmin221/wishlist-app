@@ -70,10 +70,10 @@ READY 항목에서 사용자 category 삭제 때문에 category가 빈 경우에
 | --- | --- | --- | --- | --- | --- |
 | HOME-01 | `GET /v1/home` | 로그인 후 홈·foreground 복귀·사용자 새로고침 · S4/S8 | 인증 owner | 분석 중·정보 보완·분류 검토 count/미리보기, 최근 활동순 ACTIVE 목적 최대 3개(빈 목적 포함): 이름·색·아이콘·후보 수·최근 활동·최근 저장 후보 최대 4개(이미지 null도 포함·placeholder 표시). 별도 서버 할 일 합계 필드 없음(그룹 count 제공). 기기 로컬 대기는 서버 count에 포함하지 않음 | **구현(B4)**: 같은 snapshot의 count/preview·B3 최근 목적 summary. 10-09 공통 분류·누락 invariant 포함 전체 DB 회귀 통과 |
 | HOME-02 | `GET /v1/home/action-items` | 영역 펼침, 연속 처리, 캐러셀 특정 상품부터 진입 · S4/S7/S8 | group 필수(세 홈 그룹, action query 없음), cursor/limit 또는 anchor={cursor}+before/after | 같은 홈 그룹 predicate의 item 목록·totalCount·cursor·anchorResolved. 정보 보완 그룹은 INFORMATION_COMPLETION·CATEGORY_ASSIGNMENT·CATEGORY_REASSIGNMENT를 함께 포함하고 item별 requiredAction·허용 행동은 유지 | **구현(B4)**: group·공통 page/anchor, 카드별 requiredAction 유지. 10-09 공통 reader·빈 page 복귀·실제 EXPLAIN 검증 |
-| DUP-01 | `GET /v1/wishlist-items/{id}/duplicate-candidates` | 새/기존 항목 비교 시트, 기존 실패/처리 상태 안내 · S3 | 새 item ID, cursor/limit | 중복 candidate ID·판단 근거와 MATCH/동일URL안내/판단대기 구분, 양쪽 metadata·저장일·category/purpose·version·기존 항목 삭제 영향 | 없음 |
-| DUP-02 | `PUT /v1/wishlist-items/{id}/duplicate-decisions` | 둘 다 두기/새 항목 지우기/기존 항목 지우기 확정 · S3 | candidate ID, KEEP_BOTH/DELETE_NEW/DELETE_EXISTING, decision/version 정보, 재전송 식별 key | 판단 기록과 선택 삭제를 같은 transaction에 반영, 남는/삭제 item IDs·갱신 상태. review 확정/보류는 별도 ITEM-08 | 없음 |
+| DUP-01 | `GET /v1/wishlist-items/{id}/duplicate-candidates` | 새/기존 항목 비교 시트, 기존 실패/처리 상태 안내 · S3 | 새 item ID, cursor/limit | 중복 candidate ID·판단 근거와 MATCH/동일URL안내/판단대기 구분, 양쪽 metadata·저장일·category/purpose·version·기존 항목 삭제 영향 | **구현(B9)**: 실제 상태로 계산한 kind·bases·allowedDecisions, 양쪽 WishlistItemDto+deletionImpact, keyset 20/50. 상품 DTO `duplicateCandidates` 수 |
+| DUP-02 | `PUT /v1/wishlist-items/{id}/duplicate-decisions` | 둘 다 두기/새 항목 지우기/기존 항목 지우기 확정 · S3 | candidate ID, KEEP_BOTH/DELETE_NEW/DELETE_EXISTING, decision/version 정보, 재전송 식별 key | 판단 기록과 선택 삭제를 같은 transaction에 반영, 남는/삭제 item IDs·갱신 상태. review 확정/보류는 별도 ITEM-08 | **구현(B9)**: 쌍별 판단·ITEM-05 삭제 재사용·receipt replay(V23)·계정 수명 보존 |
 
-중복 선택은 generic DELETE를 호출한 뒤 별도로 판단을 저장하는 두 요청으로 구성하지 않는다. standalone 상품 삭제는 ITEM-05, 비교 시트의 결정은 DUP-02가 담당한다. 후보 여러 개일 때의 선택 단위는 미결정 목록에 있다.
+중복 선택은 generic DELETE를 호출한 뒤 별도로 판단을 저장하는 두 요청으로 구성하지 않는다. standalone 상품 삭제는 ITEM-05, 비교 시트의 결정은 DUP-02가 담당한다. 후보가 여러 개면 쌍별로 판단한다(B9). [B9 계약](duplicate-resolution-api.md)을 따른다.
 
 `처음부터 다시 보기`는 완료된 review 재개 API로 만들지 않는다. 정보 보완의 건너뛰기는 기기 세션에서 다음 항목으로 이동하며 server review DEFER로 기록하지 않는다.
 
@@ -261,7 +261,7 @@ FlowMap은 위 화면 사이 navigation의 근거이며 별도 endpoint를 요�
 | 연속 처리 재진입/restart | **B4 해결**: 살아 있는 화면은 현재 anchor 재조회, 앱 신규 실행은 최신 첫 구간. restart는 기기 skip 초기화와 현재 미완료 재조회이며 CONFIRMED/DEFERRED 검토 재노출 없음. 별도 restart API 없음 | HOME-02/ITEM-08 |
 | 상품명·브랜드·archive 제목 입력 제한 | 목적은 **B3 해결**(이름40/설명200 code point·중복 허용). 상품명·브랜드·archive 제목은 추가 확인 | ITEM-04/ITEM-07, ARC-06 |
 | 상품 후보 수 상한·bulk 최대 크기 | 목적 수는 **B3 해결**(ACTIVE 30개·60초 10건). 상품 window 규칙은 있음. 후보 이동 bulk는 **B8 해결**(서로 다른 상품 1~100개). archive bulk는 별도 확인 | PUR-07/PUR-08, ARC-01/ARC-02 |
-| 중복 여러 후보·다른 판매처 동일 상품 | 현재 보드는 한 쌍. 여러 후보의 처리 단위·상품 식별 기준과 실패 URL 안내 필요 | DUP-01/DUP-02 |
+| 중복 여러 후보·다른 판매처 동일 상품 | **B9 해결**: 쌍별 판단, 판매처 간은 GTIN/브랜드+MPN만, 실패 기존 항목은 SAME_URL 안내·판단 허용, 검토 밖 새 항목도 후보 저장(안내 위치는 C10) | DUP-01/DUP-02 |
 | 새 자원 만들기와 편집 취소 | purpose는 **B3 해결**: 취소 뒤에도 생성한 목적 유지(빈 목적 자동 삭제 금지). category의 수명은 별도 확인 | CAT-03 + ITEM-04/ITEM-07/ITEM-08 |
 | archive 목적 snapshot·복원 예외 | 최신 상세는 목적 아이콘 필요. 설명/color/icon의 복원 범위·삭제 custom 참조·archive 제목 수정 후 목적 이름 복원 기준 확인 | ARC-02/ARC-04/ARC-07/ARC-08 |
 | 아카이브 후보의 분석 상태 | 일반적으로 비교 가능 item을 다루지만 PROCESSING/보완 필요 후보를 목적에 추가·archive할 수 있는지 명확히 필요 | PUR-07/PUR-08, ARC-01/ARC-02/ARC-08 |

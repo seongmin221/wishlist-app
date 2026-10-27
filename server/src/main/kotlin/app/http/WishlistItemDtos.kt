@@ -35,7 +35,13 @@ data class WishlistItemDto(
     /** Omitted (not null) when absent: ApiJson encodes defaults, and cards must not grow this key. */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val deletionImpact: DeletionImpactDto? = null,
+    /** Omitted when the item has no visible duplicate pair as the new side. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val duplicateCandidates: DuplicateCountsDto? = null,
 )
+
+@Serializable
+data class DuplicateCountsDto(val matchCount: Int, val sameUrlCount: Int, val awaitingAnalysisCount: Int)
 
 @Serializable
 data class DeletionImpactDto(val purpose: PurposeImpactDto?)

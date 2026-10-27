@@ -51,7 +51,7 @@ class DatabaseMigrationTest {
                 connection.createStatement().use { statement ->
                     statement.executeQuery("select version from flyway_schema_history where success order by installed_rank").use { rows ->
                         val versions = buildList { while (rows.next()) add(rows.getString(1)) }
-                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21"), versions)
+                        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"), versions)
                     }
                 }
             }
@@ -308,8 +308,8 @@ class DatabaseMigrationTest {
                 }
                 val before = listOf("wishlist_items", "analysis_jobs").associateWith { snapshot(connection, it, emptyList()) }
                 DatabaseFactory.migrate(database.jdbcUrl, database.username, database.password)
-                assertEquals(before["wishlist_items"], snapshot(connection, "wishlist_items", listOf("media_asset_id")))
-                assertEquals(before["analysis_jobs"], snapshot(connection, "analysis_jobs", emptyList()))
+                assertEquals(before["wishlist_items"], snapshot(connection, "wishlist_items", listOf("media_asset_id") + V22_ITEM_COLUMNS))
+                assertEquals(before["analysis_jobs"], snapshot(connection, "analysis_jobs", V22_JOB_COLUMNS))
                 connection.createStatement().use { s ->
                     s.executeQuery("select media_asset_id from wishlist_items").use { r -> assertTrue(r.next()); assertNull(r.getObject(1)) }
                     s.executeQuery("select count(*) from media_assets").use { r -> assertTrue(r.next()); assertEquals(0, r.getInt(1)) }
@@ -491,10 +491,16 @@ class DatabaseMigrationTest {
     }
 
     private companion object {
+        /** B9a identity and cache provenance; existing rows keep them null. */
+        val V22_ITEM_COLUMNS = listOf("normalized_source_url", "product_gtin", "product_mpn_key", "product_cache_id")
+        val V22_JOB_COLUMNS = listOf("pending_gtin", "pending_mpn_key", "pending_checked_at", "pending_product_cache_id")
+
         /** Columns added by V17 and later; older upgrade snapshots ignore them. */
         val LATER_COLUMNS = mapOf(
-            "wishlist_items" to listOf("product_brand", "product_price", "product_currency", "merchant_name", "metadata_checked_at", "media_asset_id"),
-            "analysis_jobs" to listOf("pending_brand", "pending_price", "pending_currency", "pending_merchant", "recovery_seq", "recovery_check_at"),
+            "wishlist_items" to listOf("product_brand", "product_price", "product_currency", "merchant_name", "metadata_checked_at", "media_asset_id")
+                + V22_ITEM_COLUMNS,
+            "analysis_jobs" to listOf("pending_brand", "pending_price", "pending_currency", "pending_merchant", "recovery_seq", "recovery_check_at")
+                + V22_JOB_COLUMNS,
             "outbox_events" to listOf("not_before"),
         )
     }

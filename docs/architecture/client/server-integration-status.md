@@ -1,5 +1,7 @@
 # 서버 연동 상태
 
+> 2026-10-27: 서버 B9 완료로 DUP-01/02의 서버 열만 갱신했다([계약](../server/duplicate-resolution-api.md)). 클라이언트 연결은 C10이다.
+>
 > 2026-10-24 C7 갱신: ITEM-02 window·anchor(카테고리·목적 범위), HOME-01·HOME-02를 Fake·Remote로 구현하고 MockEngine으로 검증했다. DEBUG FAKE / RELEASE UNAVAILABLE. 실서버 검증은 미실행이다. C6 #23 MERGED(`896fbc2`), C5 PR B #22 Draft OPEN·develop 미병합. ITEM-04~08은 C8이며 구현하지 않았다.
 >
 > 2026-10-24 C6 갱신: PUR-01 SUMMARY·PUR-02~04, ITEM-02 purposeId를 구현했다. DEBUG FAKE / RELEASE UNAVAILABLE. 실서버 검증은 미실행이다. C5 #21 MERGED(`0b95e90`), #22 Draft OPEN·develop 미병합.
@@ -78,8 +80,8 @@ FakeStore가 단독으로 생성 idempotency·최신 snapshot 재전송·삭제 
 | ITEM-08 | B7 완료 | C8 | UNAVAILABLE / UNAVAILABLE | 상태 규칙 구현 · FakeControls 전용 · wire 명령 미구현 | 미구현 · C8 | 미실행 | 미실행 |
 | HOME-01 | B4 완료 | C7 | FAKE / UNAVAILABLE | 구현 · 세 그룹 고정 순서·미리보기 4·목적 3 | 구현 · `RemoteHomeRepository` | Fake/Remote 공통 계약 9개 + mapper·wire 테스트 통과 | 미실행 |
 | HOME-02 | B4 완료 | C7 | FAKE / UNAVAILABLE | 구현 · 그룹 page·anchor window·fallback·cursor scope | 구현 · `RemoteHomeRepository` | Fake/Remote 공통 계약(HOME-01과 같은 9개 묶음) 통과 | 미실행 |
-| DUP-01 | B9 미구현 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
-| DUP-02 | B9 미구현 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
+| DUP-01 | B9 완료 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
+| DUP-02 | B9 완료 | C10 | UNAVAILABLE / UNAVAILABLE | 미구현 | 미구현 · C10 | 미실행 | 미실행 |
 | CAT-01 | B2 완료 | C5 | FAKE / UNAVAILABLE | 구현 · SELECT/BROWSE·count·custom 순서 | 구현 · `RemoteCategoryRepository` | 공통 계약 15개 중 해당 시나리오 통과 | 미실행 |
 | CAT-02 | B2 완료 | C5 | FAKE / UNAVAILABLE | 구현 · 404·itemCount | 구현 | 공통 계약 통과 | 미실행 |
 | CAT-03 | B2 완료 | C5 | FAKE / UNAVAILABLE | 구현 · receipt replay·20개·60초 5건·중복·`fields` | 구현 · Idempotency-Key·201/200·Retry-After | 공통 계약 통과 + Remote 전용 5개 | 미실행 |

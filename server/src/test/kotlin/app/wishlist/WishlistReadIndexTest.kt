@@ -17,13 +17,14 @@ class WishlistReadIndexTest {
         db.start()
         DatabaseFactory.migrationConfiguration(db.jdbcUrl, db.username, db.password).target("14").load().migrate()
         val source = DatabaseFactory.dataSource(db.jdbcUrl, db.username, db.password)
-        // The shared projection reads V17 metadata columns and joins V18 media. Add them only for the V14 baseline and drop
+        // The shared projection reads V17 metadata columns, joins V18 media and counts V23 duplicate pairs. Add them only for the V14 baseline and drop
         // them before migrating; nullable unindexed columns and an empty keyed join do not change the measured plans.
         val v17Columns = listOf("product_brand text", "product_price numeric(19,4)", "product_currency char(3)", "merchant_name text",
             "metadata_checked_at timestamptz", "media_asset_id uuid")
         source.connection.use { c -> c.createStatement().use { s ->
             v17Columns.forEach { s.execute("alter table wishlist_items add column $it") }
             s.execute("create table media_assets (id uuid primary key, owner_id uuid not null, object_key text not null, status varchar(16) not null)")
+            s.execute("create table duplicate_candidates (new_item_id uuid not null, existing_item_id uuid not null, status varchar(16) not null, bases text[] not null)")
         } }
         val owner = UUID.fromString("00000000-0000-0000-0000-000000000001")
         var custom: UUID? = null
@@ -93,6 +94,7 @@ class WishlistReadIndexTest {
         source.connection.use { c -> c.createStatement().use { s ->
             v17Columns.forEach { s.execute("alter table wishlist_items drop column ${it.substringBefore(' ')}") }
             s.execute("drop table media_assets")
+            s.execute("drop table duplicate_candidates")
         } }
         DatabaseFactory.migrate(db.jdbcUrl,db.username,db.password)
         val after = measure(source,captured,"V16 (original V15 retained)")
