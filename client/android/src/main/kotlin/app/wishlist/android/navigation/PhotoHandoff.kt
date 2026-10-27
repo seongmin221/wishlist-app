@@ -20,7 +20,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * snapshot 상태라 읽는 composable이 바뀔 때 다시 그린다. 이미지·key 종류는 앱이 정한다(앱은 `coil3.Image`·`MemoryCache.Key`).
  */
 class PhotoHandoff<I : Any, K : Any> {
-    data class Held<I, K>(val image: I, val memoryCacheKey: K?)
+    /** [sourceUrl]: the photo address the card drew (the detail uses the photo only while its item shows that address). */
+    data class Held<I, K>(val image: I, val memoryCacheKey: K?, val sourceUrl: String? = null)
 
     private data class Forward<I, K>(val held: Held<I, K>, val drawn: Boolean = false, val motionEnded: Boolean = false)
     private data class Reverse<I>(val sourceKey: String, val image: I)
@@ -28,8 +29,13 @@ class PhotoHandoff<I : Any, K : Any> {
     private val forward = mutableStateMapOf<Long, Forward<I, K>>()
     private val reverse = mutableStateMapOf<Long, Reverse<I>>()
 
-    fun hold(entryId: Long, image: I, memoryCacheKey: K?) {
-        forward[entryId] = Forward(Held(image, memoryCacheKey))
+    fun hold(entryId: Long, image: I, memoryCacheKey: K?, sourceUrl: String? = null) {
+        forward[entryId] = Forward(Held(image, memoryCacheKey, sourceUrl))
+    }
+
+    /** Lets go of the held card photo at once (the item's photo is no longer the one the card drew). */
+    fun letGo(entryId: Long) {
+        forward.remove(entryId)
     }
 
     fun forward(entryId: Long): Held<I, K>? = forward[entryId]?.held

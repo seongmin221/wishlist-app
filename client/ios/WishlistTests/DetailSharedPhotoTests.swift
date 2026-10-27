@@ -32,4 +32,14 @@ final class DetailSharedPhotoTests: XCTestCase {
         XCTAssertNil(DetailSharedSlot.loaded(for: b, (a, image)))
         XCTAssertNil(DetailSharedSlot.loaded(for: a, nil))
     }
+
+    /// The held card photo stands for the item only while the item is loading or shows the address the card
+    /// drew: a refresh that removes or replaces the photo drops it even when the detail photo never loaded.
+    func testTheHeldCardPhotoFitsOnlyTheAddressTheCardDrew() {
+        let a = URL(string: "https://img/a")!, b = URL(string: "https://img/b")!
+        XCTAssertTrue(DetailSharedSlot.heldFits(itemLoaded: false, heldURL: a, url: nil))
+        XCTAssertTrue(DetailSharedSlot.heldFits(itemLoaded: true, heldURL: a, url: a))
+        XCTAssertFalse(DetailSharedSlot.heldFits(itemLoaded: true, heldURL: a, url: nil))
+        XCTAssertFalse(DetailSharedSlot.heldFits(itemLoaded: true, heldURL: a, url: b))
+    }
 }

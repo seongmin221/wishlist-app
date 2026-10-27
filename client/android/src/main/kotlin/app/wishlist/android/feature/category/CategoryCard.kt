@@ -117,7 +117,7 @@ internal fun restartsLayout(known: List<String>, knownPhotos: Map<String, String
 private val PhotoShape = RoundedCornerShape(WishlistTokens.Radius.m)
 
 /** 카드가 지금 그리는 사진과 그 요청의 memory cache key. 카드를 누르면 상세로 넘긴다([PhotoHandoff]). */
-internal data class ShownPhoto(val image: Image, val memoryCacheKey: MemoryCache.Key?)
+internal data class ShownPhoto(val image: Image, val memoryCacheKey: MemoryCache.Key?, val url: String?)
 
 /**
  * 사진 상품 카드(FCategoryList): 사진(모서리 20, [ratio] = 높이/폭) + 8 + 이름 14 · 4 · 가격 18/700(없으면 숨김) · 4 ·
@@ -199,7 +199,7 @@ private fun ProductPhotoRequest(request: ImageRequest, modifier: Modifier, onSho
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
-            onSuccess = { onShown(ShownPhoto(it.result.image, it.result.memoryCacheKey)) },
+            onSuccess = { onShown(ShownPhoto(it.result.image, it.result.memoryCacheKey, request.data as? String)) },
         )
     }
 }

@@ -11,9 +11,9 @@ class PhotoHandoffTest {
 
     @Test
     fun heldCardPhotoAndItsCacheKeyReachTheDetail() {
-        handoff.hold(7, "card", memoryCacheKey = "url#w320")
+        handoff.hold(7, "card", memoryCacheKey = "url#w320", sourceUrl = "https://img/a")
 
-        assertEquals(PhotoHandoff.Held("card", "url#w320"), handoff.forward(7))
+        assertEquals(PhotoHandoff.Held("card", "url#w320", "https://img/a"), handoff.forward(7))
         assertNull(handoff.forward(8))
     }
 
@@ -35,6 +35,17 @@ class PhotoHandoffTest {
         assertEquals("card", handoff.forward(7)?.image) // detail photo not drawn yet: keep showing the card photo
         handoff.detailDrawn(7)
         assertNull(handoff.forward(7))
+    }
+
+    @Test
+    fun lettingGoReleasesOnlyTheForwardPhoto() {
+        handoff.hold(7, "card", null)
+        handoff.showing(7, "category/c/i", "detail")
+
+        handoff.letGo(7)
+
+        assertNull(handoff.forward(7))
+        assertEquals("detail", handoff.reverseFor("category/c/i") { true })
     }
 
     @Test

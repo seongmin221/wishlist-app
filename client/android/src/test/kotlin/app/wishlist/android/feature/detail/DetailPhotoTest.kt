@@ -2,6 +2,8 @@ package app.wishlist.android.feature.detail
 
 import app.wishlist.shared.domain.DetailKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -54,5 +56,17 @@ class DetailPhotoTest {
         assertNull(drawnPhotoFor(null, loaded))
         assertNull(drawnPhotoFor("https://img/b", loaded))
         assertNull(drawnPhotoFor("https://img/a", null as Pair<String, String>?))
+    }
+
+    /**
+     * The held card photo stands for the item only while the item is loading or shows the address the card
+     * drew: a refresh that removes or replaces the photo drops it even when the detail photo never loaded.
+     */
+    @Test
+    fun theHeldCardPhotoFitsOnlyTheAddressTheCardDrew() {
+        assertTrue(heldPhotoFits(itemLoaded = false, heldUrl = "https://img/a", url = null))
+        assertTrue(heldPhotoFits(itemLoaded = true, heldUrl = "https://img/a", url = "https://img/a"))
+        assertFalse(heldPhotoFits(itemLoaded = true, heldUrl = "https://img/a", url = null))
+        assertFalse(heldPhotoFits(itemLoaded = true, heldUrl = "https://img/a", url = "https://img/b"))
     }
 }

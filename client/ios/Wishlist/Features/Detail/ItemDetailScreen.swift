@@ -59,7 +59,7 @@ private struct ItemDetailContent: View {
             EmptyView()
         } content: {
             // Card photo → detail photo: one slot view from the first frame on (the flight's target).
-            if sharedSlot { DetailSharedPhoto(imageUrl: item?.product.imageUrl) }
+            if sharedSlot { DetailSharedPhoto(imageUrl: item?.product.imageUrl, itemLoaded: item != nil) }
             if item == nil, let error {
                 if error.kind == .notFound {
                     DetailStatusBlock(message: DetailLine("detail.not.found").resolve(), buttonText: DetailLine("detail.close").resolve()) { nav.pop() }

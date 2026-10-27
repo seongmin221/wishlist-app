@@ -140,7 +140,7 @@ internal fun ItemDetailScreen(route: ItemDetailRoute, sourceKey: String?) {
         refresh = if (item != null && kind?.kind != DetailKind.GONE) DetailRefresh(state.loading, owner::refresh) else null,
     ) {
         // Card photo → detail photo: one slot node from the first frame on (the shared element's target).
-        if (sharedSlot && photoKey != null) PhotoFrame { DetailSharedPhoto(item?.product?.imageUrl, photoKey) }
+        if (sharedSlot && photoKey != null) PhotoFrame { DetailSharedPhoto(item?.product?.imageUrl, itemLoaded = item != null, sourceKey = photoKey) }
         when {
             item == null && error != null -> if (error.kind == ErrorKind.NOT_FOUND) {
                 DetailStatusBlock(stringResource(R.string.detail_not_found), stringResource(R.string.detail_close), close)

@@ -42,4 +42,16 @@ final class PhotoHandoffTests: XCTestCase {
         XCTAssertNil(handoff.forward(7))
         XCTAssertNotNil(handoff.forward(9))
     }
+
+    func testLettingGoReleasesTheHeldPhotoAndItsAddress() {
+        let handoff = PhotoHandoff()
+        let a = URL(string: "https://img/a")!
+        handoff.hold(7, card, sourceURL: a)
+        XCTAssertEqual(handoff.sourceURL(7), a)
+
+        handoff.letGo(7)
+
+        XCTAssertNil(handoff.forward(7))
+        XCTAssertNil(handoff.sourceURL(7))
+    }
 }

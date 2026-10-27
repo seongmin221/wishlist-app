@@ -18,6 +18,13 @@ enum DetailSharedSlot {
         loaded ?? held ?? cached()
     }
 
+    /// Whether the held card photo still stands for the item: while the item is still loading (its address is
+    /// not known yet) or when the item's photo is the address the card drew. A refresh that removes or replaces
+    /// the photo — also after the detail photo failed and never let the handoff go — drops it (Android `heldPhotoFits`).
+    static func heldFits(itemLoaded: Bool, heldURL: URL?, url: URL?) -> Bool {
+        !itemLoaded || (url != nil && heldURL == url)
+    }
+
     /// The loaded detail photo, if it was loaded from `url` (the item's photo now). A refresh that removes or
     /// replaces the photo drops it: the slot falls back to the held photo, the cache or the placeholder, and
     /// going back shrinks what the detail shows now (Android `drawnPhotoFor`).
@@ -34,6 +41,8 @@ enum DetailSharedSlot {
 /// and the push motion ended. Without any photo the whole frame is the placeholder and that grows instead.
 struct DetailSharedPhoto: View {
     let imageUrl: String?
+    /// False while the item is still loading (no address yet): the held card photo is drawn meanwhile.
+    var itemLoaded = true
 
     @Environment(\.wlNavMotion) private var motion
     @Environment(\.wlEntryID) private var entryID
@@ -45,7 +54,9 @@ struct DetailSharedPhoto: View {
 
     var body: some View {
         let url = remotePhotoURL(imageUrl)
-        let held = entryID.flatMap { motion.handoff.forward($0) }
+        let holding = entryID.flatMap { motion.handoff.forward($0) }
+        let heldURL = entryID.flatMap { motion.handoff.sourceURL($0) }
+        let held = holding.flatMap { DetailSharedSlot.heldFits(itemLoaded: itemLoaded, heldURL: heldURL, url: url) ? $0 : nil }
         let shown = DetailSharedSlot.shown(loaded: DetailSharedSlot.loaded(for: url, loaded), held: held) { url.flatMap { RemoteImageLoader.shared.bestCached(for: $0) } }
         let animating = entryID.map { motion.channels($0).animating } ?? false
         DetailPhotoFrame {
@@ -77,6 +88,10 @@ struct DetailSharedPhoto: View {
         // A photo of another address is not kept (it is no longer drawn or handed back).
         .onChange(of: url) { _, now in
             if let current = loaded, current.url != now { loaded = nil }
+        }
+        // A card photo of another address is let go (it would otherwise stay until the detail closes).
+        .onChange(of: holding != nil && held == nil, initial: true) { _, mismatch in
+            if mismatch, let entryID { motion.handoff.letGo(entryID) }
         }
         .onChange(of: animating, initial: true) { _, now in
             if !now, let entryID { motion.handoff.motionEnded(entryID) }

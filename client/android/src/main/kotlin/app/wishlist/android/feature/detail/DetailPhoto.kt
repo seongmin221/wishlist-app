@@ -60,6 +60,14 @@ internal fun detailPhotoRatio(held: PhotoPixels?, drawn: PhotoPixels?): Float? =
     listOfNotNull(held, drawn).firstOrNull { it.width > 0 && it.height > 0 }?.let { it.height.toFloat() / it.width }
 
 /**
+ * Whether the held card photo still stands for the item: while the item is still loading (its address is not
+ * known yet) or when the item's photo is the address the card drew. A refresh that removes or replaces the
+ * photo — also after the detail photo failed and never let the handoff go — drops it.
+ */
+internal fun heldPhotoFits(itemLoaded: Boolean, heldUrl: String?, url: String?): Boolean =
+    !itemLoaded || (url != null && heldUrl == url)
+
+/**
  * The drawn detail photo, if it was loaded from [url] (the item's photo now). A refresh that removes or
  * replaces the photo drops it: the slot falls back to the held photo or the placeholder, and going back
  * shrinks what the detail shows now, not the old photo.
@@ -79,13 +87,14 @@ private fun Image.pixels() = PhotoPixels(width, height)
  * - [imageUrl]이 null이면(항목을 아직 받는 중) handoff 이미지만 그린다.
  */
 @Composable
-internal fun DetailSharedPhoto(imageUrl: String?, sourceKey: String) {
+internal fun DetailSharedPhoto(imageUrl: String?, itemLoaded: Boolean, sourceKey: String) {
     val context = LocalContext.current
     val handoff = LocalPhotoHandoff.current
     val nav = LocalWLNavigator.current
     val entry = LocalWLEntry.current
-    val held = entry?.let { handoff.forward(it.id) }
     val url = (photoSourceFor(imageUrl) as? PhotoSource.Remote)?.url
+    val holding = entry?.let { handoff.forward(it.id) }
+    val held = holding?.takeIf { heldPhotoFits(itemLoaded, it.sourceUrl, url) }
     var loaded by remember { mutableStateOf<Pair<String, Image>?>(null) }
     val drawn = drawnPhotoFor(url, loaded)
     // A photo of another address is not kept (it is no longer drawn or handed back).
@@ -93,6 +102,8 @@ internal fun DetailSharedPhoto(imageUrl: String?, sourceKey: String) {
     val ratio = detailPhotoRatio(held?.image?.pixels(), drawn?.pixels())
 
     if (entry != null) {
+        // A card photo of another address is let go (it would otherwise stay until the detail closes).
+        if (holding != null && held == null) LaunchedEffect(entry.id, url) { handoff.letGo(entry.id) }
         LaunchedEffect(entry.id) {
             snapshotFlow { nav.activeTransition == null }.first { it }
             handoff.motionEnded(entry.id)

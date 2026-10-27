@@ -10,17 +10,24 @@ import UIKit
 final class PhotoHandoff {
     private struct Held {
         let image: UIImage
+        /// The photo address the card drew (the detail uses the photo only while its item shows that address).
+        let sourceURL: URL?
         var drawn = false
         var motionEnded = false
     }
 
     private var held: [Int: Held] = [:]
 
-    func hold(_ entryID: Int, _ image: UIImage) {
-        held[entryID] = Held(image: image)
+    func hold(_ entryID: Int, _ image: UIImage, sourceURL: URL? = nil) {
+        held[entryID] = Held(image: image, sourceURL: sourceURL)
     }
 
     func forward(_ entryID: Int) -> UIImage? { held[entryID]?.image }
+
+    func sourceURL(_ entryID: Int) -> URL? { held[entryID]?.sourceURL }
+
+    /// Lets go of the held card photo at once (the item's photo is no longer the one the card drew).
+    func letGo(_ entryID: Int) { held[entryID] = nil }
 
     func detailDrawn(_ entryID: Int) { update(entryID) { $0.drawn = true } }
 

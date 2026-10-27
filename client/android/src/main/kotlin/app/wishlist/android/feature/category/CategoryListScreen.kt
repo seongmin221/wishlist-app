@@ -210,7 +210,7 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
                                 // Card photo → detail photo (C5 PR B): the image the card draws travels with the push.
                                 PhotoTransitionDebug.onPhotoTransitionStart(context)
                                 if (nav.push(ItemDetailRoute(item.id, viaPhoto = true), cardSourceKey(route.hint.categoryId, item.id)) && shown != null) {
-                                    photoHandoff.hold(nav.entries(nav.currentTab).last().id, shown.image, shown.memoryCacheKey)
+                                    photoHandoff.hold(nav.entries(nav.currentTab).last().id, shown.image, shown.memoryCacheKey, shown.url)
                                 }
                             },
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = WishlistTokens.Space.s8),

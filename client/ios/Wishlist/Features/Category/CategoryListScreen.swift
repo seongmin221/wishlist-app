@@ -280,7 +280,7 @@ private struct CategoryCard: View {
             PhotoTransitionDebug.onPhotoTransitionStart()
             if nav.push(AppDestination.item(item.id, viaPhoto: true).route, sourceKey: sourceKey),
                let image, let entry = nav.entries(nav.currentTab).last {
-                motion.handoff.hold(entry.id, image)
+                motion.handoff.hold(entry.id, image, sourceURL: imageURL)
             }
         } label: {
             VStack(alignment: .leading, spacing: WishlistTokens.Space.s8) {
