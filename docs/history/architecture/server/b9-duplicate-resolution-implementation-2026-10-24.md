@@ -42,7 +42,7 @@ Task 3·4는 테스트를 먼저 썼지만, 다른 빌드가 동시에 돌아 �
 
 최종 실행(`644df5a`, `--rerun-tasks`): **664 tests, 662 통과, 2 opt-in skip, 실패·오류 0**. B8 마지막 기록(608 tests) 대비 B9 테스트 56건이 늘었다.
 
-PR #26 리뷰 P2 반영 뒤(`--rerun-tasks`): **665 tests, 663 통과, 2 opt-in skip, 실패·오류 0**. 추가 테스트는 값이 없거나 유효하지 않거나 이름 없는 옵션 node가 있으면 식별 값이 없다는 parser 테스트 1건이다. 이 테스트는 수정 전 실패를 확인했다.
+PR #26 리뷰 P2 반영 뒤(`--rerun-tasks`): **665 tests, 663 통과, 2 opt-in skip, 실패·오류 0**. 추가 테스트는 값이 없거나 유효하지 않거나 이름 없는 옵션 node가 있으면 식별 값이 없다는 parser 테스트 1건이다. 이 테스트는 수정 전 실패를 확인했다. 브랜드 대체 지적 반영 뒤: **666 tests, 664 통과, 2 opt-in skip, 실패·오류 0**(브랜드 누락·무효·단일 node meta 대체 parser 테스트 1건 추가, 수정 전 실패 확인). 첫 재실행은 테스트 실패 없이 Gradle 결과 파일(`in-progress-results-generic.bin`) 누락으로 중단되어 다시 실행했다.
 
 명령과 환경은 [로컬 테스트 환경](../../../architecture/server/local-test-environment.md)과 같다(JDK 17, `/var/run/docker.sock` Podman, `RUN_REAL_URL_PILOT=0`).
 
@@ -66,6 +66,7 @@ PR #26 리뷰 P2 반영 뒤(`--rerun-tasks`): **665 tests, 663 통과, 2 opt-in 
 | Important: 페이지를 못 읽은 PARTIAL 기존 항목(canonical 없음)이면 같은 URL 재저장이 숨겨짐 | 반영. SAME_URL 안내 |
 | Important: 같은 이름 Product가 옵션별로 여럿이면 첫 node의 GTIN을 씀 → 다른 옵션끼리 MATCH | 반영. 모든 node가 같을 때만 |
 | PR #26 리뷰 P2: 값이 없거나 유효하지 않은 옵션 node가 합의에서 빠져, 첫 옵션의 코드가 페이지 값이 됨 | 반영. node마다 유효한 값이 있어야 하고(이름 없는 node 포함), 한 node 안에 유효하지 않은 GTIN이 섞여도 null. 탐지 누락만 늘고 오탐은 줄어든다 |
+| PR #26 리뷰 P2: 브랜드가 없거나 무효인 옵션에 첫 Product의 브랜드를 적용해 BRAND_MPN 합의로 처리 | 반영. node가 여럿이면 각 node의 브랜드만 쓴다. 페이지 meta 대체 브랜드는 node가 하나일 때만 |
 | Minor: cache 출처는 적중 때만 기록 | 보류. 설계상 출처 기록은 복사한 경우의 추적용 |
 | Minor: generation 1 ≠ 신규 저장(stale category 재예약은 generation 2) | 보류. 추가 fetch 비용만 있음 |
 | Minor: 숫자형 `mpn`·전각 GTIN 무시 | 보류. 탐지 누락만 생기고 오탐은 없음. B11 노출률 측정 때 함께 본다 |

@@ -39,11 +39,11 @@ object ProductMetadataParser {
         val brand = if (ambiguous) null else label(brandName(product?.get("brand")) ?: meta(document, "product:brand"))
         val seller = offers.firstNotNullOfOrNull { offer -> brandName(offer["seller"]) }
         // Variant pages repeat one name per option: an identifier stands for the page only when every node,
-        // unnamed ones included, has a valid one and they agree. A node without one may be a different option.
+        // unnamed ones included, has a valid one and they agree. A node without one may be a different option,
+        // so a node uses only its own brand; the page-level brand fallback applies to a single node alone.
         val gtin = if (ambiguous) null else agreed(products) { node -> ProductIdentifiers.gtin(GTIN_KEYS.flatMap { amounts(node[it]) }) }
-        val mpnKey = if (ambiguous) null else agreed(products) { node ->
-            ProductIdentifiers.mpnKey(label(brandName(node["brand"])) ?: brand, text(node["mpn"]))
-        }
+        val mpnBrand = { node: JsonObject -> if (products.size == 1) brand else label(brandName(node["brand"])) }
+        val mpnKey = if (ambiguous) null else agreed(products) { node -> ProductIdentifiers.mpnKey(mpnBrand(node), text(node["mpn"])) }
         return ParsedProduct(
             title = title, description = description, imageUrl = image, brand = brand,
             price = price?.first, currency = price?.second,

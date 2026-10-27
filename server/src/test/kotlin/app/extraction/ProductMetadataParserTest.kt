@@ -146,4 +146,17 @@ class ProductMetadataParserTest {
         assertNull(nameless.gtin, "an unnamed node is still a product node of this page")
         assertNull(nameless.mpnKey)
     }
+
+    @Test fun `a variant never borrows another variant's brand for its model number`() {
+        val missing = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","mpn":"SIZE-9"},
+            {"@type":"Product","name":"Speedgoat 6","mpn":"SIZE-9"}]"""))
+        assertNull(missing.mpnKey, "the second option's brand is unknown")
+        val tooLong = "B".repeat(201)
+        val invalid = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","mpn":"SIZE-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"$tooLong","mpn":"SIZE-9"}]"""))
+        assertNull(invalid.mpnKey, "an unusable brand is not agreement")
+        val single = parse("""<meta property="product:brand" content="HOKA">""" +
+            jsonLd("""{"@type":"Product","name":"Speedgoat 6","mpn":"SIZE-9"}"""))
+        assertEquals("hoka|SIZE9", single.mpnKey, "one product node may still use the page's own brand")
+    }
 }

@@ -39,7 +39,7 @@ B8(PR #24) 병합 지점 `ef2077d`에서 B9를 구현한다. 순서는 상품 �
 | `GTIN` | JSON-LD Product의 `gtin`/`gtin8`/`gtin12`/`gtin13`/`gtin14` | 숫자 외 공백·하이픈 제거 → 8/12/13/14자리 → mod-10 check digit 검증 → 0을 채워 14자리. 전부 0이면 버린다. 한 Product에서 서로 다른 GTIN이 나오면 null |
 | `BRAND_MPN` | 추출 brand + JSON-LD Product `mpn` | brand: NFKC·소문자·문자/숫자 외 제거. mpn: NFKC·대문자·공백/`-`/`_`/`.`/`/` 제거, 3~64자. 둘 다 있을 때만 `brand|mpn` key |
 
-- 기존 parser의 `ambiguous`(이름이 다른 Product 여러 개)이면 GTIN·MPN을 모두 null로 둔다. 같은 이름의 Product가 여럿(옵션별 node)이면 이름 없는 node를 포함한 모든 node가 유효한 값을 가지고 정규화 결과가 같을 때만 쓴다. 값이 없거나 하나라도 유효하지 않은 node가 있으면 null이다(최종 리뷰·PR 리뷰 반영). `sku`는 판매처 내부 코드이므로 쓰지 않는다.
+- 기존 parser의 `ambiguous`(이름이 다른 Product 여러 개)이면 GTIN·MPN을 모두 null로 둔다. 같은 이름의 Product가 여럿(옵션별 node)이면 이름 없는 node를 포함한 모든 node가 유효한 값을 가지고 정규화 결과가 같을 때만 쓴다. 값이 없거나 하나라도 유효하지 않은 node가 있으면 null이다. node가 여럿이면 MPN 키의 브랜드는 그 node 자신의 것만 쓰고, 다른 node나 페이지 meta 브랜드로 채우지 않는다. 대체 브랜드는 node가 하나일 때만 쓴다(최종 리뷰·PR 리뷰 반영). `sku`는 판매처 내부 코드이므로 쓰지 않는다.
 - URL 관계(`SOURCE_URL`)는 동일성 근거가 아니라 안내용이다. 새 항목의 정규화 공유 URL·canonical 중 하나가 기존 항목의 정규화 공유 URL·canonical 중 하나와 같으면 URL 관계가 있다. 정규화는 `UrlCanonicalizer.normalize`다.
 
 ## 2. Product cache와 item snapshot
