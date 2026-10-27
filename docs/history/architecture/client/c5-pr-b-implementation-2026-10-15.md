@@ -62,6 +62,15 @@ Android는 사용자 지시대로 에뮬레이터 `emulator-5556`(Pixel_5 API 30
 
 shared·localdb는 바뀌지 않아 KMP_TEST는 다시 돌리지 않았다. 새 테스트마다 해당 수정만 되돌려 실패를 확인했다(handoff 놓기 조건, 역방향 떠남 판정, 상자 비율 순서, 상세 자리 유지 규칙, 색인 큰 것 우선·축출 정리, 방향별 공급원, 끌기 방향 표시). 전체 XCTest 한 번에서 손대지 않은 `HomePresenterOwnerTests.testRefreshReturnsOnlyAfterTheRefreshFinished`가 시간 조건으로 실패했고, 단독 3회·다음 전체 실행은 통과했다(수동 시뮬레이터 확인 직후).
 
+## PR #22 추가 코드 리뷰 (2026-10-27)
+
+대상 head `981ce5b`, base `9210cc7`. 코드 수정 없이 새로고침과 사진 전환 상태의 연결을 검토했다. 다음 두 건은 코드 흐름에서 확인한 P2 결함이며, 기기에서 재현한 결과는 아니다.
+
+- **iOS `DetailSharedPhoto.swift:39–41`:** `loaded`가 URL에 묶이지 않아 상세 새로고침으로 `imageUrl`이 null로 바뀌어도 이전 사진을 계속 그린다. 새 URL 로드가 실패할 때도 같다. 기존 `ProductPhotoImage`처럼 로드 결과를 요청 key에 묶어 현재 URL의 결과만 표시해야 한다.
+- **Android `DetailPhoto.kt:81–90`:** `drawn`이 URL 변경 시 초기화되지 않는다. 사진을 한 번 그린 뒤 새로고침에서 URL이 null로 바뀌면 handoff도 해제된 상태에서 `DetailPhotoUnder.Nothing`이고 `AsyncImage`도 없어 빈 칸이다. 역방향 handoff에는 이전 사진이 남아 pop 때 다시 나타난다. 로드 결과와 역방향 등록 모두 현재 URL을 따라 무효화해야 한다.
+
+관련 Android 테스트(`DetailPhotoTest`, `PhotoHandoffTest`, `CategoryGridLayoutTest`, `WLEntryViewModelStoresTest`, `AppRouteCodecTest`) 24개를 실행해 실패·오류 0을 확인했다. 이 테스트들은 위 URL 변경 시나리오의 UI 상태를 검증하지 않는다. iOS XCTest와 기기 전환 확인은 이번 리뷰에서 실행하지 않았다.
+
 ## develop 통합·리뷰 (2026-10-27)
 
 C5 PR A #21, C6 #23, C7 #25, 서버 B9 #26이 develop에 병합된 뒤 #22가 CONFLICTING이었다. develop `9210cc7` 기준으로 리뷰하고 충돌을 해소했다.
@@ -128,3 +137,24 @@ C5 PR A #21, C6 #23, C7 #25, 서버 B9 #26이 develop에 병합된 뒤 #22가 CO
   - C7 foreground anchor 복원과 사진 전환을 함께 거치는 경로(단위 테스트만).
   - Android 끌어서 뒤로·취소(API 33+ 필요).
   - 실기기(Flip6·iPhone).
+
+## 추가 리뷰 반영: 사진 주소 변경 (2026-10-27)
+
+두 플랫폼 모두 상세 사진 자리가 마지막으로 받은 사진을 주소와 묶지 않고 들고 있었다(P2 2건).
+
+- **iOS:** `DetailSharedPhoto`의 `loaded`가 앞섰다. 새로고침으로 `imageUrl`이 없어지거나 새 주소 로드가 실패해도 이전 사진이 계속 보였고, 뒤로 갈 때 전환층도 그 사진을 그렸다.
+- **Android:** 받은 뒤 주소가 없어지면 `AsyncImage`는 빠지는데 `drawn`이 남았다. 그래서 자리표시도 그리지 않아 칸이 비었고, 역방향 handoff(`showing`)에는 이전 사진이 남아 뒤로 전환에 나타났다.
+
+고친 방식:
+
+- 받은 사진을 요청 주소와 함께 둔다(iOS `(url, image)`, Android `url to image`).
+- 지금 주소와 같을 때만 쓴다(`DetailSharedSlot.loaded(for:_:)`, `drawnPhotoFor`).
+- 주소가 바뀌면 이전 사진을 놓는다.
+- 그리면 사진 자리는 handoff 카드 사진 → cache(iOS) → 자리표시 순으로 돌아간다.
+- Android는 보일 사진이 없으면 `notShowing`으로 역방향 사진도 지운다.
+
+테스트는 `DetailPhotoTest.aDrawnPhotoIsDroppedWhenThePhotoAddressChangesOrGoes`와 `DetailSharedPhotoTests.testALoadedPhotoIsDroppedWhenThePhotoAddressChangesOrGoes`다. Android unit debug/release 268/268, assemble 두 변형, lint 0 errors / 27 warnings, iOS XCTest 303, 실패 0이다.
+
+기기에서는 보지 않았다. DEBUG에 상세가 열린 동안 사진 주소를 바꾸는 hook이 없다.
+
+남은 경계는 고치지 않았다. push 직후 handoff를 아직 들고 있는 동안(상세 사진을 그리기 전) 주소가 바뀌면 카드 사진이 잠깐 보인다. 이 handoff는 상세 사진이 그려지고 모션이 끝나면 놓인다.
