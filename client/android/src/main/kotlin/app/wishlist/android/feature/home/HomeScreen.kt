@@ -1,11 +1,5 @@
 package app.wishlist.android.feature.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,10 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -47,9 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.wishlist.android.R
+import app.wishlist.android.WishlistApplication
 import app.wishlist.android.designsystem.LocalWLColors
-import app.wishlist.android.designsystem.WLCard
-import app.wishlist.android.designsystem.WLChevron
 import app.wishlist.android.designsystem.WLCircleButton
 import app.wishlist.android.designsystem.WLIcon
 import app.wishlist.android.designsystem.WLIconTile
@@ -59,6 +52,8 @@ import app.wishlist.android.designsystem.WLTopBar
 import app.wishlist.android.designsystem.WLType
 import app.wishlist.android.designsystem.WishlistTokens
 import app.wishlist.android.designsystem.DISABLED_ALPHA
+import app.wishlist.android.feature.detail.DetailNoticeLine
+import app.wishlist.android.feature.detail.rememberBriefNotice
 import app.wishlist.android.feature.web.WebViewRoute
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLScrollToTopEffect
@@ -72,17 +67,31 @@ import app.wishlist.shared.presentation.HomeRowTarget
 import app.wishlist.shared.presentation.HomeRow
 import app.wishlist.shared.presentation.HomeState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 /**
- * 홈 탭 첫 화면(C3). 로그인 전은 FHomeLoggedOut(로그인 카드 + 분석 대기), 로그인 뒤는 FHome 틀에 "분류 중" 카드만
- * (C3-D3: 이 계정의 미전송 + 캐시의 분석 중 항목, 다른 할 일 카드는 C7까지 숨김) 당겨서 새로고침이 재전송+갱신이다.
- * `Loading`(복원 전·계정 전환 중)은 머리만 그려 이전 계정의 줄이 비치지 않게 한다.
+ * 홈 탭 첫 화면. 로그인 전은 FHomeLoggedOut(로그인 카드 + 분석 대기), 로그인 뒤는 FHome(C7: 분석 대기 · HOME-01 할 일
+ * 카드 · 비교 중인 목적). 당겨서 새로고침이 재전송 + HOME-01이다. `Loading`(복원 전·계정 전환 중)은 머리만 그려 이전 계정의
+ * 줄이 비치지 않게 한다.
+ * - 화면이 보일 때마다(진입·탭 전환·덮던 화면 pop — composition 진입) `appeared()`로 HOME-01을 읽는다(C6 재등장 패턴).
+ * - 이 화면이 보이는 동안 앱이 돌아오면(두 번째 이후 resume) `foreground()`. 앱 전체 신호의 전송 refresh와 겹치는 것은
+ *   조정기 single-flight가 합친다(Ruling 4).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
     val owner = LocalHomeOwner.current
     val state by owner.state.collectAsState()
+    val runtime = (LocalContext.current.applicationContext as WishlistApplication).runtime
+    LaunchedEffect(owner) {
+        runtime.ready.first { it }
+        owner.appeared()
+    }
+    var resumes by remember(owner) { mutableIntStateOf(0) }
+    LifecycleResumeEffect(owner) {
+        if (resumes++ > 0 && runtime.ready.value) owner.foreground()
+        onPauseOrDispose { }
+    }
     // "방금" → "1분 전" while the screen stays composed (cancelled when it leaves).
     LaunchedEffect(owner) {
         while (true) {
@@ -93,6 +102,11 @@ fun HomeScreen() {
     val c = LocalWLColors.current
     val scroll = rememberScrollState()
     WLScrollToTopEffect(WLTab.Home, scroll)
+    // A later HOME-01 failure keeps the last summary and shows a short notice.
+    val failures = remember(owner) { mutableIntStateOf(0) }
+    val refreshFailed = (state as? HomeState.LoggedIn)?.refreshFailed == true
+    LaunchedEffect(refreshFailed) { if (refreshFailed) failures.intValue++ }
+    val notice = rememberBriefNotice(failures.intValue.takeIf { it > 0 }, stringResource(R.string.home_refresh_failed))
 
     val content: @Composable () -> Unit = {
         Column(
@@ -105,13 +119,13 @@ fun HomeScreen() {
                 caption = when (val s = state) {
                     HomeState.Loading -> null
                     is HomeState.LoggedOut -> stringResource(R.string.home_logged_out_caption)
-                    is HomeState.LoggedIn -> HomeRowText.todoCount(s.processing.size).resolve()
+                    is HomeState.LoggedIn -> HomeRowText.todoCount(s.todoCount).resolve()
                 },
             )
             when (val s = state) {
                 HomeState.Loading -> Unit
                 is HomeState.LoggedOut -> HomeLoggedOutContent(s)
-                is HomeState.LoggedIn -> HomeLoggedInContent(s)
+                is HomeState.LoggedIn -> HomeLoggedInContent(s, onRetry = owner::retry)
             }
             Spacer(Modifier.height(WLTabBarHeight + wlTabBarBottomPadding() + WishlistTokens.Space.s16))
         }
@@ -126,6 +140,7 @@ fun HomeScreen() {
         } else {
             content()
         }
+        DetailNoticeLine(notice, Modifier.align(Alignment.TopCenter))
     }
 }
 
@@ -164,63 +179,6 @@ internal fun HomeSection(label: String, content: @Composable ColumnScope.() -> U
     Column(Modifier.padding(top = WishlistTokens.Space.s32), verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s12)) {
         WLText(label, HomeStyles.sectionLabel, color = LocalWLColors.current.textSecondary)
         content()
-    }
-}
-
-/**
- * 할 일 카드(분석 대기·분류 중): 갈 화면이 없어 카드 머리 전체가 펼치기다(screens.md 홈). 화살표 200 `ease`,
- * 펼침 내용 높이·opacity 200 `ease`(motion.md 작은 동작).
- */
-@Composable
-internal fun HomeTodoCard(
-    icon: WLLineIcon,
-    title: String,
-    subtitle: String,
-    count: Int,
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    rows: @Composable ColumnScope.() -> Unit,
-) {
-    val c = LocalWLColors.current
-    val description = stringResource(if (expanded) R.string.wl_expanded else R.string.wl_collapsed)
-    WLCard(Modifier.fillMaxWidth()) {
-        Column {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .semantics { stateDescription = description }
-                    .clickable(role = Role.Button) { onExpandedChange(!expanded) }
-                    .padding(start = 16.dp, top = 16.dp, bottom = 16.dp, end = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s4),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Row(
-                    Modifier.weight(1f).heightIn(min = WishlistTokens.Space.minTouch),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    WLIconTile { WLIcon(icon) }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        WLText(title, HomeStyles.cardTitle)
-                        WLText(subtitle, HomeStyles.cardSubtitle, color = c.textSecondary)
-                    }
-                    WLText(count.toString(), HomeStyles.count, maxLines = 1)
-                }
-                Box(Modifier.size(WishlistTokens.Space.minTouch), contentAlignment = Alignment.Center) { WLChevron(expanded) }
-            }
-            val spec = tween<Float>(WishlistTokens.Motion.disclosureContent, easing = WishlistTokens.Curve.ease)
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(tween(WishlistTokens.Motion.disclosureContent, easing = WishlistTokens.Curve.ease)) + fadeIn(spec),
-                exit = shrinkVertically(tween(WishlistTokens.Motion.disclosureContent, easing = WishlistTokens.Curve.ease)) + fadeOut(spec),
-            ) {
-                Column(
-                    Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s8),
-                    content = rows,
-                )
-            }
-        }
     }
 }
 

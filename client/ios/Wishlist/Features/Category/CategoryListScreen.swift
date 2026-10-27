@@ -9,6 +9,9 @@ import SwiftUI
 /// - 끝 근처에서 다음 페이지, 실패하면 끝에 "더 불러오지 못했어요 · 다시 시도". 당겨서 새로고침(머리만 실패하면 짧은 안내).
 /// - 빈 직접 만든 카테고리는 "아직 상품이 없어요 / 상품 편집에서 …", 없어진 카테고리는 "삭제된 카테고리예요 · 닫기".
 /// - 현재 탭을 다시 누르면 맨 위로. 상세에서 돌아오면 위치 유지(스택 칸이 살아 있다).
+/// - C7 목록 anchor: 당겨서 새로고침·foreground(이 목록이 보이는 맨 위 화면일 때)는 머리 아래 첫 보이는 카드 id로
+///   window를 다시 읽고, Presenter의 `restore`(token마다 한 번, 카드가 놓인 뒤)로 그 카드를 머리 바로 아래에 둔다.
+///   위쪽 끝에 닿고 더 새 카드가 있으면 `loadNewer`, 붙은 뒤에도 보던 카드를 그대로 둔다.
 struct CategoryListScreen: View {
     let target: CategoryListTarget
 
@@ -20,7 +23,10 @@ struct CategoryListScreen: View {
     @Environment(\.wlColors) private var c
     @Environment(\.displayScale) private var scale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var phase
     @State private var moreAnchor = WLAnchor()
+    @State private var anchors = ListAnchorBox()
+    @State private var atTop = true
 
     private let topID = "category-list-top"
 
@@ -34,13 +40,26 @@ struct CategoryListScreen: View {
                     LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                         Section {
                             Color.clear.frame(height: 0).id(topID)
+                                .onGeometryChange(for: Bool.self) { [anchors] in $0.frame(in: .global).minY >= anchors.coveredTop - 1 } action: { atTop = $0 }
                             content(owner: owner, state: state)
                         } header: {
                             header(owner: owner, state: state)
+                                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { [anchors] frame in
+                                    anchors.coveredTop = frame.maxY
+                                    anchors.topInset = frame.height
+                                }
                         }
                     }
                 }
-                .refreshable { await owner.refreshAndWait() }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { [anchors] in anchors.viewportHeight = $0 }
+                .refreshable { await owner.refreshAndWait(anchor: anchors.firstVisible(top: anchors.coveredTop)) }
+                .modifier(ListAnchorWiring(box: anchors, restore: state.restore, laidIds: owner.plan.laidIds,
+                                           firstItemId: state.items.first?.id, prepending: state.prepending) { target in
+                    switch target {
+                    case .top: proxy.scrollTo(topID, anchor: .top)
+                    case .item(let id): ListAnchorMath.scroll(proxy, to: id, box: anchors)
+                    }
+                })
                 .ignoresSafeArea(.container, edges: .bottom)
                 .onChange(of: nav.scrollToTopRequest) { _, request in
                     guard request == .category, nav.entries(.category).last?.id == entryID else { return }
@@ -59,6 +78,17 @@ struct CategoryListScreen: View {
             DetailNoticeLine(notice: owner.partialNotice).padding(.top, WLTopBarMetrics.height + WishlistTokens.Space.s32)
         }
         .onAppear { owner.loadOnce(target) }
+        .onChange(of: [atTop, state.hasNewer, state.prepending || state.loading], initial: true) { _, key in
+            guard anchors.shouldLoadNewer(atTop: key[0], hasNewer: key[1], busy: key[2]) else { return }
+            anchors.beginPrepend(top: anchors.coveredTop, firstItemId: state.items.first?.id)
+            owner.loadNewer()
+        }
+        .onChange(of: phase) { _, phase in
+            let visible = nav.currentTab == .category && entryID != nil && nav.entries(.category).last?.id == entryID
+            if owner.foregroundGate.shouldForeground(phase, visible: visible) {
+                owner.foreground(anchor: anchors.firstVisible(top: anchors.coveredTop))
+            }
+        }
     }
 
     // MARK: Header
@@ -145,7 +175,7 @@ struct CategoryListScreen: View {
             }
             .padding(.top, 200)
         } else {
-            CategoryMasonry(owner: owner, state: state)
+            CategoryMasonry(owner: owner, state: state, anchors: anchors)
                 .padding(.horizontal, WishlistTokens.Space.s16)
                 .padding(.top, WishlistTokens.Space.s8)
             if state.appendFailed {
@@ -168,6 +198,7 @@ struct CategoryListScreen: View {
 private struct CategoryMasonry: View {
     let owner: CategoryListOwner
     let state: CategoryListState
+    let anchors: ListAnchorBox
 
     @Environment(\.displayScale) private var scale
 
@@ -185,6 +216,8 @@ private struct CategoryMasonry: View {
                     ForEach(plan.columns[column], id: \.self) { id in
                         if let item = owner.item(id) {
                             CategoryCard(item: item, ratio: plan.ratio(id) ?? 1, owner: owner)
+                                .listAnchorFrame(id, into: anchors)
+                                .id(id)
                                 .onAppear { visible.insert(id) }
                                 .onDisappear { visible.remove(id) }
                         }

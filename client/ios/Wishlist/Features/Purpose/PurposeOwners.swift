@@ -39,6 +39,7 @@ final class PurposeDetailOwner: CategoryStateOwner<PurposeDetailState> {
     @ObservationIgnored private nonisolated(unsafe) let presenter: PurposeDetailPresenter
     @ObservationIgnored private var started = false
     @ObservationIgnored private var wasVisible = false
+    @ObservationIgnored private var wasActive = true
     @ObservationIgnored private var column: (width: CGFloat, scale: CGFloat)?
     @ObservationIgnored private var sizeTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var deadlineTask: Task<Void, Never>?
@@ -51,19 +52,23 @@ final class PurposeDetailOwner: CategoryStateOwner<PurposeDetailState> {
         super.init(initial: presenter.state.value, states: presenter.state, close: { presenter.close() })
     }
     func loadOnce(_ id: String) { guard !started else { return }; started = true; presenter.load(id: id) }
+    /// The entry is the shown tab's top (C7: the home summary opens a purpose on the home tab too).
     static func isVisible(entryID: Int?, navigator: WLNavigator, phase: ScenePhase) -> Bool {
-        phase == .active && navigator.currentTab == .purpose && entryID != nil
-            && navigator.entries(.purpose).last?.id == entryID
+        phase == .active && entryID != nil && navigator.entries(navigator.currentTab).last?.id == entryID
     }
-    /// Retained layers stay mounted: only a hidden-to-front transition starts a new read.
-    func navigationChanged(id: String, entryID: Int?, navigator: WLNavigator, phase: ScenePhase) {
+    /// Retained layers stay mounted: only a hidden-to-front transition starts a new read, around the first
+    /// visible candidate (`anchor`, C7). Coming back from the background is the quiet `foreground` read.
+    func navigationChanged(id: String, entryID: Int?, navigator: WLNavigator, phase: ScenePhase, anchor: String? = nil) {
         let visible = Self.isVisible(entryID: entryID, navigator: navigator, phase: phase)
-        defer { wasVisible = visible }
+        let returning = phase == .active && !wasActive
+        defer { wasVisible = visible; wasActive = phase == .active }
         guard visible, !wasVisible else { return }
-        if started { refresh() } else { loadOnce(id) }
+        if !started { loadOnce(id) } else if returning { presenter.foreground(anchorItemId: anchor) } else { presenter.refresh(anchorItemId: anchor) }
     }
     func refresh() { presenter.refresh() }
     func refreshAndWait() async { try? await presenter.refreshNow() }
+    func refreshAndWait(anchor: String?) async { try? await presenter.refreshNow(anchorItemId: anchor) }
+    func loadNewer() { presenter.loadNewer() }
     func retry() { presenter.retry() }
     func loadMore() { presenter.loadMore() }
     func applyEdited(_ detail: PurposeDetail) { presenter.applyEdited(detail: detail) }

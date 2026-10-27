@@ -32,16 +32,21 @@ internal fun parsePurposeDetail(body: String): ClientResult<PurposeDetail> = pur
 internal fun parsePurposeCreated(body: String): ClientResult<PurposeCreated> = purposeReading(body) {
     PurposeCreated(detail(it.o("purpose")), it.n("activeCount"), it.n("purposeLimit", 1))
 }
+/** The B3 summary item DTO (PUR-01 rows, HOME-01 recentPurposes), wire keys converted to UI keys. */
+private fun summaryItem(raw: JsonElement): PurposeSummary {
+    val o = raw as? JsonObject ?: throw InvalidPurpose()
+    return PurposeSummary(o.id("id"), o.s("name"), o.optional("description"), PurposeStyleKeys.colorFromWire(o.s("colorKey")), PurposeStyleKeys.iconFromWire(o.s("iconKey")),
+        o.n("version", 1), o.n("candidateCount"), activity(o.o("activity")), o.a("previews").map {
+            val preview = it as? JsonObject ?: throw InvalidPurpose()
+            PurposePreview(preview.id("itemId"), preview.optional("imageUrl"))
+        })
+}
+internal fun parsePurposeSummaryItem(raw: JsonElement): ClientResult<PurposeSummary> = try {
+    ClientResult.Success(summaryItem(raw))
+} catch (_: InvalidPurpose) { invalidPurpose } catch (_: IllegalArgumentException) { invalidPurpose }
 internal fun parsePurposeCatalog(body: String): ClientResult<PurposeCatalog> = purposeReading(body) { root ->
     if (root.s("projection") != "SUMMARY" || root.optional("nextCursor") != null) throw InvalidPurpose()
-    val purposes = root.a("purposes").map { raw ->
-        val o = raw as? JsonObject ?: throw InvalidPurpose()
-        PurposeSummary(o.id("id"), o.s("name"), o.optional("description"), PurposeStyleKeys.colorFromWire(o.s("colorKey")), PurposeStyleKeys.iconFromWire(o.s("iconKey")),
-            o.n("version", 1), o.n("candidateCount"), activity(o.o("activity")), o.a("previews").map {
-                val preview = it as? JsonObject ?: throw InvalidPurpose()
-                PurposePreview(preview.id("itemId"), preview.optional("imageUrl"))
-            })
-    }
+    val purposes = root.a("purposes").map(::summaryItem)
     val archive = root.o("archiveSummary")
     PurposeCatalog(purposes, root.n("activeCount"), root.n("purposeLimit", 1), ArchiveSummary(archive.n("count"), archive.a("recentTitles").map { it.stringValue() }))
 }

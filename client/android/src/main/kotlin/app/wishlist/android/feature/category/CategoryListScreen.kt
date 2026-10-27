@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.wishlist.android.R
 import app.wishlist.android.WishlistApplication
 import app.wishlist.android.designsystem.EmptyState
@@ -92,7 +93,8 @@ internal fun shouldLoadMore(scrollValue: Int, scrollMax: Int, hasMore: Boolean, 
  * 세부 유형 목록(FCategoryList · ListCustom · ListCustomEmpty, C5 spec §3). 위에 붙은 머리(뒤로 · 이름 + 개수 · 상위 이름,
  * 직접 만든 것은 ⋯ "편집"만, D7) + 2열 엇갈림 카드. 사진은 페이지 단위 skeleton 뒤 원래 비율로 한 번에 놓는다(D10).
  * - 끝 근처에서 다음 페이지, 실패하면 끝에 "더 불러오지 못했어요 · 다시 시도".
- * - 당겨서 새로고침은 첫 페이지부터(이어 붙인 페이지는 버린다, C7 전까지). foreground 갱신은 하지 않는다.
+ * - C7 목록 anchor: 당겨서 새로고침·foreground(두 번째 이후 resume)는 첫 보이는 카드 id로 그 카드 주변 window를 받아
+ *   전체를 바꾸고, `restore`로 그 카드(같은 카드면 카드 안 위치까지)를 첫 카드로 되돌린다. 위쪽 끝에 닿으면 `loadNewer`.
  * - 편집 성공 → 이름을 바로 바꾸고 머리만 다시 받는다(목록·위치 유지). 없어진 custom → "삭제된 카테고리예요" + 닫기.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -116,6 +118,12 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
 
     val scroll = rememberScrollState()
     WLScrollToTopEffect(WLTab.Category, scroll)
+    val anchors = remember { ListAnchorController(ListAnchorTracker(), scroll) }
+    var resumes by remember(owner) { mutableIntStateOf(0) }
+    LifecycleResumeEffect(owner) {
+        if (resumes++ > 0 && runtime.ready.value) list.foreground(anchors.capture())
+        onPauseOrDispose { }
+    }
     val partialNotices = remember(owner) { mutableIntStateOf(0) }
     LaunchedEffect(state.partialFailed) { if (state.partialFailed) partialNotices.intValue++ }
     val notice = rememberBriefNotice(partialNotices.intValue.takeIf { it > 0 }, stringResource(R.string.category_partial_failed))
@@ -184,15 +192,16 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
                 }
                 else -> PullToRefreshBox(
                     isRefreshing = state.loading && state.items.isNotEmpty(),
-                    onRefresh = list::refresh,
+                    onRefresh = { list.refresh(anchors.capture()) },
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                    Column(Modifier.fillMaxSize().verticalScroll(scroll).then(anchors.tracker.contentModifier)) {
                         CategoryGrid(
                             items = state.items,
                             loading = state.loading && state.items.isEmpty(),
                             onOpen = { item -> nav.push(ItemDetailRoute(item.id), "category/${route.hint.categoryId}/${item.id}") },
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = WishlistTokens.Space.s8),
+                            anchors = anchors.tracker,
                         )
                         if (state.appendFailed) {
                             Row(
@@ -215,6 +224,10 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
                             shouldLoadMore(scroll.value, scroll.maxValue, s.hasMore, s.appending || s.loading, s.appendFailed)
                         }.distinctUntilChanged().collect { if (it) list.loadMore() }
                     }
+                    ListAnchorEffects(
+                        anchors, state.restore, state.hasNewer, busy = state.loading || state.prepending, prepending = state.prepending,
+                        applied = owner.appliedRestore, onApplied = { owner.appliedRestore = it }, loadNewer = list::loadNewer,
+                    )
                 }
             }
         }
@@ -227,7 +240,7 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
  * it out; laid-out cards keep their height. A refresh (the list restarts) forgets the pages.
  */
 @Composable
-internal fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (WishlistItem) -> Unit, modifier: Modifier, merchantMeta: Boolean = false, cardTitle: @Composable (WishlistItem) -> String? = { null }) {
+internal fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (WishlistItem) -> Unit, modifier: Modifier, merchantMeta: Boolean = false, cardTitle: @Composable (WishlistItem) -> String? = { null }, anchors: ListAnchorTracker? = null) {
     val context = LocalContext.current
     val book = remember { CategoryPhotoBook(context) }
     // A restart replaces the whole layout (a job of the old one can no longer touch the one on screen).
@@ -244,6 +257,7 @@ internal fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (
         val fresh = ids.filter { it !in laid }
         if (fresh.isNotEmpty()) current.pages.add(fresh)
         fresh.forEach { current.photos[it] = photoUrls[it] }
+        anchors?.reorder(ids)
     }
 
     val shown = layout
@@ -271,16 +285,19 @@ internal fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (
                     CategorySkeletonCard()
                 } else {
                     val url = (photoSourceFor(item.product.imageUrl) as? PhotoSource.Remote)?.url
-                    CategoryCard(
-                        item = item,
-                        ratio = ratio,
-                        meta = cardMetaLine(item, now, ::deviceUtcOffsetSeconds),
-                        unconfirmed = isUnconfirmed(item),
-                        photoRequest = url?.let { remember(it, columnPx) { book.request(it, columnPx) } },
-                        onClick = { onOpen(item) },
-                        merchantMeta = merchantMeta,
-                        title = cardTitle(item) ?: item.product.name.orEmpty(),
-                    )
+                    // C7: only laid-out cards report their place (a skeleton's height is not final).
+                    Box(Modifier.anchorCard(anchors, item.id)) {
+                        CategoryCard(
+                            item = item,
+                            ratio = ratio,
+                            meta = cardMetaLine(item, now, ::deviceUtcOffsetSeconds),
+                            unconfirmed = isUnconfirmed(item),
+                            photoRequest = url?.let { remember(it, columnPx) { book.request(it, columnPx) } },
+                            onClick = { onOpen(item) },
+                            merchantMeta = merchantMeta,
+                            title = cardTitle(item) ?: item.product.name.orEmpty(),
+                        )
+                    }
                 }
             } }
         }

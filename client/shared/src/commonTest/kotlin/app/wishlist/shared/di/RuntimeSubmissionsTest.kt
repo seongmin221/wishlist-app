@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import app.wishlist.shared.model.HomeActionGroup
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -93,29 +94,28 @@ class RuntimeSubmissionsTest {
         runtime.close()
     }
 
-    @Test fun foregroundRefreshWithoutDataChangeRecomputesLoggedInRelativeTime() = runTest {
+    @Test fun signedInHomeShowsSavedItemsThroughHome01AndReloadsAfterCoordinatorRuns() = runTest {
         var now = runtimeTime
-        // ITEM-03 unbound: the refresh cannot change the cached PROCESSING item.
-        val runtime = createRuntime(
-            debugBindings(ApiId.ITEM_03 to Backend.UNAVAILABLE),
-            dispatcher = StandardTestDispatcher(testScheduler),
-            clock = Clock { now },
-        )
+        val runtime = createRuntime(debugBindings(ApiId.HOME_01 to Backend.FAKE), dispatcher = StandardTestDispatcher(testScheduler), clock = Clock { now })
         runtime.startDebugSession()
         advanceUntilIdle()
         runtime.auth().signIn(AuthProvider.GOOGLE).successValue()
         val submissions = runtime.submissions()
-        assertEquals(ShareCardKind.SAVED, submissions.receiveShared(LINK, online = true))
         val home = runtime.homePresenter()
+        home.appeared()
         advanceUntilIdle()
-        val before = submissions.view.value
-        assertEquals(RelativeTime.JustNow, assertIs<HomeState.LoggedIn>(home.state.value).processing.single().savedAt)
+        fun analysisCount() = assertIs<HomeState.LoggedIn>(home.state.value).groups
+            .firstOrNull { it.group == HomeActionGroup.ANALYSIS_IN_PROGRESS }?.count ?: 0
+        val before = analysisCount()
 
-        now += 3.hours
+        // A saved share is a server item: not a pending row, it shows in HOME-01 after the coordinator run.
+        assertEquals(ShareCardKind.SAVED, submissions.receiveShared(LINK, online = true))
         submissions.refresh()
         advanceUntilIdle()
-        assertEquals(before, submissions.view.value)
-        assertEquals(RelativeTime.Hours(3), assertIs<HomeState.LoggedIn>(home.state.value).processing.single().savedAt)
+        val state = assertIs<HomeState.LoggedIn>(home.state.value)
+        assertTrue(state.pending.isEmpty())
+        assertTrue(state.summaryLoaded)
+        assertEquals(before + 1, analysisCount())
         home.close()
         runtime.close()
     }

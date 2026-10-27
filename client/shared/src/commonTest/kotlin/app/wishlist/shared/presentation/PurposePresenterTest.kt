@@ -49,9 +49,12 @@ class PurposePresenterTest {
         val home = PurposeHomePresenter(repo, session, dispatcher)
         val form = PurposeFormPresenter(repo, IdGenerator { "00000000-0000-4000-8000-${(++seq).toString().padStart(12, '0')}" }, session, dispatcher)
         val pages = Script<ItemPage> { ok(ItemPage(emptyList(), 0, null)) }
+        val windows = Script<ItemPage> { ok(ItemPage(emptyList(), 0, null)) }
         val items = object : ItemListRepository {
             override suspend fun byCategory(categoryId: String, cursor: String?, limit: Int) = error("wrong scope")
             override suspend fun byPurpose(purposeId: String, cursor: String?, limit: Int) = pages.next(purposeId to cursor)
+            override suspend fun byPurposeAround(purposeId: String, anchor: String, before: Int, after: Int) =
+                windows.next(listOf(purposeId, anchor, before, after))
         }
         val detail = PurposeDetailPresenter(repo, items, session, dispatcher)
         fun close() { home.close(); form.close(); detail.close() }
@@ -418,4 +421,92 @@ class PurposePresenterTest {
         assertFalse(h.detail.state.value.loading)
     }
 
+
+    private fun cardId(n: Int) = "00000000-0000-4000-8000-" + n.toString().padStart(12, '0')
+    private fun cards(range: IntRange) = range.map { itemFixture(id = cardId(it)) }
+    private fun anchored(range: IntRange, next: String?, previous: String? = null, anchor: ItemAnchor? = null) =
+        ok(ItemPage(cards(range), 80, next, previous, range.associate { cardId(it) to "a$it" }, anchor))
+    @Test fun refreshWithAnchorUsesWindow() = scenario { h ->
+        val target = purposeDetail().id
+        h.pages.answer(anchored(1..40, "c1")); h.pages.answer(anchored(41..80, null))
+        h.detail.load(target); advanceUntilIdle()
+        h.detail.loadMore(); advanceUntilIdle()
+        h.windows.answer(anchored(10..50, "n50", "p10", ItemAnchor(cardId(30), cardId(30), true)))
+        h.detail.refresh(cardId(30)); advanceUntilIdle()
+        assertEquals(listOf<Any?>(listOf(target, "a30", 20, 20)), h.windows.calls)
+        assertEquals(2, h.pages.calls.size)
+        assertEquals(cards(10..50), h.detail.state.value.items)
+        assertEquals(AnchorRestore(cardId(30), sameItem = true, token = 1), h.detail.state.value.restore)
+        assertTrue(h.detail.state.value.hasNewer)
+        assertTrue(h.detail.state.value.hasMore)
+        assertFalse(h.detail.state.value.itemsLoading)
+        assertEquals(2, h.repo.details.calls.size) // the header is read again with the window
+    }
+    @Test fun refreshWithRemovedAnchorRestoresFallback() = scenario { h ->
+        h.pages.answer(anchored(1..40, "c1"))
+        h.detail.load(purposeDetail().id); advanceUntilIdle()
+        h.windows.answer(anchored(2..22, "n22", null, ItemAnchor(cardId(1), cardId(2), false)))
+        h.detail.refresh(cardId(1)); advanceUntilIdle()
+        assertEquals(AnchorRestore(cardId(2), sameItem = false, token = 1), h.detail.state.value.restore)
+        assertEquals(cards(2..22), h.detail.state.value.items)
+        assertNull(h.detail.state.value.itemsError)
+    }
+    @Test fun refreshWithoutAnchorUsesFirstPage() = scenario { h ->
+        val target = purposeDetail().id
+        h.pages.answer(anchored(1..40, "c1"))
+        h.detail.load(target); advanceUntilIdle()
+        assertNull(h.detail.state.value.restore)
+        h.pages.answer(anchored(1..40, "c1"))
+        h.detail.refresh(null); advanceUntilIdle()
+        assertEquals(AnchorRestore(null, sameItem = false, token = 1), h.detail.state.value.restore)
+        h.pages.answer(anchored(1..40, "c1"))
+        h.detail.refreshNow("99999999-9999-4999-8999-999999999999")
+        assertEquals(AnchorRestore(null, sameItem = false, token = 2), h.detail.state.value.restore)
+        assertEquals(listOf<Any?>(target to null, target to null, target to null), h.pages.calls)
+        assertTrue(h.windows.calls.isEmpty())
+        assertEquals(cards(1..40), h.detail.state.value.items)
+    }
+    @Test fun loadNewerPrepends() = scenario { h ->
+        val target = purposeDetail().id
+        h.pages.answer(anchored(1..40, "c1"))
+        h.detail.load(target); advanceUntilIdle()
+        h.windows.answer(anchored(10..50, "n50", "p10", ItemAnchor(cardId(30), cardId(30), true)))
+        h.detail.refresh(cardId(30)); advanceUntilIdle()
+        val held = h.pages.hold()
+        h.detail.loadNewer(); h.detail.loadNewer(); advanceUntilIdle()
+        assertTrue(h.detail.state.value.prepending)
+        assertEquals(listOf<Any?>(target to null, target to "p10"), h.pages.calls)
+        held.complete(anchored(1..10, "n10", null)); advanceUntilIdle()
+        assertEquals(cards(1..50), h.detail.state.value.items)
+        assertFalse(h.detail.state.value.prepending)
+        assertFalse(h.detail.state.value.hasNewer)
+    }
+    @Test fun foregroundIgnoredWhileLoading() = scenario { h ->
+        val target = purposeDetail().id
+        val held = h.pages.hold()
+        h.detail.load(target); advanceUntilIdle()
+        h.detail.foreground(null); advanceUntilIdle()
+        assertEquals(1, h.pages.calls.size)
+        assertEquals(1, h.repo.details.calls.size)
+        held.complete(anchored(1..40, "c1")); advanceUntilIdle()
+        h.repo.details.answer(fail(ErrorKind.NETWORK))
+        h.windows.answer(anchored(1..23, "n23", null, ItemAnchor(cardId(3), cardId(3), true)))
+        h.detail.foreground(cardId(3)); advanceUntilIdle()
+        assertEquals(2, h.repo.details.calls.size)
+        assertNull(h.detail.state.value.error) // the header is read again, quietly
+        assertEquals(listOf<Any?>(listOf(target, "a3", 20, 20)), h.windows.calls)
+        assertEquals(AnchorRestore(cardId(3), sameItem = true, token = 1), h.detail.state.value.restore)
+    }
+    @Test fun staleSessionWindowDropped() = scenario { h ->
+        h.pages.answer(anchored(1..40, "c1"))
+        h.detail.load(purposeDetail().id); advanceUntilIdle()
+        val held = h.windows.hold()
+        h.detail.refresh(cardId(3)); advanceUntilIdle()
+        h.session.changeAccount("B"); advanceUntilIdle()
+        held.complete(anchored(1..23, "n23", null, ItemAnchor(cardId(3), cardId(3), true))); advanceUntilIdle()
+        assertEquals(PurposeDetailState(), h.detail.state.value)
+        h.detail.loadNewer(); h.detail.foreground(cardId(3)); advanceUntilIdle()
+        assertEquals(PurposeDetailState(), h.detail.state.value)
+        assertEquals(1, h.windows.calls.size)
+    }
 }

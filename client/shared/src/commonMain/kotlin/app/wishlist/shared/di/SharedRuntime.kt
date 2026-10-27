@@ -17,6 +17,7 @@ import app.wishlist.shared.data.fake.DebugAnalysisDriver
 import app.wishlist.shared.data.fake.FakeAuthFacade
 import app.wishlist.shared.data.fake.FakeStore
 import app.wishlist.shared.presentation.AccountPresenter
+import app.wishlist.shared.presentation.HomeFlowPresenter
 import app.wishlist.shared.presentation.HomePresenter
 import app.wishlist.shared.presentation.ItemDetailPresenter
 import app.wishlist.shared.presentation.LocalSubmissionDetailPresenter
@@ -179,6 +180,10 @@ class SharedRuntime internal constructor(
     fun itemListRepository(): app.wishlist.shared.repository.ItemListRepository =
         GatedItemListRepository(ready, resolveOr<app.wishlist.shared.repository.ItemListRepository>(UnavailableItemListRepository) { get() })
 
+    /** HOME-01/02 behind the ready gate (cards refresh the item cache). */
+    fun homeRepository(): app.wishlist.shared.repository.HomeRepository =
+        GatedHomeRepository(ready, resolveOr<app.wishlist.shared.repository.HomeRepository>(UnavailableHomeRepository) { get() })
+
     /** Debug seed catalog (DEBUG); UNAVAILABLE in RELEASE. Not a CAT/PUR/ITEM-02 wire backend. */
     fun catalogRepository(): CatalogRepository =
         GatedCatalogRepository(ready, resolveOr<CatalogRepository>(UnavailableCatalogRepository) { get() })
@@ -261,9 +266,8 @@ class SharedRuntime internal constructor(
     fun accountPresenter(): AccountPresenter = AccountPresenter(auth = auth(), dispatcher = env.dispatchers.io)
 
     /**
-     * A new home list Presenter over [auth] and the one [submissions] coordinator. Foreground
-     * refresh stays app-wide (the platform calls `submissions().refresh()`). The
-     * platform owner calls [HomePresenter.close].
+     * A new home Presenter over [auth], the one [submissions] coordinator, HOME-01 ([homeRepository])
+     * and this runtime's one [session]. The platform owner calls [HomePresenter.close].
      */
     fun homePresenter(): HomePresenter {
         val submissions = submissions()
@@ -272,11 +276,19 @@ class SharedRuntime internal constructor(
             view = submissions.view,
             refreshes = submissions.refreshes,
             runRefresh = submissions::refresh,
+            home = homeRepository(),
+            session = session,
             clock = env.clock,
             utcOffsetSeconds = env.platform.utcOffsetSeconds,
             dispatcher = env.dispatchers.io,
         )
     }
+
+    /**
+     * A new continuous-processing Presenter (분류·목적 확인 / 정보 보완) over HOME-02 ([homeRepository])
+     * and this runtime's [session]; one per flow screen. The platform owner calls [HomeFlowPresenter.close].
+     */
+    fun homeFlowPresenter(): HomeFlowPresenter = HomeFlowPresenter(homeRepository(), session, env.dispatchers.io)
 
     /**
      * A new local (not yet sent) link detail Presenter over the one [submissions] coordinator's view,
@@ -380,6 +392,10 @@ class SharedRuntime internal constructor(
         ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04 -> {
             val routed = koin.get<app.wishlist.shared.repository.PurposeRepository>() as RoutedPurposeRepository
             backendOf(when (apiId) { ApiId.PUR_01 -> routed.summary; ApiId.PUR_02 -> routed.create; ApiId.PUR_03 -> routed.detail; else -> routed.update })
+        }
+        ApiId.HOME_01, ApiId.HOME_02 -> {
+            val routed = koin.get<app.wishlist.shared.repository.HomeRepository>(HOME_DELEGATE) as RoutedHomeRepository
+            backendOf(if (apiId == ApiId.HOME_01) routed.summary else routed.group)
         }
         else -> Backend.UNAVAILABLE
     }

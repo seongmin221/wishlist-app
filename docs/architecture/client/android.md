@@ -137,3 +137,11 @@
 [검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
 
 C6 PR #23 후속에서 목적 편집 취소·버리기는 폼의 `recoveredDetail`이 있으면 상세에 먼저 적용한다. 사용자가 복구 후 다시 수정한 초안은 버리고, 서버에서 읽은 이름·색·version을 유지하여 재편집 시 같은 오래된 version으로 저장하지 않는다.
+
+## 홈·연속 처리·목록 anchor (C7)
+
+- **홈:** `feature/home`의 `HomeLoggedInContent`(분석 대기 카드 → HOME-01 그룹 → 실패 시 재시도 카드), `HomeTodoCard`(접힘 시작, 화살표 200ms 180°, 미리보기 캐러셀 최대 4), `HomePurposeSummary`(비교 중인 목적 3개·목적 전체). `HomeScreen`은 composition 진입마다 `appeared()`, 두 번째 이후 resume에서 `foreground()`를 부른다(C6 재등장 패턴).
+- **연속 처리:** `feature/flow`. `HomeFlowRoute`(계정 범위, 탭 막대 없음, 시작 anchor는 base64url 인코딩), entry ViewModel `HomeFlowOwner`, `ReviewFlowScreen`·`ReviewCardStack`(던지기 340 `throw`, 회전 중심 50%/90%, 뒤 카드 2장, `pointerInput`은 고정 Box에 두어 속도를 stack 좌표로 측정), `FillFlowScreen`(내용만 320 `standard` 넘김, 건너뛰기만 동작), `FlowSummary`. 판정 순수 함수는 `CardThrowMath`(iOS와 같은 값·Ruling 6). 문자열은 새 `home_flow_strings.xml`(ko·en)에 두어 #22와 겹치는 `strings.xml`을 건드리지 않는다.
+- **목록 anchor:** `feature/category/ListAnchor.kt`가 masonry `Column`의 배치된 카드 위치로 첫 보이는 카드를 정하고 restore token을 한 번 적용한다(같은 카드면 카드 안 offset 유지). 위쪽 끝 `loadNewer`는 끝을 떠났다 돌아올 때만 다시 부른다(Ruling 9). 카테고리 목록과 목적 상세가 공유한다.
+
+[구현·검증](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).

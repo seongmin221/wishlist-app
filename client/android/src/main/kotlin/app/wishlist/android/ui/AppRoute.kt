@@ -12,6 +12,8 @@ import app.wishlist.android.feature.category.CategoryHomeScreen
 import app.wishlist.android.feature.category.CategoryListRoute
 import app.wishlist.android.feature.category.CategoryListScreen
 import app.wishlist.android.feature.detail.ItemDetailScreen
+import app.wishlist.android.feature.flow.HomeFlowRoute
+import app.wishlist.android.feature.flow.HomeFlowScreen
 import app.wishlist.android.feature.detail.LocalSubmissionScreen
 import app.wishlist.android.feature.home.HomeScreen
 import app.wishlist.android.feature.web.WebViewRoute
@@ -35,6 +37,7 @@ internal fun AppRoute(route: WLRoute, sourceKey: String?) {
         is WebViewRoute -> WebViewScreen(route)
         is CategoryListRoute -> CategoryListScreen(route)
         is PurposeDetailRoute -> PurposeDetailScreen(route)
+        is HomeFlowRoute -> HomeFlowScreen(route)
         else -> if (!VariantRoutes.Content(route, sourceKey)) {
             when (route) {
                 is WLRoute.TabRoot -> PlainTabRoot(route.tab)

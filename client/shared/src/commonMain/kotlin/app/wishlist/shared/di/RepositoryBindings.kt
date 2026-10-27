@@ -46,12 +46,13 @@ class RemoteConfig(val baseUrl: String, val tokenSource: PlatformTokenSource) {
     }
 }
 
-/** Fake wire APIs: C2 ITEM-01/03, C5 CAT-01~04, C6 PUR-01~04 and ITEM-02 (category/purpose scopes). The seed catalog is a separate debug facade. */
+/** Fake wire APIs: C2 ITEM-01/03, C5 CAT-01~04, C6 PUR-01~04, ITEM-02 (category/purpose scopes) and C7 HOME-01/02. The seed catalog is a separate debug facade. */
 internal val FAKE_IMPLEMENTED_APIS: Set<ApiId> = setOf(
     ApiId.ITEM_01, ApiId.ITEM_03, ApiId.ITEM_02, ApiId.CAT_01, ApiId.CAT_02, ApiId.CAT_03, ApiId.CAT_04, ApiId.PUR_01, ApiId.PUR_02, ApiId.PUR_03, ApiId.PUR_04,
+    ApiId.HOME_01, ApiId.HOME_02,
 )
 
-/** Remote APIs: B1 ITEM-01/03 (C2), B2 CAT-01~04 (C5), B3 PUR-01~04 (C6) and B4 ITEM-02 category/purpose scopes. */
+/** Remote APIs: B1 ITEM-01/03 (C2), B2 CAT-01~04 (C5), B3 PUR-01~04 (C6) and B4 ITEM-02 category/purpose scopes and HOME-01/02 (C7). */
 internal val REMOTE_IMPLEMENTED_APIS: Set<ApiId> = FAKE_IMPLEMENTED_APIS
 
 internal val RepositoryBindings.usesRemote: Boolean get() = backends.containsValue(Backend.REMOTE)

@@ -70,6 +70,10 @@ private struct AppShell: View {
         }
         #if DEBUG
         .task {
+            if let c7 = DebugLaunchHooks.string(of: C7DebugScreens.key, in: ProcessInfo.processInfo.arguments) {
+                await C7DebugScreens.open(c7, runtime: runtime, navigator: navigator, owners: entryOwners)
+                return
+            }
             guard let screen = DebugLaunchHooks.string(of: "wl.purpose.screen", in: ProcessInfo.processInfo.arguments) else { return }
             await runtime.purposeUntilReady()
             // A fresh simulator has no saved Fake account. Only this explicit screenshot hook signs in.
@@ -129,6 +133,7 @@ private struct AppRoute: View {
             case .web(let page): WebViewScreen(page: page)
             case .categoryList(let target): CategoryListScreen(target: target)
             case .purpose(let id): PurposeDetailScreen(purposeID: id)
+            case .homeFlow(let target): HomeFlowScreen(target: target)
             }
         }
         #if DEBUG

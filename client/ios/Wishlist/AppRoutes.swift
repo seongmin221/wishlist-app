@@ -17,11 +17,14 @@ enum AppDestination: Hashable {
     /// tab bar, so it does not move), closed when the account is left.
     case categoryList(CategoryListTarget)
     case purpose(String)
+    /// C7 FHomeReviewFlow / FHomeFillFlow from a home to-do card: horizontal slide, no tab bar, closed when
+    /// the account is left.
+    case homeFlow(HomeFlowTarget)
 
     var accountScoped: Bool {
         switch self {
         case .settings, .login: false
-        case .item, .local, .web, .categoryList, .purpose: true
+        case .item, .local, .web, .categoryList, .purpose, .homeFlow: true
         }
     }
 

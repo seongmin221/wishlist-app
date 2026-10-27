@@ -12,6 +12,10 @@ interface CategoryContractFixture {
     suspend fun repositoriesFor(ownerId: String): CategoryContractRepositories
     /** Puts an item of [ownerId] in [categoryId]; returns its id. Later calls are newer (createdAt order). */
     suspend fun placeItem(ownerId: String, categoryId: String, name: String? = "상품", lifecycle: LifecycleStatus = LifecycleStatus.ACTIVE): String
+    /** Creates an ACTIVE purpose of [ownerId]; returns its id. */
+    suspend fun createPurpose(ownerId: String): String
+    /** Puts a named item of [ownerId] linked to [purposeId]; returns its id. Later calls are newer. */
+    suspend fun placePurposeItem(ownerId: String, purposeId: String): String
     /** Moves the backend clock forward. */
     fun advanceSeconds(seconds: Long)
     suspend fun close() {}
@@ -294,6 +298,66 @@ abstract class ItemListRepositoryContractTest {
             val missing = repo.byCategory("00000000-0000-4000-8000-0000000000ff").failed()
             assertEquals(ErrorKind.NOT_FOUND, missing.kind)
             assertEquals("CATEGORY_NOT_FOUND", missing.code)
+        }
+    }
+
+    @Test fun categoryWindowAroundAnchor() = runTest {
+        scenario { f ->
+            val repo = f.repositoriesFor(ownerA).items
+            val newest = (1..30).map { f.placeItem(ownerA, "C026", name = "상품 $it") }.reversed()
+            val first = repo.byCategory("C026").ok()
+            assertNull(first.previousCursor)
+            assertNull(first.anchor)
+            assertEquals(newest.toSet(), first.anchorCursors.keys)
+            val target = newest[25]
+            val window = repo.byCategoryAround("C026", first.anchorCursors.getValue(target)).ok()
+            assertEquals(newest.subList(5, 30), window.items.map { it.id })
+            assertEquals(ItemAnchor(target, target, true), window.anchor)
+            assertEquals(30, window.totalCount)
+            assertNotNull(window.previousCursor)
+            assertNull(window.nextCursor)
+            assertEquals(newest.subList(5, 30).toSet(), window.anchorCursors.keys)
+            val narrow = repo.byCategoryAround("C026", first.anchorCursors.getValue(target), before = 2, after = 1).ok()
+            assertEquals(newest.subList(23, 27), narrow.items.map { it.id })
+            assertNotNull(narrow.nextCursor)
+            assertEquals(ErrorKind.VALIDATION, repo.byCategoryAround("C026", first.anchorCursors.getValue(target), before = 21).failed().kind)
+            assertEquals(ErrorKind.VALIDATION, repo.byCategoryAround("C024", first.anchorCursors.getValue(target)).failed().kind)
+        }
+    }
+
+    @Test fun purposeWindowAroundAnchor() = runTest {
+        scenario { f ->
+            val repo = f.repositoriesFor(ownerA).items
+            val purpose = f.createPurpose(ownerA)
+            val newest = (1..5).map { f.placePurposeItem(ownerA, purpose) }.reversed()
+            val first = repo.byPurpose(purpose).ok()
+            assertEquals(newest, first.items.map { it.id })
+            val window = repo.byPurposeAround(purpose, first.anchorCursors.getValue(newest[2]), before = 1, after = 1).ok()
+            assertEquals(newest.subList(1, 4), window.items.map { it.id })
+            assertEquals(ItemAnchor(newest[2], newest[2], true), window.anchor)
+            assertEquals(5, window.totalCount)
+            assertNotNull(window.previousCursor)
+            assertNotNull(window.nextCursor)
+        }
+    }
+
+    @Test fun previousCursorLoadsNewer() = runTest {
+        scenario { f ->
+            val repo = f.repositoriesFor(ownerA).items
+            val newest = (1..10).map { f.placeItem(ownerA, "C026", name = "상품 $it") }.reversed()
+            val anchors = repo.byCategory("C026").ok().anchorCursors
+            val window = repo.byCategoryAround("C026", anchors.getValue(newest[5]), before = 1, after = 1).ok()
+            assertEquals(newest.subList(4, 7), window.items.map { it.id })
+            val newer = repo.byCategory("C026", assertNotNull(window.previousCursor), limit = 3).ok()
+            assertEquals(newest.subList(1, 4), newer.items.map { it.id })
+            assertNull(newer.anchor)
+            val top = repo.byCategory("C026", assertNotNull(newer.previousCursor), limit = 3).ok()
+            assertEquals(listOf(newest[0]), top.items.map { it.id })
+            assertNull(top.previousCursor)
+            assertNotNull(top.nextCursor)
+            val older = repo.byCategory("C026", assertNotNull(window.nextCursor), limit = 3).ok()
+            assertEquals(newest.subList(7, 10), older.items.map { it.id })
+            assertNull(older.nextCursor)
         }
     }
 

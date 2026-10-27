@@ -10,7 +10,7 @@ final class SharedRuntimeTests: XCTestCase {
         XCTAssertEqual(bindings.buildMode, .debug)
         XCTAssertEqual(bindings.backends.count, 37)
         for api in ApiId.allCases {
-            let expected: Backend = [ApiId.item01, .item03, .item02, .cat01, .cat02, .cat03, .cat04, .pur01, .pur02, .pur03, .pur04].contains(api) ? .fake : .unavailable
+            let expected: Backend = [ApiId.item01, .item03, .item02, .cat01, .cat02, .cat03, .cat04, .pur01, .pur02, .pur03, .pur04, .home01, .home02].contains(api) ? .fake : .unavailable
             XCTAssertEqual(bindings.backends[api], expected, api.name)
         }
     }

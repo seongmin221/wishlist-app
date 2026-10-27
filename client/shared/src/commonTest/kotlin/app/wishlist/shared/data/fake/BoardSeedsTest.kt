@@ -105,6 +105,26 @@ class BoardSeedsTest {
         assertEquals(before, repo.summary().successValue().purposes)
     }
 
+    @Test fun seeded_home_matches_the_fhome_board_without_touching_the_board_counts() = runTest {
+        val data = seed()
+        // The home-only items carry no category or purpose and are not list-eligible.
+        assertEquals(4, data.homeItems.size)
+        assertTrue(data.homeItems.all { it.category.id == null && it.purpose.id == null })
+        val session = MutableAuthSession(); session.changeAccount("A")
+        val store = FakeStore(session, Clock { now }, IdGenerator { Uuid.random().toString() })
+        store.seed(data).successValue()
+        val home = FakeHomeRepository(store)
+        val summary = home.summary().successValue()
+        assertEquals(listOf(1, 3, 3), summary.groups.map { it.count })
+        assertEquals(listOf("마샬 MAJOR V", "호카 스피드고트 6", "발뮤다 더 토스터"), summary.groups[2].previews.map { it.item.product.name })
+        assertEquals(listOf(null, "오크 원목 사이드 테이블", "FiiO BTR7"), summary.groups[1].previews.map { it.item.product.name })
+        assertEquals(listOf("29cm.co.kr"), summary.groups[0].previews.map { it.item.sourceUrl.substringAfter("://").substringBefore('/') })
+        assertEquals(69, store.items(null, null).successValue().size)
+        // The board's analyzing card stays: the debug driver never completes a seeded one.
+        assertEquals(0, DebugAnalysisDriver(store, Clock { now + 1.days }).advance().successValue())
+        assertEquals(1, home.summary().successValue().groups[0].count)
+    }
+
     @Test fun every_chip_number_is_real_membership() {
         val data = seed()
         val names = data.categories.associate { it.id to it.name }

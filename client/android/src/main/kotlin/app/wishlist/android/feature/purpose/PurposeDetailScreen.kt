@@ -35,10 +35,16 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
     val forms = remember(store) { CategoryFormSlot.of(store, "purpose.detail.form") { runtime.purposeFormPresenter() } }
     val presenter = owner.presenter
     val state by presenter.state.collectAsState()
-    LaunchedEffect(owner) { runtime.ready.first { it }; owner.enter({ it.load(route.purposeId) }, { it.refresh() }) }
+    val scroll = rememberScrollState()
+    val anchors = remember { ListAnchorController(ListAnchorTracker(), scroll) }
+    // C7: coming back (pop, tab) refreshes around the card that was first; the app returning, around the one shown now.
+    LaunchedEffect(owner) { runtime.ready.first { it }; owner.enter({ it.load(route.purposeId) }, { it.refresh(anchors.keep(owner.lastAnchor)) }) }
+    LaunchedEffect(anchors) {
+        snapshotFlow { anchors.tracker.firstVisible(scroll.value) }.collect { if (it != null) owner.lastAnchor = it }
+    }
     var resumes by remember(owner) { mutableIntStateOf(0) }
     LifecycleResumeEffect(owner) {
-        if (resumes++ > 0 && runtime.ready.value) presenter.refresh()
+        if (resumes++ > 0 && runtime.ready.value) presenter.foreground(anchors.capture())
         onPauseOrDispose { }
     }
     var restoreEditing by rememberSaveable { mutableStateOf(false) }
@@ -48,7 +54,6 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
     val formState = editing?.state?.collectAsState()?.value
     val sheet = rememberWLHeaderSheetState()
     val scope = rememberCoroutineScope()
-    val scroll = rememberScrollState()
     val endEditing = {
         form?.state?.value?.recoveredDetail?.let {
             presenter.applyEdited(it)
@@ -75,6 +80,11 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
         snapshotFlow { val s = latest; shouldLoadMore(scroll.value, scroll.maxValue, s.hasMore, s.itemsLoading || s.appending || s.loading, s.appendFailed) }
             .distinctUntilChanged().collect { if (it) presenter.loadMore() }
     }
+    ListAnchorEffects(
+        anchors, state.restore, state.hasNewer, busy = state.loading || state.itemsLoading || state.prepending, prepending = state.prepending,
+        applied = owner.appliedRestore, onApplied = { owner.appliedRestore = it }, loadNewer = presenter::loadNewer,
+        keepPositionOnNullRestore = true, // Ruling 8: the header sheet and list stay put
+    )
     val detail = state.detail
     when {
         state.gone -> DetailStatusBlock(stringResource(R.string.purpose_gone), stringResource(R.string.detail_close), { nav.pop() })
@@ -107,7 +117,7 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
                         onMenu = openMenu, menuModifier = Modifier.wlAnchor(anchor), onCancel = cancelEdit)
                 },
             ) {
-                WLOnSheet {
+                Column(anchors.tracker.contentModifier) { WLOnSheet {
                     Column(Modifier.padding(horizontal = 16.dp).padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (state.items.isNotEmpty()) WLText(stringResource(R.string.purpose_candidates, detail.candidateCount), WLType.button, Modifier.padding(horizontal = 4.dp))
                         when {
@@ -117,16 +127,17 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
                             }
                             else -> CategoryGrid(state.items, state.itemsLoading && state.items.isEmpty(),
                                 onOpen = { nav.push(ItemDetailRoute(it.id), "purpose/${detail.id}/${it.id}") }, modifier = Modifier.fillMaxWidth(), merchantMeta = true,
-                                cardTitle = { item -> purposeCandidateTitleFallback(item.product.name, item.analysis.status)?.let { stringResource(it) } })
+                                cardTitle = { item -> purposeCandidateTitleFallback(item.product.name, item.analysis.status)?.let { stringResource(it) } },
+                                anchors = anchors.tracker)
                         }
                         if (state.error != null || (state.itemsError != null && state.items.isNotEmpty())) {
                             WLText(stringResource(R.string.purpose_failed), WLType.label, color = LocalWLColors.current.textSecondary)
                         }
                         if (state.appendFailed) WLButton(stringResource(R.string.detail_retry), WLButtonKind.Secondary, presenter::retry)
-                        WLButton(stringResource(R.string.purpose_refresh), WLButtonKind.Secondary, presenter::refresh, enabled = !state.loading && !state.itemsLoading)
+                        WLButton(stringResource(R.string.purpose_refresh), WLButtonKind.Secondary, { presenter.refresh(anchors.capture()) }, enabled = !state.loading && !state.itemsLoading)
                         Spacer(Modifier.height(tabBarClearance()))
                     }
-                }
+                } }
             }
         }
     }
