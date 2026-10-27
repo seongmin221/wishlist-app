@@ -157,4 +157,30 @@ C5 PR A #21, C6 #23, C7 #25, 서버 B9 #26이 develop에 병합된 뒤 #22가 CO
 
 기기에서는 보지 않았다. DEBUG에 상세가 열린 동안 사진 주소를 바꾸는 hook이 없다.
 
-남은 경계는 고치지 않았다. push 직후 handoff를 아직 들고 있는 동안(상세 사진을 그리기 전) 주소가 바뀌면 카드 사진이 잠깐 보인다. 이 handoff는 상세 사진이 그려지고 모션이 끝나면 놓인다.
+**handoff 카드 사진도 주소에 묶음(같은 날 추가 리뷰).** 위 수정 뒤에도 handoff 카드 사진은 주소를 보지 않고 쓰였다. 처음에 "주소가 바뀌면 잠깐 보인다"고 적었지만 실제로는 오래 남는 문제였다.
+
+- **재현:** 카드 사진 A를 넘긴다. 상세 크기 사진 로드가 실패한다. 새로고침으로 주소가 없어지거나 B로 바뀐다.
+- **결과:** 놓기 조건(상세 사진을 그림 + 모션 끝)을 끝내 채우지 못해 상세를 닫을 때까지 A가 보였다.
+
+고친 방식:
+
+- 카드가 넘길 때 그린 사진의 주소를 함께 넘긴다. Android는 `ShownPhoto.url`·`Held.sourceUrl`, iOS는 카드 `imageURL` → `hold(_:_:sourceURL:)`다.
+- 상세는 항목을 받는 중(주소를 아직 모름)이거나 항목 주소가 그 주소와 같을 때만 handoff를 쓴다(`heldPhotoFits`·`DetailSharedSlot.heldFits`). 처음 로딩 중의 null은 이 첫 조건으로 구분한다.
+- 맞지 않으면 그리지 않고 바로 놓는다(`letGo`, 역방향 사진은 건드리지 않음).
+- Android는 상세 요청의 `placeholderMemoryCacheKey`도 맞는 handoff에서만 가져온다.
+
+테스트는 `DetailPhotoTest.theHeldCardPhotoFitsOnlyTheAddressTheCardDrew`, `PhotoHandoffTest.lettingGoReleasesOnlyTheForwardPhoto`, `DetailSharedPhotoTests.testTheHeldCardPhotoFitsOnlyTheAddressTheCardDrew`, `PhotoHandoffTests.testLettingGoReleasesTheHeldPhotoAndItsAddress`다.
+
+검증 결과:
+
+- Android unit debug/release 270/270, assemble 두 변형, lint 0 errors / 27 warnings.
+- iOS XCTest 305, 실패 0.
+- 에뮬레이터 `emulator-5554`(`clearImageMemory`)에서 push 첫 프레임이 여전히 카드 사진이고 pop·목록 복귀가 같음을 다시 봤다.
+
+### 수정 후 재검토 (2026-10-27)
+
+로컬 head `28ee99b`에서 이전 두 지적의 상세 로드 결과 무효화와 Android 역방향 등록 해제를 확인했다. 재검토 시 GitHub PR head는 아직 `981ce5b`였으며 추가 리뷰 코멘트는 없었다.
+
+추가 P2: 위 handoff 경계는 일시적이라고 보장할 수 없다. 카드 사진 A를 전달한 뒤 상세 사진 로드가 실패하고, 새로고침 응답에서 사진 URL이 null 또는 다른 주소 B로 바뀌면 `held`는 URL 검증 없이 계속 선택된다. null이면 `detailDrawn`이 다시 호출되지 않고, B도 실패하면 마찬가지여서 상세를 닫을 때까지 A가 남는다(두 플랫폼). 항목 로딩 중의 null과 로드 완료 후 사진 없음을 구분하고, 전달된 카드 사진의 원본 URL을 현재 항목 URL과 비교해 fallback도 무효화해야 한다.
+
+관련 Android 테스트 5개 클래스 25건을 다시 실행해 실패·오류 0을 확인했다. 추가된 테스트는 로드 결과의 URL 비교만 검사하며 위 handoff 경로는 포함하지 않는다. 이번 재검토에서 iOS 테스트와 기기 재현은 실행하지 않았다.
