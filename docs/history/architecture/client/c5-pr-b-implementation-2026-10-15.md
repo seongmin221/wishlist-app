@@ -1,6 +1,6 @@
 # C5 PR B 구현 기록 (2026-10-15)
 
-> draft PR #22(base `client/c5-category`, #21 merge 뒤 `develop`으로 rebase). 브랜치 `client/c5-photo-transition`(시작 `6b1ffbb` = PR A `client/c5-category` draft PR #21 위, D4). 설계 [spec](../../../superpowers/specs/2026-10-14-client-c5-category-design.md) §4·D4, [plan](../../../superpowers/plans/2026-10-14-client-c5-category.md) Task 20~23. PR A 기록은 [여기](c5-pr-a-implementation-2026-10-15.md).
+> draft PR #22(base `client/c5-category`로 시작, 현재 base `develop`). 2026-10-27 develop `9210cc7` 통합은 rebase 대신 merge로 했다([아래](#develop-통합리뷰-2026-10-27)). 브랜치 `client/c5-photo-transition`(시작 `6b1ffbb` = PR A `client/c5-category` draft PR #21 위, D4). 설계 [spec](../../../superpowers/specs/2026-10-14-client-c5-category-design.md) §4·D4, [plan](../../../superpowers/plans/2026-10-14-client-c5-category.md) Task 20~23. PR A 기록은 [여기](c5-pr-a-implementation-2026-10-15.md).
 
 ## 작업 요약
 
@@ -61,3 +61,70 @@ Android는 사용자 지시대로 에뮬레이터 `emulator-5556`(Pixel_5 API 30
 | assembleDebug·assembleRelease·lintDebug(0 errors, 경고 27)·iOS Release simulator build | 통과 | 통과 |
 
 shared·localdb는 바뀌지 않아 KMP_TEST는 다시 돌리지 않았다. 새 테스트마다 해당 수정만 되돌려 실패를 확인했다(handoff 놓기 조건, 역방향 떠남 판정, 상자 비율 순서, 상세 자리 유지 규칙, 색인 큰 것 우선·축출 정리, 방향별 공급원, 끌기 방향 표시). 전체 XCTest 한 번에서 손대지 않은 `HomePresenterOwnerTests.testRefreshReturnsOnlyAfterTheRefreshFinished`가 시간 조건으로 실패했고, 단독 3회·다음 전체 실행은 통과했다(수동 시뮬레이터 확인 직후).
+
+## develop 통합·리뷰 (2026-10-27)
+
+C5 PR A #21, C6 #23, C7 #25, 서버 B9 #26이 develop에 병합된 뒤 #22가 CONFLICTING이었다. develop `9210cc7` 기준으로 리뷰하고 충돌을 해소했다.
+
+**통합 방식.** PR A는 이 브랜치가 갈라진 뒤 리뷰 커밋이 더해져 다른 SHA로 병합됐다. 그래서 develop을 그대로 merge하면 PR A 파일 전체가 충돌한다. 처리 순서는 다음과 같다.
+
+1. develop 위에 PR B 고유 커밋 9개(`1a051d6..36ef5b8`)를 옮겨 맞는 tree를 만들었다.
+2. 그 tree로 이 브랜치에 develop merge commit을 만들었다.
+
+기존 PR 이력이 남고 force push가 필요 없다. 계획 D4는 rebase였지만 원격 이력을 보존하려고 merge를 골랐다.
+
+**충돌 해소 판단**
+
+- **Android 목록 사진 배치(Ruling 4 갱신).** PR B의 `CategoryGridLayout`(자체 pages·photos·planner)과 PR A 리뷰 수정이 겹쳤다. PR A 리뷰 수정은 사진 URL 변경 시 재배치(`restartsLayout`), 크기를 URL에 묶고 늦은 측정을 버리는 `PhotoMeasurements`, 다시 시작할 때 `PhotoGridLayout`을 통째로 바꾸는 세대 분리다.
+  - develop 구조를 유지하고 저장 위치만 목록 칸 ViewModelStore로 옮겼다. `CategoryGridState`가 `layout: PhotoGridLayout`과 `sizes: PhotoMeasurements`를 들고, `CategoryGridHolder`에 보관된다.
+  - 같은 항목으로 다시 그려지면(상세에서 돌아옴) 배치를 유지한다. 다시 시작 규칙은 PR A와 같다.
+  - 테스트는 `CategoryGridLayoutTest` 4개다. 다시 시작과 사진 변경 시 새 배치를 만드는 경우를 포함한다.
+- **C6 목적 상세.** 같은 `CategoryGrid`·`CategoryCard`를 쓴다.
+  - `sourceKey`를 nullable로 두었다. 목적 후보 → 상품 상세는 이전처럼 slide이고 공유 요소가 없다(spec §4는 카테고리 목록만이다).
+  - 배치 상태를 칸에 보관하는 것은 목적 상세에도 적용된다. 돌아올 때 skeleton부터 다시 배치하지 않는다.
+- **C7 anchor.** `anchorCard` 감싸기와 `anchors.reorder(ids)`를 유지했다. 배치가 남아 있으므로 돌아온 첫 프레임부터 카드가 위치를 알린다.
+- **iOS `ProductPhoto`(의미 충돌, 빌드 실패로 발견).**
+  - C7은 `ProductPhoto.placeholderColor`(홈 카드 위 타일)를 더했다. PR B는 자리표시를 `DetailPhotoPlaceholder`로 뺐다.
+  - 자동 병합 결과는 `placeholderColor`를 찾지 못해 컴파일되지 않았다. 이제 `DetailPhotoPlaceholder(color:)`로 색을 넘긴다.
+- **pbxproj.** C6(`C6…`)·C7(`D7…`)과 PR B(`D5…`/`D6…`) 항목을 모두 남겼다.
+- **문서.**
+  - Q&A 번호가 겹쳐(C7 `QA-CLI-018` 회전 중심) PR B 문서를 `QA-CLI-019`로 옮겼다.
+  - 계획·로드맵 상태 줄은 develop을 기준으로 다시 썼다.
+
+**리뷰.**
+
+- 중점 확인 대상은 다음과 같다.
+  - C5 §4 사진 전환 계약.
+  - iOS: push/pop/끌어서 뒤로 취소(`back` 플래그, 방향별 공급원), handoff 놓기(`releaseRemoved`·`dropAccountScoped`).
+  - Android: handoff hold·release(`detailDrawn`+`motionEnded`, `clearRemoved`·계정 떠남 `drop`), 역방향 판정, 목록 위치 복원.
+- 통합으로 생긴 결함 하나(위 iOS 컴파일)를 고쳤다. 그 밖의 새 결함은 찾지 못했다.
+- 기준을 공유하지 않은 독립 리뷰도 결함 없음이었다. 신뢰도가 낮은 경계 상황 두 가지만 지적했고 고치지 않았다.
+  - **Android 돌아온 첫 프레임의 이전 배치:** 상세가 열린 동안 사용자 새로고침 결과가 목록 시작을 바꾸면, 다시 시작 판정이 `LaunchedEffect(items)`라 첫 프레임은 이전 배치다. 한 프레임 뒤 skeleton이 되어 줄어들던 사진의 카드가 사라질 수 있다. develop은 돌아올 때마다 배치를 잃었으므로 그보다 좁은 경우다.
+  - **iOS 색인:** NSCache가 같은 key 교체를 축출로 알리면 방금 넣은 색인이 지워질 수 있다. 진행 중 요청을 합치므로 드물고, `bestCached` 대체 경로가 약해지는 정도다.
+- 모서리(카드 20 → 상세 0)는 여전히 사용자 확인 대기다. 새 제품 결정을 만들지 않았다.
+
+**검증(로컬, 통합 tree)**
+
+| 항목 | 결과 |
+| --- | --- |
+| shared·localdb | develop 대비 변경 없음(KMP_TEST 생략, C7 기록 host 788 / simulator 785) |
+| Android unit debug / release | 267 / 267, 실패 0 (C7 251 + PR B) |
+| assembleDebug·assembleRelease·lintDebug | 통과, lint 0 errors / 27 warnings(C7과 같음) |
+| iOS XCTest (iPhone 17 Pro) | 302, 실패 0 (C7 288 + PR B 14) |
+| iOS Release simulator build | BUILD SUCCEEDED |
+| `gen_tokens --check`·`git diff --check origin/develop` | 통과 |
+
+**기기 확인.**
+
+- **Android 에뮬레이터 `emulator-5554`(Pixel_5 API 30), `longCategory C024`·`clearImageMemory`, `animator_duration_scale 5`:**
+  - push 도중 카드 사진이 비지 않고 커진다.
+  - 상세에 멈춘 사진은 모서리 0이다.
+  - pop 도중 상세 사진이 줄며 모서리가 커진다.
+  - 돌아오면 목록이 같은 스크롤 위치에 배치된 채 남는다(skeleton 없음).
+  - 사진: [`c5-shots/android/pr-b-develop-merge-push-pop.png`](c5-shots/android/pr-b-develop-merge-push-pop.png).
+- **C6 목적 상세(Android):** 후보 카드(판매처 줄) → 상품 상세 slide → 뒤로 후보 목록 유지.
+- **iOS 시뮬레이터:** DEBUG 앱이 냉시작되어 C7 홈(타일 자리표시 색 포함)까지 그려지는 것만 봤다. UI 자동 조작 도구가 없어 iOS push·pop·끌기 취소는 이번에 다시 보지 않았다. 2026-10-15 확인과 XCTest(방향별 공급원·handoff 수명)에 기댄다.
+- **보지 못한 것:**
+  - C7 foreground anchor 복원과 사진 전환을 함께 거치는 경로(단위 테스트만).
+  - Android 끌어서 뒤로·취소(API 33+ 필요).
+  - 실기기(Flip6·iPhone).

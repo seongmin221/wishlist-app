@@ -132,7 +132,7 @@
 
 실제 목적 탭은 `feature/purpose`에서 KMP Purpose Presenter에 연결한다. -22dp 카드 겹침과 펼친 ID를 유지하며 생성은 custom overlay sheet의 고정 footer·IME code point 입력을 사용한다. 상세는 계정 범위 route이며 기존 `WLHeaderSheet`의 드래그·nested scroll·실측 기본 높이를 사용해 색 면을 고정하고 머리를 연속 변형한다. 폼과 상세 Presenter는 entry ViewModelStore에 묶인다.
 
-후보 목록은 C5 사진 배치·loader를 재사용하며 판매처·마지막 확인 시각을 표시한다. #22는 미병합이므로 사진 공유 요소 전환을 포함하지 않는다. 후보 추가·삭제·종료·끝난 비교는 사용자 답변에 따라 비활성 진입점을 유지한다. 후보 0개에는 비교 끝내기를 숨긴다.
+후보 목록은 C5 사진 배치·loader를 재사용하며 판매처·마지막 확인 시각을 표시한다. 후보 → 상품 상세는 slide다(C5 PR B 사진 공유 요소 전환은 카테고리 목록만, `CategoryCard.sourceKey` 없음). 사진 배치 상태는 카테고리 목록과 같이 칸 ViewModelStore에 둔다(2026-10-27 develop 통합). 후보 추가·삭제·종료·끝난 비교는 사용자 답변에 따라 비활성 진입점을 유지한다. 후보 0개에는 비교 끝내기를 숨긴다.
 
 [검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
 
@@ -155,6 +155,6 @@ C6 PR #23 후속에서 목적 편집 취소·버리기는 폼의 `recoveredDetai
 - **뒤로(역방향):** Compose 공유 요소는 overlay에 들어오는 쪽(pop이면 카드) 내용을 그린다. 상세는 지금 그리는 이미지를 `showing`으로 알리고(화면이 이미 든 객체라 메모리가 늘지 않는다), 카드 사진 칸은 그 상세가 떠나는 동안(`PhotoHandoff.isLeaving`: 끌기는 스택 맨 위, pop은 스택에서 빠진 칸)만 `reverseFor`로 그 이미지를 그린다. 판정을 같은 composition에서 navigator snapshot으로 읽어 뒤로 첫 프레임부터 상세 사진이다(effect로 넣으면 한 프레임 늦다).
 - **상세 사진 자리:** 1:1 칸(카드색, 모서리 20) 안 여백 56에 사진 비율 상자가 공유 요소다. 비율은 handoff 사진 크기 → 그린 상세 사진 크기 순(`detailPhotoRatio`, 날아가는 도중 상세 크기 사진이 와도 목표가 튀지 않게)이고, 둘 다 없으면 칸 전체 자리표시가 같은 모션으로 커진다. 사진 자리는 항목을 받는 첫 프레임부터 상품 표시까지 한 노드다(`keepsSharedPhotoSlot`). 목표 노드가 날아가는 도중 바뀌면 사진이 카드 자리에 머물다 튀었다.
 - **모서리:** overlay에는 들어오는 쪽 내용이 그려지므로 들어오는 쪽만 전환을 따라 모서리를 바꾼다(`photoCorner`, overlay clip도 같은 모서리 — 고정 20이면 push 끝에서 0으로 튀었다): push는 상세가 20 → 0(보드 FProductDetail 칸 안 사진은 모서리 없음), pop은 카드가 0 → 20. 떠나는 쪽은 그대로라 모서리가 한 방향으로만 바뀐다. **사용자 확인 대기**(PR B 기록).
-- **목록 사진 배치 보존(`CategoryGridLayout`):** 페이지·사진 크기·배치 비율(숫자만)을 목록 칸의 ViewModelStore(`CategoryGridHolder`)에 둔다. 상세가 열린 동안 목록은 composition을 떠나므로 `remember`에 두면 돌아올 때 memory cache가 비어 있으면 skeleton부터 다시 배치해 스크롤 위치(D3)와 사진이 돌아갈 카드를 잃었다(PR B 기기 확인에서 발견).
+- **목록 사진 배치 보존(`CategoryGridState`·`CategoryGridHolder`):** 지금 배치(`PhotoGridLayout`: 페이지·배치 비율)와 사진 크기(`PhotoMeasurements`, 사진 URL별)를 목록 칸의 ViewModelStore에 둔다. 상세가 열린 동안 목록은 composition을 떠나므로 `remember`에 두면 돌아올 때 memory cache가 비어 있으면 skeleton부터 다시 배치해 스크롤 위치(D3·C7 anchor)와 사진이 돌아갈 카드를 잃었다(PR B 기기 확인에서 발견). 다시 시작(새로고침·사진 URL 변경)은 PR A 리뷰 규칙대로 `PhotoGridLayout`을 통째로 바꾸고, 이전 배치의 작업은 새 배치를 건드리지 못한다. 2026-10-27 develop 통합에서 PR B의 자체 배치 클래스를 이 구조로 바꿨다. 목적 상세 후보 목록(C6)도 같은 `CategoryGrid`라 함께 적용된다.
 - **DEBUG:** launch extra `--ez wl.debug.clearImageMemory true`는 카드를 누를 때·상세가 뒤로 떠나기 시작할 때 Coil memory cache를 비운다(`PhotoTransitionDebug`). logcat `WishlistImages`가 로더 요청(`start`)과 fetch(`fetch`, cache에 없어 받거나 만듦)를 따로 적는다.
 - **남은 점:** 에뮬레이터 API 30에는 predictive back이 없어 끌어서 뒤로·취소는 기기에서 보지 못했다(`PredictiveBackHandler` seek 경로는 slide와 같다). 120개 목록에서 돌아올 때(사진·slide 모두) 목록 재구성으로 에뮬레이터 DEBUG 빌드 프레임이 느리다(PR A부터, 성능 기록).

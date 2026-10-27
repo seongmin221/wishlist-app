@@ -157,7 +157,7 @@
 
 `Features/Purpose`가 KMP Purpose Presenter의 SKIE flow를 구독한다. entry owner가 상세와 편집 폼을 보유하므로 탭 전환·상품 상세 왕복으로 편집 초안이 닫히지 않는다. 그 자리 편집의 뒤로 버튼·가장자리 제스처는 같은 dirty/submitting guard를 사용하고 계정 이탈은 stack과 owner를 해제한다.
 
-`WLHeaderSheet`의 실측 머리 높이·시트 끌기·목록 스크롤을 재사용하며 연속 진행값으로 제목·아이콘 크기와 위치, 설명·버튼 opacity를 바꾼다. 만들기 시트 footer·그 자리 밑줄 입력에 40/200 code point와 IME 조합 보호를 적용한다. C5 사진 배치를 재사용하고 #22의 사진 공유 요소 전환은 포함하지 않는다. 후속 기능의 비활성 진입점은 사용자 답변에 따른다.
+`WLHeaderSheet`의 실측 머리 높이·시트 끌기·목록 스크롤을 재사용하며 연속 진행값으로 제목·아이콘 크기와 위치, 설명·버튼 opacity를 바꾼다. 만들기 시트 footer·그 자리 밑줄 입력에 40/200 code point와 IME 조합 보호를 적용한다. C5 사진 배치를 재사용하고 후보 → 상품 상세는 slide다(C5 PR B 사진 공유 요소 전환은 카테고리 목록만). 후속 기능의 비활성 진입점은 사용자 답변에 따른다.
 
 [검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
 
