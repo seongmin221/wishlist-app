@@ -56,6 +56,11 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import androidx.compose.ui.unit.IntOffset
 
+/** 지금 그리는 스택 칸(id·탭). 화면이 자기 칸의 전환 사진([PhotoHandoff])을 찾을 때 쓴다. */
+internal data class WLEntryInfo(val id: Long, val tab: WLTab)
+
+internal val LocalWLEntry = staticCompositionLocalOf<WLEntryInfo?> { null }
+
 /** 화면이 `push`·`pop`을 부르기 위한 접근. */
 val LocalWLNavigator = staticCompositionLocalOf<WLNavigator> { error("WLNavHost 밖에서 LocalWLNavigator를 읽었다") }
 
@@ -73,13 +78,15 @@ typealias WLRouteContent = @Composable (route: WLRoute, sourceKey: String?) -> U
  *   전환을 처음부터 재생한다.
  * - 전환 중에는 화면 전체 입력을 막고, 뒤로는 받아서 버린다(시스템에 넘기지 않는다).
  * - `replaceTop`: 맨 위 칸만 cross-fade로 바뀐다(아래 칸은 움직이지 않는다).
- * - 칸마다 `LocalWLEntryViewModelStoreOwner`로 그 칸의 ViewModelStore를 준다. 빠진 칸의 store는 전환이 끝난 뒤 지운다.
+ * - 칸마다 `LocalWLEntryViewModelStoreOwner`로 그 칸의 ViewModelStore를, `LocalWLEntry`로 칸 id·탭을 준다. 빠진 칸의
+ *   store와 전환 사진([PhotoHandoff])은 전환이 끝난 뒤 놓는다.
  */
 @Composable
 internal fun WLNavHost(
     modifier: Modifier = Modifier,
     navigator: WLNavigator = LocalWLNavigator.current,
     entryStores: WLEntryViewModelStores,
+    photoHandoff: AppPhotoHandoff = remember { AppPhotoHandoff() },
     content: WLRouteContent,
 ) {
     val c = LocalWLColors.current
@@ -104,7 +111,9 @@ internal fun WLNavHost(
     LaunchedEffect(navigator, entryStores) {
         // 복원(구성 변경) 직후: 저장되지 않은 대기 중 빠진 id(전환 도중 회전 등)의 store를 지운다.
         entryStores.retainOnly(navigator.allEntryIds())
-        snapshotFlow { !navigator.isTransitioning && navigator.hasRemoved }.collect { if (it) entryStores.clearRemoved(navigator) }
+        snapshotFlow { !navigator.isTransitioning && navigator.hasRemoved }.collect {
+            if (it) photoHandoff.drop(entryStores.clearRemoved(navigator))
+        }
     }
     // 탭 바 투명도는 매 프레임 바뀌므로 그리기 단계(graphicsLayer)에서만 읽는다. 보일지 여부만 derivedStateOf로 다시 그린다.
     val tabBarAlphaNow = {
@@ -114,7 +123,7 @@ internal fun WLNavHost(
         tabBarVisibility(navigator, tabBarAlpha)
     }
 
-    CompositionLocalProvider(LocalWLNavigator provides navigator) {
+    CompositionLocalProvider(LocalWLNavigator provides navigator, LocalPhotoHandoff provides photoHandoff) {
         SharedTransitionLayout(modifier.fillMaxSize().background(c.background)) {
             CompositionLocalProvider(LocalWLSharedScope provides this) {
                 tabTransition.AnimatedContent(
@@ -308,7 +317,11 @@ private fun SharedTransitionScope.TabStack(
         // 빠진 뒤에도 그려지는 동안(떠나는 모션) 새로 만든 임시 store는 화면에서 사라질 때 닫는다.
         DisposableEffect(entry.id) { onDispose { entryStores.releaseStray(entry.id) } }
         holder.SaveableStateProvider(entry.id) {
-            CompositionLocalProvider(LocalWLStackScope provides this, LocalWLEntryViewModelStoreOwner provides owner) {
+            CompositionLocalProvider(
+                LocalWLStackScope provides this,
+                LocalWLEntryViewModelStoreOwner provides owner,
+                LocalWLEntry provides WLEntryInfo(entry.id, tab),
+            ) {
                 content(entry.route, entry.sourceKey)
             }
         }

@@ -1,5 +1,7 @@
 # 서버 연동 상태
 
+> 2026-10-27 C5 PR B #22 develop 통합: 사진 공유 요소 전환은 API를 바꾸지 않아 이 표는 그대로다(#22 Draft OPEN).
+>
 > 2026-10-27: 서버 B9 완료로 DUP-01/02의 서버 열만 갱신했다([계약](../server/duplicate-resolution-api.md)). 클라이언트 연결은 C10이다.
 >
 > 2026-10-24 C7 갱신: ITEM-02 window·anchor(카테고리·목적 범위), HOME-01·HOME-02를 Fake·Remote로 구현하고 MockEngine으로 검증했다. DEBUG FAKE / RELEASE UNAVAILABLE. 실서버 검증은 미실행이다. C6 #23 MERGED(`896fbc2`), C5 PR B #22 Draft OPEN·develop 미병합. ITEM-04~08은 C8이며 구현하지 않았다.

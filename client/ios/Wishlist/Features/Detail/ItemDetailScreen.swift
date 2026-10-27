@@ -11,6 +11,8 @@ import SwiftUI
 /// 스택)는 바로 닫는다(`ItemDetailPresenterOwner.shouldClose`, 전환 중이면 끝난 뒤).
 struct ItemDetailScreen: View {
     let itemId: String
+    /// Opened from a category list card (C5 PR B): the photo slot is the card photo's shared element.
+    var viaPhoto = false
 
     @Environment(\.wlEntryOwners) private var owners
     @Environment(\.wlEntryID) private var entryID
@@ -21,7 +23,7 @@ struct ItemDetailScreen: View {
     var body: some View {
         ZStack {
             if let owner, let entryID {
-                ItemDetailContent(itemId: itemId, entryID: entryID, owner: owner)
+                ItemDetailContent(itemId: itemId, viaPhoto: viaPhoto, entryID: entryID, owner: owner)
             } else {
                 c.background.ignoresSafeArea()
             }
@@ -34,6 +36,7 @@ struct ItemDetailScreen: View {
 
 private struct ItemDetailContent: View {
     let itemId: String
+    let viaPhoto: Bool
     let entryID: Int
     let owner: ItemDetailPresenterOwner
 
@@ -46,6 +49,7 @@ private struct ItemDetailContent: View {
         let error = owner.error
         let kind = item.map { DetailKinds.shared.of(item: $0) }
         let gone = kind?.kind == .gone
+        let sharedSlot = DetailSharedSlot.keeps(photoEntry: viaPhoto, hasItem: item != nil, hasError: error != nil, kind: kind?.kind)
         DetailScaffold(
             onBack: { nav.pop() },
             originalUrl: gone ? nil : item?.sourceUrl,
@@ -54,6 +58,8 @@ private struct ItemDetailContent: View {
         ) {
             EmptyView()
         } content: {
+            // Card photo → detail photo: one slot view from the first frame on (the flight's target).
+            if sharedSlot { DetailSharedPhoto(imageUrl: item?.product.imageUrl, itemLoaded: item != nil) }
             if item == nil, let error {
                 if error.kind == .notFound {
                     DetailStatusBlock(message: DetailLine("detail.not.found").resolve(), buttonText: DetailLine("detail.close").resolve()) { nav.pop() }
@@ -69,9 +75,9 @@ private struct ItemDetailContent: View {
                 case .processing:
                     ProcessingContent(item: item)
                 default:
-                    ProductContent(item: item, noticeKey: kind.notice.map(DetailText.noticeKey))
+                    ProductContent(item: item, noticeKey: kind.notice.map(DetailText.noticeKey), showPhoto: !sharedSlot)
                 }
-            } else {
+            } else if !sharedSlot {
                 DetailPhotoFrame { EmptyView() }
             }
         }
@@ -107,13 +113,14 @@ private struct ProcessingContent: View {
 private struct ProductContent: View {
     let item: WishlistItem
     let noticeKey: String?
+    var showPhoto = true
 
     @Environment(\.wlColors) private var c
 
     var body: some View {
         let host = DisplayFormat.shared.host(url: item.sourceUrl)
         // 2026-10-04: 1:1 칸(모서리 20) 안 여백 56에 사진을 원래 비율로(보드 FProductDetail). 자리표시는 칸 전체.
-        DetailPhotoFrame { ProductPhoto(imageUrl: item.product.imageUrl, fill: false, inset: 56) }
+        if showPhoto { DetailPhotoFrame { ProductPhoto(imageUrl: item.product.imageUrl, fill: false, inset: 56) } }
         VStack(alignment: .leading, spacing: WishlistTokens.Space.s20) {
             if let noticeKey { NoticeCard(text: DetailLine(noticeKey).resolve(), host: host) }
             VStack(alignment: .leading, spacing: 0) {

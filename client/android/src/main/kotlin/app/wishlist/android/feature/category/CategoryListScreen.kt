@@ -60,7 +60,9 @@ import app.wishlist.android.feature.detail.deviceUtcOffsetSeconds
 import app.wishlist.android.feature.detail.photoSourceFor
 import app.wishlist.android.feature.detail.rememberBriefNotice
 import app.wishlist.android.feature.detail.rememberMinuteClock
+import app.wishlist.android.navigation.LocalPhotoHandoff
 import app.wishlist.android.navigation.LocalWLEntryViewModelStoreOwner
+import app.wishlist.android.navigation.PhotoTransitionDebug
 import app.wishlist.android.navigation.LocalWLNavigator
 import app.wishlist.android.navigation.WLScrollToTopEffect
 import app.wishlist.android.navigation.WLTab
@@ -78,6 +80,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+/** The card's key (tab-unique): the detail's photo shared element and its held photo follow it. */
+internal fun cardSourceKey(categoryId: String, itemId: String) = "category/$categoryId/$itemId"
 
 /** How close to the end (px of scroll) the next page is asked for. */
 private const val LOAD_MORE_DISTANCE_PX = 1500
@@ -109,6 +114,7 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
     val owner = remember(storeOwner) { CategoryPresenterOwner.of(storeOwner, "category.list") { runtime.categoryListPresenter() } }
     val formSlot = remember(storeOwner) { CategoryFormSlot.of(storeOwner, "category.list.form") { runtime.categoryFormPresenter() } }
     val list: CategoryListPresenter = owner.presenter
+    val photoHandoff = LocalPhotoHandoff.current
     val state by list.state.collectAsState()
 
     LaunchedEffect(owner) {
@@ -199,7 +205,14 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
                         CategoryGrid(
                             items = state.items,
                             loading = state.loading && state.items.isEmpty(),
-                            onOpen = { item -> nav.push(ItemDetailRoute(item.id), "category/${route.hint.categoryId}/${item.id}") },
+                            sourceKeyOf = { item -> cardSourceKey(route.hint.categoryId, item.id) },
+                            onOpen = { item, shown ->
+                                // Card photo → detail photo (C5 PR B): the image the card draws travels with the push.
+                                PhotoTransitionDebug.onPhotoTransitionStart(context)
+                                if (nav.push(ItemDetailRoute(item.id, viaPhoto = true), cardSourceKey(route.hint.categoryId, item.id)) && shown != null) {
+                                    photoHandoff.hold(nav.entries(nav.currentTab).last().id, shown.image, shown.memoryCacheKey, shown.url)
+                                }
+                            },
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = WishlistTokens.Space.s8),
                             anchors = anchors.tracker,
                         )
@@ -240,27 +253,30 @@ internal fun CategoryListScreen(route: CategoryListRoute) {
  * it out; laid-out cards keep their height. A refresh (the list restarts) forgets the pages.
  */
 @Composable
-internal fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (WishlistItem) -> Unit, modifier: Modifier, merchantMeta: Boolean = false, cardTitle: @Composable (WishlistItem) -> String? = { null }, anchors: ListAnchorTracker? = null) {
+internal fun CategoryGrid(
+    items: List<WishlistItem>,
+    loading: Boolean,
+    onOpen: (WishlistItem, ShownPhoto?) -> Unit,
+    modifier: Modifier,
+    merchantMeta: Boolean = false,
+    cardTitle: @Composable (WishlistItem) -> String? = { null },
+    anchors: ListAnchorTracker? = null,
+    sourceKeyOf: ((WishlistItem) -> String)? = null,
+) {
     val context = LocalContext.current
-    val book = remember { CategoryPhotoBook(context) }
-    // A restart replaces the whole layout (a job of the old one can no longer touch the one on screen).
-    var layout by remember { mutableStateOf(PhotoGridLayout()) }
+    // The layout and photo sizes outlive this composition (the list leaves it while its detail is shown).
+    val grid = CategoryGridHolder.of(LocalWLEntryViewModelStoreOwner.current)
+    val book = remember(grid) { CategoryPhotoBook(context.applicationContext, grid.sizes) }
     val now = rememberMinuteClock()
 
-    // Pages: each new tail of ids is a page; a list that no longer starts the same way (or whose photo changed) is a restart.
+    // Composed again with the same items (back from the detail), the layout stays as it was.
     LaunchedEffect(items) {
         val ids = items.map { it.id }
-        val photoUrls = items.associate { it.id to categoryPhotoUrl(it) }
-        if (restartsLayout(layout.pages.flatten(), layout.photos, ids, photoUrls)) layout = PhotoGridLayout()
-        val current = layout
-        val laid = current.pages.flatten().toSet()
-        val fresh = ids.filter { it !in laid }
-        if (fresh.isNotEmpty()) current.pages.add(fresh)
-        fresh.forEach { current.photos[it] = photoUrls[it] }
+        grid.onItems(ids, items.associate { it.id to categoryPhotoUrl(it) })
         anchors?.reorder(ids)
     }
 
-    val shown = layout
+    val shown = grid.layout
     val ratios = shown.ratios
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val columnPx = with(LocalDensity.current) { ((maxWidth - WishlistTokens.Space.s12) / 2).roundToPx() }
@@ -293,9 +309,10 @@ internal fun CategoryGrid(items: List<WishlistItem>, loading: Boolean, onOpen: (
                             meta = cardMetaLine(item, now, ::deviceUtcOffsetSeconds),
                             unconfirmed = isUnconfirmed(item),
                             photoRequest = url?.let { remember(it, columnPx) { book.request(it, columnPx) } },
-                            onClick = { onOpen(item) },
+                            onClick = { photo -> onOpen(item, photo) },
                             merchantMeta = merchantMeta,
                             title = cardTitle(item) ?: item.product.name.orEmpty(),
+                            sourceKey = sourceKeyOf?.invoke(item),
                         )
                     }
                 }

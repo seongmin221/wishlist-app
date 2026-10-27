@@ -23,6 +23,8 @@ enum DebugSessionBootstrap {
 ///
 /// - `-wl.fake.delayItem01 <ms>`: the next Fake ITEM-01 send waits that long.
 /// - `-wl.fake.pendingCount <N>`: saves N unbound pending shares once the runtime is ready.
+/// - C5 PR B `-wl.debug.clearImageMemory`: clears the image memory cache at each photo transition start
+///   (`PhotoTransitionDebug`); log category `images` counts loader requests (`start`) and fetches (`fetch`) apart.
 enum DebugLaunchHooks {
     static let delayItem01 = "wl.fake.delayItem01"
     static let pendingCount = "wl.fake.pendingCount"

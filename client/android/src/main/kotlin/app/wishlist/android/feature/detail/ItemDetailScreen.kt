@@ -90,9 +90,13 @@ internal fun rememberMinuteClock(): Instant {
  *
  * 상태: 항목 없이 로딩 → 틀만, 항목 없는 오류 → 문구 + 다시 시도(NOT_FOUND는 삭제됨 + 닫기), 항목 있는 오류 → 항목 유지 + 짧은 안내.
  * 항목·로딩·오류가 모두 없는 Initial(계정 세대가 바뀜)이나 로그인 없는 UNAUTHENTICATED(로그아웃 상태로 복원된 스택)는 바로 닫는다.
+ *
+ * 목록 카드에서 열면(`route.viaPhoto`, C5 PR B) 사진 자리가 카드 사진과 이어지는 공유 요소다([DetailSharedPhoto]).
  */
 @Composable
-internal fun ItemDetailScreen(itemId: String) {
+internal fun ItemDetailScreen(route: ItemDetailRoute, sourceKey: String?) {
+    val itemId = route.itemId
+    val photoKey = sourceKey?.takeIf { route.viaPhoto }
     val nav = LocalWLNavigator.current
     val storeOwner = LocalWLEntryViewModelStoreOwner.current
     val runtime = (LocalContext.current.applicationContext as WishlistApplication).runtime
@@ -100,7 +104,6 @@ internal fun ItemDetailScreen(itemId: String) {
         ViewModelProvider(storeOwner, ItemDetailPresenterOwner.factory(runtime))[ItemDetailPresenterOwner::class.java]
     }
     val state by owner.state.collectAsState()
-    val route = remember(itemId) { ItemDetailRoute(itemId) }
 
     // A route restored after process death composes before the DEBUG bootstrap restored the session:
     // loading then would fail (RUNTIME_NOT_READY) or be reset by that restore and close the screen.
@@ -128,6 +131,7 @@ internal fun ItemDetailScreen(itemId: String) {
     val notice = rememberBriefNotice(failures.intValue.takeIf { it > 0 }, error?.let { stringResource(DetailText.errorText(it)) }.orEmpty())
     val close = { nav.pop(); Unit }
     val kind = item?.let { DetailKinds.of(it) }
+    val sharedSlot = keepsSharedPhotoSlot(photoKey != null, item != null, error != null, kind?.kind)
 
     DetailScaffold(
         onBack = close,
@@ -135,17 +139,19 @@ internal fun ItemDetailScreen(itemId: String) {
         notice = notice,
         refresh = if (item != null && kind?.kind != DetailKind.GONE) DetailRefresh(state.loading, owner::refresh) else null,
     ) {
+        // Card photo → detail photo: one slot node from the first frame on (the shared element's target).
+        if (sharedSlot && photoKey != null) PhotoFrame { DetailSharedPhoto(item?.product?.imageUrl, itemLoaded = item != null, sourceKey = photoKey) }
         when {
             item == null && error != null -> if (error.kind == ErrorKind.NOT_FOUND) {
                 DetailStatusBlock(stringResource(R.string.detail_not_found), stringResource(R.string.detail_close), close)
             } else {
                 DetailStatusBlock(stringResource(DetailText.errorText(error)), stringResource(R.string.detail_retry), owner::retry)
             }
-            item == null -> PhotoFrame { }
+            item == null -> if (!sharedSlot) PhotoFrame { }
             kind?.kind == DetailKind.GONE ->
                 DetailStatusBlock(stringResource(R.string.detail_not_found), stringResource(R.string.detail_close), close)
             kind?.kind == DetailKind.PROCESSING -> ProcessingContent(item)
-            else -> ProductContent(item, kind?.notice?.let { DetailText.noticeText(it) })
+            else -> ProductContent(item, kind?.notice?.let { DetailText.noticeText(it) }, showPhoto = !sharedSlot)
         }
     }
 }
@@ -171,11 +177,11 @@ private fun PhotoFrame(content: @Composable () -> Unit) {
 
 /** FProductDetail: 사진 → (안내) 브랜드·이름·가격 묶음 → 정보 카드 → 저장 시점(간격 20). */
 @Composable
-private fun ProductContent(item: WishlistItem, noticeRes: Int?) {
+private fun ProductContent(item: WishlistItem, noticeRes: Int?, showPhoto: Boolean) {
     val c = LocalWLColors.current
     val now = rememberMinuteClock()
     // 2026-10-04: 1:1 칸(모서리 20) 안 여백 56에 사진을 원래 비율로(보드 FProductDetail). 자리표시는 칸 전체.
-    PhotoFrame { ProductPhoto(item.product.imageUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, imagePadding = 56.dp) }
+    if (showPhoto) PhotoFrame { ProductPhoto(item.product.imageUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Fit, imagePadding = 56.dp) }
     Column(
         Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp),
         verticalArrangement = Arrangement.spacedBy(WishlistTokens.Space.s20),

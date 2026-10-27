@@ -40,6 +40,18 @@ class AppRouteCodecTest {
         assertFalse(LoginRoute.accountScoped)
     }
 
+    /** C5 PR B: only a list card opens the detail with the photo shared element; home rows stay a slide. */
+    @Test
+    fun aPhotoEntryOpensTheDetailWithTheSharedPhotoAndRoundTrips() {
+        val photo = ItemDetailRoute("item-1", viaPhoto = true)
+        assertEquals(WLPushStyle.Photo, photo.pushStyle)
+        assertTrue(photo.accountScoped)
+        assertFalse(photo.showsTabBar)
+        assertEquals(listOf("item", "item-1", "photo"), ProductionRouteCodec.encode(photo))
+        assertEquals(photo, AppRouteCodec.decode(AppRouteCodec.encode(photo)!!))
+        assertEquals(ItemDetailRoute("item-1"), AppRouteCodec.decode(listOf("item", "item-1")))
+    }
+
     @Test
     fun signingInKeepsAccountScopedRoutes() {
         assertFalse(shouldDropAccountScoped(previous = null, next = "a"))

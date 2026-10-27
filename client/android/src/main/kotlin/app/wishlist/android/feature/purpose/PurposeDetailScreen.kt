@@ -126,7 +126,7 @@ internal fun PurposeDetailScreen(route: PurposeDetailRoute) {
                                 EmptyState(stringResource(R.string.purpose_candidates_empty), keepAllBreaks(stringResource(R.string.purpose_candidates_empty_body))) { WLIcon(WLLineIcon.Purpose, size = 24.dp) }
                             }
                             else -> CategoryGrid(state.items, state.itemsLoading && state.items.isEmpty(),
-                                onOpen = { nav.push(ItemDetailRoute(it.id), "purpose/${detail.id}/${it.id}") }, modifier = Modifier.fillMaxWidth(), merchantMeta = true,
+                                onOpen = { item, _ -> nav.push(ItemDetailRoute(item.id), "purpose/${detail.id}/${item.id}") }, modifier = Modifier.fillMaxWidth(), merchantMeta = true,
                                 cardTitle = { item -> purposeCandidateTitleFallback(item.product.name, item.analysis.status)?.let { stringResource(it) } },
                                 anchors = anchors.tracker)
                         }

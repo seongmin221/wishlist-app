@@ -104,7 +104,11 @@ private struct AppShell: View {
         }
         // Removed entries are still drawn until their motion ends: close their owners once it did.
         .onChange(of: !navigator.isTransitioning && navigator.hasRemoved, initial: true) { _, ready in
-            if ready { entryOwners.close(navigator.drainRemoved()) }
+            if ready {
+                let removed = navigator.drainRemoved()
+                entryOwners.close(removed)
+                motion.releaseRemoved(removed)
+            }
         }
     }
 }
@@ -128,7 +132,7 @@ private struct AppRoute: View {
             switch destination {
             case .settings: SettingsScreen()
             case .login: LoginScreen(mode: .pushed)
-            case .item(let itemId): ItemDetailScreen(itemId: itemId)
+            case .item(let itemId, let viaPhoto): ItemDetailScreen(itemId: itemId, viaPhoto: viaPhoto)
             case .local(let submissionId): LocalSubmissionScreen(submissionId: submissionId)
             case .web(let page): WebViewScreen(page: page)
             case .categoryList(let target): CategoryListScreen(target: target)

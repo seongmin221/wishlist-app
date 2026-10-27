@@ -157,7 +157,7 @@
 
 `Features/Purpose`가 KMP Purpose Presenter의 SKIE flow를 구독한다. entry owner가 상세와 편집 폼을 보유하므로 탭 전환·상품 상세 왕복으로 편집 초안이 닫히지 않는다. 그 자리 편집의 뒤로 버튼·가장자리 제스처는 같은 dirty/submitting guard를 사용하고 계정 이탈은 stack과 owner를 해제한다.
 
-`WLHeaderSheet`의 실측 머리 높이·시트 끌기·목록 스크롤을 재사용하며 연속 진행값으로 제목·아이콘 크기와 위치, 설명·버튼 opacity를 바꾼다. 만들기 시트 footer·그 자리 밑줄 입력에 40/200 code point와 IME 조합 보호를 적용한다. C5 사진 배치를 재사용하고 #22의 사진 공유 요소 전환은 포함하지 않는다. 후속 기능의 비활성 진입점은 사용자 답변에 따른다.
+`WLHeaderSheet`의 실측 머리 높이·시트 끌기·목록 스크롤을 재사용하며 연속 진행값으로 제목·아이콘 크기와 위치, 설명·버튼 opacity를 바꾼다. 만들기 시트 footer·그 자리 밑줄 입력에 40/200 code point와 IME 조합 보호를 적용한다. C5 사진 배치를 재사용하고 후보 → 상품 상세는 slide다(C5 PR B 사진 공유 요소 전환은 카테고리 목록만). 후속 기능의 비활성 진입점은 사용자 답변에 따른다.
 
 [검증·남은 제약](../../history/architecture/client/c6-purpose-implementation-2026-10-24.md).
 
@@ -171,3 +171,17 @@ C6 PR #23 후속에서 상세 owner는 목적 탭 선택·entry 최상단·활�
 - DEBUG 전용 launch argument `-wl.c7.screen <state>`가 실제 owner를 몰아 화면 확인 상태를 연다(UI 자동 조작 도구가 없어서).
 
 [구현·검증](../../history/architecture/client/c7-home-review-flow-implementation-2026-10-24.md).
+
+## 카드 사진 → 상세 사진 전환 (C5 PR B)
+
+> 2026-10-15 C5 Task 20·22. 규칙은 [C5 설계](../../superpowers/specs/2026-10-14-client-c5-category-design.md) §4·D4, 기록은 [PR B 구현 기록](../../history/architecture/client/c5-pr-b-implementation-2026-10-15.md), Android 쪽은 [android.md](android.md#카드-사진--상세-사진-전환-c5-pr-b).
+
+- **진입:** 카테고리 목록 카드만 `AppDestination.item(id, viaPhoto: true)`(`pushStyle .photo`)로 연다. 홈 줄은 그대로 slide다. 카드 사진은 `WLSharedPhotoSource(key: "category/item/<id>")`, 상세 사진은 `WLSharedPhotoTarget(corner: 0)`이다.
+- **사진 캐시 계약(`RemoteImageLoader`):** key와 다운샘플 규칙은 그대로 두고 주소별 색인을 더했다. `bestCached(for:)`는 그 주소로 메모리에 있는 가장 큰(픽셀 수) 사진이다. 색인은 NSCache delegate(`willEvictObject`, 비용 상한 축출과 `removeAllObjects`)를 따라 지우고, 넣기 전에 색인부터 적는다(넣는 순간 다른 항목이 빠질 수 있다). `clearMemory()`는 DEBUG hook용이다.
+- **전환 중 사진 보유(`Navigation/PhotoHandoff`):** `WLNavMotion.handoff`. 카드를 누르고 push가 성공하면 카드가 그리는 `UIImage`를 새 칸 id로 `hold`한다. 상세 사진 자리(`DetailSharedPhoto`)는 상세 크기 사진 → handoff → `bestCached` → 자리표시 순으로 그린다(`DetailSharedSlot.shown`). 상세 크기 사진이 그려지고(`detailDrawn`) 그 칸의 `animating`이 끝나면(`motionEnded`) 놓는다. 칸이 빠질 때(`ContentView`의 `drainRemoved` → `WLNavMotion.releaseRemoved`, 계정 떠남 `dropAccountScoped`) `drop`한다. 처음에는 놓는 곳이 없어 상세 사진을 못 그린 채 닫힌 상세가 카드 사진을 계속 들었다(독립 리뷰).
+- **방향별 공급원(`WLFlightPhoto.choose`):** 전환층은 push에 source(카드), pop·끌어서 뒤로·끌기를 취소해 돌아오는 동안에는 target(상세가 지금 그리는 사진)을 그린다. 고른 쪽이 없으면 다른 쪽, 그다음 자리표시다. 방향은 칸 모션의 `back`(push 시작 false, `prepareBack` true, 끌기 되돌림이 끝나면 false)이다. `WLSharedPhotoTarget`은 이제 source처럼 지금 그리는 내용을 target key로 registry에 등록한다.
+- **전환층이 다시 만드는 내용:** 전환층은 등록된 내용을 그 뷰 밖에서 새로 만든다. 그래서 `@State`에 든 이미지는 빈 값으로 보인다. 카드·상세 모두 넘겨받은 이미지 값(`shown`)을 그리는 뷰를 등록한다.
+- **상세 사진 자리:** 1:1 칸 안 여백 56에 사진 비율로 맞춘 사각형이 target이다(사진이 없으면 칸 전체 자리표시). 항목을 받는 첫 프레임부터 상품 표시까지 한 뷰다(`DetailSharedSlot.keeps`). push가 그 탐침을 바로 재기 때문이다.
+- **모서리:** 전환층은 카드 20 → 상세 자리 모서리(`WLFrameProbe.corner`로 등록, 상품 상세 0)로 phase를 따라 바꾼다. 멈춘 상세 사진은 C4처럼 모서리가 없다. **사용자 확인 대기**(PR B 기록).
+- **DEBUG:** launch 인자 `-wl.debug.clearImageMemory`는 카드를 누를 때·뒤로가 시작될 때(`prepareBack`) 로더 메모리 cache를 비운다(`PhotoTransitionDebug`). 로그 category `images`가 로더 요청(`start`)과 실제 받기(`fetch`, URLCache 디스크 포함)를 따로 적는다.
+- **시뮬레이터 확인:** memory cache를 비운 push 첫 프레임(카드 사진), pop 첫 프레임(상세 사진, 모서리 0 → 20), 끌어서 뒤로 35%에서 멈췄다 놓기(상세 사진이 손가락을 따라 줄었다 돌아오고 상세에 사진이 남음), 사진 없는 카드(자리표시가 커짐). 사진은 `docs/history/architecture/client/c5-shots/ios/pr-b-*.png`.

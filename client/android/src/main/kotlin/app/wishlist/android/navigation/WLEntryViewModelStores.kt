@@ -45,10 +45,13 @@ internal class WLEntryViewModelStores : ViewModel() {
         (stores.keys - liveIds).forEach(::clear)
     }
 
-    /** 전환이 끝났을 때만 빠진 칸의 store를 지운다. 전환 중이면 떠나는 화면이 아직 그려지므로 다음 기회로 미룬다. */
-    fun clearRemoved(navigator: WLNavigator) {
-        if (navigator.isTransitioning) return
-        navigator.drainRemoved().forEach(::clear)
+    /**
+     * 전환이 끝났을 때만 빠진 칸의 store를 지운다. 전환 중이면 떠나는 화면이 아직 그려지므로 다음 기회로 미룬다.
+     * 지운 id를 돌려준다(셸이 그 칸의 전환 사진도 놓는다).
+     */
+    fun clearRemoved(navigator: WLNavigator): List<Long> {
+        if (navigator.isTransitioning) return emptyList()
+        return navigator.drainRemoved().onEach(::clear)
     }
 
     override fun onCleared() {

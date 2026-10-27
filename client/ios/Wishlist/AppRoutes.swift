@@ -8,7 +8,8 @@ enum AppDestination: Hashable {
     /// route but a layer over the app root (`ContentView`).
     case login
     /// C4 item detail (server item id): horizontal slide, no tab bar, closed when the account is left.
-    case item(String)
+    /// C5 PR B: opened from a category list card (`viaPhoto`), the card photo grows into the detail photo.
+    case item(String, viaPhoto: Bool = false)
     /// C4 local (not yet sent) link detail (client submission id): same policy as `item`.
     case local(String)
     /// C4 PR B original-link web view (FWebView): same policy as `item`. Only a validated `WebPageURL`.
@@ -29,7 +30,12 @@ enum AppDestination: Hashable {
     }
 
     var route: WLRoute {
-        WLRoute(destination: AnyHashable(self), showsTabBar: showsTabBar, pushStyle: .slide, accountScoped: accountScoped)
+        WLRoute(destination: AnyHashable(self), showsTabBar: showsTabBar, pushStyle: pushStyle, accountScoped: accountScoped)
+    }
+
+    var pushStyle: WLPushStyle {
+        if case .item(_, true) = self { return .photo }
+        return .slide
     }
 
     var showsTabBar: Bool {
