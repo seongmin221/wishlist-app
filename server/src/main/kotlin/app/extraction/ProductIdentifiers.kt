@@ -8,8 +8,8 @@ object ProductIdentifiers {
     private val MPN_SEPARATORS = Regex("""[\s\-_./]""")
     private val NON_ALPHANUMERIC = Regex("""[^\p{L}\p{N}]""")
 
-    /** One GTIN-14 for every valid value given, or null when none is valid or valid values disagree. */
-    fun gtin(raw: List<String>): String? = raw.mapNotNull(::normalizeGtin).distinct().singleOrNull()
+    /** One GTIN-14 when every value given is valid and they agree; any invalid value, none, or disagreement means null. */
+    fun gtin(raw: List<String>): String? = raw.map { normalizeGtin(it) ?: return null }.distinct().singleOrNull()
 
     /** `brand|mpn` for a usable brand and model number; either missing means no key. */
     fun mpnKey(brand: String?, mpn: String?): String? {

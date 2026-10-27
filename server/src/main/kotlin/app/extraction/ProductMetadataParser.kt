@@ -38,11 +38,12 @@ object ProductMetadataParser {
             else validPrice(meta(document, "product:price:amount"), meta(document, "product:price:currency"))
         val brand = if (ambiguous) null else label(brandName(product?.get("brand")) ?: meta(document, "product:brand"))
         val seller = offers.firstNotNullOfOrNull { offer -> brandName(offer["seller"]) }
-        // Variant pages repeat one name per option: an identifier stands for the page only when every node agrees.
-        val gtin = if (ambiguous) null else ProductIdentifiers.gtin(products.flatMap { node -> GTIN_KEYS.flatMap { amounts(node[it]) } })
-        val mpnKey = if (ambiguous) null else products.mapNotNull { node ->
+        // Variant pages repeat one name per option: an identifier stands for the page only when every node,
+        // unnamed ones included, has a valid one and they agree. A node without one may be a different option.
+        val gtin = if (ambiguous) null else agreed(products) { node -> ProductIdentifiers.gtin(GTIN_KEYS.flatMap { amounts(node[it]) }) }
+        val mpnKey = if (ambiguous) null else agreed(products) { node ->
             ProductIdentifiers.mpnKey(label(brandName(node["brand"])) ?: brand, text(node["mpn"]))
-        }.distinct().singleOrNull()
+        }
         return ParsedProduct(
             title = title, description = description, imageUrl = image, brand = brand,
             price = price?.first, currency = price?.second,
@@ -52,6 +53,9 @@ object ProductMetadataParser {
             gtin = gtin, mpnKey = mpnKey,
         )
     }
+
+    private fun agreed(nodes: List<JsonObject>, read: (JsonObject) -> String?): String? =
+        nodes.map { read(it) ?: return null }.distinct().singleOrNull()
 
     private fun collectProducts(element: JsonElement): List<JsonObject> = when (element) {
         is JsonArray -> element.flatMap(::collectProducts)

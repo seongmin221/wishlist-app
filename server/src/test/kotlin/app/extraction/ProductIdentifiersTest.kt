@@ -21,6 +21,7 @@ class ProductIdentifiersTest {
         assertNull(ProductIdentifiers.gtin(emptyList()))
         assertNull(ProductIdentifiers.gtin(listOf("4006381333931", "96385074")))
         assertEquals("04006381333931", ProductIdentifiers.gtin(listOf("4006381333931", "04006381333931")))
+        assertNull(ProductIdentifiers.gtin(listOf("4006381333931", "4006381333932")), "one invalid value voids the rest")
     }
 
     @Test fun `brand and model number form one normalized key`() {

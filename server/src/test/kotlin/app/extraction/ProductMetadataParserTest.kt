@@ -131,4 +131,19 @@ class ProductMetadataParserTest {
         assertEquals("04006381333931", agreeing.gtin)
         assertEquals("hoka|1123190", agreeing.mpnKey)
     }
+
+    @Test fun `a variant without valid identifiers keeps the page from taking another variant's code`() {
+        val missing = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA"}]"""))
+        assertNull(missing.gtin, "an option with no code may be a different product")
+        assertNull(missing.mpnKey)
+        val invalid = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333932","mpn":"X"}]"""))
+        assertNull(invalid.gtin, "a bad check digit is not agreement")
+        assertNull(invalid.mpnKey, "a too-short model number is not agreement")
+        val nameless = parse(jsonLd("""[{"@type":"Product","name":"Speedgoat 6","brand":"HOKA","gtin13":"4006381333931","mpn":"1123190-9"},
+            {"@type":"Product"}]"""))
+        assertNull(nameless.gtin, "an unnamed node is still a product node of this page")
+        assertNull(nameless.mpnKey)
+    }
 }
